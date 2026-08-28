@@ -1,0 +1,35 @@
+{
+  "name": "@liftleadership/lifty-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "REST control plane for LIFTY workspace provisioning",
+  "type": "module",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.1",
+    "@hono/zod-openapi": "1.6.1",
+    "@supabase/server": "1.4.1",
+    "@supabase/supabase-js": "2.112.4",
+    "hono": "4.13.5",
+    "zod": "4.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.13.14",
+    "jose": "6.2.10",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  },
+  "license": "UNLICENSED"
+}
