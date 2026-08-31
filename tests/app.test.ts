@@ -3,6 +3,18 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { PublicError } from "../src/errors.js";
 
+const SECRET_FIELD_NAME = /token$|api_?key|secret|credential/i;
+
+function collectSecretBearingFieldNames(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(collectSecretBearingFieldNames);
+  if (!value || typeof value !== "object") return [];
+
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => [
+    ...(SECRET_FIELD_NAME.test(key) ? [key] : []),
+    ...collectSecretBearingFieldNames(child),
+  ]);
+}
+
 describe("LIFTY API", () => {
   it("publishes the versioned REST contract as generated OpenAPI", async () => {
     const app = createApp();
@@ -23,6 +35,16 @@ describe("LIFTY API", () => {
       "provisionWorkspace",
     );
     expect(document.components?.securitySchemes).toHaveProperty("bearerAuth");
+  });
+
+  it("keeps secret-bearing fields out of every public OpenAPI contract", async () => {
+    const document = await (await createApp().request("/openapi.json")).json();
+
+    expect(collectSecretBearingFieldNames(document)).toEqual([]);
+    expect(collectSecretBearingFieldNames({
+      access_token: { type: "string" },
+      providerToken: { type: "string" },
+    })).toEqual(["access_token", "providerToken"]);
   });
 
   it("serves an unauthenticated health check with a correlation id", async () => {
@@ -125,6 +147,36 @@ describe("LIFTY API", () => {
     });
   });
 
+  it("rejects a secret-bearing workspace result before serializing or logging it", async () => {
+    const providerToken = "synthetic-provider-token-never-surface";
+    const logEvents: unknown[] = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      getWorkspace: async () => ({
+        state: "ready_for_connections",
+        workspace: {
+          workspace_ref: "ws_opaque",
+          name: "Example",
+          access_token: providerToken,
+        },
+        next_action: null,
+      } as never),
+      log: (event) => logEvents.push(event),
+    });
+
+    const response = await app.request("/v1/workspace", {
+      headers: { authorization: "Bearer valid-token" },
+    });
+    const responseText = await response.text();
+
+    expect(response.status).toBe(500);
+    expect(responseText).not.toContain(providerToken);
+    expect(JSON.stringify(logEvents)).not.toContain(providerToken);
+  });
+
   it("provisions a workspace from the authenticated founder's draft", async () => {
     const draft = { schema_version: "1.0", status: "ready_for_auth" };
     const app = createApp({
@@ -160,6 +212,38 @@ describe("LIFTY API", () => {
       workspace: { workspace_ref: "ws_opaque", name: "Example" },
       draft_digest: `sha256:${"a".repeat(64)}`,
     });
+  });
+
+  it("rejects a secret-bearing provisioning result before serializing or logging it", async () => {
+    const providerToken = "synthetic-provider-token-never-surface";
+    const logEvents: unknown[] = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      provisionWorkspace: async () => ({
+        state: "ready_for_connections",
+        workspace: { workspace_ref: "ws_opaque", name: "Example" },
+        draft_digest: `sha256:${"a".repeat(64)}`,
+        api_key: providerToken,
+      } as never),
+      log: (event) => logEvents.push(event),
+    });
+
+    const response = await app.request("/v1/workspaces", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ draft: { schema_version: "1.0" } }),
+    });
+    const responseText = await response.text();
+
+    expect(response.status).toBe(500);
+    expect(responseText).not.toContain(providerToken);
+    expect(JSON.stringify(logEvents)).not.toContain(providerToken);
   });
 
   it("rejects a malformed provisioning envelope without echoing its content", async () => {
