@@ -63,6 +63,21 @@ Logs contain request ID, method, path, status, and public error code. They must
 not contain bearer tokens, request bodies, onboarding drafts, or database error
 details.
 
+## Vercel staging
+
+Vercel staging uses the default-exported Hono app in `src/index.ts` on the Node
+runtime. Production remains portable through the Dockerfile; this staging path
+does not use the Edge runtime.
+
+1. Link the checkout to the dedicated `lifty-api-staging` Vercel project.
+2. Configure `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and
+   `SUPABASE_JWKS_URL` for the Preview environment only. Do not configure any
+   secret or service-role key.
+3. Run `vercel deploy` and retain the immutable preview URL as the canary
+   endpoint.
+4. Run the health, readiness, OpenAPI, and unauthenticated fail-closed probes
+   above against that URL before configuring `LIFTY_API_URL` for a CLI canary.
+
 ## Rollback
 
 The service introduces no database migration. Roll back the CLI release to the
