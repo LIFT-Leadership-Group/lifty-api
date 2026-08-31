@@ -11,6 +11,7 @@ import {
 import { PublicError } from "./errors.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
+const RequestIdSchema = z.uuid();
 
 export interface AuthSession {
   userId: string;
@@ -62,6 +63,41 @@ const JsonResponse = (schema: z.ZodType) => ({
   content: { "application/json": { schema } },
   description: "JSON response",
 });
+
+async function readRequestTextWithinLimit(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; text: string } | { ok: false }> {
+  if (!request.body) return { ok: true, text: "" };
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  const parts: string[] = [];
+  let bytesRead = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        parts.push(decoder.decode());
+        return { ok: true, text: parts.join("") };
+      }
+
+      bytesRead += value.byteLength;
+      if (bytesRead > maxBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The response remains 413 even when the upstream stream cannot cancel.
+        }
+        return { ok: false };
+      }
+      parts.push(decoder.decode(value, { stream: true }));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
@@ -134,7 +170,12 @@ export function createApp(
   registerOpenApi(app);
 
   app.use("*", async (context, next) => {
-    const requestId = context.req.header("x-request-id") ?? crypto.randomUUID();
+    const suppliedRequestId = RequestIdSchema.safeParse(
+      context.req.header("x-request-id"),
+    );
+    const requestId = suppliedRequestId.success
+      ? suppliedRequestId.data
+      : crypto.randomUUID();
     context.set("requestId", requestId);
     context.header("x-request-id", requestId);
     await next();
@@ -213,8 +254,11 @@ export function createApp(
         413,
       );
     }
-    const requestText = await context.req.text();
-    if (new TextEncoder().encode(requestText).byteLength > MAX_REQUEST_BYTES) {
+    const requestBody = await readRequestTextWithinLimit(
+      context.req.raw,
+      MAX_REQUEST_BYTES,
+    );
+    if (!requestBody.ok) {
       return context.json(
         {
           error: {
@@ -226,6 +270,7 @@ export function createApp(
         413,
       );
     }
+    const requestText = requestBody.text;
 
     let parsedJson: unknown;
     try {

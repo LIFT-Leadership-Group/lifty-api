@@ -63,13 +63,55 @@ Logs contain request ID, method, path, status, and public error code. They must
 not contain bearer tokens, request bodies, onboarding drafts, or database error
 details.
 
-## Vercel staging
+## DigitalOcean staging (primary)
 
-Vercel staging adapts the configured Hono app through `api/index.ts` on the Node
-runtime and rewrites all paths to that single function. Production remains
-portable through the Dockerfile; this staging path does not use the Edge
-runtime. The static output is intentionally limited to `public/robots.txt` so
-compiled service files are not web-accessible.
+The primary hosted runtime is the `lifty-api-staging` App Platform app. The
+repository exposes the normal operational workflow through npm so agents do
+not need a memorized app ID or dashboard-only steps:
+
+```sh
+npm run do:doctor
+npm run do:status
+npm run do:logs -- --tail 200
+npm run do:logs -- --follow
+npm run do:smoke
+```
+
+`do:logs` defaults to the last 100 runtime lines. It accepts the native
+`doctl apps logs` flags, including `--type build`, `--deployment <id>`, and
+`--follow`.
+
+After a reviewed commit is available on the source branch configured in App
+Platform, deploy and wait for verification with:
+
+```sh
+npm run do:deploy
+```
+
+The deploy command resolves the app by name, exports its current remote spec
+to a private temporary file, asks App Platform to update its sources, waits for
+the deployment, reports the exact active commit, and runs health, readiness,
+OpenAPI, and unauthenticated fail-closed checks. It preserves remote secret
+bindings and never prints environment values. It does not upload local files:
+the intended commit must already exist on the configured remote branch.
+
+Agents need `doctl`, `jq`, and `curl`, plus an authenticated DigitalOcean
+context. Run `npm run do:doctor` first on a new machine. The optional
+`LIFTY_DO_APP_NAME` and `LIFTY_DO_APP_ID` variables support a separate app
+without changing repository files.
+
+Do not run authenticated provisioning canaries unless the app is connected to
+a non-production Supabase project. Public smoke checks remain safe because
+they perform no persistent writes.
+
+## Vercel adapter (portable fallback)
+
+The repository retains the Vercel adapter added during rollout exploration.
+It adapts the configured Hono app through `api/index.ts` on the Node runtime
+and rewrites all paths to that single function. DigitalOcean remains the
+primary runtime and executes the Dockerfile; the adapter is a fallback, not a
+second source of truth. The static output is intentionally limited to
+`public/robots.txt` so compiled service files are not web-accessible.
 
 Stable staging endpoint: `https://lifty-api-staging.vercel.app`
 

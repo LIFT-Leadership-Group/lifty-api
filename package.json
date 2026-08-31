@@ -10,6 +10,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/server.ts",
+    "do:deploy": "bash scripts/digitalocean.sh deploy",
+    "do:doctor": "bash scripts/digitalocean.sh doctor",
+    "do:logs": "bash scripts/digitalocean.sh logs",
+    "do:smoke": "bash scripts/digitalocean.sh smoke",
+    "do:status": "bash scripts/digitalocean.sh status",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",

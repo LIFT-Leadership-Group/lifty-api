@@ -29,12 +29,46 @@ describe("LIFTY API", () => {
     const app = createApp();
 
     const response = await app.request("/healthz", {
-      headers: { "x-request-id": "req-health-123" },
+      headers: { "x-request-id": "11111111-1111-4111-8111-111111111111" },
     });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-request-id")).toBe("req-health-123");
+    expect(response.headers.get("x-request-id")).toBe(
+      "11111111-1111-4111-8111-111111111111",
+    );
     expect(await response.json()).toEqual({ status: "ok" });
+  });
+
+  it("replaces an untrusted request id before reflecting or logging it", async () => {
+    const privateMarker = "founder-private-content";
+    const logEvents: unknown[] = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      getWorkspace: async () => {
+        throw new Error("failed safely");
+      },
+      log: (event) => logEvents.push(event),
+    });
+
+    const response = await app.request("/v1/workspace", {
+      headers: {
+        authorization: "Bearer valid-token",
+        "x-request-id": privateMarker,
+      },
+    });
+    const responseText = await response.text();
+    const responseId = response.headers.get("x-request-id");
+
+    expect(response.status).toBe(500);
+    expect(responseId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(responseText).not.toContain(privateMarker);
+    expect(JSON.stringify(logEvents)).not.toContain(privateMarker);
+    expect(logEvents).toMatchObject([{ request_id: responseId }]);
   });
 
   it("serves readiness only after the configured app exists", async () => {
@@ -50,7 +84,7 @@ describe("LIFTY API", () => {
     });
 
     const response = await app.request("/v1/workspace", {
-      headers: { "x-request-id": "req-auth-123" },
+      headers: { "x-request-id": "22222222-2222-4222-8222-222222222222" },
     });
 
     expect(response.status).toBe(401);
@@ -59,7 +93,7 @@ describe("LIFTY API", () => {
         code: "UNAUTHORIZED",
         message: "A valid LIFTY session is required.",
       },
-      request_id: "req-auth-123",
+      request_id: "22222222-2222-4222-8222-222222222222",
     });
   });
 
@@ -142,7 +176,7 @@ describe("LIFTY API", () => {
       headers: {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
-        "x-request-id": "req-invalid-123",
+        "x-request-id": "33333333-3333-4333-8333-333333333333",
       },
       body: JSON.stringify({ draft: [secretMarker] }),
     });
@@ -155,7 +189,7 @@ describe("LIFTY API", () => {
         code: "INVALID_REQUEST",
         message: "The provisioning request must contain one JSON object named draft.",
       },
-      request_id: "req-invalid-123",
+      request_id: "33333333-3333-4333-8333-333333333333",
     });
   });
 
@@ -172,7 +206,7 @@ describe("LIFTY API", () => {
       headers: {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
-        "x-request-id": "req-large-123",
+        "x-request-id": "44444444-4444-4444-8444-444444444444",
       },
       body: JSON.stringify({ draft: { value: "x".repeat(133 * 1024) } }),
     });
@@ -183,7 +217,7 @@ describe("LIFTY API", () => {
         code: "PAYLOAD_TOO_LARGE",
         message: "The provisioning request exceeds 132 KiB.",
       },
-      request_id: "req-large-123",
+      request_id: "44444444-4444-4444-8444-444444444444",
     });
   });
 
@@ -214,6 +248,52 @@ describe("LIFTY API", () => {
     expect(provisioned).toBe(false);
   });
 
+  it("stops consuming a streamed body as soon as it exceeds the limit", async () => {
+    let pulls = 0;
+    let cancelled = false;
+    let provisioned = false;
+    const chunk = new Uint8Array(64 * 1024).fill(120);
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulls === 8) {
+          controller.close();
+          return;
+        }
+        pulls += 1;
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      provisionWorkspace: async () => {
+        provisioned = true;
+        throw new Error("must not provision");
+      },
+    });
+    const request = new Request("http://localhost/v1/workspaces", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": "application/json",
+      },
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+
+    const response = await app.fetch(request);
+
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(pulls).toBeLessThan(8);
+    expect(provisioned).toBe(false);
+  });
+
   it("translates a known provisioning conflict without leaking private details", async () => {
     const privateMarker = "private-database-detail";
     const logEvents: unknown[] = [];
@@ -238,7 +318,7 @@ describe("LIFTY API", () => {
       headers: {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
-        "x-request-id": "req-conflict-123",
+        "x-request-id": "55555555-5555-4555-8555-555555555555",
       },
       body: JSON.stringify({ draft: { schema_version: "1.0" } }),
     });
@@ -251,7 +331,7 @@ describe("LIFTY API", () => {
         code: "WORKSPACE_ALREADY_EXISTS",
         message: "This LIFTY account already has a workspace.",
       },
-      request_id: "req-conflict-123",
+      request_id: "55555555-5555-4555-8555-555555555555",
     });
     expect(responseText).not.toContain(privateMarker);
     expect(logText).not.toContain(privateMarker);
@@ -259,7 +339,7 @@ describe("LIFTY API", () => {
       {
         level: "warn",
         event: "request_failed",
-        request_id: "req-conflict-123",
+        request_id: "55555555-5555-4555-8555-555555555555",
         method: "POST",
         path: "/v1/workspaces",
         error_code: "WORKSPACE_ALREADY_EXISTS",
