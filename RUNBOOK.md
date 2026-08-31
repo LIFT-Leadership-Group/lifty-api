@@ -63,36 +63,21 @@ Logs contain request ID, method, path, status, and public error code. They must
 not contain bearer tokens, request bodies, onboarding drafts, or database error
 details.
 
-## Environments and migration flow (LIF-625)
+## Environments and database (decision 2026-08-31, LIF-617)
 
-LIFTY runs on its own dedicated Supabase projects, never on the internal GTM
-Engine catalog:
+LIFTY runs on the GTM engine Supabase project (`ycwarkyijoeunmgjbikm`,
+`https://ycwarkyijoeunmgjbikm.supabase.co`). The dedicated LIFTY Supabase
+boundary built under LIF-625 was rejected and deleted the same day; do not
+recreate it. Tenant isolation for founder JWTs is enforced inside the shared
+catalog (RLS by workspace, locked-down grants, backend-only secrets) under the
+LIF-617 track.
 
-| Environment | Supabase project | Runtime |
-| --- | --- | --- |
-| Staging | `siafcvcdhenahviuoxer` (`https://siafcvcdhenahviuoxer.supabase.co`) | `lifty-api-staging` on App Platform |
-| Production | not created yet | not created yet |
-
-This repository owns the LIFTY schema: `supabase/migrations/` is the canonical
-migration root for both environments. There is no staging branch. All work
-merges to `main`; the environments differ only in configuration:
-
-1. A migration merges to `main` as a file in `supabase/migrations/`.
-2. The `supabase-staging` workflow applies it to LIFTY Staging automatically
-   (`supabase db push` against the `SUPABASE_STAGING_DB_URL` secret).
-3. Verify on staging.
-4. Promote by dispatching the `supabase-prod` workflow (type `promote`), which
-   applies the same files to production. Until LIFTY Production exists and the
-   `SUPABASE_PROD_DB_URL` secret is set, that workflow fails fast on purpose.
-
-Never apply this migration root to the GTM Engine project, and never apply the
-GTM catalog here. If a migration is ever applied out-of-band (MCP, psql), the
-ledger row in `supabase_migrations.schema_migrations` must be restamped to the
-file's `YYYYMMDDHHMMSS` version or the next `db push` will refuse to run.
-
-Database passwords are held only as the `SUPABASE_*_DB_URL` GitHub secrets
-(session-pooler URIs). Losing one is not an incident: reset the database
-password in the Supabase dashboard and update the secret.
+This repository carries no migration root. The LIFTY schema (workspaces,
+memberships, onboarding submissions, provisioning RPCs from LIF-607) lives in
+the GTM engine migration ledger and changes through the same flow as every
+other GTM engine migration. The only Supabase configuration this repo owns is
+the runtime environment of the App Platform app (`SUPABASE_URL`,
+`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_JWKS_URL`).
 
 ## DigitalOcean staging (primary)
 
