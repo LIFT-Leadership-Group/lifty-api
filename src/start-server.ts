@@ -20,7 +20,7 @@ export function startService<Server>(
   config: ServiceConfig,
   serveImplementation?: ServeImplementation<Server>,
 ): Server {
-  const app = createProductionApp(config.supabase);
+  const app = createProductionApp(config);
   const start = (serveImplementation ?? serve) as ServeImplementation<Server>;
   return start({
     fetch: app.fetch,

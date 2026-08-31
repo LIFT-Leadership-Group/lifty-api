@@ -20,6 +20,13 @@ describe("HTTP server bootstrap", () => {
           publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
           jwks: { keys: [{ kty: "EC", crv: "P-256", x: "x", y: "y" }] },
         },
+        hubspot: {
+          clientId: "client-123",
+          clientSecret: "client-secret",
+          publicBaseUrl: "https://api.lifty.test",
+          supabaseUrl: "https://project.supabase.test",
+          publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
+        },
       },
       serve,
     );

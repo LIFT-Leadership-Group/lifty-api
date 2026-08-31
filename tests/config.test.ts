@@ -7,6 +7,9 @@ const validEnvironment = {
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_example",
   SUPABASE_JWKS_URL:
     "https://project.supabase.co/auth/v1/.well-known/jwks.json",
+  HUBSPOT_CLIENT_ID: "client-123",
+  HUBSPOT_CLIENT_SECRET: "client-secret",
+  PUBLIC_BASE_URL: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
 };
 
 describe("service configuration", () => {
@@ -24,6 +27,13 @@ describe("service configuration", () => {
     expect(config.supabase.jwks).toEqual(
       new URL(validEnvironment.SUPABASE_JWKS_URL),
     );
+    expect(config.hubspot).toEqual({
+      clientId: "client-123",
+      clientSecret: "client-secret",
+      publicBaseUrl: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
+      supabaseUrl: "https://project.supabase.co",
+      publishableKey: "sb_publishable_example",
+    });
   });
 
   it.each([
@@ -61,6 +71,13 @@ describe("service configuration", () => {
       /SUPABASE_JWKS_URL/,
     ],
     [{ ...validEnvironment, PORT: "70000" }, /PORT/],
+    [{ ...validEnvironment, HUBSPOT_CLIENT_ID: undefined }, /HUBSPOT_CLIENT_ID/],
+    [{ ...validEnvironment, HUBSPOT_CLIENT_SECRET: undefined }, /HUBSPOT_CLIENT_SECRET/],
+    [{ ...validEnvironment, PUBLIC_BASE_URL: undefined }, /PUBLIC_BASE_URL/],
+    [
+      { ...validEnvironment, PUBLIC_BASE_URL: "http://api.example.test" },
+      /PUBLIC_BASE_URL/,
+    ],
   ])("fails closed for an invalid environment", (environment, message) => {
     expect(() => loadConfig(environment)).toThrow(message);
   });

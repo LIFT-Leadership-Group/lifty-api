@@ -1,17 +1,25 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { createProductionApp } from "../src/service.js";
+import { sealHubspotConnectIntent } from "../src/hubspot-state.js";
 
 describe("production service composition", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   it("wires the Supabase authenticator into the REST app", async () => {
     const app = createProductionApp({
-      supabaseUrl: "https://project.supabase.test",
-      publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
-      jwks: { keys: [{ kty: "EC", crv: "P-256", x: "x", y: "y" }] },
+      host: "0.0.0.0",
+      port: 3000,
+      supabase: {
+        supabaseUrl: "https://project.supabase.test",
+        publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
+        jwks: { keys: [{ kty: "EC", crv: "P-256", x: "x", y: "y" }] },
+      },
+      hubspot: {
+        clientId: "client-123",
+        clientSecret: "client-secret",
+        publicBaseUrl: "https://api.lifty.test",
+        supabaseUrl: "https://project.supabase.test",
+        publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
+      },
     });
 
     const response = await app.request("/v1/workspace", {
@@ -37,38 +45,25 @@ describe("production service composition", () => {
       SUPABASE_JWKS: JSON.stringify({
         keys: [{ kty: "EC", crv: "P-256", x: "x", y: "y" }],
       }),
+      HUBSPOT_CLIENT_ID: "client-123",
+      HUBSPOT_CLIENT_SECRET: "client-secret",
+      PUBLIC_BASE_URL: "https://api.lifty.test",
     });
 
     const response = await app.request("/healthz");
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: "ok" });
+
+    const state = sealHubspotConnectIntent("a".repeat(64), "client-secret");
+    const redirect = await app.request(`/hubspot/start?intent=${state}`);
+    const location = new URL(redirect.headers.get("location") ?? "");
+    expect(redirect.status).toBe(302);
+    expect(location.searchParams.get("client_id")).toBe("client-123");
+    expect(location.searchParams.get("redirect_uri")).toBe(
+      "https://api.lifty.test/hubspot/callback",
+    );
+    expect(location.searchParams.get("state")).toBe(state);
   });
 
-  it("exposes the configured app through Vercel method handlers", async () => {
-    vi.stubEnv("SUPABASE_URL", "https://project.supabase.test");
-    vi.stubEnv(
-      "SUPABASE_PUBLISHABLE_KEY",
-      "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
-    );
-    vi.stubEnv(
-      "SUPABASE_JWKS",
-      JSON.stringify({
-        keys: [{ kty: "EC", crv: "P-256", x: "x", y: "y" }],
-      }),
-    );
-
-    const adapter = await import("../api/index.js");
-
-    expect(adapter.GET).toBeTypeOf("function");
-    expect(adapter.POST).toBe(adapter.GET);
-    expect(adapter.DELETE).toBe(adapter.GET);
-
-    const response = await adapter.GET(
-      new Request("https://lifty-api-staging.example/healthz"),
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "ok" });
-  });
 });

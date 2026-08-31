@@ -1,6 +1,7 @@
 import type { SupabaseEnv } from "@supabase/server";
 
 import type { SupabaseAuthenticationConfig } from "./supabase-auth.js";
+import type { HubspotConnectSettings } from "./hubspot-connect.js";
 
 type Environment = Record<string, string | undefined>;
 
@@ -8,6 +9,7 @@ export interface ServiceConfig {
   host: string;
   port: number;
   supabase: SupabaseAuthenticationConfig;
+  hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
 }
 
 const FORBIDDEN_SECRET_NAMES = [
@@ -88,14 +90,26 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     required(environment, "SUPABASE_URL"),
     "SUPABASE_URL",
   );
+  const publishableKey = required(environment, "SUPABASE_PUBLISHABLE_KEY");
+  const publicBaseUrl = secureUrl(
+    required(environment, "PUBLIC_BASE_URL"),
+    "PUBLIC_BASE_URL",
+  );
 
   return {
     host: environment.HOST?.trim() || "0.0.0.0",
     port: parsePort(environment.PORT),
     supabase: {
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
-      publishableKey: required(environment, "SUPABASE_PUBLISHABLE_KEY"),
+      publishableKey,
       jwks: parseJwks(environment),
+    },
+    hubspot: {
+      clientId: required(environment, "HUBSPOT_CLIENT_ID"),
+      clientSecret: required(environment, "HUBSPOT_CLIENT_SECRET"),
+      publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
+      supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
+      publishableKey,
     },
   };
 }
