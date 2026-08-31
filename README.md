@@ -8,9 +8,9 @@ The process deliberately has no Supabase secret key or service-role client. It
 refuses to start if a known secret-key environment variable is populated.
 
 `src/server.ts` is the long-running Node/container entrypoint. `src/index.ts`
-exports the same configured Hono app for Node-based staging platforms such as
-Vercel Functions; it is not an Edge runtime and does not change the API or
-Supabase trust boundary.
+constructs the same configured Hono app, and `api/index.ts` adapts it to Vercel
+Functions for Node-based staging; it is not an Edge runtime and does not change
+the API or Supabase trust boundary.
 
 ## API
 

@@ -65,18 +65,28 @@ details.
 
 ## Vercel staging
 
-Vercel staging uses the default-exported Hono app in `src/index.ts` on the Node
-runtime. Production remains portable through the Dockerfile; this staging path
-does not use the Edge runtime.
+Vercel staging adapts the configured Hono app through `api/index.ts` on the Node
+runtime and rewrites all paths to that single function. Production remains
+portable through the Dockerfile; this staging path does not use the Edge
+runtime. The static output is intentionally limited to `public/robots.txt` so
+compiled service files are not web-accessible.
+
+Stable staging endpoint: `https://lifty-api-staging.vercel.app`
 
 1. Link the checkout to the dedicated `lifty-api-staging` Vercel project.
 2. Configure `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and
-   `SUPABASE_JWKS_URL` for the Preview environment only. Do not configure any
-   secret or service-role key.
-3. Run `vercel deploy` and retain the immutable preview URL as the canary
-   endpoint.
+   `SUPABASE_JWKS_URL` for Preview and Production. Do not configure any secret
+   or service-role key.
+3. Run `vercel deploy` for a protected preview canary, then `vercel deploy
+   --prod` to update the stable public staging alias.
 4. Run the health, readiness, OpenAPI, and unauthenticated fail-closed probes
-   above against that URL before configuring `LIFTY_API_URL` for a CLI canary.
+   above against the stable endpoint before configuring `LIFTY_API_URL` for a
+   CLI canary. Also verify a compiled path such as `/app.js` returns `404`.
+
+The 2026-08-31 staging cut verified `GET /healthz` and `GET /readyz` at `200`,
+OpenAPI `3.1.0`, absent and malformed bearer tokens at `401`, and `/app.js` at
+`404`. Runtime logs contained only method, path, status, and platform metadata;
+no bearer token or request body was emitted.
 
 ## Rollback
 
