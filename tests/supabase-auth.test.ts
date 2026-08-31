@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createSupabaseAuthenticator,
+  createSupabaseReadinessCheck,
   createTimeoutFetch,
 } from "../src/supabase-auth.js";
 
@@ -131,5 +132,64 @@ describe("Supabase authentication boundary", () => {
         reason: "invalid_session",
       });
     }
+  });
+});
+
+describe("Supabase readiness check", () => {
+  const config = {
+    supabaseUrl: "https://project.supabase.test",
+    publishableKey: "sb_publishable_test",
+    jwks: { keys: [] },
+  };
+
+  it("probes the auth health endpoint with the publishable key", async () => {
+    const calls: Array<{ url: string; apikey: string | undefined }> = [];
+    const okFetch: typeof fetch = async (input, init) => {
+      const headers = new Headers(init?.headers);
+      calls.push({ url: String(input), apikey: headers.get("apikey") ?? undefined });
+      return new Response("{}", { status: 200 });
+    };
+
+    const check = createSupabaseReadinessCheck(config, { fetch: okFetch });
+
+    await expect(check()).resolves.toBe(true);
+    expect(calls).toEqual([{
+      url: "https://project.supabase.test/auth/v1/health",
+      apikey: "sb_publishable_test",
+    }]);
+  });
+
+  it("reports unready on a non-2xx upstream response", async () => {
+    const failingFetch: typeof fetch = async () =>
+      new Response("{}", { status: 503 });
+
+    const check = createSupabaseReadinessCheck(config, { fetch: failingFetch });
+
+    await expect(check()).resolves.toBe(false);
+  });
+
+  it("reports unready when the probe cannot reach Supabase", async () => {
+    const unreachableFetch: typeof fetch = async () => {
+      throw new TypeError("fetch failed");
+    };
+
+    const check = createSupabaseReadinessCheck(config, { fetch: unreachableFetch });
+
+    await expect(check()).resolves.toBe(false);
+  });
+
+  it("reports unready when the probe exceeds its deadline", async () => {
+    const hangingFetch: typeof fetch = async (_input, init) =>
+      await new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("aborted", "AbortError")));
+      });
+
+    const check = createSupabaseReadinessCheck(config, {
+      fetch: hangingFetch,
+      timeoutMs: 20,
+    });
+
+    await expect(check()).resolves.toBe(false);
   });
 });

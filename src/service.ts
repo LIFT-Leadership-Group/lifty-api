@@ -2,6 +2,7 @@ import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import {
   createSupabaseAuthenticator,
+  createSupabaseReadinessCheck,
   type SupabaseAuthenticationConfig,
 } from "./supabase-auth.js";
 import {
@@ -14,6 +15,7 @@ export function createProductionApp(config: SupabaseAuthenticationConfig) {
     authenticate: createSupabaseAuthenticator(config),
     getWorkspace: getWorkspaceStatus,
     provisionWorkspace,
+    checkReadiness: createSupabaseReadinessCheck(config),
   });
 }
 

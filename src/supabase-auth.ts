@@ -29,6 +29,29 @@ export interface SupabaseAuthenticatorOptions {
   timeoutMs?: number;
 }
 
+export function createSupabaseReadinessCheck(
+  config: SupabaseAuthenticationConfig,
+  options: SupabaseAuthenticatorOptions = {},
+): () => Promise<boolean> {
+  const timeoutFetch = createTimeoutFetch(
+    options.fetch ?? globalThis.fetch.bind(globalThis),
+    // Stay under the App Platform probe timeout (2s) so an unreachable
+    // Supabase reports unready instead of timing out the probe itself.
+    options.timeoutMs ?? 1_500,
+  );
+  const healthUrl = new URL("/auth/v1/health", config.supabaseUrl).toString();
+  return async () => {
+    try {
+      const response = await timeoutFetch(healthUrl, {
+        headers: { apikey: config.publishableKey },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+}
+
 export function createSupabaseAuthenticator(
   config: SupabaseAuthenticationConfig,
   options: SupabaseAuthenticatorOptions = {},
