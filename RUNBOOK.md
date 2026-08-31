@@ -95,9 +95,9 @@ exact active commit, and runs health, readiness, OpenAPI, and unauthenticated
 fail-closed checks. It never prints environment values or uploads local files.
 
 Agents need `doctl`, `jq`, and `curl`, plus an authenticated DigitalOcean
-context. Run `npm run do:doctor` first on a new machine. The optional
-`LIFTY_DO_APP_ID` variable is an additional assertion; it cannot redirect the
-script to another app.
+context; deploys additionally need `git`. Run `npm run do:doctor` first on a
+new machine. The optional `LIFTY_DO_APP_ID` variable is an additional
+assertion; it cannot redirect the script to another app.
 
 Do not run authenticated provisioning canaries unless the app is connected to
 a non-production Supabase project. Public smoke checks remain safe because

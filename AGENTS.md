@@ -26,7 +26,8 @@ flags through the repository script.
 
 Never print the live app spec or environment values into logs. A machine or
 agent needs `doctl`, `jq`, `curl`, and an authenticated DigitalOcean context;
-`npm run do:doctor` verifies these prerequisites without exposing the token.
+deploys additionally need `git`. `npm run do:doctor` verifies the runtime
+prerequisites without exposing the token.
 
 Do not run authenticated provisioning canaries until `do:status` and the
 Linear issue confirm that the app targets a non-production Supabase project.
