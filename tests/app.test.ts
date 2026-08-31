@@ -100,6 +100,28 @@ describe("LIFTY API", () => {
     expect(await response.json()).toEqual({ status: "ready" });
   });
 
+  it("reports 503 when the readiness dependency says the backend is unreachable", async () => {
+    const app = createApp({ checkReadiness: async () => false });
+
+    const response = await app.request("/readyz");
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ status: "unready" });
+  });
+
+  it("reports 503 when the readiness dependency throws", async () => {
+    const app = createApp({
+      checkReadiness: async () => {
+        throw new Error("supabase unreachable");
+      },
+    });
+
+    const response = await app.request("/readyz");
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ status: "unready" });
+  });
+
   it("rejects an unauthenticated workspace request before business logic", async () => {
     const app = createApp({
       authenticate: async () => ({ ok: false, reason: "invalid_session" }),

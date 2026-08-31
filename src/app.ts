@@ -31,6 +31,7 @@ export interface AppDependencies {
     session: AuthSession,
     draft: Record<string, unknown>,
   ): Promise<ProvisioningResult>;
+  checkReadiness(): Promise<boolean>;
   log(event: LogEvent): void;
 }
 
@@ -115,7 +116,10 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     method: "get",
     path: "/readyz",
     operationId: "getReadiness",
-    responses: { 200: JsonResponse(z.object({ status: z.literal("ready") })) },
+    responses: {
+      200: JsonResponse(z.object({ status: z.literal("ready") })),
+      503: JsonResponse(z.object({ status: z.literal("unready") })),
+    },
   });
   app.openAPIRegistry.registerPath({
     method: "get",
@@ -159,6 +163,7 @@ const defaultDependencies: AppDependencies = {
   provisionWorkspace: async () => {
     throw new Error("provisionWorkspace is not configured");
   },
+  checkReadiness: async () => true,
   log: (event) => process.stderr.write(`${JSON.stringify(event)}\n`),
 };
 
@@ -182,7 +187,17 @@ export function createApp(
   });
 
   app.get("/healthz", (context) => context.json({ status: "ok" }));
-  app.get("/readyz", (context) => context.json({ status: "ready" }));
+  app.get("/readyz", async (context) => {
+    let ready: boolean;
+    try {
+      ready = await dependencies.checkReadiness();
+    } catch {
+      ready = false;
+    }
+    return ready
+      ? context.json({ status: "ready" })
+      : context.json({ status: "unready" }, 503);
+  });
   app.doc("/openapi.json", {
     openapi: "3.1.0",
     info: {
