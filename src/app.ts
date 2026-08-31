@@ -237,7 +237,8 @@ export function createApp(
   });
 
   app.get("/v1/workspace", async (context) => {
-    return context.json(await dependencies.getWorkspace(context.get("authSession")));
+    const result = await dependencies.getWorkspace(context.get("authSession"));
+    return context.json(WorkspaceStatusSchema.parse(result));
   });
 
   app.post("/v1/workspaces", async (context) => {
@@ -292,9 +293,11 @@ export function createApp(
       );
     }
 
-    return context.json(
-      await dependencies.provisionWorkspace(context.get("authSession"), body.data.draft),
+    const result = await dependencies.provisionWorkspace(
+      context.get("authSession"),
+      body.data.draft,
     );
+    return context.json(ProvisioningResultSchema.parse(result));
   });
 
   return app;
