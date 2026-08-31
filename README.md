@@ -47,3 +47,8 @@ docker build -t lifty-api .
 ```
 
 See [RUNBOOK.md](./RUNBOOK.md) for deployment, smoke tests, and rollback.
+
+DigitalOcean App Platform is the primary hosted runtime. Agents can inspect or
+operate it with `npm run do:doctor`, `do:status`, `do:logs`, `do:smoke`, and
+`do:deploy -- <full-sha>`; the runbook documents the guardrails and
+prerequisites.
