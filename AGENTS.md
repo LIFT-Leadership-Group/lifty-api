@@ -8,17 +8,21 @@ into prompts:
 npm run do:doctor
 npm run do:status
 npm run do:logs -- --tail 200
-npm run do:logs -- --follow
 npm run do:smoke
-npm run do:deploy
+npm run do:deploy -- <full-40-character-sha>
 ```
 
-`do:deploy` resolves the app by `lifty-api-staging`, exports its current remote
-spec into a private temporary directory, updates from the configured source
-branch, waits for the deployment, prints the exact deployed commit, and runs
-the public smoke suite. It deploys remote source; it does not upload unpushed
-local changes. Override resolution only with `LIFTY_DO_APP_NAME` or an exact
-`LIFTY_DO_APP_ID`.
+`do:deploy` is pinned to `lifty-api-staging`, its single `api` component, the
+LIFTY API GitHub repository, and `main`. It verifies that the supplied SHA is
+the current remote branch head, starts a dedicated deployment without
+reapplying the app spec, waits, verifies the exact active commit, and runs the
+public smoke suite. It does not upload unpushed local changes. An optional
+`LIFTY_DO_APP_ID` is treated as an assertion and must match the app resolved by
+name.
+
+`do:logs` intentionally accepts only bounded `--tail N` and `--type TYPE`
+options. Agents must not forward global `doctl` credential, config, or trace
+flags through the repository script.
 
 Never print the live app spec or environment values into logs. A machine or
 agent needs `doctl`, `jq`, `curl`, and an authenticated DigitalOcean context;

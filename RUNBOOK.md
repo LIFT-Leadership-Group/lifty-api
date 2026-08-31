@@ -73,32 +73,31 @@ not need a memorized app ID or dashboard-only steps:
 npm run do:doctor
 npm run do:status
 npm run do:logs -- --tail 200
-npm run do:logs -- --follow
 npm run do:smoke
 ```
 
-`do:logs` defaults to the last 100 runtime lines. It accepts the native
-`doctl apps logs` flags, including `--type build`, `--deployment <id>`, and
-`--follow`.
+`do:logs` defaults to the last 100 runtime lines. For a bounded, agent-safe
+query it accepts only `--tail N` and `--type TYPE`; unsupported or global
+`doctl` flags fail closed.
 
 After a reviewed commit is available on the source branch configured in App
 Platform, deploy and wait for verification with:
 
 ```sh
-npm run do:deploy
+npm run do:deploy -- <full-40-character-sha>
 ```
 
-The deploy command resolves the app by name, exports its current remote spec
-to a private temporary file, asks App Platform to update its sources, waits for
-the deployment, reports the exact active commit, and runs health, readiness,
-OpenAPI, and unauthenticated fail-closed checks. It preserves remote secret
-bindings and never prints environment values. It does not upload local files:
-the intended commit must already exist on the configured remote branch.
+The deploy command resolves the app by name and validates its ID, single API
+component, GitHub repository, and `main` branch before mutation. It requires
+the supplied SHA to match the remote branch head, creates a dedicated App
+Platform deployment without reapplying the live app spec, waits, verifies the
+exact active commit, and runs health, readiness, OpenAPI, and unauthenticated
+fail-closed checks. It never prints environment values or uploads local files.
 
 Agents need `doctl`, `jq`, and `curl`, plus an authenticated DigitalOcean
 context. Run `npm run do:doctor` first on a new machine. The optional
-`LIFTY_DO_APP_NAME` and `LIFTY_DO_APP_ID` variables support a separate app
-without changing repository files.
+`LIFTY_DO_APP_ID` variable is an additional assertion; it cannot redirect the
+script to another app.
 
 Do not run authenticated provisioning canaries unless the app is connected to
 a non-production Supabase project. Public smoke checks remain safe because
