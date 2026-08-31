@@ -1,4 +1,5 @@
 import { createApp } from "./app.js";
+import { loadConfig } from "./config.js";
 import {
   createSupabaseAuthenticator,
   type SupabaseAuthenticationConfig,
@@ -14,4 +15,10 @@ export function createProductionApp(config: SupabaseAuthenticationConfig) {
     getWorkspace: getWorkspaceStatus,
     provisionWorkspace,
   });
+}
+
+export function createDeploymentApp(
+  environment: Record<string, string | undefined> = process.env,
+) {
+  return createProductionApp(loadConfig(environment).supabase);
 }
