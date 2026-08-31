@@ -19,6 +19,8 @@ The database remains responsible for actor identity (`auth.uid()`), RLS,
 validation, idempotency, advisory locking, and atomic provisioning. The service
 does not duplicate that business logic.
 
+The request-scoped Supabase client aborts each database request after 10 seconds.
+
 ## Required configuration
 
 | Variable | Purpose |
