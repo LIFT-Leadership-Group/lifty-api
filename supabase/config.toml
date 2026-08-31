@@ -1,4 +1,0 @@
-# Minimal Supabase CLI config for the LIFTY migration root.
-# Environments are selected per-invocation with --db-url (see the GitHub
-# workflows); nothing environment-specific belongs in this file.
-project_id = "lifty-api"
