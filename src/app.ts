@@ -1,14 +1,24 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
+import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
+  HubspotConnectStartSchema,
+  HubspotConnectionStatusSchema,
   ProvisionRequestSchema,
   ProvisioningResultSchema,
+  type HubspotConnectStart,
+  type HubspotConnectionStatus,
   type ProvisioningResult,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
 import { PublicError } from "./errors.js";
+import {
+  HubspotCallbackError,
+  type HubspotCallbackSuccess,
+} from "./hubspot-connect.js";
+import { isSealedHubspotState } from "./hubspot-state.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
 const RequestIdSchema = z.uuid();
@@ -31,6 +41,20 @@ export interface AppDependencies {
     session: AuthSession,
     draft: Record<string, unknown>,
   ): Promise<ProvisioningResult>;
+  startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
+  getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
+  completeHubspotCallback(
+    input: { code: string; state: string },
+  ): Promise<HubspotCallbackSuccess>;
+  buildHubspotAuthorizeUrl(state: string): string | null;
+  renderCliAuthPage(
+    state: string,
+    port: number,
+  ): {
+    html: string;
+    scriptNonce: string;
+    connectOrigin?: string;
+  } | null;
   checkReadiness(): Promise<boolean>;
   log(event: LogEvent): void;
 }
@@ -153,6 +177,48 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       502: JsonResponse(ErrorResponseSchema),
     },
   });
+  app.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/v1/integrations/hubspot/connect",
+    operationId: "startHubspotConnect",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(HubspotConnectStartSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/integrations/hubspot",
+    operationId: "getHubspotConnection",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(HubspotConnectionStatusSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+}
+
+function hubspotPage(title: string, message: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body><main><h1>${title}</h1><p>${message}</p><p>You can close this tab and return to your terminal.</p></main></body></html>`;
+}
+
+function hubspotHtmlResponse(
+  context: Context<AppEnvironment>,
+  status: ContentfulStatusCode,
+  title: string,
+  message: string,
+): Response {
+  return context.html(hubspotPage(title, message), status, {
+    "cache-control": "no-store",
+    "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+  });
 }
 
 const defaultDependencies: AppDependencies = {
@@ -163,6 +229,21 @@ const defaultDependencies: AppDependencies = {
   provisionWorkspace: async () => {
     throw new Error("provisionWorkspace is not configured");
   },
+  startHubspotConnect: async () => {
+    throw new Error("startHubspotConnect is not configured");
+  },
+  getHubspotConnection: async () => {
+    throw new Error("getHubspotConnection is not configured");
+  },
+  completeHubspotCallback: async () => {
+    throw new HubspotCallbackError(
+      "server_misconfigured",
+      503,
+      "The HubSpot connection service is not configured.",
+    );
+  },
+  buildHubspotAuthorizeUrl: () => null,
+  renderCliAuthPage: () => null,
   checkReadiness: async () => true,
   log: (event) => process.stderr.write(`${JSON.stringify(event)}\n`),
 };
@@ -197,6 +278,133 @@ export function createApp(
     return ready
       ? context.json({ status: "ready" })
       : context.json({ status: "unready" }, 503);
+  });
+  app.get("/cli/auth", (context) => {
+    const state = context.req.query("state") ?? "";
+    const portValue = context.req.query("port") ?? "";
+    const port = Number(portValue);
+    if (
+      !/^[A-Za-z0-9_-]{43}$/.test(state)
+      || !/^\d{4,5}$/.test(portValue)
+      || !Number.isInteger(port)
+      || port < 1024
+      || port > 65535
+    ) {
+      return hubspotHtmlResponse(
+        context,
+        400,
+        "Invalid CLI authorization link",
+        "Run lifty login again to get a fresh link.",
+      );
+    }
+    const page = dependencies.renderCliAuthPage(state, port);
+    if (
+      !page
+      || !/^[A-Za-z0-9_-]{16,128}$/.test(page.scriptNonce)
+      || (page.connectOrigin !== undefined
+        && !/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(page.connectOrigin))
+    ) {
+      return hubspotHtmlResponse(
+        context,
+        503,
+        "CLI authorization unavailable",
+        "Try lifty login again in a moment.",
+      );
+    }
+    const connectSources = page.connectOrigin
+      ? `${page.connectOrigin} http://127.0.0.1:${port}`
+      : `http://127.0.0.1:${port}`;
+    return context.html(page.html, 200, {
+      "cache-control": "no-store",
+      "content-security-policy": [
+        "default-src 'none'",
+        `script-src 'nonce-${page.scriptNonce}'`,
+        "style-src 'unsafe-inline'",
+        `connect-src ${connectSources}`,
+        "base-uri 'none'",
+        "form-action 'none'",
+        "frame-ancestors 'none'",
+      ].join("; "),
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+    });
+  });
+  app.get("/hubspot/start", (context) => {
+    const intent = context.req.query("intent") ?? "";
+    if (!isSealedHubspotState(intent)) {
+      return hubspotHtmlResponse(
+        context,
+        400,
+        "Invalid connection link",
+        "Ask LIFTY for a fresh HubSpot connection link.",
+      );
+    }
+    const authorizeUrl = dependencies.buildHubspotAuthorizeUrl(intent);
+    if (!authorizeUrl) {
+      return hubspotHtmlResponse(
+        context,
+        503,
+        "Connection unavailable",
+        "The HubSpot connection service is temporarily unavailable.",
+      );
+    }
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
+    return context.redirect(authorizeUrl, 302);
+  });
+  app.get("/hubspot/callback", async (context) => {
+    if (context.req.query("error")) {
+      return hubspotHtmlResponse(
+        context,
+        400,
+        "HubSpot authorization was cancelled",
+        "No connection was saved. Ask LIFTY for a fresh link when you are ready.",
+      );
+    }
+
+    const code = context.req.query("code") ?? "";
+    const state = context.req.query("state") ?? "";
+    if (!code || code.length > 4096 || !isSealedHubspotState(state)) {
+      return hubspotHtmlResponse(
+        context,
+        400,
+        "Invalid HubSpot callback",
+        "No connection was saved. Ask LIFTY for a fresh link.",
+      );
+    }
+
+    try {
+      await dependencies.completeHubspotCallback({ code, state });
+      return hubspotHtmlResponse(
+        context,
+        200,
+        "HubSpot is connected",
+        "LIFTY verified and saved the connection.",
+      );
+    } catch (error) {
+      const callbackError = error instanceof HubspotCallbackError
+        ? error
+        : new HubspotCallbackError(
+            "internal_error",
+            500,
+            "LIFTY could not complete the HubSpot connection.",
+          );
+      dependencies.log({
+        level: callbackError.status >= 500 ? "error" : "warn",
+        event: "request_failed",
+        request_id: context.get("requestId"),
+        method: context.req.method,
+        path: context.req.path,
+        error_code: `HUBSPOT_CALLBACK_${callbackError.reason.toUpperCase()}`,
+        status: callbackError.status,
+      });
+      return hubspotHtmlResponse(
+        context,
+        callbackError.status as ContentfulStatusCode,
+        "HubSpot connection failed",
+        callbackError.safeMessage,
+      );
+    }
   });
   app.doc("/openapi.json", {
     openapi: "3.1.0",
@@ -313,6 +521,20 @@ export function createApp(
       body.data.draft,
     );
     return context.json(ProvisioningResultSchema.parse(result));
+  });
+
+  app.post("/v1/integrations/hubspot/connect", async (context) => {
+    const result = await dependencies.startHubspotConnect(
+      context.get("authSession"),
+    );
+    return context.json(HubspotConnectStartSchema.parse(result));
+  });
+
+  app.get("/v1/integrations/hubspot", async (context) => {
+    const result = await dependencies.getHubspotConnection(
+      context.get("authSession"),
+    );
+    return context.json(HubspotConnectionStatusSchema.parse(result));
   });
 
   return app;

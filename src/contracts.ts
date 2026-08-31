@@ -38,5 +38,35 @@ export const ProvisionRequestSchema = z
   })
   .strict();
 
+export const HubspotConnectStartSchema = z
+  .object({
+    provider: z.literal("hubspot"),
+    connect_url: z.string().url(),
+    expires_in_seconds: z.number().int().positive(),
+  })
+  .strict();
+
+export const HubspotConnectionStatusSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      provider: z.literal("hubspot"),
+      status: z.literal("not_connected"),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("hubspot"),
+      status: z.literal("connected"),
+      portal_id: z.string().regex(/^[0-9]{1,20}$/),
+      hub_domain: z.string().nullable(),
+      granted_scopes: z.array(z.string()),
+      connected_at: z.string().nullable(),
+      reconnect_required: z.boolean(),
+    })
+    .strict(),
+]);
+
 export type WorkspaceStatus = z.infer<typeof WorkspaceStatusSchema>;
 export type ProvisioningResult = z.infer<typeof ProvisioningResultSchema>;
+export type HubspotConnectStart = z.infer<typeof HubspotConnectStartSchema>;
+export type HubspotConnectionStatus = z.infer<typeof HubspotConnectionStatusSchema>;

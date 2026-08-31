@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app.js";
 import { PublicError } from "../src/errors.js";
+import { HubspotCallbackError } from "../src/hubspot-connect.js";
+import { sealHubspotConnectIntent } from "../src/hubspot-state.js";
 
 const SECRET_FIELD_NAME = /token$|api_?key|secret|credential/i;
 
@@ -34,6 +36,12 @@ describe("LIFTY API", () => {
     expect(document.paths?.["/v1/workspaces"]?.post?.operationId).toBe(
       "provisionWorkspace",
     );
+    expect(
+      document.paths?.["/v1/integrations/hubspot/connect"]?.post?.operationId,
+    ).toBe("startHubspotConnect");
+    expect(
+      document.paths?.["/v1/integrations/hubspot"]?.get?.operationId,
+    ).toBe("getHubspotConnection");
     expect(document.components?.securitySchemes).toHaveProperty("bearerAuth");
   });
 
@@ -452,5 +460,205 @@ describe("LIFTY API", () => {
         status: 409,
       },
     ]);
+  });
+
+  it("returns a short-lived HubSpot connection URL for an authenticated founder", async () => {
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      startHubspotConnect: async (session) => {
+        expect(session.userId).toBe("founder-123");
+        return {
+          provider: "hubspot",
+          connect_url: "https://api.lifty.test/hubspot/start?intent=opaque",
+          expires_in_seconds: 600,
+        };
+      },
+    });
+
+    const response = await app.request("/v1/integrations/hubspot/connect", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      provider: "hubspot",
+      connect_url: "https://api.lifty.test/hubspot/start?intent=opaque",
+      expires_in_seconds: 600,
+    });
+  });
+
+  it("reports HubSpot connection status without exposing credentials", async () => {
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      getHubspotConnection: async () => ({
+        provider: "hubspot",
+        status: "connected",
+        portal_id: "49072478",
+        hub_domain: "example.test",
+        granted_scopes: ["oauth"],
+        connected_at: "2026-08-31T16:00:00Z",
+        reconnect_required: false,
+      }),
+    });
+
+    const response = await app.request("/v1/integrations/hubspot", {
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      provider: "hubspot",
+      status: "connected",
+      portal_id: "49072478",
+      hub_domain: "example.test",
+      granted_scopes: ["oauth"],
+      connected_at: "2026-08-31T16:00:00Z",
+      reconnect_required: false,
+    });
+  });
+
+  it("redirects a valid one-time intent to HubSpot consent without cookies", async () => {
+    const state = sealHubspotConnectIntent("a".repeat(64), "test-secret");
+    const authorizeUrl = `https://app.hubspot.com/oauth/authorize?state=${state}`;
+    const app = createApp({
+      buildHubspotAuthorizeUrl: (receivedState) => {
+        expect(receivedState).toBe(state);
+        return authorizeUrl;
+      },
+    });
+
+    const response = await app.request(`/hubspot/start?intent=${state}`);
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(authorizeUrl);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("serves CLI login from the hosted runtime with strict no-store headers", async () => {
+    const rendered: Array<{ state: string; port: number }> = [];
+    const response = await createApp({
+      renderCliAuthPage: (state, port) => {
+        rendered.push({ state, port });
+        return {
+          html: "<!doctype html><title>Authorize LIFTY</title>",
+          scriptNonce: "test-nonce-value",
+        };
+      },
+    }).request(`/cli/auth?state=${"s".repeat(43)}&port=49152`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(response.headers.get("content-security-policy")).toContain(
+      "script-src 'nonce-test-nonce-value'",
+    );
+    expect(rendered).toEqual([{ state: "s".repeat(43), port: 49152 }]);
+  });
+
+  it("rejects invalid CLI login parameters before rendering auth", async () => {
+    let rendered = false;
+    const app = createApp({
+      renderCliAuthPage: () => {
+        rendered = true;
+        return { html: "must not render", scriptNonce: "unused" };
+      },
+    });
+
+    expect((await app.request("/cli/auth?state=bad state&port=49152")).status)
+      .toBe(400);
+    expect((await app.request("/cli/auth?state=safe&port=80")).status).toBe(400);
+    expect(rendered).toBe(false);
+  });
+
+  it("rejects malformed HubSpot intents before building an authorization URL", async () => {
+    let built = false;
+    const response = await createApp({
+      buildHubspotAuthorizeUrl: () => {
+        built = true;
+        return "https://must-not-open.example";
+      },
+    }).request("/hubspot/start?intent=not-a-capability");
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(built).toBe(false);
+  });
+
+  it("completes a HubSpot callback without reflecting its code or state", async () => {
+    const code = "provider-authorization-code-never-reflect";
+    const state = sealHubspotConnectIntent("b".repeat(64), "test-secret");
+    const app = createApp({
+      completeHubspotCallback: async (input) => {
+        expect(input).toEqual({ code, state });
+        return { portalId: "49072478", hubDomain: "example.test" };
+      },
+    });
+
+    const response = await app.request(
+      `/hubspot/callback?code=${encodeURIComponent(code)}&state=${state}`,
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(html).toContain("HubSpot is connected");
+    expect(html).not.toContain(code);
+    expect(html).not.toContain(state);
+  });
+
+  it("fails a denied HubSpot callback without attempting a token exchange", async () => {
+    let completed = false;
+    const response = await createApp({
+      completeHubspotCallback: async () => {
+        completed = true;
+        throw new Error("must not exchange");
+      },
+    }).request(
+      `/hubspot/callback?error=access_denied&state=${sealHubspotConnectIntent("c".repeat(64), "test-secret")}`,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("HubSpot authorization was cancelled");
+    expect(completed).toBe(false);
+  });
+
+  it("logs only a safe callback reason when completion fails", async () => {
+    const providerToken = "synthetic-provider-token-never-surface";
+    const logEvents: unknown[] = [];
+    const response = await createApp({
+      completeHubspotCallback: async () => {
+        throw new HubspotCallbackError(
+          "exchange_failed",
+          502,
+          "HubSpot did not accept the authorization.",
+        );
+      },
+      log: (event) => logEvents.push(event),
+    }).request(
+      `/hubspot/callback?code=${providerToken}&state=${sealHubspotConnectIntent("d".repeat(64), "test-secret")}`,
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(502);
+    expect(html).not.toContain(providerToken);
+    expect(JSON.stringify(logEvents)).not.toContain(providerToken);
+    expect(logEvents).toMatchObject([{
+      error_code: "HUBSPOT_CALLBACK_EXCHANGE_FAILED",
+      method: "GET",
+      path: "/hubspot/callback",
+      status: 502,
+    }]);
   });
 });
