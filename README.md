@@ -20,7 +20,8 @@ configured Hono app for programmatic use.
 - `GET /cli/auth` — hosted founder sign-in and loopback CLI authorization
 - `GET /v1/workspace` — authenticated founder workspace state
 - `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
-- `POST /v1/workspaces` — authenticated, idempotent draft provisioning (deprecated push path until P4.2)
+- `POST /v1/onboarding` — authenticated draft submission; queues one onboarding-import run (LIF-656)
+- `GET /v1/onboarding` — authenticated import status with a secret-free config summary
 - `POST /v1/integrations/hubspot/connect` — mint a short-lived connect URL
 - `GET /v1/integrations/hubspot` — secret-free connection status
 - `GET /hubspot/start` — redirect an opaque connect intent to HubSpot consent

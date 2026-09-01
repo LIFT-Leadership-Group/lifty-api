@@ -27,6 +27,10 @@ describe("HTTP server bootstrap", () => {
           supabaseUrl: "https://project.supabase.test",
           publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
         },
+        trigger: {
+          apiUrl: "https://api.trigger.test",
+          secretKey: "tr_prod_test_key",
+        },
       },
       serve,
     );

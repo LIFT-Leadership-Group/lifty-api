@@ -10,6 +10,7 @@ const validEnvironment = {
   HUBSPOT_CLIENT_ID: "client-123",
   HUBSPOT_CLIENT_SECRET: "client-secret",
   PUBLIC_BASE_URL: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
+  TRIGGER_SECRET_KEY: "tr_prod_test_key",
 };
 
 describe("service configuration", () => {
@@ -27,6 +28,10 @@ describe("service configuration", () => {
     expect(config.supabase.jwks).toEqual(
       new URL(validEnvironment.SUPABASE_JWKS_URL),
     );
+    expect(config.trigger).toEqual({
+      apiUrl: "https://api.trigger.dev",
+      secretKey: "tr_prod_test_key",
+    });
     expect(config.hubspot).toEqual({
       clientId: "client-123",
       clientSecret: "client-secret",
@@ -73,6 +78,11 @@ describe("service configuration", () => {
     [{ ...validEnvironment, PORT: "70000" }, /PORT/],
     [{ ...validEnvironment, HUBSPOT_CLIENT_ID: undefined }, /HUBSPOT_CLIENT_ID/],
     [{ ...validEnvironment, HUBSPOT_CLIENT_SECRET: undefined }, /HUBSPOT_CLIENT_SECRET/],
+    [{ ...validEnvironment, TRIGGER_SECRET_KEY: undefined }, /TRIGGER_SECRET_KEY/],
+    [
+      { ...validEnvironment, TRIGGER_API_URL: "http://attacker.example" },
+      /TRIGGER_API_URL/,
+    ],
     [{ ...validEnvironment, PUBLIC_BASE_URL: undefined }, /PUBLIC_BASE_URL/],
     [
       { ...validEnvironment, PUBLIC_BASE_URL: "http://api.example.test" },

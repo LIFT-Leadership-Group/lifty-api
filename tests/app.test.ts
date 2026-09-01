@@ -36,8 +36,11 @@ describe("LIFTY API", () => {
     expect(document.paths?.["/v1/workspace"]?.post?.operationId).toBe(
       "createWorkspace",
     );
-    expect(document.paths?.["/v1/workspaces"]?.post?.operationId).toBe(
-      "provisionWorkspace",
+    expect(document.paths?.["/v1/onboarding"]?.post?.operationId).toBe(
+      "submitOnboarding",
+    );
+    expect(document.paths?.["/v1/onboarding"]?.get?.operationId).toBe(
+      "getOnboardingStatus",
     );
     expect(
       document.paths?.["/v1/integrations/hubspot/connect"]?.post?.operationId,
@@ -310,27 +313,37 @@ describe("LIFTY API", () => {
     );
   });
 
-  it("provisions a workspace from the authenticated founder's draft", async () => {
-    const draft = { schema_version: "1.0", status: "ready_for_auth" };
+  const submissionFixture = (importStatus: "pending" | "imported" | "failed") => ({
+    state: "submitted" as const,
+    submission_ref: "11111111-1111-4111-8111-111111111111",
+    draft_digest: `sha256:${"a".repeat(64)}`,
+    import_status: importStatus,
+    workspace: { workspace_ref: "ws_opaque", name: "Example" },
+    created: importStatus === "pending",
+  });
+
+  it("submits the draft and queues exactly one import run", async () => {
+    const draft = { schema_version: "2.0", status: "ready_for_auth" };
+    const enqueueCalls: Array<{ submissionId: string; fresh: boolean }> = [];
     const app = createApp({
       authenticate: async () => ({
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
-      provisionWorkspace: async (session, receivedDraft) => {
+      submitOnboarding: async (session, receivedDraft) => {
         if (session.userId !== "founder-123") throw new Error("wrong actor");
         if (JSON.stringify(receivedDraft) !== JSON.stringify(draft)) {
           throw new Error("wrong draft");
         }
-        return {
-          state: "ready_for_connections",
-          workspace: { workspace_ref: "ws_opaque", name: "Example" },
-          draft_digest: `sha256:${"a".repeat(64)}`,
-        };
+        return submissionFixture("pending");
+      },
+      enqueueOnboardingImport: async (submissionId, options) => {
+        enqueueCalls.push({ submissionId, fresh: options.fresh });
+        return { id: "run_abc123" };
       },
     });
 
-    const response = await app.request("/v1/workspaces", {
+    const response = await app.request("/v1/onboarding", {
       method: "POST",
       headers: {
         authorization: "Bearer valid-token",
@@ -341,13 +354,101 @@ describe("LIFTY API", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      state: "ready_for_connections",
-      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      state: "queued",
+      run_id: "run_abc123",
+      submission_ref: "11111111-1111-4111-8111-111111111111",
       draft_digest: `sha256:${"a".repeat(64)}`,
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      created: true,
     });
+    expect(enqueueCalls).toEqual([
+      { submissionId: "11111111-1111-4111-8111-111111111111", fresh: false },
+    ]);
   });
 
-  it("rejects a secret-bearing provisioning result before serializing or logging it", async () => {
+  it("returns imported without enqueuing when the draft already landed", async () => {
+    let enqueued = false;
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      submitOnboarding: async () => submissionFixture("imported"),
+      enqueueOnboardingImport: async () => {
+        enqueued = true;
+        return { id: "run_must_not_exist" };
+      },
+    });
+
+    const response = await app.request("/v1/onboarding", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ draft: { schema_version: "2.0" } }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as { state: string; run_id: string | null };
+    expect(body.state).toBe("imported");
+    expect(body.run_id).toBeNull();
+    expect(enqueued).toBe(false);
+  });
+
+  it("forces a fresh run for a previously failed import", async () => {
+    const enqueueCalls: Array<{ fresh: boolean }> = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      submitOnboarding: async () => submissionFixture("failed"),
+      enqueueOnboardingImport: async (_submissionId, options) => {
+        enqueueCalls.push({ fresh: options.fresh });
+        return { id: "run_retry" };
+      },
+    });
+
+    const response = await app.request("/v1/onboarding", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ draft: { schema_version: "2.0" } }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(enqueueCalls).toEqual([{ fresh: true }]);
+  });
+
+  it("returns the onboarding status for the authenticated founder", async () => {
+    const status = {
+      state: "pending" as const,
+      submission_ref: "11111111-1111-4111-8111-111111111111",
+      draft_digest: `sha256:${"a".repeat(64)}`,
+      submitted_at: "2026-09-01T21:00:00Z",
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      summary: null,
+    };
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      getOnboardingStatus: async () => status,
+    });
+
+    const response = await app.request("/v1/onboarding", {
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(status);
+  });
+
+  it("never serializes fields beyond the push contract, even from a hostile dependency", async () => {
     const providerToken = "synthetic-provider-token-never-surface";
     const logEvents: unknown[] = [];
     const app = createApp({
@@ -355,31 +456,30 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
-      provisionWorkspace: async () => ({
-        state: "ready_for_connections",
-        workspace: { workspace_ref: "ws_opaque", name: "Example" },
-        draft_digest: `sha256:${"a".repeat(64)}`,
+      submitOnboarding: async () => ({
+        ...submissionFixture("pending"),
         api_key: providerToken,
       } as never),
+      enqueueOnboardingImport: async () => ({ id: "run_abc123" }),
       log: (event) => logEvents.push(event),
     });
 
-    const response = await app.request("/v1/workspaces", {
+    const response = await app.request("/v1/onboarding", {
       method: "POST",
       headers: {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "1.0" } }),
+      body: JSON.stringify({ draft: { schema_version: "2.0" } }),
     });
     const responseText = await response.text();
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     expect(responseText).not.toContain(providerToken);
     expect(JSON.stringify(logEvents)).not.toContain(providerToken);
   });
 
-  it("rejects a malformed provisioning envelope without echoing its content", async () => {
+  it("rejects a malformed onboarding push without echoing its content", async () => {
     const secretMarker = "founder-private-content";
     const app = createApp({
       authenticate: async () => ({
@@ -388,7 +488,7 @@ describe("LIFTY API", () => {
       }),
     });
 
-    const response = await app.request("/v1/workspaces", {
+    const response = await app.request("/v1/onboarding", {
       method: "POST",
       headers: {
         authorization: "Bearer valid-token",
@@ -404,13 +504,13 @@ describe("LIFTY API", () => {
     expect(JSON.parse(responseText)).toEqual({
       error: {
         code: "INVALID_REQUEST",
-        message: "The provisioning request must contain one JSON object named draft.",
+        message: "The onboarding push must contain one JSON object named draft.",
       },
       request_id: "33333333-3333-4333-8333-333333333333",
     });
   });
 
-  it("rejects an oversized provisioning request before business logic", async () => {
+  it("rejects an oversized onboarding push before business logic", async () => {
     const app = createApp({
       authenticate: async () => ({
         ok: true,
@@ -418,7 +518,7 @@ describe("LIFTY API", () => {
       }),
     });
 
-    const response = await app.request("/v1/workspaces", {
+    const response = await app.request("/v1/onboarding", {
       method: "POST",
       headers: {
         authorization: "Bearer valid-token",
@@ -432,26 +532,26 @@ describe("LIFTY API", () => {
     expect(await response.json()).toEqual({
       error: {
         code: "PAYLOAD_TOO_LARGE",
-        message: "The provisioning request exceeds 132 KiB.",
+        message: "The onboarding push exceeds 132 KiB.",
       },
       request_id: "44444444-4444-4444-8444-444444444444",
     });
   });
 
-  it("rejects a declared oversized body before reading or provisioning it", async () => {
+  it("rejects a declared oversized body before reading or submitting it", async () => {
     let provisioned = false;
     const app = createApp({
       authenticate: async () => ({
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
-      provisionWorkspace: async () => {
+      submitOnboarding: async () => {
         provisioned = true;
-        throw new Error("must not provision");
+        throw new Error("must not submit");
       },
     });
 
-    const response = await app.request("/v1/workspaces", {
+    const response = await app.request("/v1/onboarding", {
       method: "POST",
       headers: {
         authorization: "Bearer valid-token",
@@ -488,12 +588,12 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
-      provisionWorkspace: async () => {
+      submitOnboarding: async () => {
         provisioned = true;
-        throw new Error("must not provision");
+        throw new Error("must not submit");
       },
     });
-    const request = new Request("http://localhost/v1/workspaces", {
+    const request = new Request("http://localhost/v1/onboarding", {
       method: "POST",
       headers: {
         authorization: "Bearer valid-token",
@@ -519,7 +619,7 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
-      provisionWorkspace: async () => {
+      submitOnboarding: async () => {
         throw new PublicError({
           status: 409,
           code: "WORKSPACE_ALREADY_EXISTS",
@@ -530,7 +630,7 @@ describe("LIFTY API", () => {
       log: (event) => logEvents.push(event),
     });
 
-    const response = await app.request("/v1/workspaces", {
+    const response = await app.request("/v1/onboarding", {
       method: "POST",
       headers: {
         authorization: "Bearer valid-token",
@@ -558,7 +658,7 @@ describe("LIFTY API", () => {
         event: "request_failed",
         request_id: "55555555-5555-4555-8555-555555555555",
         method: "POST",
-        path: "/v1/workspaces",
+        path: "/v1/onboarding",
         error_code: "WORKSPACE_ALREADY_EXISTS",
         status: 409,
       },
