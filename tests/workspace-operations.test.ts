@@ -79,6 +79,12 @@ describe("workspace RPC operations", () => {
     ["PT400", "lifty_draft_invalid: gate_4_hard_disqualifier", 422, "DRAFT_INVALID"],
     ["PT413", "lifty_draft_too_large: max_nodes", 413, "DRAFT_TOO_LARGE"],
     ["PT409", "provisioning_conflict", 409, "PROVISIONING_CONFLICT"],
+    [
+      "P0001",
+      "Workspace 153b9a10 requires at least one active approach and exactly one active fallback",
+      502,
+      "PROVISIONING_REJECTED",
+    ],
     ["XX000", "private internal failure", 502, "SUPABASE_REQUEST_FAILED"],
   ])(
     "maps %s failures to a safe %s response",
