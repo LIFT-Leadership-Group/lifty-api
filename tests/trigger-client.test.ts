@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createOnboardingImportTrigger } from "../src/trigger-client.js";
+import {
+  createFirstRunTrigger,
+  createOnboardingImportTrigger,
+} from "../src/trigger-client.js";
 
 const settings = {
   apiUrl: "https://api.trigger.test",
@@ -83,6 +86,33 @@ describe("onboarding import trigger client", () => {
     ).rejects.toMatchObject({
       status: 502,
       code: "IMPORT_ENQUEUE_FAILED",
+    });
+  });
+});
+
+describe("first run trigger client", () => {
+  it("enqueues lifty-first-run with a run-scoped idempotency key", async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    const enqueue = createFirstRunTrigger({
+      ...settings,
+      fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+        return jsonResponse(200, { id: "run_first" });
+      }) as typeof fetch,
+    });
+
+    const run = await enqueue("22222222-2222-4222-8222-222222222222");
+
+    expect(run).toEqual({ id: "run_first" });
+    expect(requests[0]?.url).toBe(
+      "https://api.trigger.test/api/v1/tasks/lifty-first-run/trigger",
+    );
+    expect(requests[0]?.body).toEqual({
+      payload: { runId: "22222222-2222-4222-8222-222222222222" },
+      options: {
+        idempotencyKey: "lifty-first-run:22222222-2222-4222-8222-222222222222",
+        idempotencyKeyTTL: "1h",
+      },
     });
   });
 });

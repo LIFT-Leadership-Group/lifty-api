@@ -18,7 +18,11 @@ describe("HubSpot connect state sealing", () => {
 
   it("fails closed for tampering, another secret, and raw capabilities", () => {
     const sealed = sealHubspotConnectIntent("b".repeat(64), "client-secret");
-    const tampered = `${sealed.slice(0, -1)}${sealed.endsWith("A") ? "B" : "A"}`;
+    // Tamper a middle character: flipping the final one is flaky because
+    // base64url ignores trailing padding bits, so the change can decode to
+    // identical bytes.
+    const middle = Math.floor(sealed.length / 2);
+    const tampered = `${sealed.slice(0, middle)}${sealed[middle] === "A" ? "B" : "A"}${sealed.slice(middle + 1)}`;
 
     expect(() => openHubspotConnectIntent(tampered, "client-secret")).toThrow(
       "invalid_hubspot_state",

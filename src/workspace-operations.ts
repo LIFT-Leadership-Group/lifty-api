@@ -7,6 +7,10 @@ import {
   type OnboardingStatus,
   OnboardingSubmissionSchema,
   type OnboardingSubmission,
+  RunStatusSchema,
+  type RunStatus,
+  StartRunResultSchema,
+  type StartRunResult,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
@@ -46,6 +50,42 @@ function mapRpcError(error: unknown): PublicError {
       status: 409,
       code: "WORKSPACE_ALREADY_EXISTS",
       message: "This account already has a LIFTY workspace.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_run_not_configured")) {
+    return new PublicError({
+      status: 409,
+      code: "RUN_NOT_CONFIGURED",
+      message: "This workspace has no generated configuration yet. Run `lifty push` first.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_run_already_completed")) {
+    return new PublicError({
+      status: 409,
+      code: "RUN_ALREADY_COMPLETED",
+      message: "The first ICP batch already ran for this workspace. See it with `lifty status`.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_run_workspace_suspended")) {
+    return new PublicError({
+      status: 409,
+      code: "WORKSPACE_SUSPENDED",
+      message: "This workspace is suspended. Contact LIFT support.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_run_unavailable")) {
+    return new PublicError({
+      status: 409,
+      code: "RUN_UNAVAILABLE",
+      message: "LIFTY cannot start a run for this workspace right now. Contact LIFT support.",
       cause: error,
     });
   }
@@ -201,6 +241,38 @@ export async function getOnboardingStatus(
   }
 
   const parsed = OnboardingStatusSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+export async function startRun(session: AuthSession): Promise<StartRunResult> {
+  const { data, error } = await getRpcClient(session).rpc<StartRunResult>(
+    "start_lifty_run",
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = StartRunResultSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+export async function getRunStatus(session: AuthSession): Promise<RunStatus> {
+  const { data, error } = await getRpcClient(session).rpc<RunStatus>(
+    "get_lifty_run_status",
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = RunStatusSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }

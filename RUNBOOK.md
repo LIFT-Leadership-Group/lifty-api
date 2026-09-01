@@ -16,6 +16,8 @@ project JWKS, creates a user-scoped Supabase client, and delegates to:
 - `public.create_lifty_workspace(name text, description text)`
 - `public.submit_lifty_onboarding(draft jsonb)` — draft-gated push receipt (LIF-656)
 - `public.get_lifty_onboarding_status()` — import status + secret-free summary (LIF-656)
+- `public.start_lifty_run()` — first ICP run start with the platform Apollo default (LIF-657)
+- `public.get_lifty_run_status()` — run state + researched results (LIF-657)
 - `public.create_lifty_hubspot_connect_intent()`
 - `public.get_lifty_hubspot_connection()`
 

@@ -42,6 +42,12 @@ describe("LIFTY API", () => {
     expect(document.paths?.["/v1/onboarding"]?.get?.operationId).toBe(
       "getOnboardingStatus",
     );
+    expect(document.paths?.["/v1/workspace/runs"]?.post?.operationId).toBe(
+      "startRun",
+    );
+    expect(document.paths?.["/v1/workspace/runs"]?.get?.operationId).toBe(
+      "getRunStatus",
+    );
     expect(
       document.paths?.["/v1/integrations/hubspot/connect"]?.post?.operationId,
     ).toBe("startHubspotConnect");
@@ -421,6 +427,100 @@ describe("LIFTY API", () => {
 
     expect(response.status).toBe(200);
     expect(enqueueCalls).toEqual([{ fresh: true }]);
+  });
+
+  const startRunFixture = (created: boolean) => ({
+    state: "queued" as const,
+    run_ref: "22222222-2222-4222-8222-222222222222",
+    requested_leads: 5,
+    workspace: { workspace_ref: "ws_opaque", name: "Example" },
+    created,
+  });
+
+  it("starts the first run and enqueues exactly one job", async () => {
+    const enqueued: string[] = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      startRun: async () => startRunFixture(true),
+      enqueueFirstRun: async (runId) => {
+        enqueued.push(runId);
+        return { id: "run_first" };
+      },
+    });
+
+    const response = await app.request("/v1/workspace/runs", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(startRunFixture(true));
+    expect(enqueued).toEqual(["22222222-2222-4222-8222-222222222222"]);
+  });
+
+  it("re-attaching to an active run still re-enqueues idempotently", async () => {
+    const enqueued: string[] = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      startRun: async () => startRunFixture(false),
+      enqueueFirstRun: async (runId) => {
+        enqueued.push(runId);
+        return { id: "run_first" };
+      },
+    });
+
+    const response = await app.request("/v1/workspace/runs", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(enqueued).toEqual(["22222222-2222-4222-8222-222222222222"]);
+  });
+
+  it("returns the run status for the authenticated founder", async () => {
+    const status = {
+      state: "succeeded" as const,
+      run_ref: "22222222-2222-4222-8222-222222222222",
+      requested_leads: 5,
+      leads_discovered: 5,
+      leads_researched: 5,
+      error_code: null,
+      started_at: "2026-09-01T21:00:00Z",
+      completed_at: "2026-09-01T21:20:00Z",
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      leads: [
+        {
+          name: "Pat Lopez",
+          title: "VP Operations",
+          company: "Acme Plants",
+          linkedin_url: null,
+          tier: "A",
+          fit_rationale: "Owns the inspection budget.",
+          stage: "qualified",
+        },
+      ],
+    };
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      getRunStatus: async () => status,
+    });
+
+    const response = await app.request("/v1/workspace/runs", {
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(status);
   });
 
   it("returns the onboarding status for the authenticated founder", async () => {
