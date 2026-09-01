@@ -10,6 +10,7 @@ import {
   createSupabaseReadinessCheck,
 } from "./supabase-auth.js";
 import {
+  createWorkspace,
   getWorkspaceStatus,
   provisionWorkspace,
 } from "./workspace-operations.js";
@@ -19,6 +20,7 @@ export function createProductionApp(config: ServiceConfig) {
   return createApp({
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,
+    createWorkspace,
     provisionWorkspace,
     startHubspotConnect: hubspot.startConnect,
     getHubspotConnection: hubspot.getConnection,
