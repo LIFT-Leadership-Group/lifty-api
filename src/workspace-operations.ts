@@ -81,6 +81,17 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  // P0001 is a plain `raise exception` — a database trigger or function
+  // rejected the request outright rather than failing to run.
+  if (code === "P0001") {
+    return new PublicError({
+      status: 502,
+      code: "PROVISIONING_REJECTED",
+      message: "A LIFTY server-side integrity check rejected the workspace request. Contact LIFT support.",
+      cause: error,
+    });
+  }
+
   return new PublicError({
     status: 502,
     code: "SUPABASE_REQUEST_FAILED",
