@@ -3,6 +3,10 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
+  CreateWorkspaceRequestSchema,
+  CreateWorkspaceResultSchema,
+  type CreateWorkspaceRequest,
+  type CreateWorkspaceResult,
   HubspotConnectStartSchema,
   HubspotConnectionStatusSchema,
   ProvisionRequestSchema,
@@ -21,6 +25,8 @@ import {
 import { isSealedHubspotState } from "./hubspot-state.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
+// The create-workspace body carries only a bounded name and description.
+const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
 const RequestIdSchema = z.uuid();
 
 export interface AuthSession {
@@ -37,6 +43,10 @@ export type { ProvisioningResult, WorkspaceStatus } from "./contracts.js";
 export interface AppDependencies {
   authenticate(request: Request): Promise<AuthenticationResult>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
+  createWorkspace(
+    session: AuthSession,
+    input: CreateWorkspaceRequest,
+  ): Promise<CreateWorkspaceResult>;
   provisionWorkspace(
     session: AuthSession,
     draft: Record<string, unknown>,
@@ -158,6 +168,26 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   });
   app.openAPIRegistry.registerPath({
     method: "post",
+    path: "/v1/workspace",
+    operationId: "createWorkspace",
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: { "application/json": { schema: CreateWorkspaceRequestSchema } },
+      },
+    },
+    responses: {
+      200: JsonResponse(CreateWorkspaceResultSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      413: JsonResponse(ErrorResponseSchema),
+      422: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post",
     path: "/v1/workspaces",
     operationId: "provisionWorkspace",
     security: [{ bearerAuth: [] }],
@@ -225,6 +255,9 @@ const defaultDependencies: AppDependencies = {
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
+  },
+  createWorkspace: async () => {
+    throw new Error("createWorkspace is not configured");
   },
   provisionWorkspace: async () => {
     throw new Error("provisionWorkspace is not configured");
@@ -462,6 +495,67 @@ export function createApp(
   app.get("/v1/workspace", async (context) => {
     const result = await dependencies.getWorkspace(context.get("authSession"));
     return context.json(WorkspaceStatusSchema.parse(result));
+  });
+
+  app.post("/v1/workspace", async (context) => {
+    const declaredLength = Number(context.req.header("content-length"));
+    if (
+      Number.isFinite(declaredLength)
+      && declaredLength > MAX_CREATE_WORKSPACE_BYTES
+    ) {
+      return context.json(
+        {
+          error: {
+            code: "PAYLOAD_TOO_LARGE",
+            message: "The workspace request exceeds 16 KiB.",
+          },
+          request_id: context.get("requestId"),
+        },
+        413,
+      );
+    }
+    const requestBody = await readRequestTextWithinLimit(
+      context.req.raw,
+      MAX_CREATE_WORKSPACE_BYTES,
+    );
+    if (!requestBody.ok) {
+      return context.json(
+        {
+          error: {
+            code: "PAYLOAD_TOO_LARGE",
+            message: "The workspace request exceeds 16 KiB.",
+          },
+          request_id: context.get("requestId"),
+        },
+        413,
+      );
+    }
+
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(requestBody.text);
+    } catch {
+      parsedJson = null;
+    }
+    const body = CreateWorkspaceRequestSchema.safeParse(parsedJson);
+    if (!body.success) {
+      return context.json(
+        {
+          error: {
+            code: "INVALID_REQUEST",
+            message: "The workspace request must contain a non-empty name and an optional description.",
+          },
+          request_id: context.get("requestId"),
+        },
+        400,
+      );
+    }
+
+    const result = await dependencies.createWorkspace(
+      context.get("authSession"),
+      body.data,
+    );
+    return context.json(CreateWorkspaceResultSchema.parse(result));
   });
 
   app.post("/v1/workspaces", async (context) => {

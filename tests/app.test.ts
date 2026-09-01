@@ -33,6 +33,9 @@ describe("LIFTY API", () => {
     expect(document.paths?.["/v1/workspace"]?.get?.operationId).toBe(
       "getWorkspaceStatus",
     );
+    expect(document.paths?.["/v1/workspace"]?.post?.operationId).toBe(
+      "createWorkspace",
+    );
     expect(document.paths?.["/v1/workspaces"]?.post?.operationId).toBe(
       "provisionWorkspace",
     );
@@ -205,6 +208,106 @@ describe("LIFTY API", () => {
     expect(response.status).toBe(500);
     expect(responseText).not.toContain(providerToken);
     expect(JSON.stringify(logEvents)).not.toContain(providerToken);
+  });
+
+  it("creates the login workspace for the authenticated founder", async () => {
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      createWorkspace: async (session, input) => {
+        if (session.userId !== "founder-123") throw new Error("wrong actor");
+        if (input.name !== "Example" || input.description !== "Example helps founders.") {
+          throw new Error("wrong input");
+        }
+        return {
+          state: "ready_for_connections",
+          workspace: { workspace_ref: "ws_opaque", name: "Example" },
+          created: true,
+        };
+      },
+    });
+
+    const response = await app.request("/v1/workspace", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Example", description: "Example helps founders." }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      state: "ready_for_connections",
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      created: true,
+    });
+  });
+
+  it("rejects a malformed create-workspace body before business logic", async () => {
+    let called = false;
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      createWorkspace: async () => {
+        called = true;
+        throw new Error("must not be reached");
+      },
+    });
+
+    const response = await app.request("/v1/workspace", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": "application/json",
+        "x-request-id": "33333333-3333-4333-8333-333333333333",
+      },
+      body: JSON.stringify({ name: "   ", extra: true }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(called).toBe(false);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "INVALID_REQUEST",
+        message: "The workspace request must contain a non-empty name and an optional description.",
+      },
+      request_id: "33333333-3333-4333-8333-333333333333",
+    });
+  });
+
+  it("rejects a declared oversized create-workspace body before reading it", async () => {
+    let called = false;
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      createWorkspace: async () => {
+        called = true;
+        throw new Error("must not be reached");
+      },
+    });
+
+    const response = await app.request("/v1/workspace", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": "application/json",
+        "content-length": String(64 * 1024),
+      },
+      body: JSON.stringify({ name: "Example" }),
+    });
+
+    expect(response.status).toBe(413);
+    expect(called).toBe(false);
+    expect((await response.json() as { error: { code: string } }).error.code).toBe(
+      "PAYLOAD_TOO_LARGE",
+    );
   });
 
   it("provisions a workspace from the authenticated founder's draft", async () => {

@@ -19,7 +19,8 @@ configured Hono app for programmatic use.
 - `GET /openapi.json` — generated OpenAPI 3.1 contract
 - `GET /cli/auth` — hosted founder sign-in and loopback CLI authorization
 - `GET /v1/workspace` — authenticated founder workspace state
-- `POST /v1/workspaces` — authenticated, idempotent workspace provisioning
+- `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
+- `POST /v1/workspaces` — authenticated, idempotent draft provisioning (deprecated push path until P4.2)
 - `POST /v1/integrations/hubspot/connect` — mint a short-lived connect URL
 - `GET /v1/integrations/hubspot` — secret-free connection status
 - `GET /hubspot/start` — redirect an opaque connect intent to HubSpot consent

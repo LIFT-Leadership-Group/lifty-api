@@ -13,7 +13,8 @@ reads and writes go only through this API. The API verifies the JWT against the
 project JWKS, creates a user-scoped Supabase client, and delegates to:
 
 - `public.get_lifty_workspace_status()`
-- `public.provision_lifty_workspace(draft jsonb)`
+- `public.create_lifty_workspace(name text, description text)`
+- `public.provision_lifty_workspace(draft jsonb)` — deprecated by LIF-655; push path until P4.2
 - `public.create_lifty_hubspot_connect_intent()`
 - `public.get_lifty_hubspot_connection()`
 

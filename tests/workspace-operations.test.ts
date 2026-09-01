@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createWorkspace,
   getWorkspaceStatus,
   provisionWorkspace,
 } from "../src/workspace-operations.js";
@@ -27,6 +28,101 @@ describe("workspace RPC operations", () => {
     await expect(
       getWorkspaceStatus({ userId: "founder-123", client }),
     ).resolves.toEqual(expected);
+  });
+
+  it("creates the login workspace through the authenticated client", async () => {
+    const expected = {
+      state: "ready_for_connections" as const,
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      created: true,
+    };
+    const calls: Array<{ name: string; args?: unknown }> = [];
+    const client = {
+      rpc: async (name: string, args?: unknown) => {
+        calls.push({ name, args });
+        return { data: expected, error: null };
+      },
+    };
+
+    await expect(
+      createWorkspace(
+        { userId: "founder-123", client },
+        { name: "Example", description: "Example helps founders." },
+      ),
+    ).resolves.toEqual(expected);
+    expect(calls).toEqual([
+      {
+        name: "create_lifty_workspace",
+        args: { name: "Example", description: "Example helps founders." },
+      },
+    ]);
+  });
+
+  it("normalizes a missing description to null before calling the RPC", async () => {
+    const calls: Array<{ name: string; args?: unknown }> = [];
+    const client = {
+      rpc: async (name: string, args?: unknown) => {
+        calls.push({ name, args });
+        return {
+          data: {
+            state: "ready_for_connections",
+            workspace: { workspace_ref: "ws_opaque", name: "Example" },
+            created: false,
+          },
+          error: null,
+        };
+      },
+    };
+
+    await expect(
+      createWorkspace({ userId: "founder-123", client }, { name: "Example" }),
+    ).resolves.toMatchObject({ created: false });
+    expect(calls).toEqual([
+      { name: "create_lifty_workspace", args: { name: "Example", description: null } },
+    ]);
+  });
+
+  it.each([
+    ["PT401", "unauthenticated", 401, "UNAUTHORIZED"],
+    ["PT400", "lifty_workspace_invalid: name", 422, "WORKSPACE_INVALID"],
+    ["PT413", "lifty_workspace_too_large: description", 413, "WORKSPACE_FIELD_TOO_LARGE"],
+    ["PT409", "provisioning_conflict", 409, "PROVISIONING_CONFLICT"],
+    ["XX000", "private internal failure", 502, "SUPABASE_REQUEST_FAILED"],
+  ])(
+    "maps create-workspace %s failures to a safe %s response",
+    async (databaseCode, databaseMessage, status, publicCode) => {
+      const client = {
+        rpc: async () => ({
+          data: null,
+          error: { code: databaseCode, message: databaseMessage },
+        }),
+      };
+
+      await expect(
+        createWorkspace({ userId: "founder-123", client }, { name: "Example" }),
+      ).rejects.toMatchObject({ status, code: publicCode });
+    },
+  );
+
+  it("rejects a malformed create-workspace response at the control-plane boundary", async () => {
+    const client = {
+      rpc: async () => ({
+        data: {
+          state: "ready_for_connections",
+          workspace: { workspace_ref: "ws_opaque", name: "Example" },
+          created: true,
+          private_field: "do-not-forward",
+        },
+        error: null,
+      }),
+    };
+
+    await expect(
+      createWorkspace({ userId: "founder-123", client }, { name: "Example" }),
+    ).rejects.toMatchObject({
+      status: 502,
+      code: "SUPABASE_INVALID_RESPONSE",
+    });
   });
 
   it("provisions through the authenticated client without forwarding actor identity", async () => {

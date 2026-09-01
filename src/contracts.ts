@@ -38,6 +38,21 @@ export const ProvisionRequestSchema = z
   })
   .strict();
 
+export const CreateWorkspaceRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    description: z.string().max(4000).nullable().optional(),
+  })
+  .strict();
+
+export const CreateWorkspaceResultSchema = z
+  .object({
+    state: z.enum(["ready_for_connections", "suspended"]),
+    workspace: WorkspaceReferenceSchema,
+    created: z.boolean(),
+  })
+  .strict();
+
 export const HubspotConnectStartSchema = z
   .object({
     provider: z.literal("hubspot"),
@@ -68,5 +83,7 @@ export const HubspotConnectionStatusSchema = z.discriminatedUnion("status", [
 
 export type WorkspaceStatus = z.infer<typeof WorkspaceStatusSchema>;
 export type ProvisioningResult = z.infer<typeof ProvisioningResultSchema>;
+export type CreateWorkspaceRequest = z.infer<typeof CreateWorkspaceRequestSchema>;
+export type CreateWorkspaceResult = z.infer<typeof CreateWorkspaceResultSchema>;
 export type HubspotConnectStart = z.infer<typeof HubspotConnectStartSchema>;
 export type HubspotConnectionStatus = z.infer<typeof HubspotConnectionStatusSchema>;

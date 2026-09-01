@@ -1,5 +1,8 @@
 import type { AuthSession } from "./app.js";
 import {
+  CreateWorkspaceResultSchema,
+  type CreateWorkspaceRequest,
+  type CreateWorkspaceResult,
   ProvisioningResultSchema,
   type ProvisioningResult,
   WorkspaceStatusSchema,
@@ -63,6 +66,24 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (code === "PT400" && message.startsWith("lifty_workspace_invalid:")) {
+    return new PublicError({
+      status: 422,
+      code: "WORKSPACE_INVALID",
+      message: "The workspace request did not pass server validation.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT413" && message.startsWith("lifty_workspace_too_large:")) {
+    return new PublicError({
+      status: 413,
+      code: "WORKSPACE_FIELD_TOO_LARGE",
+      message: "The workspace request exceeds the server safety limits.",
+      cause: error,
+    });
+  }
+
   if (code === "PT413") {
     return new PublicError({
       status: 413,
@@ -111,6 +132,26 @@ export async function getWorkspaceStatus(
   }
 
   const parsed = WorkspaceStatusSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+export async function createWorkspace(
+  session: AuthSession,
+  input: CreateWorkspaceRequest,
+): Promise<CreateWorkspaceResult> {
+  const { data, error } = await getRpcClient(session).rpc<CreateWorkspaceResult>(
+    "create_lifty_workspace",
+    { name: input.name, description: input.description ?? null },
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = CreateWorkspaceResultSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }
