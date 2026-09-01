@@ -5,6 +5,7 @@ import { PublicError } from "./errors.js";
 // the payload and an idempotency key — queue, retry, and version selection
 // belong to the deployed lift-gtm-jobs task.
 const ONBOARDING_IMPORT_TASK_ID = "lifty-onboarding-import";
+const FIRST_RUN_TASK_ID = "lifty-first-run";
 const IDEMPOTENCY_TTL = "1h";
 
 export interface TriggerClientSettings {
@@ -23,50 +24,69 @@ export type EnqueueOnboardingImport = (
   options: EnqueueOnboardingImportOptions,
 ) => Promise<{ id: string }>;
 
-export function createOnboardingImportTrigger(
+async function triggerTask(
   settings: TriggerClientSettings,
-): EnqueueOnboardingImport {
+  taskId: string,
+  payload: unknown,
+  idempotencyKey: string,
+): Promise<{ id: string }> {
   const fetchImpl = settings.fetchImpl ?? fetch;
   const baseUrl = settings.apiUrl.replace(/\/$/, "");
 
+  let response: Response;
+  try {
+    response = await fetchImpl(`${baseUrl}/api/v1/tasks/${taskId}/trigger`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${settings.secretKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        payload,
+        options: { idempotencyKey, idempotencyKeyTTL: IDEMPOTENCY_TTL },
+      }),
+    });
+  } catch (error) {
+    throw enqueueFailed(error);
+  }
+  if (!response.ok) {
+    throw enqueueFailed(new Error(`Trigger.dev responded ${response.status}`));
+  }
+
+  const body = (await response.json().catch(() => null)) as
+    | { id?: unknown }
+    | null;
+  if (!body || typeof body.id !== "string" || body.id.length === 0) {
+    throw enqueueFailed(new Error("Trigger.dev returned no run id"));
+  }
+  return { id: body.id };
+}
+
+export function createOnboardingImportTrigger(
+  settings: TriggerClientSettings,
+): EnqueueOnboardingImport {
   return async (submissionId, options) => {
     const idempotencyKey = options.fresh
       ? `${ONBOARDING_IMPORT_TASK_ID}:${submissionId}:retry:${Date.now()}`
       : `${ONBOARDING_IMPORT_TASK_ID}:${submissionId}`;
-
-    let response: Response;
-    try {
-      response = await fetchImpl(
-        `${baseUrl}/api/v1/tasks/${ONBOARDING_IMPORT_TASK_ID}/trigger`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${settings.secretKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            payload: { submissionId },
-            options: { idempotencyKey, idempotencyKeyTTL: IDEMPOTENCY_TTL },
-          }),
-        },
-      );
-    } catch (error) {
-      throw enqueueFailed(error);
-    }
-    if (!response.ok) {
-      throw enqueueFailed(
-        new Error(`Trigger.dev responded ${response.status}`),
-      );
-    }
-
-    const body = (await response.json().catch(() => null)) as
-      | { id?: unknown }
-      | null;
-    if (!body || typeof body.id !== "string" || body.id.length === 0) {
-      throw enqueueFailed(new Error("Trigger.dev returned no run id"));
-    }
-    return { id: body.id };
+    return triggerTask(
+      settings,
+      ONBOARDING_IMPORT_TASK_ID,
+      { submissionId },
+      idempotencyKey,
+    );
   };
+}
+
+export type EnqueueFirstRun = (runId: string) => Promise<{ id: string }>;
+
+export function createFirstRunTrigger(
+  settings: TriggerClientSettings,
+): EnqueueFirstRun {
+  // Always the same key per ledger run: a re-attached `lifty run` re-triggers
+  // idempotently, which also self-heals an enqueue lost after the RPC insert.
+  return async (runId) =>
+    triggerTask(settings, FIRST_RUN_TASK_ID, { runId }, `${FIRST_RUN_TASK_ID}:${runId}`);
 }
 
 function enqueueFailed(cause: unknown): PublicError {
@@ -74,7 +94,7 @@ function enqueueFailed(cause: unknown): PublicError {
     status: 502,
     code: "IMPORT_ENQUEUE_FAILED",
     message:
-      "LIFTY accepted the draft but could not start the import. Run `lifty push` again.",
+      "LIFTY accepted the request but could not start the background run. Try the command again.",
     cause,
   });
 }

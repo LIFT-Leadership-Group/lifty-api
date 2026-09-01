@@ -11,15 +11,19 @@ import {
   HubspotConnectionStatusSchema,
   OnboardingPushResultSchema,
   OnboardingStatusSchema,
+  RunStatusSchema,
+  StartRunResultSchema,
   SubmitOnboardingRequestSchema,
   type HubspotConnectStart,
   type HubspotConnectionStatus,
   type OnboardingStatus,
   type OnboardingSubmission,
+  type RunStatus,
+  type StartRunResult,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
-import type { EnqueueOnboardingImport } from "./trigger-client.js";
+import type { EnqueueFirstRun, EnqueueOnboardingImport } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
   HubspotCallbackError,
@@ -56,6 +60,9 @@ export interface AppDependencies {
   ): Promise<OnboardingSubmission>;
   getOnboardingStatus(session: AuthSession): Promise<OnboardingStatus>;
   enqueueOnboardingImport: EnqueueOnboardingImport;
+  startRun(session: AuthSession): Promise<StartRunResult>;
+  getRunStatus(session: AuthSession): Promise<RunStatus>;
+  enqueueFirstRun: EnqueueFirstRun;
   startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
   completeHubspotCallback(
@@ -225,6 +232,29 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   });
   app.openAPIRegistry.registerPath({
     method: "post",
+    path: "/v1/workspace/runs",
+    operationId: "startRun",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(StartRunResultSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/workspace/runs",
+    operationId: "getRunStatus",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(RunStatusSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post",
     path: "/v1/integrations/hubspot/connect",
     operationId: "startHubspotConnect",
     security: [{ bearerAuth: [] }],
@@ -283,6 +313,15 @@ const defaultDependencies: AppDependencies = {
   },
   enqueueOnboardingImport: async () => {
     throw new Error("enqueueOnboardingImport is not configured");
+  },
+  startRun: async () => {
+    throw new Error("startRun is not configured");
+  },
+  getRunStatus: async () => {
+    throw new Error("getRunStatus is not configured");
+  },
+  enqueueFirstRun: async () => {
+    throw new Error("enqueueFirstRun is not configured");
   },
   startHubspotConnect: async () => {
     throw new Error("startHubspotConnect is not configured");
@@ -664,6 +703,20 @@ export function createApp(
       context.get("authSession"),
     );
     return context.json(OnboardingStatusSchema.parse(result));
+  });
+
+  app.post("/v1/workspace/runs", async (context) => {
+    const result = await dependencies.startRun(context.get("authSession"));
+    // Enqueue on every start, including a re-attach: the run-scoped
+    // idempotency key makes it a no-op when the run is already enqueued and
+    // self-heals an enqueue lost after the ledger insert.
+    await dependencies.enqueueFirstRun(result.run_ref);
+    return context.json(StartRunResultSchema.parse(result));
+  });
+
+  app.get("/v1/workspace/runs", async (context) => {
+    const result = await dependencies.getRunStatus(context.get("authSession"));
+    return context.json(RunStatusSchema.parse(result));
   });
 
   app.post("/v1/integrations/hubspot/connect", async (context) => {

@@ -121,6 +121,46 @@ export const OnboardingStatusSchema = z.discriminatedUnion("state", [
     .strict(),
 ]);
 
+export const StartRunResultSchema = z
+  .object({
+    state: z.enum(["queued", "running"]),
+    run_ref: z.string().min(1),
+    requested_leads: z.number().int().positive(),
+    workspace: WorkspaceReferenceSchema,
+    created: z.boolean(),
+  })
+  .strict();
+
+const RunLeadSchema = z
+  .object({
+    name: z.string(),
+    title: z.string().nullable(),
+    company: z.string().nullable(),
+    linkedin_url: z.string().nullable(),
+    tier: z.string().nullable(),
+    fit_rationale: z.string().nullable(),
+    stage: z.string().nullable(),
+  })
+  .strict();
+
+export const RunStatusSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("none") }).strict(),
+  z
+    .object({
+      state: z.enum(["queued", "running", "succeeded", "failed"]),
+      run_ref: z.string().min(1),
+      requested_leads: z.number().int().positive(),
+      leads_discovered: z.number().int().nonnegative().nullable(),
+      leads_researched: z.number().int().nonnegative().nullable(),
+      error_code: z.string().nullable(),
+      started_at: z.string().min(1),
+      completed_at: z.string().nullable(),
+      workspace: WorkspaceReferenceSchema,
+      leads: z.array(RunLeadSchema).nullable(),
+    })
+    .strict(),
+]);
+
 export const HubspotConnectStartSchema = z
   .object({
     provider: z.literal("hubspot"),
@@ -155,5 +195,7 @@ export type CreateWorkspaceResult = z.infer<typeof CreateWorkspaceResultSchema>;
 export type OnboardingSubmission = z.infer<typeof OnboardingSubmissionSchema>;
 export type OnboardingPushResult = z.infer<typeof OnboardingPushResultSchema>;
 export type OnboardingStatus = z.infer<typeof OnboardingStatusSchema>;
+export type StartRunResult = z.infer<typeof StartRunResultSchema>;
+export type RunStatus = z.infer<typeof RunStatusSchema>;
 export type HubspotConnectStart = z.infer<typeof HubspotConnectStartSchema>;
 export type HubspotConnectionStatus = z.infer<typeof HubspotConnectionStatusSchema>;

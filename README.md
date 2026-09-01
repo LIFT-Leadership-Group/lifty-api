@@ -22,6 +22,8 @@ configured Hono app for programmatic use.
 - `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
 - `POST /v1/onboarding` — authenticated draft submission; queues one onboarding-import run (LIF-656)
 - `GET /v1/onboarding` — authenticated import status with a secret-free config summary
+- `POST /v1/workspace/runs` — start (or re-attach to) the first ICP run of five leads (LIF-657)
+- `GET /v1/workspace/runs` — run state, progress, and researched results
 - `POST /v1/integrations/hubspot/connect` — mint a short-lived connect URL
 - `GET /v1/integrations/hubspot` — secret-free connection status
 - `GET /hubspot/start` — redirect an opaque connect intent to HubSpot consent

@@ -4,6 +4,8 @@ import {
   createWorkspace,
   getWorkspaceStatus,
   getOnboardingStatus,
+  getRunStatus,
+  startRun,
   submitOnboarding,
 } from "../src/workspace-operations.js";
 
@@ -88,6 +90,10 @@ describe("workspace RPC operations", () => {
     ["PT400", "lifty_workspace_invalid: name", 422, "WORKSPACE_INVALID"],
     ["PT413", "lifty_workspace_too_large: description", 413, "WORKSPACE_FIELD_TOO_LARGE"],
     ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING"],
+    ["PT409", "lifty_run_not_configured", 409, "RUN_NOT_CONFIGURED"],
+    ["PT409", "lifty_run_already_completed", 409, "RUN_ALREADY_COMPLETED"],
+    ["PT409", "lifty_run_workspace_suspended", 409, "WORKSPACE_SUSPENDED"],
+    ["PT409", "lifty_run_unavailable", 409, "RUN_UNAVAILABLE"],
     ["PT409", "provisioning_conflict", 409, "PROVISIONING_CONFLICT"],
     ["XX000", "private internal failure", 502, "SUPABASE_REQUEST_FAILED"],
   ])(
@@ -238,6 +244,10 @@ describe("workspace RPC operations", () => {
     ["PT400", "lifty_draft_invalid: gate_4_hard_disqualifier", 422, "DRAFT_INVALID"],
     ["PT413", "lifty_draft_too_large: max_nodes", 413, "DRAFT_TOO_LARGE"],
     ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING"],
+    ["PT409", "lifty_run_not_configured", 409, "RUN_NOT_CONFIGURED"],
+    ["PT409", "lifty_run_already_completed", 409, "RUN_ALREADY_COMPLETED"],
+    ["PT409", "lifty_run_workspace_suspended", 409, "WORKSPACE_SUSPENDED"],
+    ["PT409", "lifty_run_unavailable", 409, "RUN_UNAVAILABLE"],
     ["PT409", "provisioning_conflict", 409, "PROVISIONING_CONFLICT"],
     [
       "P0001",
@@ -291,5 +301,66 @@ describe("workspace RPC operations", () => {
       status: 502,
       code: "SUPABASE_INVALID_RESPONSE",
     });
+  });
+});
+
+describe("first run operations", () => {
+  it("starts the run through the authenticated client", async () => {
+    const expected = {
+      state: "queued" as const,
+      run_ref: "22222222-2222-4222-8222-222222222222",
+      requested_leads: 5,
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      created: true,
+    };
+    const calls: string[] = [];
+    const client = {
+      rpc: async (name: string) => {
+        calls.push(name);
+        return { data: expected, error: null };
+      },
+    };
+
+    await expect(startRun({ userId: "founder-123", client })).resolves.toEqual(expected);
+    expect(calls).toEqual(["start_lifty_run"]);
+  });
+
+  it("maps a not-configured start to a push-first error", async () => {
+    const client = {
+      rpc: async () => ({
+        data: null,
+        error: { code: "PT409", message: "lifty_run_not_configured" },
+      }),
+    };
+
+    await expect(startRun({ userId: "founder-123", client })).rejects.toMatchObject({
+      status: 409,
+      code: "RUN_NOT_CONFIGURED",
+    });
+  });
+
+  it("returns the run status through the authenticated client", async () => {
+    const expected = {
+      state: "running" as const,
+      run_ref: "22222222-2222-4222-8222-222222222222",
+      requested_leads: 5,
+      leads_discovered: 5,
+      leads_researched: 2,
+      error_code: null,
+      started_at: "2026-09-01T21:00:00Z",
+      completed_at: null,
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      leads: null,
+    };
+    const calls: string[] = [];
+    const client = {
+      rpc: async (name: string) => {
+        calls.push(name);
+        return { data: expected, error: null };
+      },
+    };
+
+    await expect(getRunStatus({ userId: "founder-123", client })).resolves.toEqual(expected);
+    expect(calls).toEqual(["get_lifty_run_status"]);
   });
 });
