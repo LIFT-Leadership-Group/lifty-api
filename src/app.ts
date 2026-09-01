@@ -9,14 +9,17 @@ import {
   type CreateWorkspaceResult,
   HubspotConnectStartSchema,
   HubspotConnectionStatusSchema,
-  ProvisionRequestSchema,
-  ProvisioningResultSchema,
+  OnboardingPushResultSchema,
+  OnboardingStatusSchema,
+  SubmitOnboardingRequestSchema,
   type HubspotConnectStart,
   type HubspotConnectionStatus,
-  type ProvisioningResult,
+  type OnboardingStatus,
+  type OnboardingSubmission,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
+import type { EnqueueOnboardingImport } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
   HubspotCallbackError,
@@ -38,7 +41,7 @@ export type AuthenticationResult =
   | { ok: true; session: AuthSession }
   | { ok: false; reason: "invalid_session" };
 
-export type { ProvisioningResult, WorkspaceStatus } from "./contracts.js";
+export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
   authenticate(request: Request): Promise<AuthenticationResult>;
@@ -47,10 +50,12 @@ export interface AppDependencies {
     session: AuthSession,
     input: CreateWorkspaceRequest,
   ): Promise<CreateWorkspaceResult>;
-  provisionWorkspace(
+  submitOnboarding(
     session: AuthSession,
     draft: Record<string, unknown>,
-  ): Promise<ProvisioningResult>;
+  ): Promise<OnboardingSubmission>;
+  getOnboardingStatus(session: AuthSession): Promise<OnboardingStatus>;
+  enqueueOnboardingImport: EnqueueOnboardingImport;
   startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
   completeHubspotCallback(
@@ -188,22 +193,33 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   });
   app.openAPIRegistry.registerPath({
     method: "post",
-    path: "/v1/workspaces",
-    operationId: "provisionWorkspace",
+    path: "/v1/onboarding",
+    operationId: "submitOnboarding",
     security: [{ bearerAuth: [] }],
     request: {
       body: {
         required: true,
-        content: { "application/json": { schema: ProvisionRequestSchema } },
+        content: { "application/json": { schema: SubmitOnboardingRequestSchema } },
       },
     },
     responses: {
-      200: JsonResponse(ProvisioningResultSchema),
+      200: JsonResponse(OnboardingPushResultSchema),
       400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
       413: JsonResponse(ErrorResponseSchema),
       422: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/onboarding",
+    operationId: "getOnboardingStatus",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(OnboardingStatusSchema),
+      401: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
   });
@@ -259,8 +275,14 @@ const defaultDependencies: AppDependencies = {
   createWorkspace: async () => {
     throw new Error("createWorkspace is not configured");
   },
-  provisionWorkspace: async () => {
-    throw new Error("provisionWorkspace is not configured");
+  submitOnboarding: async () => {
+    throw new Error("submitOnboarding is not configured");
+  },
+  getOnboardingStatus: async () => {
+    throw new Error("getOnboardingStatus is not configured");
+  },
+  enqueueOnboardingImport: async () => {
+    throw new Error("enqueueOnboardingImport is not configured");
   },
   startHubspotConnect: async () => {
     throw new Error("startHubspotConnect is not configured");
@@ -558,14 +580,14 @@ export function createApp(
     return context.json(CreateWorkspaceResultSchema.parse(result));
   });
 
-  app.post("/v1/workspaces", async (context) => {
+  app.post("/v1/onboarding", async (context) => {
     const declaredLength = Number(context.req.header("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
       return context.json(
         {
           error: {
             code: "PAYLOAD_TOO_LARGE",
-            message: "The provisioning request exceeds 132 KiB.",
+            message: "The onboarding push exceeds 132 KiB.",
           },
           request_id: context.get("requestId"),
         },
@@ -581,28 +603,27 @@ export function createApp(
         {
           error: {
             code: "PAYLOAD_TOO_LARGE",
-            message: "The provisioning request exceeds 132 KiB.",
+            message: "The onboarding push exceeds 132 KiB.",
           },
           request_id: context.get("requestId"),
         },
         413,
       );
     }
-    const requestText = requestBody.text;
 
     let parsedJson: unknown;
     try {
-      parsedJson = JSON.parse(requestText);
+      parsedJson = JSON.parse(requestBody.text);
     } catch {
       parsedJson = null;
     }
-    const body = ProvisionRequestSchema.safeParse(parsedJson);
+    const body = SubmitOnboardingRequestSchema.safeParse(parsedJson);
     if (!body.success) {
       return context.json(
         {
           error: {
             code: "INVALID_REQUEST",
-            message: "The provisioning request must contain one JSON object named draft.",
+            message: "The onboarding push must contain one JSON object named draft.",
           },
           request_id: context.get("requestId"),
         },
@@ -610,11 +631,39 @@ export function createApp(
       );
     }
 
-    const result = await dependencies.provisionWorkspace(
+    const submission = await dependencies.submitOnboarding(
       context.get("authSession"),
       body.data.draft,
     );
-    return context.json(ProvisioningResultSchema.parse(result));
+
+    // An already-imported draft needs no run; anything else gets exactly one.
+    // A previously failed import must not dedupe onto its dead run.
+    let runId: string | null = null;
+    if (submission.import_status !== "imported") {
+      const run = await dependencies.enqueueOnboardingImport(
+        submission.submission_ref,
+        { fresh: submission.import_status === "failed" },
+      );
+      runId = run.id;
+    }
+
+    return context.json(
+      OnboardingPushResultSchema.parse({
+        state: submission.import_status === "imported" ? "imported" : "queued",
+        run_id: runId,
+        submission_ref: submission.submission_ref,
+        draft_digest: submission.draft_digest,
+        workspace: submission.workspace,
+        created: submission.created,
+      }),
+    );
+  });
+
+  app.get("/v1/onboarding", async (context) => {
+    const result = await dependencies.getOnboardingStatus(
+      context.get("authSession"),
+    );
+    return context.json(OnboardingStatusSchema.parse(result));
   });
 
   app.post("/v1/integrations/hubspot/connect", async (context) => {

@@ -3,8 +3,10 @@ import {
   CreateWorkspaceResultSchema,
   type CreateWorkspaceRequest,
   type CreateWorkspaceResult,
-  ProvisioningResultSchema,
-  type ProvisioningResult,
+  OnboardingStatusSchema,
+  type OnboardingStatus,
+  OnboardingSubmissionSchema,
+  type OnboardingSubmission,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
@@ -44,6 +46,15 @@ function mapRpcError(error: unknown): PublicError {
       status: 409,
       code: "WORKSPACE_ALREADY_EXISTS",
       message: "This account already has a LIFTY workspace.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_workspace_missing")) {
+    return new PublicError({
+      status: 409,
+      code: "WORKSPACE_MISSING",
+      message: "This account has no LIFTY workspace yet. Run `lifty login` first.",
       cause: error,
     });
   }
@@ -158,12 +169,12 @@ export async function createWorkspace(
   return parsed.data;
 }
 
-export async function provisionWorkspace(
+export async function submitOnboarding(
   session: AuthSession,
   draft: Record<string, unknown>,
-): Promise<ProvisioningResult> {
-  const { data, error } = await getRpcClient(session).rpc<ProvisioningResult>(
-    "provision_lifty_workspace",
+): Promise<OnboardingSubmission> {
+  const { data, error } = await getRpcClient(session).rpc<OnboardingSubmission>(
+    "submit_lifty_onboarding",
     { draft },
   );
 
@@ -171,7 +182,25 @@ export async function provisionWorkspace(
     throw mapRpcError(error);
   }
 
-  const parsed = ProvisioningResultSchema.safeParse(unwrapSingleRow(data));
+  const parsed = OnboardingSubmissionSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+export async function getOnboardingStatus(
+  session: AuthSession,
+): Promise<OnboardingStatus> {
+  const { data, error } = await getRpcClient(session).rpc<OnboardingStatus>(
+    "get_lifty_onboarding_status",
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = OnboardingStatusSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }

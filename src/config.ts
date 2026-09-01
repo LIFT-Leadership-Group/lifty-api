@@ -10,6 +10,10 @@ export interface ServiceConfig {
   port: number;
   supabase: SupabaseAuthenticationConfig;
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
+  trigger: {
+    apiUrl: string;
+    secretKey: string;
+  };
 }
 
 const FORBIDDEN_SECRET_NAMES = [
@@ -110,6 +114,15 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
       publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
       publishableKey,
+    },
+    trigger: {
+      apiUrl: secureUrl(
+        environment.TRIGGER_API_URL?.trim() || "https://api.trigger.dev",
+        "TRIGGER_API_URL",
+      )
+        .toString()
+        .replace(/\/$/, ""),
+      secretKey: required(environment, "TRIGGER_SECRET_KEY"),
     },
   };
 }

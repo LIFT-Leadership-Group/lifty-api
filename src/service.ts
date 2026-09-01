@@ -9,10 +9,12 @@ import {
   createSupabaseAuthenticator,
   createSupabaseReadinessCheck,
 } from "./supabase-auth.js";
+import { createOnboardingImportTrigger } from "./trigger-client.js";
 import {
   createWorkspace,
+  getOnboardingStatus,
   getWorkspaceStatus,
-  provisionWorkspace,
+  submitOnboarding,
 } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
@@ -21,7 +23,9 @@ export function createProductionApp(config: ServiceConfig) {
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,
     createWorkspace,
-    provisionWorkspace,
+    submitOnboarding,
+    getOnboardingStatus,
+    enqueueOnboardingImport: createOnboardingImportTrigger(config.trigger),
     startHubspotConnect: hubspot.startConnect,
     getHubspotConnection: hubspot.getConnection,
     completeHubspotCallback: hubspot.completeCallback,

@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createWorkspace,
   getWorkspaceStatus,
-  provisionWorkspace,
+  getOnboardingStatus,
+  submitOnboarding,
 } from "../src/workspace-operations.js";
 
 describe("workspace RPC operations", () => {
@@ -86,6 +87,7 @@ describe("workspace RPC operations", () => {
     ["PT401", "unauthenticated", 401, "UNAUTHORIZED"],
     ["PT400", "lifty_workspace_invalid: name", 422, "WORKSPACE_INVALID"],
     ["PT413", "lifty_workspace_too_large: description", 413, "WORKSPACE_FIELD_TOO_LARGE"],
+    ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING"],
     ["PT409", "provisioning_conflict", 409, "PROVISIONING_CONFLICT"],
     ["XX000", "private internal failure", 502, "SUPABASE_REQUEST_FAILED"],
   ])(
@@ -125,12 +127,15 @@ describe("workspace RPC operations", () => {
     });
   });
 
-  it("provisions through the authenticated client without forwarding actor identity", async () => {
-    const draft = { schema_version: "1.0", company: { name: "Example" } };
+  it("submits through the authenticated client without forwarding actor identity", async () => {
+    const draft = { schema_version: "2.0", company: { name: "Example" } };
     const expected = {
-      state: "ready_for_connections" as const,
+      state: "submitted" as const,
+      submission_ref: "11111111-1111-4111-8111-111111111111",
+      draft_digest: `sha256:${"d".repeat(64)}`,
+      import_status: "pending" as const,
       workspace: { workspace_ref: "ws_opaque", name: "Example" },
-      draft_digest: "sha256:deadbeef",
+      created: true,
     };
     const calls: Array<{ name: string; args?: unknown }> = [];
     const client = {
@@ -141,11 +146,69 @@ describe("workspace RPC operations", () => {
     };
 
     await expect(
-      provisionWorkspace({ userId: "founder-123", client }, draft),
+      submitOnboarding({ userId: "founder-123", client }, draft),
     ).resolves.toEqual(expected);
     expect(calls).toEqual([
-      { name: "provision_lifty_workspace", args: { draft } },
+      { name: "submit_lifty_onboarding", args: { draft } },
     ]);
+  });
+
+  it("rejects a submission response with unexpected fields", async () => {
+    const client = {
+      rpc: async () => ({
+        data: {
+          state: "submitted",
+          submission_ref: "11111111-1111-4111-8111-111111111111",
+          draft_digest: `sha256:${"d".repeat(64)}`,
+          import_status: "pending",
+          workspace: { workspace_ref: "ws_opaque", name: "Example" },
+          created: true,
+          api_key: "secret-never-surface",
+        },
+        error: null,
+      }),
+    };
+
+    await expect(
+      submitOnboarding({ userId: "founder-123", client }, { draft: true }),
+    ).rejects.toMatchObject({
+      status: 502,
+      code: "SUPABASE_INVALID_RESPONSE",
+    });
+  });
+
+  it("returns the onboarding status through the authenticated client", async () => {
+    const expected = {
+      state: "imported" as const,
+      submission_ref: "11111111-1111-4111-8111-111111111111",
+      draft_digest: `sha256:${"d".repeat(64)}`,
+      submitted_at: "2026-09-01T21:00:00Z",
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      summary: {
+        icp: {
+          version: 1,
+          label: "Example lane",
+          person_locations: ["United States"],
+          organization_industries: ["computer software"],
+          organization_num_employees_ranges: ["51,200"],
+          person_seniorities: null,
+          personas: [{ name: "Founder buyer", titles: ["Founder"] }],
+        },
+        prompt: { agent: "scout" as const, chars: 1234, published: true as const },
+      },
+    };
+    const calls: string[] = [];
+    const client = {
+      rpc: async (name: string) => {
+        calls.push(name);
+        return { data: expected, error: null };
+      },
+    };
+
+    await expect(
+      getOnboardingStatus({ userId: "founder-123", client }),
+    ).resolves.toEqual(expected);
+    expect(calls).toEqual(["get_lifty_onboarding_status"]);
   });
 
   it("maps database errors to stable public API errors without exposing details", async () => {
@@ -162,7 +225,7 @@ describe("workspace RPC operations", () => {
     };
 
     await expect(
-      provisionWorkspace({ userId: "founder-123", client }, { draft: true }),
+      submitOnboarding({ userId: "founder-123", client }, { draft: true }),
     ).rejects.toMatchObject({
       status: 409,
       code: "WORKSPACE_ALREADY_EXISTS",
@@ -174,6 +237,7 @@ describe("workspace RPC operations", () => {
     ["PT401", "unauthenticated", 401, "UNAUTHORIZED"],
     ["PT400", "lifty_draft_invalid: gate_4_hard_disqualifier", 422, "DRAFT_INVALID"],
     ["PT413", "lifty_draft_too_large: max_nodes", 413, "DRAFT_TOO_LARGE"],
+    ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING"],
     ["PT409", "provisioning_conflict", 409, "PROVISIONING_CONFLICT"],
     [
       "P0001",
@@ -193,7 +257,7 @@ describe("workspace RPC operations", () => {
       };
 
       await expect(
-        provisionWorkspace({ userId: "founder-123", client }, { draft: true }),
+        submitOnboarding({ userId: "founder-123", client }, { draft: true }),
       ).rejects.toMatchObject({ status, code: publicCode });
     },
   );

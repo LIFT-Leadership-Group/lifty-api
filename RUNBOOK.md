@@ -14,7 +14,8 @@ project JWKS, creates a user-scoped Supabase client, and delegates to:
 
 - `public.get_lifty_workspace_status()`
 - `public.create_lifty_workspace(name text, description text)`
-- `public.provision_lifty_workspace(draft jsonb)` — deprecated by LIF-655; push path until P4.2
+- `public.submit_lifty_onboarding(draft jsonb)` — draft-gated push receipt (LIF-656)
+- `public.get_lifty_onboarding_status()` — import status + secret-free summary (LIF-656)
 - `public.create_lifty_hubspot_connect_intent()`
 - `public.get_lifty_hubspot_connection()`
 
@@ -45,6 +46,8 @@ The request-scoped Supabase client aborts each database request after 10 seconds
 | `PUBLIC_BASE_URL` | Exact HTTPS DigitalOcean ingress used for OAuth redirects |
 | `HUBSPOT_CLIENT_ID` | Client ID for the reviewed HubSpot LIFTY app |
 | `HUBSPOT_CLIENT_SECRET` | Encrypted app-level secret for the HubSpot LIFTY app |
+| `TRIGGER_SECRET_KEY` | Trigger.dev prod secret key used to enqueue `lifty-onboarding-import` |
+| `TRIGGER_API_URL` | Optional; defaults to `https://api.trigger.dev` |
 | `HOST` | Bind host, default `0.0.0.0` |
 | `PORT` | Bind port, default `3000` |
 
