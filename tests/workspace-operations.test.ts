@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   createWorkspace,
+  getCrmSyncStatus,
   getWorkspaceStatus,
   getOnboardingStatus,
   getRunStatus,
+  startCrmSyncRun,
   startRun,
   submitOnboarding,
 } from "../src/workspace-operations.js";
@@ -362,5 +364,85 @@ describe("first run operations", () => {
 
     await expect(getRunStatus({ userId: "founder-123", client })).resolves.toEqual(expected);
     expect(calls).toEqual(["get_lifty_run_status"]);
+  });
+});
+
+describe("crm sync RPC operations", () => {
+  const startFixture = {
+    state: "queued" as const,
+    run_ref: "33333333-3333-4333-8333-333333333333",
+    requested_leads: 4,
+    portal_id: "149239526",
+    workspace: { workspace_ref: "ws_opaque", name: "Example" },
+    created: true,
+  };
+
+  it("starts the sync through the authenticated request-scoped client", async () => {
+    const calls: Array<{ name: string; args?: unknown }> = [];
+    const client = {
+      rpc: async (name: string, args?: unknown) => {
+        calls.push({ name, args });
+        return { data: startFixture, error: null };
+      },
+    };
+
+    await expect(
+      startCrmSyncRun({ userId: "founder-123", client }),
+    ).resolves.toEqual(startFixture);
+    expect(calls).toEqual([{ name: "start_lifty_crm_sync_run", args: undefined }]);
+  });
+
+  it.each([
+    ["PT401", "unauthenticated", 401, "UNAUTHORIZED"],
+    ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING"],
+    ["PT409", "lifty_sync_not_connected", 409, "HUBSPOT_NOT_CONNECTED"],
+    ["PT409", "lifty_sync_nothing_to_sync", 409, "NOTHING_TO_SYNC"],
+    ["PT409", "lifty_sync_run_in_progress", 409, "RUN_IN_PROGRESS"],
+    ["PT409", "lifty_sync_workspace_suspended", 409, "WORKSPACE_SUSPENDED"],
+    ["XX000", "private internal failure", 502, "SUPABASE_REQUEST_FAILED"],
+  ])(
+    "maps sync-start %s %s failures to a safe response",
+    async (databaseCode, databaseMessage, status, publicCode) => {
+      const client = {
+        rpc: async () => ({
+          data: null,
+          error: { code: databaseCode, message: databaseMessage },
+        }),
+      };
+
+      await expect(
+        startCrmSyncRun({ userId: "founder-123", client }),
+      ).rejects.toMatchObject({ status, code: publicCode });
+    },
+  );
+
+  it("reads sync status and rejects unexpected fields at the boundary", async () => {
+    const status = {
+      state: "succeeded" as const,
+      run_ref: "33333333-3333-4333-8333-333333333333",
+      requested_leads: 4,
+      leads_synced: 4,
+      error_code: null,
+      portal_id: "149239526",
+      started_at: "2026-09-02T14:00:00Z",
+      completed_at: "2026-09-02T14:05:00Z",
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+    };
+    const okClient = {
+      rpc: async () => ({ data: status, error: null }),
+    };
+    await expect(
+      getCrmSyncStatus({ userId: "founder-123", client: okClient }),
+    ).resolves.toEqual(status);
+
+    const leakyClient = {
+      rpc: async () => ({
+        data: { ...status, access_token: "never-forward" },
+        error: null,
+      }),
+    };
+    await expect(
+      getCrmSyncStatus({ userId: "founder-123", client: leakyClient }),
+    ).rejects.toMatchObject({ status: 502, code: "SUPABASE_INVALID_RESPONSE" });
   });
 });

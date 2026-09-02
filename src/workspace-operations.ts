@@ -11,6 +11,10 @@ import {
   type RunStatus,
   StartRunResultSchema,
   type StartRunResult,
+  StartCrmSyncResultSchema,
+  type StartCrmSyncResult,
+  CrmSyncStatusSchema,
+  type CrmSyncStatus,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
@@ -86,6 +90,42 @@ function mapRpcError(error: unknown): PublicError {
       status: 409,
       code: "RUN_UNAVAILABLE",
       message: "LIFTY cannot start a run for this workspace right now. Contact LIFT support.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_sync_not_connected")) {
+    return new PublicError({
+      status: 409,
+      code: "HUBSPOT_NOT_CONNECTED",
+      message: "No usable HubSpot connection. Connect first with `lifty connect hubspot`.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_sync_nothing_to_sync")) {
+    return new PublicError({
+      status: 409,
+      code: "NOTHING_TO_SYNC",
+      message: "Every researched lead is already in your CRM.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_sync_run_in_progress")) {
+    return new PublicError({
+      status: 409,
+      code: "RUN_IN_PROGRESS",
+      message: "A lead run is still working. Check it with `lifty status`, then run `lifty sync` again.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_sync_workspace_suspended")) {
+    return new PublicError({
+      status: 409,
+      code: "WORKSPACE_SUSPENDED",
+      message: "This workspace is suspended. Contact LIFT support.",
       cause: error,
     });
   }
@@ -273,6 +313,42 @@ export async function getRunStatus(session: AuthSession): Promise<RunStatus> {
   }
 
   const parsed = RunStatusSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+export async function startCrmSyncRun(
+  session: AuthSession,
+): Promise<StartCrmSyncResult> {
+  const { data, error } = await getRpcClient(session).rpc<StartCrmSyncResult>(
+    "start_lifty_crm_sync_run",
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = StartCrmSyncResultSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+export async function getCrmSyncStatus(
+  session: AuthSession,
+): Promise<CrmSyncStatus> {
+  const { data, error } = await getRpcClient(session).rpc<CrmSyncStatus>(
+    "get_lifty_crm_sync_status",
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = CrmSyncStatusSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }

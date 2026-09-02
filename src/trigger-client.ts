@@ -6,6 +6,7 @@ import { PublicError } from "./errors.js";
 // belong to the deployed lift-gtm-jobs task.
 const ONBOARDING_IMPORT_TASK_ID = "lifty-onboarding-import";
 const FIRST_RUN_TASK_ID = "lifty-first-run";
+const CRM_SYNC_TASK_ID = "lifty-crm-sync";
 const IDEMPOTENCY_TTL = "1h";
 
 export interface TriggerClientSettings {
@@ -87,6 +88,17 @@ export function createFirstRunTrigger(
   // idempotently, which also self-heals an enqueue lost after the RPC insert.
   return async (runId) =>
     triggerTask(settings, FIRST_RUN_TASK_ID, { runId }, `${FIRST_RUN_TASK_ID}:${runId}`);
+}
+
+export type EnqueueCrmSync = (runId: string) => Promise<{ id: string }>;
+
+export function createCrmSyncTrigger(
+  settings: TriggerClientSettings,
+): EnqueueCrmSync {
+  // Same key per ledger run as the first-run trigger: a re-attached
+  // `lifty sync` re-triggers idempotently and self-heals a lost enqueue.
+  return async (runId) =>
+    triggerTask(settings, CRM_SYNC_TASK_ID, { runId }, `${CRM_SYNC_TASK_ID}:${runId}`);
 }
 
 function enqueueFailed(cause: unknown): PublicError {

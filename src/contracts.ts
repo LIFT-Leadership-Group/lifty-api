@@ -189,6 +189,34 @@ export const HubspotConnectionStatusSchema = z.discriminatedUnion("status", [
     .strict(),
 ]);
 
+export const StartCrmSyncResultSchema = z
+  .object({
+    state: z.enum(["queued", "running"]),
+    run_ref: z.string().min(1),
+    requested_leads: z.number().int().positive(),
+    portal_id: z.string().regex(/^[0-9]{1,20}$/).nullable(),
+    workspace: WorkspaceReferenceSchema,
+    created: z.boolean(),
+  })
+  .strict();
+
+export const CrmSyncStatusSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("none") }).strict(),
+  z
+    .object({
+      state: z.enum(["queued", "running", "succeeded", "failed"]),
+      run_ref: z.string().min(1),
+      requested_leads: z.number().int().positive(),
+      leads_synced: z.number().int().nonnegative().nullable(),
+      error_code: z.string().nullable(),
+      portal_id: z.string().regex(/^[0-9]{1,20}$/).nullable(),
+      started_at: z.string().min(1),
+      completed_at: z.string().nullable(),
+      workspace: WorkspaceReferenceSchema,
+    })
+    .strict(),
+]);
+
 export type WorkspaceStatus = z.infer<typeof WorkspaceStatusSchema>;
 export type CreateWorkspaceRequest = z.infer<typeof CreateWorkspaceRequestSchema>;
 export type CreateWorkspaceResult = z.infer<typeof CreateWorkspaceResultSchema>;
@@ -199,3 +227,5 @@ export type StartRunResult = z.infer<typeof StartRunResultSchema>;
 export type RunStatus = z.infer<typeof RunStatusSchema>;
 export type HubspotConnectStart = z.infer<typeof HubspotConnectStartSchema>;
 export type HubspotConnectionStatus = z.infer<typeof HubspotConnectionStatusSchema>;
+export type StartCrmSyncResult = z.infer<typeof StartCrmSyncResultSchema>;
+export type CrmSyncStatus = z.infer<typeof CrmSyncStatusSchema>;
