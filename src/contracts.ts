@@ -161,6 +161,9 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
     .strict(),
 ]);
 
+/** Providers the integration routes accept. unipile is reserved: routed, not connectable yet. */
+export const ProviderSchema = z.enum(["hubspot", "unipile"]);
+
 export const HubspotConnectStartSchema = z
   .object({
     provider: z.literal("hubspot"),
@@ -188,6 +191,28 @@ export const HubspotConnectionStatusSchema = z.discriminatedUnion("status", [
     })
     .strict(),
 ]);
+
+/** GET /v1/integrations/{provider}: hubspot reads the RPC; unipile has no connect path yet. */
+export const IntegrationConnectionStatusSchema = z.union([
+  HubspotConnectionStatusSchema,
+  z
+    .object({
+      provider: z.literal("unipile"),
+      status: z.literal("not_connected"),
+    })
+    .strict(),
+]);
+
+/** Exact shape of the disconnect_lifty_integration RPC result. */
+export const DisconnectResultSchema = z
+  .object({
+    provider: ProviderSchema,
+    status: z.literal("disconnected"),
+    portal_id: z.string().nullable(),
+    disconnected_at: z.string().min(1),
+    workspace: WorkspaceReferenceSchema,
+  })
+  .strict();
 
 export const StartCrmSyncResultSchema = z
   .object({
@@ -217,6 +242,243 @@ export const CrmSyncStatusSchema = z.discriminatedUnion("state", [
     .strict(),
 ]);
 
+// ---------------------------------------------------------------- P6 config
+
+export const ConfigSectionSchema = z.enum(["icp", "tone", "prompt", "workspace"]);
+
+const ConfigPersonaSchema = z.looseObject({
+  name: z.string(),
+  titles: z.array(z.string()),
+});
+
+const ConfigIcpSchema = z
+  .object({
+    version: z.number().int().positive(),
+    digest: z.string().startsWith("sha256:"),
+    label: z.string().nullable(),
+    person_locations: z.array(z.string()).nullable(),
+    organization_industries: z.array(z.string()).nullable(),
+    organization_num_employees_ranges: z.array(z.string()).nullable(),
+    person_seniorities: z.array(z.string()).nullable(),
+    contact_email_status: z.string(),
+    q_organization_domains_list: z.array(z.string()).nullable(),
+    q_keywords: z.string().nullable(),
+    personas: z.array(ConfigPersonaSchema),
+    max_stale_days: z.number().int(),
+    reject_extrapolated: z.boolean(),
+    daily_target: z.number().int().nullable(),
+  })
+  .strict();
+
+const ConfigToneSchema = z
+  .object({
+    version: z.string().startsWith("sha256:"),
+    values: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+const ConfigPromptSchema = z
+  .object({
+    version: z.string().min(1),
+    digest: z.string().startsWith("sha256:"),
+    source: z.string(),
+    text: z.string(),
+  })
+  .strict();
+
+const ConfigWorkspaceSchema = z
+  .object({
+    version: z.string().startsWith("sha256:"),
+    name: z.string(),
+    description: z.string().nullable(),
+  })
+  .strict();
+
+/** Exact shape of the get_lifty_config RPC result (sections present per filter). */
+export const WorkspaceConfigSchema = z
+  .object({
+    workspace_ref: z.string().min(1),
+    config: z
+      .object({
+        icp: ConfigIcpSchema.nullable().optional(),
+        tone: ConfigToneSchema.optional(),
+        prompt: ConfigPromptSchema.nullable().optional(),
+        workspace: ConfigWorkspaceSchema.optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const ConfigValuesSchema = z.record(z.string(), z.unknown());
+
+/** PATCH /v1/config body: one section with values, the prompt instruction form, or a full-config object. */
+export const ConfigUpdateRequestSchema = z.union([
+  z
+    .object({
+      section: z.literal("prompt"),
+      instruction: z.string().trim().min(1).max(4000),
+    })
+    .strict(),
+  z
+    .object({
+      section: z.enum(["icp", "tone", "workspace"]),
+      values: ConfigValuesSchema,
+    })
+    .strict(),
+  z.object({ values: ConfigValuesSchema }).strict(),
+]);
+
+const ConfigUpdateStateSchema = z.enum(["queued", "applied", "unchanged", "failed"]);
+const ImportStatusSchema = z.enum(["pending", "imported", "failed"]);
+const ArtifactActionsSchema = z.record(z.string(), z.string());
+
+/**
+ * Shape of the submit_lifty_config_update RPC result. A digest replay returns
+ * the stored receipt, which carries the completion summary once the job
+ * landed — hence the optional completion fields and the loose object; the
+ * route projects it onto the strict public result below.
+ */
+export const ConfigUpdateSubmissionSchema = z.looseObject({
+  state: ConfigUpdateStateSchema,
+  submission_ref: z.string().min(1),
+  run_ref: z.string().nullable(),
+  import_status: ImportStatusSchema,
+  changed_sections: z.array(ConfigSectionSchema),
+  artifact_actions: ArtifactActionsSchema,
+  regenerate_icp: z.boolean(),
+  regenerate_prompt: z.boolean(),
+  workspace_ref: z.string().min(1),
+  created: z.boolean(),
+  icp_version: z.number().int().nullable().optional(),
+  prompt_chars: z.number().int().nullable().optional(),
+  prompt_version: z.string().nullable().optional(),
+  error_code: z.string().nullable().optional(),
+});
+
+/** What PATCH /v1/config returns to the CLI. */
+export const ConfigUpdateResultSchema = z
+  .object({
+    state: ConfigUpdateStateSchema,
+    submission_ref: z.string().min(1),
+    run_ref: z.string().min(1).nullable(),
+    import_status: ImportStatusSchema,
+    changed_sections: z.array(ConfigSectionSchema),
+    artifact_actions: ArtifactActionsSchema,
+    workspace_ref: z.string().min(1),
+    created: z.boolean(),
+    icp_version: z.number().int().nullable(),
+    prompt_chars: z.number().int().nullable(),
+    prompt_version: z.string().nullable(),
+    error_code: z.string().nullable(),
+  })
+  .strict();
+
+/** Exact shape of the get_lifty_config_update_status RPC result. */
+export const ConfigUpdateStatusSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("none") }).strict(),
+  z
+    .object({
+      state: ConfigUpdateStateSchema,
+      submission_ref: z.string().min(1),
+      import_status: ImportStatusSchema,
+      run_ref: z.string().nullable(),
+      changed_sections: z.array(ConfigSectionSchema),
+      artifact_actions: ArtifactActionsSchema,
+      regenerate_icp: z.boolean(),
+      regenerate_prompt: z.boolean(),
+      icp_version: z.number().int().nullable(),
+      prompt_chars: z.number().int().nullable(),
+      prompt_version: z.string().nullable(),
+      error_code: z.string().nullable(),
+      submitted_at: z.string().min(1),
+      updated_at: z.string().min(1),
+      workspace: WorkspaceReferenceSchema,
+    })
+    .strict(),
+]);
+
+// ---------------------------------------------------------------- P6 status
+
+const OverviewSyncSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("none") }).strict(),
+  z
+    .object({
+      state: z.enum(["queued", "running", "succeeded", "failed"]),
+      run_ref: z.string().min(1),
+      requested_leads: z.number().int().positive(),
+      leads_synced: z.number().int().nonnegative().nullable(),
+      error_code: z.string().nullable(),
+      started_at: z.string().min(1),
+      completed_at: z.string().nullable(),
+    })
+    .strict(),
+]);
+
+/** GET /v1/status: one aggregate read so `lifty status` never needs OAuth to answer health. */
+export const WorkspaceOverviewSchema = z
+  .object({
+    workspace: z.discriminatedUnion("state", [
+      z.object({ state: z.literal("needs_workspace") }).strict(),
+      z
+        .object({
+          state: z.enum(["ready_for_connections", "suspended"]),
+          workspace_ref: z.string().min(1),
+          name: z.string().min(1),
+        })
+        .strict(),
+    ]),
+    onboarding: z.discriminatedUnion("state", [
+      z.object({ state: z.literal("none") }).strict(),
+      z
+        .object({
+          state: z.enum(["pending", "imported", "failed"]),
+          submission_ref: z.string().min(1),
+          submitted_at: z.string().min(1),
+        })
+        .strict(),
+    ]),
+    run: z.discriminatedUnion("state", [
+      z.object({ state: z.literal("none") }).strict(),
+      z
+        .object({
+          state: z.enum(["queued", "running", "succeeded", "failed"]),
+          run_ref: z.string().min(1),
+          requested_leads: z.number().int().positive(),
+          leads_discovered: z.number().int().nonnegative().nullable(),
+          leads_researched: z.number().int().nonnegative().nullable(),
+          error_code: z.string().nullable(),
+          started_at: z.string().min(1),
+          completed_at: z.string().nullable(),
+        })
+        .strict(),
+    ]),
+    config_update: ConfigUpdateStatusSchema,
+    integrations: z
+      .object({
+        hubspot: z
+          .object({
+            available: z.literal(true),
+            connected: z.boolean(),
+            portal_id: z.string().nullable(),
+            hub_domain: z.string().nullable(),
+            connected_at: z.string().nullable(),
+            reconnect_required: z.boolean(),
+            sync_pending: z.boolean(),
+            last_sync_at: z.string().nullable(),
+            last_sync: OverviewSyncSchema,
+          })
+          .strict(),
+        unipile: z
+          .object({
+            available: z.literal(false),
+            connected: z.literal(false),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export type WorkspaceStatus = z.infer<typeof WorkspaceStatusSchema>;
 export type CreateWorkspaceRequest = z.infer<typeof CreateWorkspaceRequestSchema>;
 export type CreateWorkspaceResult = z.infer<typeof CreateWorkspaceResultSchema>;
@@ -225,7 +487,17 @@ export type OnboardingPushResult = z.infer<typeof OnboardingPushResultSchema>;
 export type OnboardingStatus = z.infer<typeof OnboardingStatusSchema>;
 export type StartRunResult = z.infer<typeof StartRunResultSchema>;
 export type RunStatus = z.infer<typeof RunStatusSchema>;
+export type Provider = z.infer<typeof ProviderSchema>;
 export type HubspotConnectStart = z.infer<typeof HubspotConnectStartSchema>;
 export type HubspotConnectionStatus = z.infer<typeof HubspotConnectionStatusSchema>;
+export type IntegrationConnectionStatus = z.infer<typeof IntegrationConnectionStatusSchema>;
+export type DisconnectResult = z.infer<typeof DisconnectResultSchema>;
 export type StartCrmSyncResult = z.infer<typeof StartCrmSyncResultSchema>;
 export type CrmSyncStatus = z.infer<typeof CrmSyncStatusSchema>;
+export type ConfigSection = z.infer<typeof ConfigSectionSchema>;
+export type WorkspaceConfig = z.infer<typeof WorkspaceConfigSchema>;
+export type ConfigUpdateRequest = z.infer<typeof ConfigUpdateRequestSchema>;
+export type ConfigUpdateSubmission = z.infer<typeof ConfigUpdateSubmissionSchema>;
+export type ConfigUpdateResult = z.infer<typeof ConfigUpdateResultSchema>;
+export type ConfigUpdateStatus = z.infer<typeof ConfigUpdateStatusSchema>;
+export type WorkspaceOverview = z.infer<typeof WorkspaceOverviewSchema>;

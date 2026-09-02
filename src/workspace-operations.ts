@@ -1,12 +1,21 @@
 import type { AuthSession } from "./app.js";
 import {
+  ConfigUpdateStatusSchema,
+  type ConfigUpdateStatus,
+  ConfigUpdateSubmissionSchema,
+  type ConfigUpdateRequest,
+  type ConfigUpdateSubmission,
+  type ConfigSection,
   CreateWorkspaceResultSchema,
   type CreateWorkspaceRequest,
   type CreateWorkspaceResult,
+  DisconnectResultSchema,
+  type DisconnectResult,
   OnboardingStatusSchema,
   type OnboardingStatus,
   OnboardingSubmissionSchema,
   type OnboardingSubmission,
+  type Provider,
   RunStatusSchema,
   type RunStatus,
   StartRunResultSchema,
@@ -15,6 +24,8 @@ import {
   type StartCrmSyncResult,
   CrmSyncStatusSchema,
   type CrmSyncStatus,
+  WorkspaceConfigSchema,
+  type WorkspaceConfig,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
@@ -42,6 +53,12 @@ function invalidResponse(cause: unknown): PublicError {
     message: "LIFTY received an invalid workspace response.",
     cause,
   });
+}
+
+/** The reason token after a `lifty_config_invalid:` marker, or null. Fixed server vocabulary — safe to surface. */
+function configInvalidReason(message: string): string | null {
+  const match = /^lifty_config_invalid:\s*([a-z0-9_]{1,80})/.exec(message);
+  return match?.[1] ?? null;
 }
 
 function mapRpcError(error: unknown): PublicError {
@@ -130,11 +147,56 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (code === "PT409" && message.includes("lifty_sync_in_flight")) {
+    return new PublicError({
+      status: 409,
+      code: "SYNC_IN_PROGRESS",
+      message: "A CRM sync is still running. Wait for it to finish (`lifty status`), then disconnect.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_integration_not_connected")) {
+    return new PublicError({
+      status: 409,
+      code: "NOT_CONNECTED",
+      message: "This provider is not connected to your workspace.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_config_missing_icp")) {
+    return new PublicError({
+      status: 409,
+      code: "CONFIG_NOT_READY",
+      message: "This workspace has no generated configuration yet. Run `lifty push` first.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_prompt_hand_tuned")) {
+    return new PublicError({
+      status: 409,
+      code: "PROMPT_HAND_TUNED",
+      message: "The research prompt for this workspace was hand-tuned by LIFT and is not regenerated automatically. Contact LIFT support to change it.",
+      cause: error,
+    });
+  }
+
   if (code === "PT409" && message.includes("lifty_workspace_missing")) {
     return new PublicError({
       status: 409,
       code: "WORKSPACE_MISSING",
       message: "This account has no LIFTY workspace yet. Run `lifty login` first.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT404" && message.includes("lifty_config_update_missing")) {
+    return new PublicError({
+      status: 404,
+      code: "CONFIG_UPDATE_NOT_FOUND",
+      message: "No config update with that reference exists for this workspace.",
       cause: error,
     });
   }
@@ -166,11 +228,41 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (code === "PT400" && message.startsWith("lifty_config_invalid:")) {
+    const reason = configInvalidReason(message);
+    return new PublicError({
+      status: 422,
+      code: "CONFIG_INVALID",
+      message: reason
+        ? `The config update did not pass server validation (${reason}).`
+        : "The config update did not pass server validation.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT400" && message.includes("lifty_provider_invalid")) {
+    return new PublicError({
+      status: 400,
+      code: "PROVIDER_INVALID",
+      message: "Unknown provider. Supported providers: hubspot, unipile.",
+      cause: error,
+    });
+  }
+
   if (code === "PT413" && message.startsWith("lifty_workspace_too_large:")) {
     return new PublicError({
       status: 413,
       code: "WORKSPACE_FIELD_TOO_LARGE",
       message: "The workspace request exceeds the server safety limits.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT413" && message.startsWith("lifty_config_too_large:")) {
+    return new PublicError({
+      status: 413,
+      code: "CONFIG_TOO_LARGE",
+      message: "The config update exceeds the server safety limits.",
       cause: error,
     });
   }
@@ -349,6 +441,92 @@ export async function getCrmSyncStatus(
   }
 
   const parsed = CrmSyncStatusSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+// ---------------------------------------------------------------- P6 (LIF-669)
+
+/** get_lifty_config: all sections, or one. Secret-free by construction in the RPC. */
+export async function getConfig(
+  session: AuthSession,
+  section: ConfigSection | null,
+): Promise<WorkspaceConfig> {
+  const { data, error } = await getRpcClient(session).rpc<WorkspaceConfig>(
+    "get_lifty_config",
+    section ? { section } : undefined,
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = WorkspaceConfigSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+/** submit_lifty_config_update: the P6.1 write seam (digests, routing matrix, synchronous direct writes). */
+export async function submitConfigUpdate(
+  session: AuthSession,
+  payload: ConfigUpdateRequest,
+): Promise<ConfigUpdateSubmission> {
+  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateSubmission>(
+    "submit_lifty_config_update",
+    { payload },
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = ConfigUpdateSubmissionSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+/** get_lifty_config_update_status: one submission by ref, or the latest when ref is null. */
+export async function getConfigUpdateStatus(
+  session: AuthSession,
+  submissionRef: string | null,
+): Promise<ConfigUpdateStatus> {
+  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateStatus>(
+    "get_lifty_config_update_status",
+    submissionRef ? { p_submission_ref: submissionRef } : undefined,
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = ConfigUpdateStatusSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+/** disconnect_lifty_integration: the one destructive founder verb (confirmation is the skill's job). */
+export async function disconnectIntegration(
+  session: AuthSession,
+  provider: Provider,
+): Promise<DisconnectResult> {
+  const { data, error } = await getRpcClient(session).rpc<DisconnectResult>(
+    "disconnect_lifty_integration",
+    { p_provider: provider },
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = DisconnectResultSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }
