@@ -13,6 +13,8 @@ import {
   OnboardingStatusSchema,
   RunStatusSchema,
   StartRunResultSchema,
+  StartCrmSyncResultSchema,
+  CrmSyncStatusSchema,
   SubmitOnboardingRequestSchema,
   type HubspotConnectStart,
   type HubspotConnectionStatus,
@@ -20,10 +22,12 @@ import {
   type OnboardingSubmission,
   type RunStatus,
   type StartRunResult,
+  type StartCrmSyncResult,
+  type CrmSyncStatus,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
-import type { EnqueueFirstRun, EnqueueOnboardingImport } from "./trigger-client.js";
+import type { EnqueueCrmSync, EnqueueFirstRun, EnqueueOnboardingImport } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
   HubspotCallbackError,
@@ -63,6 +67,9 @@ export interface AppDependencies {
   startRun(session: AuthSession): Promise<StartRunResult>;
   getRunStatus(session: AuthSession): Promise<RunStatus>;
   enqueueFirstRun: EnqueueFirstRun;
+  startCrmSyncRun(session: AuthSession): Promise<StartCrmSyncResult>;
+  getCrmSyncStatus(session: AuthSession): Promise<CrmSyncStatus>;
+  enqueueCrmSync: EnqueueCrmSync;
   startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
   completeHubspotCallback(
@@ -255,6 +262,29 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   });
   app.openAPIRegistry.registerPath({
     method: "post",
+    path: "/v1/integrations/hubspot/sync",
+    operationId: "startCrmSync",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(StartCrmSyncResultSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/integrations/hubspot/sync",
+    operationId: "getCrmSyncStatus",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(CrmSyncStatusSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post",
     path: "/v1/integrations/hubspot/connect",
     operationId: "startHubspotConnect",
     security: [{ bearerAuth: [] }],
@@ -359,6 +389,15 @@ const defaultDependencies: AppDependencies = {
   },
   enqueueFirstRun: async () => {
     throw new Error("enqueueFirstRun is not configured");
+  },
+  startCrmSyncRun: async () => {
+    throw new Error("startCrmSyncRun is not configured");
+  },
+  getCrmSyncStatus: async () => {
+    throw new Error("getCrmSyncStatus is not configured");
+  },
+  enqueueCrmSync: async () => {
+    throw new Error("enqueueCrmSync is not configured");
   },
   startHubspotConnect: async () => {
     throw new Error("startHubspotConnect is not configured");
@@ -768,6 +807,23 @@ export function createApp(
       context.get("authSession"),
     );
     return context.json(HubspotConnectionStatusSchema.parse(result));
+  });
+
+  app.post("/v1/integrations/hubspot/sync", async (context) => {
+    const result = await dependencies.startCrmSyncRun(
+      context.get("authSession"),
+    );
+    // Enqueue on every start, including a re-attach — same self-healing
+    // run-scoped idempotency as the first run.
+    await dependencies.enqueueCrmSync(result.run_ref);
+    return context.json(StartCrmSyncResultSchema.parse(result));
+  });
+
+  app.get("/v1/integrations/hubspot/sync", async (context) => {
+    const result = await dependencies.getCrmSyncStatus(
+      context.get("authSession"),
+    );
+    return context.json(CrmSyncStatusSchema.parse(result));
   });
 
   return app;

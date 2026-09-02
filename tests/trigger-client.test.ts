@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createCrmSyncTrigger,
   createFirstRunTrigger,
   createOnboardingImportTrigger,
 } from "../src/trigger-client.js";
@@ -111,6 +112,33 @@ describe("first run trigger client", () => {
       payload: { runId: "22222222-2222-4222-8222-222222222222" },
       options: {
         idempotencyKey: "lifty-first-run:22222222-2222-4222-8222-222222222222",
+        idempotencyKeyTTL: "1h",
+      },
+    });
+  });
+});
+
+describe("crm sync trigger client", () => {
+  it("enqueues lifty-crm-sync with a run-scoped idempotency key", async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    const enqueue = createCrmSyncTrigger({
+      ...settings,
+      fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+        return jsonResponse(200, { id: "run_sync" });
+      }) as typeof fetch,
+    });
+
+    const run = await enqueue("33333333-3333-4333-8333-333333333333");
+
+    expect(run).toEqual({ id: "run_sync" });
+    expect(requests[0]?.url).toBe(
+      "https://api.trigger.test/api/v1/tasks/lifty-crm-sync/trigger",
+    );
+    expect(requests[0]?.body).toEqual({
+      payload: { runId: "33333333-3333-4333-8333-333333333333" },
+      options: {
+        idempotencyKey: "lifty-crm-sync:33333333-3333-4333-8333-333333333333",
         idempotencyKeyTTL: "1h",
       },
     });

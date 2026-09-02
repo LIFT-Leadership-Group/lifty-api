@@ -48,6 +48,12 @@ describe("LIFTY API", () => {
     expect(document.paths?.["/v1/workspace/runs"]?.get?.operationId).toBe(
       "getRunStatus",
     );
+    expect(document.paths?.["/v1/integrations/hubspot/sync"]?.post?.operationId).toBe(
+      "startCrmSync",
+    );
+    expect(document.paths?.["/v1/integrations/hubspot/sync"]?.get?.operationId).toBe(
+      "getCrmSyncStatus",
+    );
     expect(
       document.paths?.["/v1/integrations/hubspot/connect"]?.post?.operationId,
     ).toBe("startHubspotConnect");
@@ -963,5 +969,105 @@ describe("LIFTY API", () => {
       path: "/hubspot/callback",
       status: 502,
     }]);
+  });
+});
+
+describe("LIFTY API crm sync endpoints", () => {
+  const startFixture = (created: boolean) => ({
+    state: "queued" as const,
+    run_ref: "33333333-3333-4333-8333-333333333333",
+    requested_leads: 4,
+    portal_id: "149239526",
+    workspace: { workspace_ref: "ws_opaque", name: "Example" },
+    created,
+  });
+
+  it("starts the sync and enqueues exactly one job", async () => {
+    const enqueued: string[] = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      startCrmSyncRun: async () => startFixture(true),
+      enqueueCrmSync: async (runId) => {
+        enqueued.push(runId);
+        return { id: "run_sync" };
+      },
+    });
+
+    const response = await app.request("/v1/integrations/hubspot/sync", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(startFixture(true));
+    expect(enqueued).toEqual(["33333333-3333-4333-8333-333333333333"]);
+  });
+
+  it("re-attaching to an active sync still re-enqueues idempotently", async () => {
+    const enqueued: string[] = [];
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      startCrmSyncRun: async () => startFixture(false),
+      enqueueCrmSync: async (runId) => {
+        enqueued.push(runId);
+        return { id: "run_sync" };
+      },
+    });
+
+    const response = await app.request("/v1/integrations/hubspot/sync", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(enqueued).toEqual(["33333333-3333-4333-8333-333333333333"]);
+  });
+
+  it("returns the sync status for the authenticated founder", async () => {
+    const status = {
+      state: "succeeded" as const,
+      run_ref: "33333333-3333-4333-8333-333333333333",
+      requested_leads: 4,
+      leads_synced: 4,
+      error_code: null,
+      portal_id: "149239526",
+      started_at: "2026-09-02T14:00:00Z",
+      completed_at: "2026-09-02T14:05:00Z",
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+    };
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      getCrmSyncStatus: async () => status,
+    });
+
+    const response = await app.request("/v1/integrations/hubspot/sync", {
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(status);
+  });
+
+  it("rejects an unauthenticated sync start before business logic", async () => {
+    const app = createApp({
+      authenticate: async () => ({ ok: false as const, reason: "invalid_session" as const }),
+      startCrmSyncRun: async () => {
+        throw new Error("must not run");
+      },
+    });
+
+    const response = await app.request("/v1/integrations/hubspot/sync", {
+      method: "POST",
+    });
+    expect(response.status).toBe(401);
   });
 });
