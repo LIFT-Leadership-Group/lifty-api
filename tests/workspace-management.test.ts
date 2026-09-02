@@ -368,6 +368,39 @@ describe("LIFTY API workspace management (P6)", () => {
     expect(enqueued).toBe(false);
   });
 
+  it("reads the new lane version back after a synchronous filter-only write", async () => {
+    const sections: Array<string | null> = [];
+    const app = createApp({
+      authenticate,
+      submitConfigUpdate: async () =>
+        submissionFixture({
+          state: "applied",
+          run_ref: null,
+          import_status: "imported",
+          changed_sections: ["icp"],
+          artifact_actions: { icp: "applied", tone: "none", prompt: "none", workspace: "none" },
+          regenerate_prompt: false,
+        }),
+      getConfig: async (_session, section) => {
+        sections.push(section);
+        return configFixture;
+      },
+      enqueueConfigUpdate: async () => {
+        throw new Error("must not enqueue a synchronous write");
+      },
+    });
+
+    const response = await app.request("/v1/config", {
+      method: "PATCH",
+      headers: { ...authorized, "content-type": "application/json" },
+      body: JSON.stringify({ section: "icp", values: { person_locations: ["Canada"] } }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ state: "applied", icp_version: 2 });
+    expect(sections).toEqual(["icp"]);
+  });
+
   it("re-runs a previously failed regeneration with a fresh key", async () => {
     const enqueueCalls: Array<{ fresh: boolean }> = [];
     const app = createApp({

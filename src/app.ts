@@ -1171,6 +1171,18 @@ export function createApp(
       runRef = submission.submission_ref;
     }
 
+    // A synchronous filter-only write lands a new lane version inside the RPC
+    // but its receipt carries no version; read it back so the CLI can name it.
+    let icpVersion = submission.icp_version ?? null;
+    if (
+      icpVersion === null
+      && state !== "queued"
+      && submission.artifact_actions.icp === "applied"
+    ) {
+      const config = await dependencies.getConfig(context.get("authSession"), "icp");
+      icpVersion = config.config.icp?.version ?? null;
+    }
+
     return context.json(
       ConfigUpdateResultSchema.parse({
         state,
@@ -1181,7 +1193,7 @@ export function createApp(
         artifact_actions: submission.artifact_actions,
         workspace_ref: submission.workspace_ref,
         created: submission.created,
-        icp_version: submission.icp_version ?? null,
+        icp_version: icpVersion,
         prompt_chars: submission.prompt_chars ?? null,
         prompt_version: submission.prompt_version ?? null,
         error_code: state === "queued" ? null : submission.error_code ?? null,
