@@ -279,8 +279,45 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   });
 }
 
-function hubspotPage(title: string, message: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body><main><h1>${title}</h1><p>${message}</p><p>You can close this tab and return to your terminal.</p></main></body></html>`;
+function hubspotPage(title: string, message: string, success: boolean): string {
+  const iconPath = success
+    ? "M5 13l4 4L19 7"
+    : "M6 6l12 12M18 6L6 18";
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>${title}</title>
+  <style>
+    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #0b0d10; color: #f4f4f5; }
+    main { width: min(92vw, 420px); }
+    .brand { letter-spacing: .18em; font-size: .82rem; font-weight: 800; margin: 0 0 1.25rem; }
+    .card { border: 1px solid #2a2e35; border-radius: 16px; padding: 1.5rem; background: #14171c; box-shadow: 0 18px 60px #0008; }
+    .icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 1rem; }
+    .icon.success { background: #86efac22; color: #86efac; }
+    .icon.error { background: #fda4af22; color: #fda4af; }
+    h1 { margin: 0 0 .5rem; font-size: 1.45rem; }
+    p { color: #a9afb9; line-height: 1.5; margin: 0 0 .75rem; }
+    .hint { margin: 1.25rem 0 0; padding-top: 1rem; border-top: 1px solid #2a2e35; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="brand">LIFTY</p>
+    <section class="card">
+      <div class="icon ${success ? "success" : "error"}" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="${iconPath}"></path></svg>
+      </div>
+      <h1>${title}</h1>
+      <p>${message}</p>
+      <p class="hint">You can close this tab and return to your terminal.</p>
+    </section>
+  </main>
+</body>
+</html>`;
 }
 
 function hubspotHtmlResponse(
@@ -289,9 +326,9 @@ function hubspotHtmlResponse(
   title: string,
   message: string,
 ): Response {
-  return context.html(hubspotPage(title, message), status, {
+  return context.html(hubspotPage(title, message, status < 400), status, {
     "cache-control": "no-store",
-    "content-security-policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
     "referrer-policy": "no-referrer",
     "x-content-type-options": "nosniff",
   });
