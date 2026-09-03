@@ -12,10 +12,17 @@ import {
   type CreateWorkspaceRequest,
   type CreateWorkspaceResult,
   DisconnectResponseSchema,
-  HubspotConnectStartSchema,
   IntegrationConnectionStatusSchema,
   OnboardingPushResultSchema,
   OnboardingStatusSchema,
+  NotificationConfigSchema,
+  NotificationDestinationSchema,
+  NotificationRouteSchema,
+  NotificationTestResultSchema,
+  SetNotificationRouteRequestSchema,
+  SlackNotificationChannelsSchema,
+  UpsertNotificationDestinationRequestSchema,
+  ProviderConnectStartSchema,
   ProviderSchema,
   RunStatusSchema,
   StartRunResultSchema,
@@ -33,7 +40,16 @@ import {
   type HubspotConnectionStatus,
   type OnboardingStatus,
   type OnboardingSubmission,
+  type NotificationConfig,
+  type NotificationDestination,
+  type NotificationRoute,
+  type NotificationTestResult,
+  type SetNotificationRouteRequest,
+  type SlackNotificationChannels,
+  type UpsertNotificationDestinationRequest,
   type Provider,
+  type SlackConnectStart,
+  type SlackConnectionStatus,
   type RunStatus,
   type StartRunResult,
   type StartCrmSyncResult,
@@ -48,6 +64,7 @@ import type {
   EnqueueFirstRun,
   EnqueueIntegrationRevocation,
   EnqueueOnboardingImport,
+  EnqueueNotificationDelivery,
 } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
@@ -55,12 +72,18 @@ import {
   type HubspotCallbackSuccess,
 } from "./hubspot-connect.js";
 import { isSealedHubspotState } from "./hubspot-state.js";
+import {
+  SlackCallbackError,
+  type SlackCallbackSuccess,
+} from "./slack-connect.js";
+import { isSealedSlackState } from "./slack-state.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
 // The create-workspace body carries only a bounded name and description.
 const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
 const RequestIdSchema = z.uuid();
 const SubmissionRefSchema = z.uuid();
+const DestinationRefSchema = z.uuid();
 
 export interface AuthSession {
   userId: string;
@@ -105,12 +128,33 @@ export interface AppDependencies {
   requeueConfigUpdate(session: AuthSession, submissionRef: string): Promise<ConfigUpdateStatus>;
   disconnectIntegration(session: AuthSession, provider: Provider): Promise<DisconnectResult>;
   enqueueIntegrationRevocation: EnqueueIntegrationRevocation;
+  getNotificationConfig(session: AuthSession): Promise<NotificationConfig>;
+  listSlackNotificationChannels(session: AuthSession): Promise<SlackNotificationChannels>;
+  upsertNotificationDestination(
+    session: AuthSession,
+    input: UpsertNotificationDestinationRequest,
+  ): Promise<NotificationDestination>;
+  setNotificationRoute(
+    session: AuthSession,
+    input: SetNotificationRouteRequest,
+  ): Promise<NotificationRoute>;
+  enqueueNotificationTest(
+    session: AuthSession,
+    destinationRef: string,
+  ): Promise<NotificationTestResult>;
+  enqueueNotificationDelivery: EnqueueNotificationDelivery;
   startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
   completeHubspotCallback(
     input: { code: string; state: string },
   ): Promise<HubspotCallbackSuccess>;
   buildHubspotAuthorizeUrl(state: string): string | null;
+  startSlackConnect(session: AuthSession): Promise<SlackConnectStart>;
+  getSlackConnection(session: AuthSession): Promise<SlackConnectionStatus>;
+  completeSlackCallback(
+    input: { code: string; state: string },
+  ): Promise<SlackCallbackSuccess>;
+  buildSlackAuthorizeUrl(state: string): string | null;
   renderCliAuthPage(
     state: string,
     port: number,
@@ -417,7 +461,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     security: [{ bearerAuth: [] }],
     request: { params: ProviderPathParams },
     responses: {
-      200: JsonResponse(HubspotConnectStartSchema),
+      200: JsonResponse(ProviderConnectStartSchema),
       400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
@@ -447,6 +491,90 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     request: { params: ProviderPathParams },
     responses: {
       200: JsonResponse(DisconnectResponseSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/notifications",
+    operationId: "getNotificationConfig",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(NotificationConfigSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/notifications/slack/channels",
+    operationId: "listSlackNotificationChannels",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(SlackNotificationChannelsSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "put",
+    path: "/v1/notifications/destinations/slack",
+    operationId: "upsertSlackNotificationDestination",
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: {
+          "application/json": { schema: UpsertNotificationDestinationRequestSchema },
+        },
+      },
+    },
+    responses: {
+      200: JsonResponse(NotificationDestinationSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "put",
+    path: "/v1/notifications/routes",
+    operationId: "setNotificationRoute",
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: { "application/json": { schema: SetNotificationRouteRequestSchema } },
+      },
+    },
+    responses: {
+      200: JsonResponse(NotificationRouteSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      404: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/v1/notifications/destinations/{destination_ref}/test",
+    operationId: "sendNotificationTest",
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({
+        destination_ref: DestinationRefSchema.openapi({
+          param: { name: "destination_ref", in: "path" },
+        }),
+      }),
+    },
+    responses: {
+      200: JsonResponse(NotificationTestResultSchema),
       400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
@@ -536,7 +664,7 @@ function resolveProvider(
         context,
         400,
         "PROVIDER_INVALID",
-        "Unknown provider. Supported providers: hubspot, unipile.",
+        "Unknown provider. Supported providers: hubspot, slack, unipile.",
       ),
     };
   }
@@ -608,6 +736,24 @@ const defaultDependencies: AppDependencies = {
   enqueueIntegrationRevocation: async () => {
     throw new Error("enqueueIntegrationRevocation is not configured");
   },
+  getNotificationConfig: async () => {
+    throw new Error("getNotificationConfig is not configured");
+  },
+  listSlackNotificationChannels: async () => {
+    throw new Error("listSlackNotificationChannels is not configured");
+  },
+  upsertNotificationDestination: async () => {
+    throw new Error("upsertNotificationDestination is not configured");
+  },
+  setNotificationRoute: async () => {
+    throw new Error("setNotificationRoute is not configured");
+  },
+  enqueueNotificationTest: async () => {
+    throw new Error("enqueueNotificationTest is not configured");
+  },
+  enqueueNotificationDelivery: async () => {
+    throw new Error("enqueueNotificationDelivery is not configured");
+  },
   startHubspotConnect: async () => {
     throw new Error("startHubspotConnect is not configured");
   },
@@ -622,6 +768,20 @@ const defaultDependencies: AppDependencies = {
     );
   },
   buildHubspotAuthorizeUrl: () => null,
+  startSlackConnect: async () => {
+    throw new Error("startSlackConnect is not configured");
+  },
+  getSlackConnection: async () => {
+    throw new Error("getSlackConnection is not configured");
+  },
+  completeSlackCallback: async () => {
+    throw new SlackCallbackError(
+      "server_misconfigured",
+      503,
+      "The Slack connection service is not configured.",
+    );
+  },
+  buildSlackAuthorizeUrl: () => null,
   renderCliAuthPage: () => null,
   checkReadiness: async () => true,
   log: (event) => process.stderr.write(`${JSON.stringify(event)}\n`),
@@ -781,6 +941,83 @@ export function createApp(
         context,
         callbackError.status as ContentfulStatusCode,
         "HubSpot connection failed",
+        callbackError.safeMessage,
+      );
+    }
+  });
+  app.get("/slack/start", (context) => {
+    const intent = context.req.query("intent") ?? "";
+    if (!isSealedSlackState(intent)) {
+      return hubspotHtmlResponse(
+        context,
+        400,
+        "Invalid connection link",
+        "Ask LIFTY for a fresh Slack connection link.",
+      );
+    }
+    const authorizeUrl = dependencies.buildSlackAuthorizeUrl(intent);
+    if (!authorizeUrl) {
+      return hubspotHtmlResponse(
+        context,
+        503,
+        "Connection unavailable",
+        "The Slack connection service is temporarily unavailable.",
+      );
+    }
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
+    return context.redirect(authorizeUrl, 302);
+  });
+  app.get("/slack/callback", async (context) => {
+    if (context.req.query("error")) {
+      return hubspotHtmlResponse(
+        context,
+        400,
+        "Slack authorization was cancelled",
+        "No connection was saved. Ask LIFTY for a fresh link when you are ready.",
+      );
+    }
+
+    const code = context.req.query("code") ?? "";
+    const state = context.req.query("state") ?? "";
+    if (!code || code.length > 4096 || !isSealedSlackState(state)) {
+      return hubspotHtmlResponse(
+        context,
+        400,
+        "Invalid Slack callback",
+        "No connection was saved. Ask LIFTY for a fresh link.",
+      );
+    }
+
+    try {
+      await dependencies.completeSlackCallback({ code, state });
+      return hubspotHtmlResponse(
+        context,
+        200,
+        "Slack is connected",
+        "LIFTY verified and saved the connection.",
+      );
+    } catch (error) {
+      const callbackError = error instanceof SlackCallbackError
+        ? error
+        : new SlackCallbackError(
+            "internal_error",
+            500,
+            "LIFTY could not complete the Slack connection.",
+          );
+      dependencies.log({
+        level: callbackError.status >= 500 ? "error" : "warn",
+        event: "request_failed",
+        request_id: context.get("requestId"),
+        method: context.req.method,
+        path: context.req.path,
+        error_code: `SLACK_CALLBACK_${callbackError.reason.toUpperCase()}`,
+        status: callbackError.status,
+      });
+      return hubspotHtmlResponse(
+        context,
+        callbackError.status as ContentfulStatusCode,
+        "Slack connection failed",
         callbackError.safeMessage,
       );
     }
@@ -1222,24 +1459,133 @@ export function createApp(
     );
   });
 
+  // ------------------------------------------------------------ notifications
+
+  app.get("/v1/notifications", async (context) => {
+    const result = await dependencies.getNotificationConfig(
+      context.get("authSession"),
+    );
+    return context.json(NotificationConfigSchema.parse(result));
+  });
+
+  app.get("/v1/notifications/slack/channels", async (context) => {
+    const result = await dependencies.listSlackNotificationChannels(
+      context.get("authSession"),
+    );
+    return context.json(SlackNotificationChannelsSchema.parse(result));
+  });
+
+  app.put("/v1/notifications/destinations/slack", async (context) => {
+    const requestBody = await readRequestTextWithinLimit(
+      context.req.raw,
+      MAX_CREATE_WORKSPACE_BYTES,
+    );
+    if (!requestBody.ok) {
+      return errorJson(
+        context,
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "The notification destination request exceeds 16 KiB.",
+      );
+    }
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(requestBody.text);
+    } catch {
+      parsedJson = null;
+    }
+    const input = UpsertNotificationDestinationRequestSchema.safeParse(parsedJson);
+    if (!input.success) {
+      return errorJson(
+        context,
+        400,
+        "INVALID_REQUEST",
+        "Choose a valid Slack channel returned by the channel list.",
+      );
+    }
+    const result = await dependencies.upsertNotificationDestination(
+      context.get("authSession"),
+      input.data,
+    );
+    return context.json(NotificationDestinationSchema.parse(result));
+  });
+
+  app.put("/v1/notifications/routes", async (context) => {
+    const requestBody = await readRequestTextWithinLimit(
+      context.req.raw,
+      MAX_CREATE_WORKSPACE_BYTES,
+    );
+    if (!requestBody.ok) {
+      return errorJson(
+        context,
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "The notification route request exceeds 16 KiB.",
+      );
+    }
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(requestBody.text);
+    } catch {
+      parsedJson = null;
+    }
+    const input = SetNotificationRouteRequestSchema.safeParse(parsedJson);
+    if (!input.success) {
+      return errorJson(
+        context,
+        400,
+        "INVALID_REQUEST",
+        "The notification route is invalid.",
+      );
+    }
+    const result = await dependencies.setNotificationRoute(
+      context.get("authSession"),
+      input.data,
+    );
+    return context.json(NotificationRouteSchema.parse(result));
+  });
+
+  app.post(
+    "/v1/notifications/destinations/:destination_ref/test",
+    async (context) => {
+      const destinationRef = DestinationRefSchema.safeParse(
+        context.req.param("destination_ref"),
+      );
+      if (!destinationRef.success) {
+        return errorJson(
+          context,
+          400,
+          "INVALID_REQUEST",
+          "The notification destination reference must be a UUID.",
+        );
+      }
+      const result = await dependencies.enqueueNotificationTest(
+        context.get("authSession"),
+        destinationRef.data,
+      );
+      await dependencies.enqueueNotificationDelivery(result.delivery_ref);
+      return context.json(NotificationTestResultSchema.parse(result));
+    },
+  );
+
   // ---------------------------------------------------------------- integrations
 
   app.post("/v1/integrations/:provider/connect", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    if (provider.provider !== "hubspot") {
+    if (provider.provider === "unipile") {
       return providerUnavailable(context, provider.provider);
     }
-    const result = await dependencies.startHubspotConnect(
-      context.get("authSession"),
-    );
-    return context.json(HubspotConnectStartSchema.parse(result));
+    const result = provider.provider === "hubspot"
+      ? await dependencies.startHubspotConnect(context.get("authSession"))
+      : await dependencies.startSlackConnect(context.get("authSession"));
+    return context.json(ProviderConnectStartSchema.parse(result));
   });
 
   app.get("/v1/integrations/:provider", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    if (provider.provider !== "hubspot") {
+    if (provider.provider === "unipile") {
       // No connect path exists yet, so nothing can be connected.
       return context.json(
         IntegrationConnectionStatusSchema.parse({
@@ -1248,9 +1594,9 @@ export function createApp(
         }),
       );
     }
-    const result = await dependencies.getHubspotConnection(
-      context.get("authSession"),
-    );
+    const result = provider.provider === "hubspot"
+      ? await dependencies.getHubspotConnection(context.get("authSession"))
+      : await dependencies.getSlackConnection(context.get("authSession"));
     return context.json(IntegrationConnectionStatusSchema.parse(result));
   });
 

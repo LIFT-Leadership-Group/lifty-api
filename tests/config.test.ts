@@ -9,6 +9,8 @@ const validEnvironment = {
     "https://project.supabase.co/auth/v1/.well-known/jwks.json",
   HUBSPOT_CLIENT_ID: "client-123",
   HUBSPOT_CLIENT_SECRET: "client-secret",
+  SLACK_CLIENT_ID: "slack-client-123",
+  SLACK_CLIENT_SECRET: "slack-client-secret",
   PUBLIC_BASE_URL: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
   TRIGGER_SECRET_KEY: "tr_prod_test_key",
 };
@@ -35,6 +37,13 @@ describe("service configuration", () => {
     expect(config.hubspot).toEqual({
       clientId: "client-123",
       clientSecret: "client-secret",
+      publicBaseUrl: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
+      supabaseUrl: "https://project.supabase.co",
+      publishableKey: "sb_publishable_example",
+    });
+    expect(config.slack).toEqual({
+      clientId: "slack-client-123",
+      clientSecret: "slack-client-secret",
       publicBaseUrl: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
       supabaseUrl: "https://project.supabase.co",
       publishableKey: "sb_publishable_example",
@@ -78,6 +87,8 @@ describe("service configuration", () => {
     [{ ...validEnvironment, PORT: "70000" }, /PORT/],
     [{ ...validEnvironment, HUBSPOT_CLIENT_ID: undefined }, /HUBSPOT_CLIENT_ID/],
     [{ ...validEnvironment, HUBSPOT_CLIENT_SECRET: undefined }, /HUBSPOT_CLIENT_SECRET/],
+    [{ ...validEnvironment, SLACK_CLIENT_ID: undefined }, /SLACK_CLIENT_ID/],
+    [{ ...validEnvironment, SLACK_CLIENT_SECRET: undefined }, /SLACK_CLIENT_SECRET/],
     [{ ...validEnvironment, TRIGGER_SECRET_KEY: undefined }, /TRIGGER_SECRET_KEY/],
     [
       { ...validEnvironment, TRIGGER_API_URL: "http://attacker.example" },

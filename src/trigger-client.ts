@@ -9,6 +9,7 @@ const FIRST_RUN_TASK_ID = "lifty-first-run";
 const CRM_SYNC_TASK_ID = "lifty-crm-sync";
 const CONFIG_UPDATE_TASK_ID = "lifty-config-update";
 const INTEGRATION_REVOKE_TASK_ID = "lifty-integration-revoke";
+const NOTIFICATION_DELIVERY_TASK_ID = "notification-delivery";
 const IDEMPOTENCY_TTL = "1h";
 
 export interface TriggerClientSettings {
@@ -148,6 +149,22 @@ export function createIntegrationRevocationTrigger(
       INTEGRATION_REVOKE_TASK_ID,
       { revocationId },
       `${INTEGRATION_REVOKE_TASK_ID}:${revocationId}`,
+    );
+}
+
+export type EnqueueNotificationDelivery = (
+  deliveryId: string,
+) => Promise<{ id: string }>;
+
+export function createNotificationDeliveryTrigger(
+  settings: TriggerClientSettings,
+): EnqueueNotificationDelivery {
+  return async (deliveryId) =>
+    triggerTask(
+      settings,
+      NOTIFICATION_DELIVERY_TASK_ID,
+      { deliveryId },
+      `${NOTIFICATION_DELIVERY_TASK_ID}:${deliveryId}`,
     );
 }
 

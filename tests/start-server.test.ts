@@ -27,6 +27,13 @@ describe("HTTP server bootstrap", () => {
           supabaseUrl: "https://project.supabase.test",
           publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
         },
+        slack: {
+          clientId: "slack-client-123",
+          clientSecret: "slack-client-secret",
+          publicBaseUrl: "https://api.lifty.test",
+          supabaseUrl: "https://project.supabase.test",
+          publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
+        },
         trigger: {
           apiUrl: "https://api.trigger.test",
           secretKey: "tr_prod_test_key",

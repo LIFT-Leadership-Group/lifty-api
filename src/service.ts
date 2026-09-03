@@ -5,6 +5,8 @@ import { renderCliAuthPage } from "./cli-auth-page.js";
 import { loadConfig, type ServiceConfig } from "./config.js";
 import { createHubspotConnectOperations } from "./hubspot-connect.js";
 import { buildAuthorizationUrl } from "./hubspot-oauth.js";
+import { createSlackConnectOperations } from "./slack-connect.js";
+import { buildSlackAuthorizationUrl } from "./slack-oauth.js";
 import {
   createSupabaseAuthenticator,
   createSupabaseReadinessCheck,
@@ -14,6 +16,7 @@ import {
   createCrmSyncTrigger,
   createFirstRunTrigger,
   createIntegrationRevocationTrigger,
+  createNotificationDeliveryTrigger,
   createOnboardingImportTrigger,
 } from "./trigger-client.js";
 import {
@@ -25,6 +28,11 @@ import {
   getOnboardingStatus,
   getRunStatus,
   getWorkspaceStatus,
+  getNotificationConfig,
+  listSlackNotificationChannels,
+  upsertNotificationDestination,
+  setNotificationRoute,
+  enqueueNotificationTest,
   requeueConfigUpdate,
   startCrmSyncRun,
   startRun,
@@ -34,6 +42,7 @@ import {
 
 export function createProductionApp(config: ServiceConfig) {
   const hubspot = createHubspotConnectOperations(config.hubspot);
+  const slack = createSlackConnectOperations(config.slack);
   return createApp({
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,
@@ -54,12 +63,26 @@ export function createProductionApp(config: ServiceConfig) {
     requeueConfigUpdate,
     disconnectIntegration,
     enqueueIntegrationRevocation: createIntegrationRevocationTrigger(config.trigger),
+    enqueueNotificationDelivery: createNotificationDeliveryTrigger(config.trigger),
+    getNotificationConfig,
+    listSlackNotificationChannels,
+    upsertNotificationDestination,
+    setNotificationRoute,
+    enqueueNotificationTest,
     startHubspotConnect: hubspot.startConnect,
     getHubspotConnection: hubspot.getConnection,
     completeHubspotCallback: hubspot.completeCallback,
     buildHubspotAuthorizeUrl: (state) => buildAuthorizationUrl({
       clientId: config.hubspot.clientId,
       redirectUri: `${config.hubspot.publicBaseUrl}/hubspot/callback`,
+      state,
+    }),
+    startSlackConnect: slack.startConnect,
+    getSlackConnection: slack.getConnection,
+    completeSlackCallback: slack.completeCallback,
+    buildSlackAuthorizeUrl: (state) => buildSlackAuthorizationUrl({
+      clientId: config.slack.clientId,
+      redirectUri: `${config.slack.publicBaseUrl}/slack/callback`,
       state,
     }),
     renderCliAuthPage: (state, port) => {

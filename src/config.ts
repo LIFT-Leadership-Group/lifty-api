@@ -2,6 +2,7 @@ import type { SupabaseEnv } from "@supabase/server";
 
 import type { SupabaseAuthenticationConfig } from "./supabase-auth.js";
 import type { HubspotConnectSettings } from "./hubspot-connect.js";
+import type { SlackConnectSettings } from "./slack-connect.js";
 
 type Environment = Record<string, string | undefined>;
 
@@ -10,6 +11,7 @@ export interface ServiceConfig {
   port: number;
   supabase: SupabaseAuthenticationConfig;
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
+  slack: Omit<SlackConnectSettings, "fetchImpl">;
   trigger: {
     apiUrl: string;
     secretKey: string;
@@ -111,6 +113,13 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     hubspot: {
       clientId: required(environment, "HUBSPOT_CLIENT_ID"),
       clientSecret: required(environment, "HUBSPOT_CLIENT_SECRET"),
+      publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
+      supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
+      publishableKey,
+    },
+    slack: {
+      clientId: required(environment, "SLACK_CLIENT_ID"),
+      clientSecret: required(environment, "SLACK_CLIENT_SECRET"),
       publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
       publishableKey,

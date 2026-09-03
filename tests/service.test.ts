@@ -20,6 +20,13 @@ describe("production service composition", () => {
         supabaseUrl: "https://project.supabase.test",
         publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
       },
+      slack: {
+        clientId: "slack-client-123",
+        clientSecret: "slack-client-secret",
+        publicBaseUrl: "https://api.lifty.test",
+        supabaseUrl: "https://project.supabase.test",
+        publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
+      },
       trigger: {
         apiUrl: "https://api.trigger.test",
         secretKey: "tr_prod_test_key",
@@ -51,6 +58,8 @@ describe("production service composition", () => {
       }),
       HUBSPOT_CLIENT_ID: "client-123",
       HUBSPOT_CLIENT_SECRET: "client-secret",
+      SLACK_CLIENT_ID: "slack-client-123",
+      SLACK_CLIENT_SECRET: "slack-client-secret",
       PUBLIC_BASE_URL: "https://api.lifty.test",
       TRIGGER_SECRET_KEY: "tr_prod_test_key",
     });
