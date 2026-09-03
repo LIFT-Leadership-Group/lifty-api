@@ -3,31 +3,51 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
+  ConfigSectionSchema,
+  ConfigUpdateRequestSchema,
+  ConfigUpdateResultSchema,
+  ConfigUpdateStatusSchema,
   CreateWorkspaceRequestSchema,
   CreateWorkspaceResultSchema,
   type CreateWorkspaceRequest,
   type CreateWorkspaceResult,
+  DisconnectResultSchema,
   HubspotConnectStartSchema,
-  HubspotConnectionStatusSchema,
+  IntegrationConnectionStatusSchema,
   OnboardingPushResultSchema,
   OnboardingStatusSchema,
+  ProviderSchema,
   RunStatusSchema,
   StartRunResultSchema,
   StartCrmSyncResultSchema,
   CrmSyncStatusSchema,
   SubmitOnboardingRequestSchema,
+  WorkspaceConfigSchema,
+  WorkspaceOverviewSchema,
+  type ConfigSection,
+  type ConfigUpdateRequest,
+  type ConfigUpdateStatus,
+  type ConfigUpdateSubmission,
+  type DisconnectResult,
   type HubspotConnectStart,
   type HubspotConnectionStatus,
   type OnboardingStatus,
   type OnboardingSubmission,
+  type Provider,
   type RunStatus,
   type StartRunResult,
   type StartCrmSyncResult,
   type CrmSyncStatus,
+  type WorkspaceConfig,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
 } from "./contracts.js";
-import type { EnqueueCrmSync, EnqueueFirstRun, EnqueueOnboardingImport } from "./trigger-client.js";
+import type {
+  EnqueueConfigUpdate,
+  EnqueueCrmSync,
+  EnqueueFirstRun,
+  EnqueueOnboardingImport,
+} from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
   HubspotCallbackError,
@@ -39,6 +59,7 @@ const MAX_REQUEST_BYTES = 132 * 1024;
 // The create-workspace body carries only a bounded name and description.
 const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
 const RequestIdSchema = z.uuid();
+const SubmissionRefSchema = z.uuid();
 
 export interface AuthSession {
   userId: string;
@@ -70,6 +91,17 @@ export interface AppDependencies {
   startCrmSyncRun(session: AuthSession): Promise<StartCrmSyncResult>;
   getCrmSyncStatus(session: AuthSession): Promise<CrmSyncStatus>;
   enqueueCrmSync: EnqueueCrmSync;
+  getConfig(session: AuthSession, section: ConfigSection | null): Promise<WorkspaceConfig>;
+  submitConfigUpdate(
+    session: AuthSession,
+    payload: ConfigUpdateRequest,
+  ): Promise<ConfigUpdateSubmission>;
+  getConfigUpdateStatus(
+    session: AuthSession,
+    submissionRef: string | null,
+  ): Promise<ConfigUpdateStatus>;
+  enqueueConfigUpdate: EnqueueConfigUpdate;
+  disconnectIntegration(session: AuthSession, provider: Provider): Promise<DisconnectResult>;
   startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
   completeHubspotCallback(
@@ -116,6 +148,10 @@ const ErrorResponseSchema = z.object({
 const JsonResponse = (schema: z.ZodType) => ({
   content: { "application/json": { schema } },
   description: "JSON response",
+});
+
+const ProviderPathParams = z.object({
+  provider: ProviderSchema.openapi({ param: { name: "provider", in: "path" } }),
 });
 
 async function readRequestTextWithinLimit(
@@ -172,6 +208,17 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     responses: {
       200: JsonResponse(z.object({ status: z.literal("ready") })),
       503: JsonResponse(z.object({ status: z.literal("unready") })),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/status",
+    operationId: "getStatus",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(WorkspaceOverviewSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
     },
   });
   app.openAPIRegistry.registerPath({
@@ -261,47 +308,143 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     },
   });
   app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/config",
+    operationId: "getConfig",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(WorkspaceConfigSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/config/{section}",
+    operationId: "getConfigSection",
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({
+        section: ConfigSectionSchema.openapi({ param: { name: "section", in: "path" } }),
+      }),
+    },
+    responses: {
+      200: JsonResponse(WorkspaceConfigSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "patch",
+    path: "/v1/config",
+    operationId: "updateConfig",
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: { "application/json": { schema: ConfigUpdateRequestSchema } },
+      },
+    },
+    responses: {
+      200: JsonResponse(ConfigUpdateResultSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      413: JsonResponse(ErrorResponseSchema),
+      422: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/config/updates/{submission_ref}",
+    operationId: "getConfigUpdateStatus",
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({
+        submission_ref: SubmissionRefSchema.openapi({
+          param: { name: "submission_ref", in: "path" },
+        }),
+      }),
+    },
+    responses: {
+      200: JsonResponse(ConfigUpdateStatusSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      404: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
     method: "post",
-    path: "/v1/integrations/hubspot/sync",
+    path: "/v1/integrations/{provider}/sync",
     operationId: "startCrmSync",
     security: [{ bearerAuth: [] }],
+    request: { params: ProviderPathParams },
     responses: {
       200: JsonResponse(StartCrmSyncResultSchema),
+      400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
+      501: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
   });
   app.openAPIRegistry.registerPath({
     method: "get",
-    path: "/v1/integrations/hubspot/sync",
+    path: "/v1/integrations/{provider}/sync",
     operationId: "getCrmSyncStatus",
     security: [{ bearerAuth: [] }],
+    request: { params: ProviderPathParams },
     responses: {
       200: JsonResponse(CrmSyncStatusSchema),
+      400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
+      501: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
   });
   app.openAPIRegistry.registerPath({
     method: "post",
-    path: "/v1/integrations/hubspot/connect",
-    operationId: "startHubspotConnect",
+    path: "/v1/integrations/{provider}/connect",
+    operationId: "startProviderConnect",
     security: [{ bearerAuth: [] }],
+    request: { params: ProviderPathParams },
     responses: {
       200: JsonResponse(HubspotConnectStartSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      501: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/integrations/{provider}",
+    operationId: "getProviderConnection",
+    security: [{ bearerAuth: [] }],
+    request: { params: ProviderPathParams },
+    responses: {
+      200: JsonResponse(IntegrationConnectionStatusSchema),
+      400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
   });
   app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/integrations/hubspot",
-    operationId: "getHubspotConnection",
+    method: "delete",
+    path: "/v1/integrations/{provider}",
+    operationId: "disconnectProvider",
     security: [{ bearerAuth: [] }],
+    request: { params: ProviderPathParams },
     responses: {
-      200: JsonResponse(HubspotConnectionStatusSchema),
+      200: JsonResponse(DisconnectResultSchema),
+      400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
@@ -364,6 +507,48 @@ function hubspotHtmlResponse(
   });
 }
 
+function errorJson(
+  context: Context<AppEnvironment>,
+  status: ContentfulStatusCode,
+  code: string,
+  message: string,
+): Response {
+  return context.json(
+    { error: { code, message }, request_id: context.get("requestId") },
+    status,
+  );
+}
+
+/** Provider allowlist for `/v1/integrations/{provider}/*`; `ok: false` already carries the 400. */
+function resolveProvider(
+  context: Context<AppEnvironment>,
+): { ok: true; provider: Provider } | { ok: false; response: Response } {
+  const parsed = ProviderSchema.safeParse(
+    (context.req.param("provider") ?? "").toLowerCase(),
+  );
+  if (!parsed.success) {
+    return {
+      ok: false,
+      response: errorJson(
+        context,
+        400,
+        "PROVIDER_INVALID",
+        "Unknown provider. Supported providers: hubspot, unipile.",
+      ),
+    };
+  }
+  return { ok: true, provider: parsed.data };
+}
+
+function providerUnavailable(context: Context<AppEnvironment>, provider: Provider): Response {
+  return errorJson(
+    context,
+    501,
+    "PROVIDER_NOT_AVAILABLE",
+    `Connecting ${provider} is not available yet.`,
+  );
+}
+
 const defaultDependencies: AppDependencies = {
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
   getWorkspace: async () => {
@@ -398,6 +583,21 @@ const defaultDependencies: AppDependencies = {
   },
   enqueueCrmSync: async () => {
     throw new Error("enqueueCrmSync is not configured");
+  },
+  getConfig: async () => {
+    throw new Error("getConfig is not configured");
+  },
+  submitConfigUpdate: async () => {
+    throw new Error("submitConfigUpdate is not configured");
+  },
+  getConfigUpdateStatus: async () => {
+    throw new Error("getConfigUpdateStatus is not configured");
+  },
+  enqueueConfigUpdate: async () => {
+    throw new Error("enqueueConfigUpdate is not configured");
+  },
+  disconnectIntegration: async () => {
+    throw new Error("disconnectIntegration is not configured");
   },
   startHubspotConnect: async () => {
     throw new Error("startHubspotConnect is not configured");
@@ -629,6 +829,106 @@ export function createApp(
     await next();
   });
 
+  // ---------------------------------------------------------------- status
+
+  // One aggregate read so `lifty status` answers "is my HubSpot OK?" without
+  // ever touching OAuth: workspace, onboarding import, first run, the latest
+  // config update, and per-provider connection + last sync.
+  app.get("/v1/status", async (context) => {
+    const session = context.get("authSession");
+    const workspace = await dependencies.getWorkspace(session);
+    if (workspace.state === "needs_workspace") {
+      return context.json(
+        WorkspaceOverviewSchema.parse({
+          workspace: { state: "needs_workspace" },
+          onboarding: { state: "none" },
+          run: { state: "none" },
+          config_update: { state: "none" },
+          integrations: {
+            hubspot: {
+              available: true,
+              connected: false,
+              portal_id: null,
+              hub_domain: null,
+              connected_at: null,
+              reconnect_required: false,
+              sync_pending: false,
+              last_sync_at: null,
+              last_sync: { state: "none" },
+            },
+            unipile: { available: false, connected: false },
+          },
+        }),
+      );
+    }
+
+    const [onboarding, run, sync, hubspot, configUpdate] = await Promise.all([
+      dependencies.getOnboardingStatus(session),
+      dependencies.getRunStatus(session),
+      dependencies.getCrmSyncStatus(session),
+      dependencies.getHubspotConnection(session),
+      dependencies.getConfigUpdateStatus(session, null),
+    ]);
+
+    return context.json(
+      WorkspaceOverviewSchema.parse({
+        workspace: {
+          state: workspace.state,
+          workspace_ref: workspace.workspace.workspace_ref,
+          name: workspace.workspace.name,
+        },
+        onboarding: onboarding.state === "none"
+          ? { state: "none" }
+          : {
+              state: onboarding.state,
+              submission_ref: onboarding.submission_ref,
+              submitted_at: onboarding.submitted_at,
+            },
+        run: run.state === "none"
+          ? { state: "none" }
+          : {
+              state: run.state,
+              run_ref: run.run_ref,
+              requested_leads: run.requested_leads,
+              leads_discovered: run.leads_discovered,
+              leads_researched: run.leads_researched,
+              error_code: run.error_code,
+              started_at: run.started_at,
+              completed_at: run.completed_at,
+            },
+        config_update: configUpdate,
+        integrations: {
+          hubspot: {
+            available: true,
+            connected: hubspot.status === "connected",
+            portal_id: hubspot.status === "connected" ? hubspot.portal_id : null,
+            hub_domain: hubspot.status === "connected" ? hubspot.hub_domain : null,
+            connected_at: hubspot.status === "connected" ? hubspot.connected_at : null,
+            reconnect_required: hubspot.status === "connected"
+              ? hubspot.reconnect_required
+              : false,
+            sync_pending: sync.state === "queued" || sync.state === "running",
+            last_sync_at: sync.state === "none" ? null : sync.completed_at,
+            last_sync: sync.state === "none"
+              ? { state: "none" }
+              : {
+                  state: sync.state,
+                  run_ref: sync.run_ref,
+                  requested_leads: sync.requested_leads,
+                  leads_synced: sync.leads_synced,
+                  error_code: sync.error_code,
+                  started_at: sync.started_at,
+                  completed_at: sync.completed_at,
+                },
+          },
+          unipile: { available: false, connected: false },
+        },
+      }),
+    );
+  });
+
+  // ---------------------------------------------------------------- workspace
+
   app.get("/v1/workspace", async (context) => {
     const result = await dependencies.getWorkspace(context.get("authSession"));
     return context.json(WorkspaceStatusSchema.parse(result));
@@ -640,15 +940,11 @@ export function createApp(
       Number.isFinite(declaredLength)
       && declaredLength > MAX_CREATE_WORKSPACE_BYTES
     ) {
-      return context.json(
-        {
-          error: {
-            code: "PAYLOAD_TOO_LARGE",
-            message: "The workspace request exceeds 16 KiB.",
-          },
-          request_id: context.get("requestId"),
-        },
+      return errorJson(
+        context,
         413,
+        "PAYLOAD_TOO_LARGE",
+        "The workspace request exceeds 16 KiB.",
       );
     }
     const requestBody = await readRequestTextWithinLimit(
@@ -656,15 +952,11 @@ export function createApp(
       MAX_CREATE_WORKSPACE_BYTES,
     );
     if (!requestBody.ok) {
-      return context.json(
-        {
-          error: {
-            code: "PAYLOAD_TOO_LARGE",
-            message: "The workspace request exceeds 16 KiB.",
-          },
-          request_id: context.get("requestId"),
-        },
+      return errorJson(
+        context,
         413,
+        "PAYLOAD_TOO_LARGE",
+        "The workspace request exceeds 16 KiB.",
       );
     }
 
@@ -676,15 +968,11 @@ export function createApp(
     }
     const body = CreateWorkspaceRequestSchema.safeParse(parsedJson);
     if (!body.success) {
-      return context.json(
-        {
-          error: {
-            code: "INVALID_REQUEST",
-            message: "The workspace request must contain a non-empty name and an optional description.",
-          },
-          request_id: context.get("requestId"),
-        },
+      return errorJson(
+        context,
         400,
+        "INVALID_REQUEST",
+        "The workspace request must contain a non-empty name and an optional description.",
       );
     }
 
@@ -698,15 +986,11 @@ export function createApp(
   app.post("/v1/onboarding", async (context) => {
     const declaredLength = Number(context.req.header("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
-      return context.json(
-        {
-          error: {
-            code: "PAYLOAD_TOO_LARGE",
-            message: "The onboarding push exceeds 132 KiB.",
-          },
-          request_id: context.get("requestId"),
-        },
+      return errorJson(
+        context,
         413,
+        "PAYLOAD_TOO_LARGE",
+        "The onboarding push exceeds 132 KiB.",
       );
     }
     const requestBody = await readRequestTextWithinLimit(
@@ -714,15 +998,11 @@ export function createApp(
       MAX_REQUEST_BYTES,
     );
     if (!requestBody.ok) {
-      return context.json(
-        {
-          error: {
-            code: "PAYLOAD_TOO_LARGE",
-            message: "The onboarding push exceeds 132 KiB.",
-          },
-          request_id: context.get("requestId"),
-        },
+      return errorJson(
+        context,
         413,
+        "PAYLOAD_TOO_LARGE",
+        "The onboarding push exceeds 132 KiB.",
       );
     }
 
@@ -734,15 +1014,11 @@ export function createApp(
     }
     const body = SubmitOnboardingRequestSchema.safeParse(parsedJson);
     if (!body.success) {
-      return context.json(
-        {
-          error: {
-            code: "INVALID_REQUEST",
-            message: "The onboarding push must contain one JSON object named draft.",
-          },
-          request_id: context.get("requestId"),
-        },
+      return errorJson(
+        context,
         400,
+        "INVALID_REQUEST",
+        "The onboarding push must contain one JSON object named draft.",
       );
     }
 
@@ -795,21 +1071,186 @@ export function createApp(
     return context.json(RunStatusSchema.parse(result));
   });
 
-  app.post("/v1/integrations/hubspot/connect", async (context) => {
+  // ---------------------------------------------------------------- config
+
+  app.get("/v1/config", async (context) => {
+    const result = await dependencies.getConfig(context.get("authSession"), null);
+    return context.json(WorkspaceConfigSchema.parse(result));
+  });
+
+  // Registered before `/v1/config/:section` so the literal segment wins.
+  app.get("/v1/config/updates/:submission_ref", async (context) => {
+    const ref = SubmissionRefSchema.safeParse(context.req.param("submission_ref"));
+    if (!ref.success) {
+      return errorJson(
+        context,
+        400,
+        "INVALID_REQUEST",
+        "The config update reference must be a UUID.",
+      );
+    }
+    const result = await dependencies.getConfigUpdateStatus(
+      context.get("authSession"),
+      ref.data,
+    );
+    return context.json(ConfigUpdateStatusSchema.parse(result));
+  });
+
+  app.get("/v1/config/:section", async (context) => {
+    const section = ConfigSectionSchema.safeParse(
+      (context.req.param("section") ?? "").toLowerCase(),
+    );
+    if (!section.success) {
+      return errorJson(
+        context,
+        400,
+        "INVALID_REQUEST",
+        "The config section must be one of icp, tone, prompt, workspace.",
+      );
+    }
+    const result = await dependencies.getConfig(context.get("authSession"), section.data);
+    return context.json(WorkspaceConfigSchema.parse(result));
+  });
+
+  app.patch("/v1/config", async (context) => {
+    const declaredLength = Number(context.req.header("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
+      return errorJson(
+        context,
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "The config update exceeds 132 KiB.",
+      );
+    }
+    const requestBody = await readRequestTextWithinLimit(
+      context.req.raw,
+      MAX_REQUEST_BYTES,
+    );
+    if (!requestBody.ok) {
+      return errorJson(
+        context,
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "The config update exceeds 132 KiB.",
+      );
+    }
+
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(requestBody.text);
+    } catch {
+      parsedJson = null;
+    }
+    const body = ConfigUpdateRequestSchema.safeParse(parsedJson);
+    if (!body.success) {
+      return errorJson(
+        context,
+        400,
+        "INVALID_REQUEST",
+        "The config update must be {section, values}, {section: \"prompt\", instruction}, or {values}.",
+      );
+    }
+
+    const submission = await dependencies.submitConfigUpdate(
+      context.get("authSession"),
+      body.data,
+    );
+
+    // Direct writes (filters, tone, workspace) already landed inside the RPC.
+    // Anything flagged for regeneration gets exactly one job; a replay of a
+    // still-pending digest re-enqueues idempotently (self-healing a lost
+    // enqueue), and a previously failed regeneration gets a fresh run.
+    let state = submission.state;
+    let runRef = submission.run_ref;
+    const regenerates = submission.regenerate_icp || submission.regenerate_prompt;
+    if (regenerates && submission.import_status !== "imported") {
+      await dependencies.enqueueConfigUpdate(submission.submission_ref, {
+        fresh: submission.import_status === "failed",
+      });
+      state = "queued";
+      runRef = submission.submission_ref;
+    }
+
+    // A synchronous filter-only write lands a new lane version inside the RPC
+    // but its receipt carries no version; read it back so the CLI can name it.
+    let icpVersion = submission.icp_version ?? null;
+    if (
+      icpVersion === null
+      && state !== "queued"
+      && submission.artifact_actions.icp === "applied"
+    ) {
+      const config = await dependencies.getConfig(context.get("authSession"), "icp");
+      icpVersion = config.config.icp?.version ?? null;
+    }
+
+    return context.json(
+      ConfigUpdateResultSchema.parse({
+        state,
+        submission_ref: submission.submission_ref,
+        run_ref: runRef,
+        import_status: submission.import_status,
+        changed_sections: submission.changed_sections,
+        artifact_actions: submission.artifact_actions,
+        workspace_ref: submission.workspace_ref,
+        created: submission.created,
+        icp_version: icpVersion,
+        prompt_chars: submission.prompt_chars ?? null,
+        prompt_version: submission.prompt_version ?? null,
+        error_code: state === "queued" ? null : submission.error_code ?? null,
+      }),
+    );
+  });
+
+  // ---------------------------------------------------------------- integrations
+
+  app.post("/v1/integrations/:provider/connect", async (context) => {
+    const provider = resolveProvider(context);
+    if (!provider.ok) return provider.response;
+    if (provider.provider !== "hubspot") {
+      return providerUnavailable(context, provider.provider);
+    }
     const result = await dependencies.startHubspotConnect(
       context.get("authSession"),
     );
     return context.json(HubspotConnectStartSchema.parse(result));
   });
 
-  app.get("/v1/integrations/hubspot", async (context) => {
+  app.get("/v1/integrations/:provider", async (context) => {
+    const provider = resolveProvider(context);
+    if (!provider.ok) return provider.response;
+    if (provider.provider !== "hubspot") {
+      // No connect path exists yet, so nothing can be connected.
+      return context.json(
+        IntegrationConnectionStatusSchema.parse({
+          provider: provider.provider,
+          status: "not_connected",
+        }),
+      );
+    }
     const result = await dependencies.getHubspotConnection(
       context.get("authSession"),
     );
-    return context.json(HubspotConnectionStatusSchema.parse(result));
+    return context.json(IntegrationConnectionStatusSchema.parse(result));
   });
 
-  app.post("/v1/integrations/hubspot/sync", async (context) => {
+  app.delete("/v1/integrations/:provider", async (context) => {
+    const provider = resolveProvider(context);
+    if (!provider.ok) return provider.response;
+    // Confirmation is the skill's job; the RPC refuses while a sync is in
+    // flight and when nothing is connected.
+    const result = await dependencies.disconnectIntegration(
+      context.get("authSession"),
+      provider.provider,
+    );
+    return context.json(DisconnectResultSchema.parse(result));
+  });
+
+  app.post("/v1/integrations/:provider/sync", async (context) => {
+    const provider = resolveProvider(context);
+    if (!provider.ok) return provider.response;
+    if (provider.provider !== "hubspot") {
+      return providerUnavailable(context, provider.provider);
+    }
     const result = await dependencies.startCrmSyncRun(
       context.get("authSession"),
     );
@@ -819,7 +1260,12 @@ export function createApp(
     return context.json(StartCrmSyncResultSchema.parse(result));
   });
 
-  app.get("/v1/integrations/hubspot/sync", async (context) => {
+  app.get("/v1/integrations/:provider/sync", async (context) => {
+    const provider = resolveProvider(context);
+    if (!provider.ok) return provider.response;
+    if (provider.provider !== "hubspot") {
+      return providerUnavailable(context, provider.provider);
+    }
     const result = await dependencies.getCrmSyncStatus(
       context.get("authSession"),
     );

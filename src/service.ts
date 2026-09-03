@@ -10,18 +10,23 @@ import {
   createSupabaseReadinessCheck,
 } from "./supabase-auth.js";
 import {
+  createConfigUpdateTrigger,
   createCrmSyncTrigger,
   createFirstRunTrigger,
   createOnboardingImportTrigger,
 } from "./trigger-client.js";
 import {
   createWorkspace,
+  disconnectIntegration,
+  getConfig,
+  getConfigUpdateStatus,
   getCrmSyncStatus,
   getOnboardingStatus,
   getRunStatus,
   getWorkspaceStatus,
   startCrmSyncRun,
   startRun,
+  submitConfigUpdate,
   submitOnboarding,
 } from "./workspace-operations.js";
 
@@ -40,6 +45,11 @@ export function createProductionApp(config: ServiceConfig) {
     startCrmSyncRun,
     getCrmSyncStatus,
     enqueueCrmSync: createCrmSyncTrigger(config.trigger),
+    getConfig,
+    submitConfigUpdate,
+    getConfigUpdateStatus,
+    enqueueConfigUpdate: createConfigUpdateTrigger(config.trigger),
+    disconnectIntegration,
     startHubspotConnect: hubspot.startConnect,
     getHubspotConnection: hubspot.getConnection,
     completeHubspotCallback: hubspot.completeCallback,

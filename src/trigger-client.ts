@@ -7,6 +7,7 @@ import { PublicError } from "./errors.js";
 const ONBOARDING_IMPORT_TASK_ID = "lifty-onboarding-import";
 const FIRST_RUN_TASK_ID = "lifty-first-run";
 const CRM_SYNC_TASK_ID = "lifty-crm-sync";
+const CONFIG_UPDATE_TASK_ID = "lifty-config-update";
 const IDEMPOTENCY_TTL = "1h";
 
 export interface TriggerClientSettings {
@@ -99,6 +100,34 @@ export function createCrmSyncTrigger(
   // `lifty sync` re-triggers idempotently and self-heals a lost enqueue.
   return async (runId) =>
     triggerTask(settings, CRM_SYNC_TASK_ID, { runId }, `${CRM_SYNC_TASK_ID}:${runId}`);
+}
+
+export interface EnqueueConfigUpdateOptions {
+  /** A failed regeneration must not dedupe onto its dead run — force a fresh one. */
+  fresh: boolean;
+}
+
+export type EnqueueConfigUpdate = (
+  submissionId: string,
+  options: EnqueueConfigUpdateOptions,
+) => Promise<{ id: string }>;
+
+export function createConfigUpdateTrigger(
+  settings: TriggerClientSettings,
+): EnqueueConfigUpdate {
+  // Submission-scoped key like the onboarding import: a digest replay of a
+  // queued update re-triggers idempotently and self-heals a lost enqueue.
+  return async (submissionId, options) => {
+    const idempotencyKey = options.fresh
+      ? `${CONFIG_UPDATE_TASK_ID}:${submissionId}:retry:${Date.now()}`
+      : `${CONFIG_UPDATE_TASK_ID}:${submissionId}`;
+    return triggerTask(
+      settings,
+      CONFIG_UPDATE_TASK_ID,
+      { submissionId },
+      idempotencyKey,
+    );
+  };
 }
 
 function enqueueFailed(cause: unknown): PublicError {

@@ -24,8 +24,14 @@ configured Hono app for programmatic use.
 - `GET /v1/onboarding` — authenticated import status with a secret-free config summary
 - `POST /v1/workspace/runs` — start (or re-attach to) the first ICP run of five leads (LIF-657)
 - `GET /v1/workspace/runs` — run state, progress, and researched results
-- `POST /v1/integrations/hubspot/connect` — mint a short-lived connect URL
-- `GET /v1/integrations/hubspot` — secret-free connection status
+- `GET /v1/status` — one aggregate read for `lifty status`: workspace, onboarding import, first run, latest config update, and per-provider connection + last sync (LIF-669). Never touches OAuth.
+- `GET /v1/config` / `GET /v1/config/{section}` — secret-free workspace config (`icp`, `tone`, `prompt`, `workspace`), each with a version stamp
+- `PATCH /v1/config` — config update through the LIF-667 seam. Body: `{section, values}`, `{section: "prompt", instruction}`, or `{values}`. Filter/tone/workspace writes land synchronously; persona, tone, and prompt regenerations return `queued` and run through the `lifty-config-update` job (LIF-668)
+- `GET /v1/config/updates/{submission_ref}` — poll a queued update (state, changed sections, new versions, error code)
+- `POST /v1/integrations/{provider}/connect` — mint a short-lived connect URL (`hubspot`; `unipile` is reserved and answers 501 until its connect path exists)
+- `GET /v1/integrations/{provider}` — secret-free connection status
+- `DELETE /v1/integrations/{provider}` — disconnect: deletes the stored grant, deactivates the integration, clears the portal pointer; 409 while a CRM sync is in flight. Founder confirmation is the skill's job (LIF-669)
+- `POST /v1/integrations/{provider}/sync` / `GET …/sync` — start / poll the CRM sync run (LIF-663)
 - `GET /hubspot/start` — redirect an opaque connect intent to HubSpot consent
 - `GET /hubspot/callback` — verify OAuth, refreshability, scopes, and portal;
   persist the encrypted grant and render a safe browser result

@@ -48,18 +48,18 @@ describe("LIFTY API", () => {
     expect(document.paths?.["/v1/workspace/runs"]?.get?.operationId).toBe(
       "getRunStatus",
     );
-    expect(document.paths?.["/v1/integrations/hubspot/sync"]?.post?.operationId).toBe(
+    expect(document.paths?.["/v1/integrations/{provider}/sync"]?.post?.operationId).toBe(
       "startCrmSync",
     );
-    expect(document.paths?.["/v1/integrations/hubspot/sync"]?.get?.operationId).toBe(
+    expect(document.paths?.["/v1/integrations/{provider}/sync"]?.get?.operationId).toBe(
       "getCrmSyncStatus",
     );
     expect(
-      document.paths?.["/v1/integrations/hubspot/connect"]?.post?.operationId,
-    ).toBe("startHubspotConnect");
+      document.paths?.["/v1/integrations/{provider}/connect"]?.post?.operationId,
+    ).toBe("startProviderConnect");
     expect(
-      document.paths?.["/v1/integrations/hubspot"]?.get?.operationId,
-    ).toBe("getHubspotConnection");
+      document.paths?.["/v1/integrations/{provider}"]?.get?.operationId,
+    ).toBe("getProviderConnection");
     expect(document.components?.securitySchemes).toHaveProperty("bearerAuth");
   });
 
