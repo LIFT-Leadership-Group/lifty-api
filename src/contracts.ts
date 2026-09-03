@@ -165,7 +165,7 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
 ]);
 
 /** Providers the integration routes accept. unipile is reserved: routed, not connectable yet. */
-export const ProviderSchema = z.enum(["hubspot", "unipile"]);
+export const ProviderSchema = z.enum(["hubspot", "slack", "unipile"]);
 
 export const HubspotConnectStartSchema = z
   .object({
@@ -195,9 +195,45 @@ export const HubspotConnectionStatusSchema = z.discriminatedUnion("status", [
     .strict(),
 ]);
 
+export const SlackConnectStartSchema = z
+  .object({
+    provider: z.literal("slack"),
+    connect_url: z.string().url(),
+    expires_in_seconds: z.number().int().positive(),
+  })
+  .strict();
+
+export const ProviderConnectStartSchema = z.union([
+  HubspotConnectStartSchema,
+  SlackConnectStartSchema,
+]);
+
+export const SlackConnectionStatusSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      provider: z.literal("slack"),
+      status: z.literal("not_connected"),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("slack"),
+      status: z.literal("connected"),
+      team_id: z.string().min(1),
+      team_name: z.string().min(1),
+      enterprise_id: z.string().nullable(),
+      bot_user_id: z.string().min(1),
+      scopes: z.array(z.string()),
+      connected_at: z.string().nullable(),
+      reconnect_required: z.boolean(),
+    })
+    .strict(),
+]);
+
 /** GET /v1/integrations/{provider}: hubspot reads the RPC; unipile has no connect path yet. */
 export const IntegrationConnectionStatusSchema = z.union([
   HubspotConnectionStatusSchema,
+  SlackConnectionStatusSchema,
   z
     .object({
       provider: z.literal("unipile"),
@@ -507,6 +543,8 @@ export type RunStatus = z.infer<typeof RunStatusSchema>;
 export type Provider = z.infer<typeof ProviderSchema>;
 export type HubspotConnectStart = z.infer<typeof HubspotConnectStartSchema>;
 export type HubspotConnectionStatus = z.infer<typeof HubspotConnectionStatusSchema>;
+export type SlackConnectStart = z.infer<typeof SlackConnectStartSchema>;
+export type SlackConnectionStatus = z.infer<typeof SlackConnectionStatusSchema>;
 export type IntegrationConnectionStatus = z.infer<typeof IntegrationConnectionStatusSchema>;
 export type DisconnectResult = z.infer<typeof DisconnectResultSchema>;
 export type StartCrmSyncResult = z.infer<typeof StartCrmSyncResultSchema>;

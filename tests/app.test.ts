@@ -4,6 +4,8 @@ import { createApp } from "../src/app.js";
 import { PublicError } from "../src/errors.js";
 import { HubspotCallbackError } from "../src/hubspot-connect.js";
 import { sealHubspotConnectIntent } from "../src/hubspot-state.js";
+import { SlackCallbackError } from "../src/slack-connect.js";
+import { sealSlackConnectIntent } from "../src/slack-state.js";
 
 const SECRET_FIELD_NAME = /token$|api_?key|secret|credential/i;
 
@@ -968,6 +970,126 @@ describe("LIFTY API", () => {
       error_code: "HUBSPOT_CALLBACK_EXCHANGE_FAILED",
       method: "GET",
       path: "/hubspot/callback",
+      status: 502,
+    }]);
+  });
+
+  it("returns a short-lived Slack connection URL for an authenticated founder", async () => {
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      startSlackConnect: async (session) => {
+        expect(session.userId).toBe("founder-123");
+        return {
+          provider: "slack",
+          connect_url: "https://api.lifty.test/slack/start?intent=opaque",
+          expires_in_seconds: 600,
+        };
+      },
+    });
+
+    const response = await app.request("/v1/integrations/slack/connect", {
+      method: "POST",
+      headers: { authorization: "Bearer valid-token" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      provider: "slack",
+      connect_url: "https://api.lifty.test/slack/start?intent=opaque",
+      expires_in_seconds: 600,
+    });
+  });
+
+  it("reports Slack connection status without exposing credentials", async () => {
+    const app = createApp({
+      authenticate: async () => ({
+        ok: true,
+        session: { userId: "founder-123", client: { kind: "scoped" } },
+      }),
+      getSlackConnection: async () => ({
+        provider: "slack",
+        status: "connected",
+        team_id: "T123TEAM",
+        team_name: "Example",
+        enterprise_id: null,
+        bot_user_id: "U123BOT",
+        scopes: ["channels:read", "chat:write", "groups:read"],
+        connected_at: "2026-09-03T14:00:00Z",
+        reconnect_required: false,
+      }),
+    });
+
+    const response = await app.request("/v1/integrations/slack", {
+      headers: { authorization: "Bearer valid-token" },
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      provider: "slack",
+      status: "connected",
+      team_id: "T123TEAM",
+      reconnect_required: false,
+    });
+    expect(JSON.stringify(body)).not.toMatch(/xoxb|bot_token|secret/i);
+  });
+
+  it("redirects Slack consent and completes its callback without reflecting secrets", async () => {
+    const code = "slack-authorization-code-never-reflect";
+    const state = sealSlackConnectIntent("e".repeat(64), "test-secret");
+    const authorizeUrl = `https://slack.com/oauth/v2/authorize?state=${state}`;
+    const app = createApp({
+      buildSlackAuthorizeUrl: (receivedState) => {
+        expect(receivedState).toBe(state);
+        return authorizeUrl;
+      },
+      completeSlackCallback: async (input) => {
+        expect(input).toEqual({ code, state });
+        return { teamId: "T123TEAM", teamName: "Example" };
+      },
+    });
+
+    const start = await app.request(`/slack/start?intent=${state}`);
+    expect(start.status).toBe(302);
+    expect(start.headers.get("location")).toBe(authorizeUrl);
+    expect(start.headers.get("set-cookie")).toBeNull();
+
+    const response = await app.request(
+      `/slack/callback?code=${encodeURIComponent(code)}&state=${state}`,
+    );
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain("Slack is connected");
+    expect(html).not.toContain(code);
+    expect(html).not.toContain(state);
+  });
+
+  it("logs only a safe Slack callback failure reason", async () => {
+    const marker = "synthetic-slack-token-never-surface";
+    const events: unknown[] = [];
+    const response = await createApp({
+      completeSlackCallback: async () => {
+        throw new SlackCallbackError(
+          "exchange_failed",
+          502,
+          "Slack did not accept the authorization.",
+        );
+      },
+      log: (event) => events.push(event),
+    }).request(
+      `/slack/callback?code=${marker}&state=${sealSlackConnectIntent("f".repeat(64), "test-secret")}`,
+    );
+    const html = await response.text();
+
+    expect(response.status).toBe(502);
+    expect(html).not.toContain(marker);
+    expect(JSON.stringify(events)).not.toContain(marker);
+    expect(events).toMatchObject([{
+      error_code: "SLACK_CALLBACK_EXCHANGE_FAILED",
+      path: "/slack/callback",
       status: 502,
     }]);
   });
