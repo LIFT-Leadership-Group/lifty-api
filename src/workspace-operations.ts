@@ -192,6 +192,15 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (code === "PT409" && message.includes("lifty_config_update_not_retryable")) {
+    return new PublicError({
+      status: 409,
+      code: "CONFIG_UPDATE_NOT_RETRYABLE",
+      message: "That config update is not in a failed state, so there is nothing to retry.",
+      cause: error,
+    });
+  }
+
   if (code === "PT404" && message.includes("lifty_config_update_missing")) {
     return new PublicError({
       status: 404,
@@ -499,6 +508,30 @@ export async function getConfigUpdateStatus(
   const { data, error } = await getRpcClient(session).rpc<ConfigUpdateStatus>(
     "get_lifty_config_update_status",
     submissionRef ? { p_submission_ref: submissionRef } : undefined,
+  );
+
+  if (error) {
+    throw mapRpcError(error);
+  }
+
+  const parsed = ConfigUpdateStatusSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) {
+    throw invalidResponse(parsed.error);
+  }
+  return parsed.data;
+}
+
+/**
+ * requeue_lifty_config_update: flip the actor's failed submission back to pending
+ * before the fresh enqueue, so a poll never reads the stale failure (LIF-672).
+ */
+export async function requeueConfigUpdate(
+  session: AuthSession,
+  submissionRef: string,
+): Promise<ConfigUpdateStatus> {
+  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateStatus>(
+    "requeue_lifty_config_update",
+    { p_submission_ref: submissionRef },
   );
 
   if (error) {
