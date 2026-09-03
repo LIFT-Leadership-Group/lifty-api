@@ -26,7 +26,7 @@ configured Hono app for programmatic use.
 - `GET /v1/workspace/runs` — run state, progress, and researched results
 - `GET /v1/status` — one aggregate read for `lifty status`: workspace, onboarding import, first run, latest config update, and per-provider connection + last sync (LIF-669). Never touches OAuth.
 - `GET /v1/config` / `GET /v1/config/{section}` — secret-free workspace config (`icp`, `tone`, `prompt`, `workspace`), each with a version stamp
-- `PATCH /v1/config` — config update through the LIF-667 seam. Body: `{section, values}`, `{section: "prompt", instruction}`, or `{values}`. Filter/tone/workspace writes land synchronously; persona, tone, and prompt regenerations return `queued` and run through the `lifty-config-update` job (LIF-668)
+- `PATCH /v1/config` — config update through the LIF-667 seam. Body: `{section, values}`, `{section: "prompt", instruction}`, or `{values}`. Filter/tone/workspace writes land synchronously; persona, tone, and prompt regenerations return `queued` and run through the `lifty-config-update` job (LIF-668). While one regeneration is queued any other change answers 409 `CONFIG_UPDATE_IN_FLIGHT`; re-sending the queued update re-attaches (LIF-681)
 - `GET /v1/config/updates/{submission_ref}` — poll a queued update (state, changed sections, new versions, error code)
 - `POST /v1/integrations/{provider}/connect` — mint a short-lived connect URL (`hubspot`; `unipile` is reserved and answers 501 until its connect path exists)
 - `GET /v1/integrations/{provider}` — secret-free connection status

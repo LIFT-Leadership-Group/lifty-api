@@ -100,6 +100,8 @@ export const OnboardingStatusSchema = z.discriminatedUnion("state", [
       submission_ref: z.string().min(1),
       draft_digest: z.string().startsWith("sha256:"),
       submitted_at: z.string().min(1),
+      /** Short reason token, present only once the import failed with one (LIF-681), e.g. prompt_hand_tuned. */
+      error_code: z.string().nullable().optional(),
       workspace: WorkspaceReferenceSchema,
       summary: z.null(),
     })
@@ -110,6 +112,7 @@ export const OnboardingStatusSchema = z.discriminatedUnion("state", [
       submission_ref: z.string().min(1),
       draft_digest: z.string().startsWith("sha256:"),
       submitted_at: z.string().min(1),
+      error_code: z.null().optional(),
       workspace: WorkspaceReferenceSchema,
       summary: z
         .object({
@@ -353,6 +356,8 @@ export const ConfigUpdateSubmissionSchema = z.looseObject({
   prompt_chars: z.number().int().nullable().optional(),
   prompt_version: z.string().nullable().optional(),
   error_code: z.string().nullable().optional(),
+  /** Set once the row was requeued after a failure; keys the retry enqueue (LIF-681). */
+  requeued_at: z.string().nullable().optional(),
 });
 
 /** What PATCH /v1/config returns to the CLI. */
@@ -390,6 +395,8 @@ export const ConfigUpdateStatusSchema = z.discriminatedUnion("state", [
       prompt_chars: z.number().int().nullable(),
       prompt_version: z.string().nullable(),
       error_code: z.string().nullable(),
+      /** Present only once the row was requeued after a failure (LIF-681). */
+      requeued_at: z.string().nullable().optional(),
       submitted_at: z.string().min(1),
       updated_at: z.string().min(1),
       workspace: WorkspaceReferenceSchema,
@@ -434,6 +441,7 @@ export const WorkspaceOverviewSchema = z
           state: z.enum(["pending", "imported", "failed"]),
           submission_ref: z.string().min(1),
           submitted_at: z.string().min(1),
+          error_code: z.string().nullable(),
         })
         .strict(),
     ]),

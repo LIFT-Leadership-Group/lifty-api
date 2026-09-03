@@ -887,6 +887,7 @@ export function createApp(
               state: onboarding.state,
               submission_ref: onboarding.submission_ref,
               submitted_at: onboarding.submitted_at,
+              error_code: onboarding.error_code ?? null,
             },
         run: run.state === "none"
           ? { state: "none" }
@@ -1163,22 +1164,25 @@ export function createApp(
     // Direct writes (filters, tone, workspace) already landed inside the RPC.
     // Anything flagged for regeneration gets exactly one job; a replay of a
     // still-pending digest re-enqueues idempotently (self-healing a lost
-    // enqueue), and a previously failed regeneration gets a fresh run.
+    // enqueue), and a previously failed regeneration gets a fresh run keyed on
+    // the requeue stamp, so a lost enqueue after a requeue is also healed.
     let state = submission.state;
     let runRef = submission.run_ref;
     const regenerates = submission.regenerate_icp || submission.regenerate_prompt;
     if (regenerates && submission.import_status !== "imported") {
+      let requeuedAt = submission.requeued_at ?? null;
       if (submission.import_status === "failed") {
         // Reset the row before the job runs, so the founder's poll never
         // reads the previous failure while the retry lands behind it.
-        await dependencies.requeueConfigUpdate(
+        const requeued = await dependencies.requeueConfigUpdate(
           context.get("authSession"),
           submission.submission_ref,
         );
+        requeuedAt = requeued.state === "none"
+          ? new Date().toISOString()
+          : requeued.requeued_at ?? new Date().toISOString();
       }
-      await dependencies.enqueueConfigUpdate(submission.submission_ref, {
-        fresh: submission.import_status === "failed",
-      });
+      await dependencies.enqueueConfigUpdate(submission.submission_ref, { requeuedAt });
       state = "queued";
       runRef = submission.submission_ref;
     }

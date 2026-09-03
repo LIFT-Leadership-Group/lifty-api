@@ -103,8 +103,13 @@ export function createCrmSyncTrigger(
 }
 
 export interface EnqueueConfigUpdateOptions {
-  /** A failed regeneration must not dedupe onto its dead run — force a fresh one. */
-  fresh: boolean;
+  /**
+   * The submission's `requeued_at` stamp, set by requeue_lifty_config_update
+   * after a failure. Each requeue gets its own idempotency key, so a retry never
+   * dedupes onto the dead run, and a re-send after a lost enqueue reuses the
+   * same key as the attempt that was lost (LIF-681).
+   */
+  requeuedAt: string | null;
 }
 
 export type EnqueueConfigUpdate = (
@@ -118,8 +123,8 @@ export function createConfigUpdateTrigger(
   // Submission-scoped key like the onboarding import: a digest replay of a
   // queued update re-triggers idempotently and self-heals a lost enqueue.
   return async (submissionId, options) => {
-    const idempotencyKey = options.fresh
-      ? `${CONFIG_UPDATE_TASK_ID}:${submissionId}:retry:${Date.now()}`
+    const idempotencyKey = options.requeuedAt
+      ? `${CONFIG_UPDATE_TASK_ID}:${submissionId}:retry:${options.requeuedAt}`
       : `${CONFIG_UPDATE_TASK_ID}:${submissionId}`;
     return triggerTask(
       settings,
