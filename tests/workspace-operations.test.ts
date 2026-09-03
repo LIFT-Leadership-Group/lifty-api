@@ -136,7 +136,7 @@ describe("workspace RPC operations", () => {
   });
 
   it("submits through the authenticated client without forwarding actor identity", async () => {
-    const draft = { schema_version: "2.0", company: { name: "Example" } };
+    const draft = { schema_version: "2.1", company: { name: "Example" } };
     const expected = {
       state: "submitted" as const,
       submission_ref: "11111111-1111-4111-8111-111111111111",
