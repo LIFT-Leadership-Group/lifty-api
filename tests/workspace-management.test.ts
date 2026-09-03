@@ -67,6 +67,7 @@ const statusFixture: ConfigUpdateStatus = {
   prompt_chars: 1234,
   prompt_version: "2026-09-02T20:00:00.000000Z",
   error_code: null,
+  requeued_at: null,
   submitted_at: "2026-09-02T19:59:00Z",
   updated_at: "2026-09-02T20:00:00Z",
   workspace: { workspace_ref: "ws_opaque", name: "Example" },
@@ -109,6 +110,7 @@ describe("LIFTY API workspace management (P6)", () => {
         submission_ref: "11111111-1111-4111-8111-111111111111",
         draft_digest: `sha256:${"a".repeat(64)}`,
         submitted_at: "2026-09-01T21:00:00Z",
+        error_code: null,
         workspace: { workspace_ref: "ws_opaque", name: "Example" },
         summary: { icp: null, prompt: null },
       }),
@@ -168,6 +170,7 @@ describe("LIFTY API workspace management (P6)", () => {
         state: "imported",
         submission_ref: "11111111-1111-4111-8111-111111111111",
         submitted_at: "2026-09-01T21:00:00Z",
+        error_code: null,
       },
       run: {
         state: "succeeded",
@@ -300,7 +303,7 @@ describe("LIFTY API workspace management (P6)", () => {
   });
 
   it("queues a regenerating update and enqueues exactly one job", async () => {
-    const enqueueCalls: Array<{ submissionId: string; fresh: boolean }> = [];
+    const enqueueCalls: Array<{ submissionId: string; requeuedAt: string | null }> = [];
     const app = createApp({
       authenticate,
       submitConfigUpdate: async (received, payload) => {
@@ -309,7 +312,7 @@ describe("LIFTY API workspace management (P6)", () => {
         return submissionFixture();
       },
       enqueueConfigUpdate: async (submissionId, options) => {
-        enqueueCalls.push({ submissionId, fresh: options.fresh });
+        enqueueCalls.push({ submissionId, requeuedAt: options.requeuedAt });
         return { id: "run_cfg" };
       },
     });
@@ -335,7 +338,7 @@ describe("LIFTY API workspace management (P6)", () => {
       prompt_version: null,
       error_code: null,
     });
-    expect(enqueueCalls).toEqual([{ submissionId: SUBMISSION_REF, fresh: false }]);
+    expect(enqueueCalls).toEqual([{ submissionId: SUBMISSION_REF, requeuedAt: null }]);
   });
 
   it("applies a direct write synchronously without enqueuing", async () => {
@@ -401,14 +404,20 @@ describe("LIFTY API workspace management (P6)", () => {
     expect(sections).toEqual(["icp"]);
   });
 
-  it("re-runs a previously failed regeneration with a fresh key", async () => {
-    const enqueueCalls: Array<{ fresh: boolean }> = [];
+  it("re-runs a previously failed regeneration keyed on the requeue stamp", async () => {
+    const enqueueCalls: Array<{ requeuedAt: string | null }> = [];
     const order: string[] = [];
     const app = createApp({
       authenticate,
       requeueConfigUpdate: async (_session, ref) => {
         order.push(`requeue:${ref}`);
-        return { ...statusFixture, state: "queued", import_status: "pending", run_ref: SUBMISSION_REF };
+        return {
+          ...statusFixture,
+          state: "queued",
+          import_status: "pending",
+          run_ref: SUBMISSION_REF,
+          requeued_at: "2026-09-03T06:53:00Z",
+        };
       },
       submitConfigUpdate: async () =>
         submissionFixture({
@@ -420,7 +429,7 @@ describe("LIFTY API workspace management (P6)", () => {
         }),
       enqueueConfigUpdate: async (submissionId, options) => {
         order.push(`enqueue:${submissionId}`);
-        enqueueCalls.push({ fresh: options.fresh });
+        enqueueCalls.push({ requeuedAt: options.requeuedAt });
         return { id: "run_retry" };
       },
     });
@@ -438,14 +447,14 @@ describe("LIFTY API workspace management (P6)", () => {
       error_code: null,
       created: false,
     });
-    expect(enqueueCalls).toEqual([{ fresh: true }]);
+    expect(enqueueCalls).toEqual([{ requeuedAt: "2026-09-03T06:53:00Z" }]);
     // The row is reset before the job is triggered, never after.
     expect(order).toEqual([`requeue:${SUBMISSION_REF}`, `enqueue:${SUBMISSION_REF}`]);
   });
 
   it("does not requeue a still-pending replay; it only re-enqueues idempotently", async () => {
     let requeued = false;
-    const enqueueCalls: Array<{ fresh: boolean }> = [];
+    const enqueueCalls: Array<{ requeuedAt: string | null }> = [];
     const app = createApp({
       authenticate,
       submitConfigUpdate: async () => submissionFixture({ created: false }),
@@ -454,7 +463,7 @@ describe("LIFTY API workspace management (P6)", () => {
         throw new Error("must not requeue a pending submission");
       },
       enqueueConfigUpdate: async (_submissionId, options) => {
-        enqueueCalls.push({ fresh: options.fresh });
+        enqueueCalls.push({ requeuedAt: options.requeuedAt });
         return { id: "run_same" };
       },
     });
@@ -467,7 +476,70 @@ describe("LIFTY API workspace management (P6)", () => {
 
     expect(response.status).toBe(200);
     expect(requeued).toBe(false);
-    expect(enqueueCalls).toEqual([{ fresh: false }]);
+    expect(enqueueCalls).toEqual([{ requeuedAt: null }]);
+  });
+
+  it("accepts RPC results that omit error_code and requeued_at (pre-LIF-681 shape)", async () => {
+    const { error_code: _omittedError, ...onboardingWithoutErrorCode } = {
+      state: "imported" as const,
+      submission_ref: "11111111-1111-4111-8111-111111111111",
+      draft_digest: `sha256:${"a".repeat(64)}`,
+      submitted_at: "2026-09-01T21:00:00Z",
+      error_code: null,
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+      summary: { icp: null, prompt: null },
+    };
+    const { requeued_at: _omittedRequeue, ...statusWithoutRequeue } = statusFixture;
+    const app = createApp({
+      authenticate,
+      getWorkspace: async () => ({
+        state: "ready_for_connections",
+        workspace: { workspace_ref: "ws_opaque", name: "Example" },
+        next_action: null,
+      }),
+      getOnboardingStatus: async () => onboardingWithoutErrorCode,
+      getRunStatus: async () => ({ state: "none" }),
+      getCrmSyncStatus: async () => ({ state: "none" }),
+      getHubspotConnection: async () => ({ provider: "hubspot", status: "not_connected" }),
+      getConfigUpdateStatus: async () => statusWithoutRequeue,
+    });
+
+    const response = await app.request("/v1/status", { headers: authorized });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      onboarding: { state: "imported", error_code: null },
+      config_update: { state: "applied" },
+    });
+  });
+
+  it("re-attaches to a requeued-but-still-pending submission with the same retry key", async () => {
+    // requeue succeeded earlier but the enqueue was lost: the re-send must
+    // reuse the requeue stamp, not the original key (which dedupes onto the
+    // dead run inside the idempotency TTL).
+    const enqueueCalls: Array<{ requeuedAt: string | null }> = [];
+    const app = createApp({
+      authenticate,
+      submitConfigUpdate: async () =>
+        submissionFixture({ created: false, requeued_at: "2026-09-03T06:53:00Z" }),
+      requeueConfigUpdate: async () => {
+        throw new Error("must not requeue a pending submission");
+      },
+      enqueueConfigUpdate: async (_submissionId, options) => {
+        enqueueCalls.push({ requeuedAt: options.requeuedAt });
+        return { id: "run_retry_again" };
+      },
+    });
+
+    const response = await app.request("/v1/config", {
+      method: "PATCH",
+      headers: { ...authorized, "content-type": "application/json" },
+      body: JSON.stringify({ section: "prompt", instruction: "Emphasize urgency." }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ state: "queued", created: false });
+    expect(enqueueCalls).toEqual([{ requeuedAt: "2026-09-03T06:53:00Z" }]);
   });
 
   it("never serializes fields beyond the config update contract", async () => {

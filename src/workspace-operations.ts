@@ -192,6 +192,24 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (code === "PT409" && message.includes("lifty_config_update_in_flight")) {
+    return new PublicError({
+      status: 409,
+      code: "CONFIG_UPDATE_IN_FLIGHT",
+      message: "Another configuration change is still being applied. Check `lifty status` and send this update again once it has landed.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_config_missing_prompt")) {
+    return new PublicError({
+      status: 409,
+      code: "CONFIG_NOT_READY",
+      message: "This workspace has no research prompt yet. Run `lifty push` first.",
+      cause: error,
+    });
+  }
+
   if (code === "PT409" && message.includes("lifty_config_update_not_retryable")) {
     return new PublicError({
       status: 409,

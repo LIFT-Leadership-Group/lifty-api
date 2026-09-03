@@ -191,6 +191,7 @@ describe("workspace RPC operations", () => {
       submission_ref: "11111111-1111-4111-8111-111111111111",
       draft_digest: `sha256:${"d".repeat(64)}`,
       submitted_at: "2026-09-01T21:00:00Z",
+      error_code: null,
       workspace: { workspace_ref: "ws_opaque", name: "Example" },
       summary: {
         icp: {

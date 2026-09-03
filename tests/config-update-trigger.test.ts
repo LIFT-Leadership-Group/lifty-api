@@ -25,7 +25,7 @@ describe("config update trigger client", () => {
       }) as typeof fetch,
     });
 
-    const run = await enqueue("44444444-4444-4444-8444-444444444444", { fresh: false });
+    const run = await enqueue("44444444-4444-4444-8444-444444444444", { requeuedAt: null });
 
     expect(run).toEqual({ id: "run_cfg" });
     expect(requests[0]?.url).toBe(
@@ -40,7 +40,7 @@ describe("config update trigger client", () => {
     });
   });
 
-  it("varies the idempotency key when a failed regeneration needs a fresh run", async () => {
+  it("keys a requeued regeneration on its requeue stamp, deterministically", async () => {
     let body: { options?: { idempotencyKey?: string } } = {};
     const enqueue = createConfigUpdateTrigger({
       ...settings,
@@ -50,10 +50,12 @@ describe("config update trigger client", () => {
       }) as typeof fetch,
     });
 
-    await enqueue("44444444-4444-4444-8444-444444444444", { fresh: true });
+    await enqueue("44444444-4444-4444-8444-444444444444", {
+      requeuedAt: "2026-09-03T06:53:00Z",
+    });
 
-    expect(body.options?.idempotencyKey).toMatch(
-      /^lifty-config-update:44444444-4444-4444-8444-444444444444:retry:\d+$/,
+    expect(body.options?.idempotencyKey).toBe(
+      "lifty-config-update:44444444-4444-4444-8444-444444444444:retry:2026-09-03T06:53:00Z",
     );
   });
 
@@ -64,7 +66,7 @@ describe("config update trigger client", () => {
     });
 
     await expect(
-      enqueue("44444444-4444-4444-8444-444444444444", { fresh: false }),
+      enqueue("44444444-4444-4444-8444-444444444444", { requeuedAt: null }),
     ).rejects.toMatchObject({ status: 502, code: "IMPORT_ENQUEUE_FAILED" });
   });
 });
