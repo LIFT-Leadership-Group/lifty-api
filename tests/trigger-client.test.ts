@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createCrmSyncTrigger,
   createFirstRunTrigger,
+  createNotificationDeliveryTrigger,
   createOnboardingImportTrigger,
 } from "../src/trigger-client.js";
 
@@ -142,5 +143,32 @@ describe("crm sync trigger client", () => {
         idempotencyKeyTTL: "1h",
       },
     });
+  });
+});
+
+describe("notification delivery trigger client", () => {
+  it("enqueues the exact delivery with a delivery-scoped idempotency key", async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    const enqueue = createNotificationDeliveryTrigger({
+      ...settings,
+      fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+        return jsonResponse(200, { id: "run_notification" });
+      }) as typeof fetch,
+    });
+    const deliveryId = "64300000-0000-4000-a000-000000000012";
+
+    await enqueue(deliveryId);
+
+    expect(requests).toEqual([{
+      url: "https://api.trigger.test/api/v1/tasks/notification-delivery/trigger",
+      body: {
+        payload: { deliveryId },
+        options: {
+          idempotencyKey: `notification-delivery:${deliveryId}`,
+          idempotencyKeyTTL: "1h",
+        },
+      },
+    }]);
   });
 });

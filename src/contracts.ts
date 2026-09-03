@@ -242,6 +242,89 @@ export const IntegrationConnectionStatusSchema = z.union([
     .strict(),
 ]);
 
+export const NotificationTypeSchema = z.enum([
+  "reply.requires_action",
+  "meeting.booked",
+  "integration.disconnected",
+  "system.test",
+]);
+
+export const SlackNotificationChannelSchema = z
+  .object({
+    id: z.string().regex(/^C[A-Z0-9]{2,31}$/),
+    name: z.string().min(1).max(80),
+    is_private: z.boolean(),
+  })
+  .strict();
+
+export const SlackNotificationChannelsSchema = z
+  .object({ channels: z.array(SlackNotificationChannelSchema) })
+  .strict();
+
+export const NotificationDestinationSchema = z
+  .object({
+    destination_ref: z.uuid(),
+    provider: z.literal("slack"),
+    external_id: z.string().regex(/^C[A-Z0-9]{2,31}$/),
+    display_name: z.string().min(1).max(80),
+    status: z.enum(["active", "unavailable", "archived"]),
+  })
+  .strict();
+
+export const NotificationRouteSchema = z
+  .object({
+    route_ref: z.uuid(),
+    notification_type: NotificationTypeSchema,
+    destination_ref: z.uuid(),
+    enabled: z.boolean(),
+  })
+  .strict();
+
+const NotificationSlackStatusSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("not_connected") }).strict(),
+  z
+    .object({
+      status: z.literal("connected"),
+      team_id: z.string().min(1),
+      team_name: z.string().min(1),
+      reconnect_required: z.boolean(),
+    })
+    .strict(),
+]);
+
+export const NotificationConfigSchema = z
+  .object({
+    workspace_ref: z.uuid(),
+    notification_types: z.array(NotificationTypeSchema),
+    slack: NotificationSlackStatusSchema,
+    destinations: z.array(NotificationDestinationSchema),
+    routes: z.array(NotificationRouteSchema),
+  })
+  .strict();
+
+export const UpsertNotificationDestinationRequestSchema = z
+  .object({
+    channel_id: z.string().trim().regex(/^C[A-Z0-9]{2,31}$/),
+    channel_name: z.string().trim().min(1).max(80),
+  })
+  .strict();
+
+export const SetNotificationRouteRequestSchema = z
+  .object({
+    notification_type: NotificationTypeSchema,
+    destination_ref: z.uuid(),
+    enabled: z.boolean(),
+  })
+  .strict();
+
+export const NotificationTestResultSchema = z
+  .object({
+    delivery_ref: z.uuid(),
+    destination_ref: z.uuid(),
+    status: z.literal("queued"),
+  })
+  .strict();
+
 /** What DELETE /v1/integrations/{provider} returns to the CLI. */
 export const DisconnectResponseSchema = z
   .object({
@@ -556,3 +639,13 @@ export type ConfigUpdateSubmission = z.infer<typeof ConfigUpdateSubmissionSchema
 export type ConfigUpdateResult = z.infer<typeof ConfigUpdateResultSchema>;
 export type ConfigUpdateStatus = z.infer<typeof ConfigUpdateStatusSchema>;
 export type WorkspaceOverview = z.infer<typeof WorkspaceOverviewSchema>;
+export type NotificationType = z.infer<typeof NotificationTypeSchema>;
+export type SlackNotificationChannels = z.infer<typeof SlackNotificationChannelsSchema>;
+export type NotificationDestination = z.infer<typeof NotificationDestinationSchema>;
+export type NotificationRoute = z.infer<typeof NotificationRouteSchema>;
+export type NotificationConfig = z.infer<typeof NotificationConfigSchema>;
+export type UpsertNotificationDestinationRequest = z.infer<
+  typeof UpsertNotificationDestinationRequestSchema
+>;
+export type SetNotificationRouteRequest = z.infer<typeof SetNotificationRouteRequestSchema>;
+export type NotificationTestResult = z.infer<typeof NotificationTestResultSchema>;

@@ -28,6 +28,20 @@ import {
   type WorkspaceConfig,
   WorkspaceStatusSchema,
   type WorkspaceStatus,
+  NotificationConfigSchema,
+  type NotificationConfig,
+  NotificationDestinationSchema,
+  type NotificationDestination,
+  NotificationRouteSchema,
+  type NotificationRoute,
+  NotificationTestResultSchema,
+  type NotificationTestResult,
+  SetNotificationRouteRequestSchema,
+  type SetNotificationRouteRequest,
+  SlackNotificationChannelsSchema,
+  type SlackNotificationChannels,
+  UpsertNotificationDestinationRequestSchema,
+  type UpsertNotificationDestinationRequest,
 } from "./contracts.js";
 import { PublicError } from "./errors.js";
 
@@ -38,8 +52,21 @@ interface RpcClient {
   ): Promise<{ data: T; error: unknown }>;
 }
 
+interface FunctionsClient {
+  functions: {
+    invoke<T>(
+      name: string,
+      options?: { method?: "GET" | "POST" },
+    ): Promise<{ data: T; error: unknown }>;
+  };
+}
+
 function getRpcClient(session: AuthSession): RpcClient {
   return session.client as RpcClient;
+}
+
+function getFunctionsClient(session: AuthSession): FunctionsClient {
+  return session.client as FunctionsClient;
 }
 
 function unwrapSingleRow(value: unknown): unknown {
@@ -161,6 +188,33 @@ function mapRpcError(error: unknown): PublicError {
       status: 409,
       code: "NOT_CONNECTED",
       message: "This provider is not connected to your workspace.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_slack_not_connected")) {
+    return new PublicError({
+      status: 409,
+      code: "SLACK_NOT_CONNECTED",
+      message: "Connect Slack before configuring notification channels.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("notification_destination_unavailable")) {
+    return new PublicError({
+      status: 409,
+      code: "DESTINATION_UNAVAILABLE",
+      message: "That Slack channel is unavailable. Refresh channels and select it again.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT404" && message.includes("notification_destination_missing")) {
+    return new PublicError({
+      status: 404,
+      code: "DESTINATION_NOT_FOUND",
+      message: "That notification destination does not exist in this workspace.",
       cause: error,
     });
   }
@@ -581,5 +635,88 @@ export async function disconnectIntegration(
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }
+  return parsed.data;
+}
+
+export async function getNotificationConfig(
+  session: AuthSession,
+): Promise<NotificationConfig> {
+  const { data, error } = await getRpcClient(session).rpc<NotificationConfig>(
+    "get_lifty_notification_config",
+  );
+  if (error) throw mapRpcError(error);
+  const parsed = NotificationConfigSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) throw invalidResponse(parsed.error);
+  return parsed.data;
+}
+
+export async function listSlackNotificationChannels(
+  session: AuthSession,
+): Promise<SlackNotificationChannels> {
+  const { data, error } = await getFunctionsClient(session).functions.invoke<unknown>(
+    "lifty-slack-channels",
+    { method: "POST" },
+  );
+  if (error) {
+    throw new PublicError({
+      status: 502,
+      code: "SLACK_CHANNELS_UNAVAILABLE",
+      message: "LIFTY could not load Slack channels. Try again in a moment.",
+      cause: error,
+    });
+  }
+  const parsed = SlackNotificationChannelsSchema.safeParse(data);
+  if (!parsed.success) throw invalidResponse(parsed.error);
+  return parsed.data;
+}
+
+export async function upsertNotificationDestination(
+  session: AuthSession,
+  input: UpsertNotificationDestinationRequest,
+): Promise<NotificationDestination> {
+  const validated = UpsertNotificationDestinationRequestSchema.parse(input);
+  const { data, error } = await getRpcClient(session).rpc<NotificationDestination>(
+    "upsert_lifty_notification_destination",
+    {
+      p_external_id: validated.channel_id,
+      p_display_name: validated.channel_name,
+    },
+  );
+  if (error) throw mapRpcError(error);
+  const parsed = NotificationDestinationSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) throw invalidResponse(parsed.error);
+  return parsed.data;
+}
+
+export async function setNotificationRoute(
+  session: AuthSession,
+  input: SetNotificationRouteRequest,
+): Promise<NotificationRoute> {
+  const validated = SetNotificationRouteRequestSchema.parse(input);
+  const { data, error } = await getRpcClient(session).rpc<NotificationRoute>(
+    "set_lifty_notification_route",
+    {
+      p_notification_type: validated.notification_type,
+      p_destination_id: validated.destination_ref,
+      p_enabled: validated.enabled,
+    },
+  );
+  if (error) throw mapRpcError(error);
+  const parsed = NotificationRouteSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) throw invalidResponse(parsed.error);
+  return parsed.data;
+}
+
+export async function enqueueNotificationTest(
+  session: AuthSession,
+  destinationRef: string,
+): Promise<NotificationTestResult> {
+  const { data, error } = await getRpcClient(session).rpc<NotificationTestResult>(
+    "enqueue_lifty_notification_test",
+    { p_destination_id: destinationRef },
+  );
+  if (error) throw mapRpcError(error);
+  const parsed = NotificationTestResultSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) throw invalidResponse(parsed.error);
   return parsed.data;
 }
