@@ -4,6 +4,7 @@ import {
   disconnectIntegration,
   getConfig,
   getConfigUpdateStatus,
+  requeueConfigUpdate,
   submitConfigUpdate,
 } from "../src/workspace-operations.js";
 
@@ -121,6 +122,41 @@ describe("config update operations", () => {
         args: { p_submission_ref: "44444444-4444-4444-8444-444444444444" },
       },
     ]);
+  });
+
+  it("requeues a failed update through the authenticated client", async () => {
+    const queued = {
+      state: "queued",
+      submission_ref: "44444444-4444-4444-8444-444444444444",
+      import_status: "pending",
+      run_ref: "44444444-4444-4444-8444-444444444444",
+      changed_sections: ["tone"],
+      artifact_actions: { icp: "none", tone: "applied", prompt: "regenerate", workspace: "none" },
+      regenerate_icp: false,
+      regenerate_prompt: true,
+      icp_version: null,
+      prompt_chars: null,
+      prompt_version: null,
+      error_code: null,
+      submitted_at: "2026-09-03T06:40:00Z",
+      updated_at: "2026-09-03T06:53:00Z",
+      workspace: { workspace_ref: "ws_opaque", name: "Example" },
+    };
+    const { client, calls } = recordingClient(queued);
+    await expect(
+      requeueConfigUpdate({ ...session, client }, "44444444-4444-4444-8444-444444444444"),
+    ).resolves.toEqual(queued);
+    expect(calls).toEqual([
+      {
+        name: "requeue_lifty_config_update",
+        args: { p_submission_ref: "44444444-4444-4444-8444-444444444444" },
+      },
+    ]);
+
+    const notRetryable = failingClient("PT409", "lifty_config_update_not_retryable");
+    await expect(
+      requeueConfigUpdate({ ...session, client: notRetryable }, "44444444-4444-4444-8444-444444444444"),
+    ).rejects.toMatchObject({ status: 409, code: "CONFIG_UPDATE_NOT_RETRYABLE" });
   });
 
   it.each([

@@ -101,6 +101,7 @@ export interface AppDependencies {
     submissionRef: string | null,
   ): Promise<ConfigUpdateStatus>;
   enqueueConfigUpdate: EnqueueConfigUpdate;
+  requeueConfigUpdate(session: AuthSession, submissionRef: string): Promise<ConfigUpdateStatus>;
   disconnectIntegration(session: AuthSession, provider: Provider): Promise<DisconnectResult>;
   startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
@@ -595,6 +596,9 @@ const defaultDependencies: AppDependencies = {
   },
   enqueueConfigUpdate: async () => {
     throw new Error("enqueueConfigUpdate is not configured");
+  },
+  requeueConfigUpdate: async () => {
+    throw new Error("requeueConfigUpdate is not configured");
   },
   disconnectIntegration: async () => {
     throw new Error("disconnectIntegration is not configured");
@@ -1164,6 +1168,14 @@ export function createApp(
     let runRef = submission.run_ref;
     const regenerates = submission.regenerate_icp || submission.regenerate_prompt;
     if (regenerates && submission.import_status !== "imported") {
+      if (submission.import_status === "failed") {
+        // Reset the row before the job runs, so the founder's poll never
+        // reads the previous failure while the retry lands behind it.
+        await dependencies.requeueConfigUpdate(
+          context.get("authSession"),
+          submission.submission_ref,
+        );
+      }
       await dependencies.enqueueConfigUpdate(submission.submission_ref, {
         fresh: submission.import_status === "failed",
       });

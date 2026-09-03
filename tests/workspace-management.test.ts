@@ -403,8 +403,13 @@ describe("LIFTY API workspace management (P6)", () => {
 
   it("re-runs a previously failed regeneration with a fresh key", async () => {
     const enqueueCalls: Array<{ fresh: boolean }> = [];
+    const order: string[] = [];
     const app = createApp({
       authenticate,
+      requeueConfigUpdate: async (_session, ref) => {
+        order.push(`requeue:${ref}`);
+        return { ...statusFixture, state: "queued", import_status: "pending", run_ref: SUBMISSION_REF };
+      },
       submitConfigUpdate: async () =>
         submissionFixture({
           state: "failed",
@@ -413,7 +418,8 @@ describe("LIFTY API workspace management (P6)", () => {
           created: false,
           error_code: "agent_timeout",
         }),
-      enqueueConfigUpdate: async (_submissionId, options) => {
+      enqueueConfigUpdate: async (submissionId, options) => {
+        order.push(`enqueue:${submissionId}`);
         enqueueCalls.push({ fresh: options.fresh });
         return { id: "run_retry" };
       },
@@ -433,6 +439,35 @@ describe("LIFTY API workspace management (P6)", () => {
       created: false,
     });
     expect(enqueueCalls).toEqual([{ fresh: true }]);
+    // The row is reset before the job is triggered, never after.
+    expect(order).toEqual([`requeue:${SUBMISSION_REF}`, `enqueue:${SUBMISSION_REF}`]);
+  });
+
+  it("does not requeue a still-pending replay; it only re-enqueues idempotently", async () => {
+    let requeued = false;
+    const enqueueCalls: Array<{ fresh: boolean }> = [];
+    const app = createApp({
+      authenticate,
+      submitConfigUpdate: async () => submissionFixture({ created: false }),
+      requeueConfigUpdate: async () => {
+        requeued = true;
+        throw new Error("must not requeue a pending submission");
+      },
+      enqueueConfigUpdate: async (_submissionId, options) => {
+        enqueueCalls.push({ fresh: options.fresh });
+        return { id: "run_same" };
+      },
+    });
+
+    const response = await app.request("/v1/config", {
+      method: "PATCH",
+      headers: { ...authorized, "content-type": "application/json" },
+      body: JSON.stringify({ section: "tone", values: { identity: "Clear" } }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(requeued).toBe(false);
+    expect(enqueueCalls).toEqual([{ fresh: false }]);
   });
 
   it("never serializes fields beyond the config update contract", async () => {
