@@ -206,8 +206,8 @@ export const IntegrationConnectionStatusSchema = z.union([
     .strict(),
 ]);
 
-/** Exact shape of the disconnect_lifty_integration RPC result. */
-export const DisconnectResultSchema = z
+/** What DELETE /v1/integrations/{provider} returns to the CLI. */
+export const DisconnectResponseSchema = z
   .object({
     provider: ProviderSchema,
     status: z.literal("disconnected"),
@@ -216,6 +216,15 @@ export const DisconnectResultSchema = z
     workspace: WorkspaceReferenceSchema,
   })
   .strict();
+
+/**
+ * Exact shape of the disconnect_lifty_integration RPC result. `revocation_ref`
+ * (LIF-681) names the detached grant the `lifty-integration-revoke` job must
+ * revoke at the provider; it stays internal to the API.
+ */
+export const DisconnectResultSchema = DisconnectResponseSchema.extend({
+  revocation_ref: z.string().nullable().optional(),
+}).strict();
 
 export const StartCrmSyncResultSchema = z
   .object({

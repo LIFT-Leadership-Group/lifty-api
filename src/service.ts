@@ -13,6 +13,7 @@ import {
   createConfigUpdateTrigger,
   createCrmSyncTrigger,
   createFirstRunTrigger,
+  createIntegrationRevocationTrigger,
   createOnboardingImportTrigger,
 } from "./trigger-client.js";
 import {
@@ -52,6 +53,7 @@ export function createProductionApp(config: ServiceConfig) {
     enqueueConfigUpdate: createConfigUpdateTrigger(config.trigger),
     requeueConfigUpdate,
     disconnectIntegration,
+    enqueueIntegrationRevocation: createIntegrationRevocationTrigger(config.trigger),
     startHubspotConnect: hubspot.startConnect,
     getHubspotConnection: hubspot.getConnection,
     completeHubspotCallback: hubspot.completeCallback,

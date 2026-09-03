@@ -8,6 +8,7 @@ const ONBOARDING_IMPORT_TASK_ID = "lifty-onboarding-import";
 const FIRST_RUN_TASK_ID = "lifty-first-run";
 const CRM_SYNC_TASK_ID = "lifty-crm-sync";
 const CONFIG_UPDATE_TASK_ID = "lifty-config-update";
+const INTEGRATION_REVOKE_TASK_ID = "lifty-integration-revoke";
 const IDEMPOTENCY_TTL = "1h";
 
 export interface TriggerClientSettings {
@@ -133,6 +134,21 @@ export function createConfigUpdateTrigger(
       idempotencyKey,
     );
   };
+}
+
+export type EnqueueIntegrationRevocation = (revocationId: string) => Promise<{ id: string }>;
+
+/** LIF-681: one revoke job per detached grant; the revocation row id is the key. */
+export function createIntegrationRevocationTrigger(
+  settings: TriggerClientSettings,
+): EnqueueIntegrationRevocation {
+  return async (revocationId) =>
+    triggerTask(
+      settings,
+      INTEGRATION_REVOKE_TASK_ID,
+      { revocationId },
+      `${INTEGRATION_REVOKE_TASK_ID}:${revocationId}`,
+    );
 }
 
 function enqueueFailed(cause: unknown): PublicError {

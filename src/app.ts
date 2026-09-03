@@ -11,7 +11,7 @@ import {
   CreateWorkspaceResultSchema,
   type CreateWorkspaceRequest,
   type CreateWorkspaceResult,
-  DisconnectResultSchema,
+  DisconnectResponseSchema,
   HubspotConnectStartSchema,
   IntegrationConnectionStatusSchema,
   OnboardingPushResultSchema,
@@ -46,6 +46,7 @@ import type {
   EnqueueConfigUpdate,
   EnqueueCrmSync,
   EnqueueFirstRun,
+  EnqueueIntegrationRevocation,
   EnqueueOnboardingImport,
 } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
@@ -103,6 +104,7 @@ export interface AppDependencies {
   enqueueConfigUpdate: EnqueueConfigUpdate;
   requeueConfigUpdate(session: AuthSession, submissionRef: string): Promise<ConfigUpdateStatus>;
   disconnectIntegration(session: AuthSession, provider: Provider): Promise<DisconnectResult>;
+  enqueueIntegrationRevocation: EnqueueIntegrationRevocation;
   startHubspotConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getHubspotConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
   completeHubspotCallback(
@@ -123,7 +125,7 @@ export interface AppDependencies {
 
 export interface LogEvent {
   level: "warn" | "error";
-  event: "request_failed";
+  event: "request_failed" | "revocation_enqueue_failed";
   request_id: string;
   method: string;
   path: string;
@@ -444,7 +446,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     security: [{ bearerAuth: [] }],
     request: { params: ProviderPathParams },
     responses: {
-      200: JsonResponse(DisconnectResultSchema),
+      200: JsonResponse(DisconnectResponseSchema),
       400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
@@ -602,6 +604,9 @@ const defaultDependencies: AppDependencies = {
   },
   disconnectIntegration: async () => {
     throw new Error("disconnectIntegration is not configured");
+  },
+  enqueueIntegrationRevocation: async () => {
+    throw new Error("enqueueIntegrationRevocation is not configured");
   },
   startHubspotConnect: async () => {
     throw new Error("startHubspotConnect is not configured");
@@ -1258,7 +1263,36 @@ export function createApp(
       context.get("authSession"),
       provider.provider,
     );
-    return context.json(DisconnectResultSchema.parse(result));
+
+    // LIF-681: the RPC detached the grant under a revocation row; ask the
+    // provider to revoke it too, best effort. LIFT already cannot use the
+    // grant, so a lost enqueue degrades to "not revoked at HubSpot", never to
+    // a failed disconnect.
+    if (result.revocation_ref) {
+      try {
+        await dependencies.enqueueIntegrationRevocation(result.revocation_ref);
+      } catch (error) {
+        dependencies.log({
+          level: "error",
+          event: "revocation_enqueue_failed",
+          request_id: context.get("requestId"),
+          method: context.req.method,
+          path: context.req.path,
+          error_code: error instanceof PublicError ? error.code : "REVOCATION_ENQUEUE_FAILED",
+          status: error instanceof PublicError ? error.status : 502,
+        });
+      }
+    }
+
+    return context.json(
+      DisconnectResponseSchema.parse({
+        provider: result.provider,
+        status: result.status,
+        portal_id: result.portal_id,
+        disconnected_at: result.disconnected_at,
+        workspace: result.workspace,
+      }),
+    );
   });
 
   app.post("/v1/integrations/:provider/sync", async (context) => {
