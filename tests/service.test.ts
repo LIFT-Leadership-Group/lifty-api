@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createProductionApp } from "../src/service.js";
+import { createDeploymentApp, createProductionApp } from "../src/service.js";
 import { sealHubspotConnectIntent } from "../src/hubspot-state.js";
 
 describe("production service composition", () => {
@@ -78,6 +78,25 @@ describe("production service composition", () => {
       "https://api.lifty.test/hubspot/callback",
     );
     expect(location.searchParams.get("state")).toBe(state);
+  });
+
+  it("keeps the control plane healthy before Slack OAuth credentials are configured", async () => {
+    const app = createDeploymentApp({
+      SUPABASE_URL: "https://project.supabase.test",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
+      SUPABASE_JWKS: JSON.stringify({
+        keys: [{ kty: "EC", crv: "P-256", x: "x", y: "y" }],
+      }),
+      HUBSPOT_CLIENT_ID: "client-123",
+      HUBSPOT_CLIENT_SECRET: "client-secret",
+      PUBLIC_BASE_URL: "https://api.lifty.test",
+      TRIGGER_SECRET_KEY: "tr_prod_test_key",
+    });
+
+    const response = await app.request("/healthz");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "ok" });
   });
 
 });

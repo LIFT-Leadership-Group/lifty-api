@@ -3,9 +3,13 @@ import { randomBytes } from "node:crypto";
 import { createApp } from "./app.js";
 import { renderCliAuthPage } from "./cli-auth-page.js";
 import { loadConfig, type ServiceConfig } from "./config.js";
+import { PublicError } from "./errors.js";
 import { createHubspotConnectOperations } from "./hubspot-connect.js";
 import { buildAuthorizationUrl } from "./hubspot-oauth.js";
-import { createSlackConnectOperations } from "./slack-connect.js";
+import {
+  createSlackConnectOperations,
+  SlackCallbackError,
+} from "./slack-connect.js";
 import { buildSlackAuthorizationUrl } from "./slack-oauth.js";
 import {
   createSupabaseAuthenticator,
@@ -42,7 +46,17 @@ import {
 
 export function createProductionApp(config: ServiceConfig) {
   const hubspot = createHubspotConnectOperations(config.hubspot);
-  const slack = createSlackConnectOperations(config.slack);
+  const slackSettings = config.slack;
+  const slack = slackSettings
+    ? createSlackConnectOperations(slackSettings)
+    : null;
+  const slackUnavailable = () => {
+    throw new PublicError({
+      status: 503,
+      code: "INTEGRATION_NOT_CONFIGURED",
+      message: "The Slack connection service is not configured.",
+    });
+  };
   return createApp({
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,
@@ -77,14 +91,22 @@ export function createProductionApp(config: ServiceConfig) {
       redirectUri: `${config.hubspot.publicBaseUrl}/hubspot/callback`,
       state,
     }),
-    startSlackConnect: slack.startConnect,
-    getSlackConnection: slack.getConnection,
-    completeSlackCallback: slack.completeCallback,
-    buildSlackAuthorizeUrl: (state) => buildSlackAuthorizationUrl({
-      clientId: config.slack.clientId,
-      redirectUri: `${config.slack.publicBaseUrl}/slack/callback`,
-      state,
+    startSlackConnect: slack?.startConnect ?? (async () => slackUnavailable()),
+    getSlackConnection: slack?.getConnection ?? (async () => slackUnavailable()),
+    completeSlackCallback: slack?.completeCallback ?? (async () => {
+      throw new SlackCallbackError(
+        "server_misconfigured",
+        503,
+        "The Slack connection service is not configured.",
+      );
     }),
+    buildSlackAuthorizeUrl: slackSettings
+      ? (state) => buildSlackAuthorizationUrl({
+          clientId: slackSettings.clientId,
+          redirectUri: `${slackSettings.publicBaseUrl}/slack/callback`,
+          state,
+        })
+      : () => null,
     renderCliAuthPage: (state, port) => {
       const scriptNonce = randomBytes(18).toString("base64url");
       return {

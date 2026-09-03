@@ -11,7 +11,7 @@ export interface ServiceConfig {
   port: number;
   supabase: SupabaseAuthenticationConfig;
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
-  slack: Omit<SlackConnectSettings, "fetchImpl">;
+  slack: Omit<SlackConnectSettings, "fetchImpl"> | null;
   trigger: {
     apiUrl: string;
     secretKey: string;
@@ -101,6 +101,8 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     required(environment, "PUBLIC_BASE_URL"),
     "PUBLIC_BASE_URL",
   );
+  const slackClientId = environment.SLACK_CLIENT_ID?.trim();
+  const slackClientSecret = environment.SLACK_CLIENT_SECRET?.trim();
 
   return {
     host: environment.HOST?.trim() || "0.0.0.0",
@@ -117,13 +119,15 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
       publishableKey,
     },
-    slack: {
-      clientId: required(environment, "SLACK_CLIENT_ID"),
-      clientSecret: required(environment, "SLACK_CLIENT_SECRET"),
-      publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
-      supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
-      publishableKey,
-    },
+    slack: slackClientId && slackClientSecret
+      ? {
+          clientId: slackClientId,
+          clientSecret: slackClientSecret,
+          publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
+          supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
+          publishableKey,
+        }
+      : null,
     trigger: {
       apiUrl: secureUrl(
         environment.TRIGGER_API_URL?.trim() || "https://api.trigger.dev",

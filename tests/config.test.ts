@@ -79,6 +79,18 @@ describe("service configuration", () => {
   });
 
   it.each([
+    {
+      ...validEnvironment,
+      SLACK_CLIENT_ID: undefined,
+      SLACK_CLIENT_SECRET: undefined,
+    },
+    { ...validEnvironment, SLACK_CLIENT_ID: undefined },
+    { ...validEnvironment, SLACK_CLIENT_SECRET: undefined },
+  ])("disables Slack OAuth until both credentials are configured", (environment) => {
+    expect(loadConfig(environment).slack).toBeNull();
+  });
+
+  it.each([
     [{ ...validEnvironment, SUPABASE_URL: undefined }, /SUPABASE_URL/],
     [
       { ...validEnvironment, SUPABASE_JWKS_URL: "http://attacker.example/jwks" },
@@ -87,8 +99,6 @@ describe("service configuration", () => {
     [{ ...validEnvironment, PORT: "70000" }, /PORT/],
     [{ ...validEnvironment, HUBSPOT_CLIENT_ID: undefined }, /HUBSPOT_CLIENT_ID/],
     [{ ...validEnvironment, HUBSPOT_CLIENT_SECRET: undefined }, /HUBSPOT_CLIENT_SECRET/],
-    [{ ...validEnvironment, SLACK_CLIENT_ID: undefined }, /SLACK_CLIENT_ID/],
-    [{ ...validEnvironment, SLACK_CLIENT_SECRET: undefined }, /SLACK_CLIENT_SECRET/],
     [{ ...validEnvironment, TRIGGER_SECRET_KEY: undefined }, /TRIGGER_SECRET_KEY/],
     [
       { ...validEnvironment, TRIGGER_API_URL: "http://attacker.example" },
