@@ -30,7 +30,7 @@ configured Hono app for programmatic use.
 - `GET /v1/config/updates/{submission_ref}` — poll a queued update (state, changed sections, new versions, error code)
 - `POST /v1/integrations/{provider}/connect` — mint a short-lived connect URL (`hubspot`; `unipile` is reserved and answers 501 until its connect path exists)
 - `GET /v1/integrations/{provider}` — secret-free connection status
-- `DELETE /v1/integrations/{provider}` — disconnect: deletes the stored grant, deactivates the integration, clears the portal pointer; 409 while a CRM sync is in flight. Founder confirmation is the skill's job (LIF-669)
+- `DELETE /v1/integrations/{provider}` — disconnect: detaches the stored grant (unusable by LIFT from that moment), deactivates the integration, clears the portal pointer, and enqueues the `lifty-integration-revoke` job that revokes the grant at the provider best-effort and deletes the secret (LIF-681); 409 while a CRM sync is in flight. Founder confirmation is the skill's job (LIF-669)
 - `POST /v1/integrations/{provider}/sync` / `GET …/sync` — start / poll the CRM sync run (LIF-663)
 - `GET /hubspot/start` — redirect an opaque connect intent to HubSpot consent
 - `GET /hubspot/callback` — verify OAuth, refreshability, scopes, and portal;

@@ -672,6 +672,84 @@ describe("LIFTY API workspace management (P6)", () => {
     });
   });
 
+  const disconnectedFixture = {
+    provider: "hubspot" as const,
+    status: "disconnected" as const,
+    portal_id: "149239526",
+    disconnected_at: "2026-09-02T21:00:00Z",
+    workspace: { workspace_ref: "ws_opaque", name: "Example" },
+  };
+  const REVOCATION_REF = "681a0000-0000-4000-a000-000000000001";
+
+  it("enqueues the provider-side revocation for a detached grant without exposing it (LIF-681)", async () => {
+    const enqueued: string[] = [];
+    const app = createApp({
+      authenticate,
+      disconnectIntegration: async () => ({ ...disconnectedFixture, revocation_ref: REVOCATION_REF }),
+      enqueueIntegrationRevocation: async (revocationId) => {
+        enqueued.push(revocationId);
+        return { id: "run_revoke" };
+      },
+    });
+
+    const response = await app.request("/v1/integrations/hubspot", {
+      method: "DELETE",
+      headers: authorized,
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(disconnectedFixture);
+    expect(enqueued).toEqual([REVOCATION_REF]);
+  });
+
+  it("does not enqueue a revocation when the RPC had no grant to detach", async () => {
+    let enqueued = false;
+    const app = createApp({
+      authenticate,
+      disconnectIntegration: async () => ({ ...disconnectedFixture, revocation_ref: null }),
+      enqueueIntegrationRevocation: async () => {
+        enqueued = true;
+        return { id: "run_must_not_exist" };
+      },
+    });
+
+    const response = await app.request("/v1/integrations/hubspot", {
+      method: "DELETE",
+      headers: authorized,
+    });
+
+    expect(response.status).toBe(200);
+    expect(enqueued).toBe(false);
+  });
+
+  it("still reports the disconnect when the revocation enqueue fails, and logs it", async () => {
+    const events: unknown[] = [];
+    const app = createApp({
+      authenticate,
+      disconnectIntegration: async () => ({ ...disconnectedFixture, revocation_ref: REVOCATION_REF }),
+      enqueueIntegrationRevocation: async () => {
+        throw new Error("trigger down");
+      },
+      log: (event) => events.push(event),
+    });
+
+    const response = await app.request("/v1/integrations/hubspot", {
+      method: "DELETE",
+      headers: authorized,
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(disconnectedFixture);
+    expect(events).toEqual([
+      expect.objectContaining({
+        level: "error",
+        event: "revocation_enqueue_failed",
+        path: "/v1/integrations/hubspot",
+      }),
+    ]);
+    expect(JSON.stringify(events)).not.toContain(REVOCATION_REF);
+  });
+
   it.each([
     ["GET", "/v1/integrations/salesforce"],
     ["DELETE", "/v1/integrations/salesforce"],

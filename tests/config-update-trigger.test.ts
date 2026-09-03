@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createConfigUpdateTrigger } from "../src/trigger-client.js";
+import {
+  createConfigUpdateTrigger,
+  createIntegrationRevocationTrigger,
+} from "../src/trigger-client.js";
 
 const settings = {
   apiUrl: "https://api.trigger.test",
@@ -57,6 +60,31 @@ describe("config update trigger client", () => {
     expect(body.options?.idempotencyKey).toBe(
       "lifty-config-update:44444444-4444-4444-8444-444444444444:retry:2026-09-03T06:53:00Z",
     );
+  });
+
+  it("enqueues the lifty-integration-revoke task keyed on the revocation row (LIF-681)", async () => {
+    let request: { url: string; body: unknown } | null = null;
+    const enqueue = createIntegrationRevocationTrigger({
+      ...settings,
+      fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
+        request = { url: String(url), body: JSON.parse(String(init?.body)) };
+        return jsonResponse(200, { id: "run_revoke" });
+      }) as typeof fetch,
+    });
+
+    await expect(enqueue("681a0000-0000-4000-a000-000000000001")).resolves.toEqual({
+      id: "run_revoke",
+    });
+    expect(request).toEqual({
+      url: "https://api.trigger.test/api/v1/tasks/lifty-integration-revoke/trigger",
+      body: {
+        payload: { revocationId: "681a0000-0000-4000-a000-000000000001" },
+        options: {
+          idempotencyKey: "lifty-integration-revoke:681a0000-0000-4000-a000-000000000001",
+          idempotencyKeyTTL: "1h",
+        },
+      },
+    });
   });
 
   it("maps a Trigger.dev failure to the public enqueue error", async () => {
