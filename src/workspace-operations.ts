@@ -102,6 +102,15 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (code === "PT409" && message.includes("lifty_onboarding_already_configured")) {
+    return new PublicError({
+      status: 409,
+      code: "ONBOARDING_ALREADY_CONFIGURED",
+      message: "This workspace is already configured. Use `lifty update` to change it.",
+      cause: error,
+    });
+  }
+
   if (code === "PT409" && message.includes("workspace_already_exists")) {
     return new PublicError({
       status: 409,

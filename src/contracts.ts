@@ -397,6 +397,8 @@ const ConfigIcpSchema = z
     personas: z.array(ConfigPersonaSchema),
     max_stale_days: z.number().int(),
     reject_extrapolated: z.boolean(),
+    /** Rolling-upgrade compatibility only. This is a lane weight, never the workspace target. */
+    daily_target: z.number().int().nullable().optional(),
   })
   .strict();
 
@@ -421,7 +423,8 @@ const ConfigWorkspaceSchema = z
     version: z.string().startsWith("sha256:"),
     name: z.string(),
     description: z.string().nullable(),
-    daily_discovery_target: z.number().int().nonnegative(),
+    /** Absent while the API is briefly paired with the pre-LIF-722 SQL reader. */
+    daily_discovery_target: z.number().int().nonnegative().optional(),
   })
   .strict();
 
