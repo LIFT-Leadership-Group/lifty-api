@@ -161,6 +161,7 @@ describe("config update operations", () => {
   });
 
   it.each([
+    ["PT409", "lifty_multi_lane_config_unsupported", 409, "MULTI_LANE_CONFIG_UNSUPPORTED", "outside LIFTY"],
     ["PT400", "lifty_config_invalid: icp_unknown_key", 422, "CONFIG_INVALID", "(icp_unknown_key)"],
     ["PT400", "lifty_config_invalid: prompt_instruction", 422, "CONFIG_INVALID", "(prompt_instruction)"],
     ["PT413", "lifty_config_too_large: max_nodes", 413, "CONFIG_TOO_LARGE", null],
@@ -177,7 +178,10 @@ describe("config update operations", () => {
     async (databaseCode, databaseMessage, status, publicCode, fragment) => {
       const client = failingClient(databaseCode, databaseMessage);
       const rejection = expect(
-        submitConfigUpdate({ ...session, client }, { section: "icp", values: { x: 1 } }),
+        submitConfigUpdate({ ...session, client }, {
+          section: "icp",
+          values: { person_locations: ["Canada"] },
+        }),
       ).rejects;
       await rejection.toMatchObject({ status, code: publicCode });
       if (fragment) {
