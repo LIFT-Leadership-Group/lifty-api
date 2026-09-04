@@ -25,7 +25,6 @@ const configFixture = {
       personas: [{ name: "Finance", titles: ["CFO"] }],
       max_stale_days: 90,
       reject_extrapolated: true,
-      daily_target: 10,
     },
     tone: { version: `sha256:${"b".repeat(64)}`, values: { identity: "Clear and direct" } },
     prompt: {
@@ -34,7 +33,12 @@ const configFixture = {
       source: "lif667_config_update",
       text: "## ICP gate\nMid-market manufacturers.",
     },
-    workspace: { version: `sha256:${"d".repeat(64)}`, name: "Example", description: null },
+    workspace: {
+      version: `sha256:${"d".repeat(64)}`,
+      name: "Example",
+      description: null,
+      daily_discovery_target: 30,
+    },
   },
 };
 
@@ -598,6 +602,9 @@ describe("LIFTY API workspace management (P6)", () => {
   it.each([
     ["missing instruction", { section: "prompt" }],
     ["missing values", { section: "icp" }],
+    ["lane weight masquerading as target", { section: "icp", values: { daily_target: 30 } }],
+    ["lane label edit", { section: "icp", values: { label: "Collapsed lane" } }],
+    ["target hidden in a full update", { values: { icp: { daily_target: 30 } } }],
     ["empty body", {}],
     ["unknown section", { section: "secrets", values: { a: 1 } }],
     ["not json", "not json"],

@@ -252,6 +252,7 @@ describe("workspace RPC operations", () => {
     ["PT400", "lifty_draft_invalid: gate_4_hard_disqualifier", 422, "DRAFT_INVALID"],
     ["PT413", "lifty_draft_too_large: max_nodes", 413, "DRAFT_TOO_LARGE"],
     ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING"],
+    ["PT409", "lifty_onboarding_already_configured", 409, "ONBOARDING_ALREADY_CONFIGURED"],
     ["PT409", "lifty_run_not_configured", 409, "RUN_NOT_CONFIGURED"],
     ["PT409", "lifty_run_already_completed", 409, "RUN_ALREADY_COMPLETED"],
     ["PT409", "lifty_run_workspace_suspended", 409, "WORKSPACE_SUSPENDED"],
