@@ -93,6 +93,24 @@ function mapRpcError(error: unknown): PublicError {
   const code = typeof candidate?.code === "string" ? candidate.code : "";
   const message = typeof candidate?.message === "string" ? candidate.message : "";
 
+  if (code === "PT409" && message.includes("lifty_multi_lane_config_unsupported")) {
+    return new PublicError({
+      status: 409,
+      code: "MULTI_LANE_CONFIG_UNSUPPORTED",
+      message: "This workspace's ICP lanes are managed outside LIFTY. Use the LIFT admin tools to change lane targeting.",
+      cause: error,
+    });
+  }
+
+  if (code === "PT409" && message.includes("lifty_onboarding_already_configured")) {
+    return new PublicError({
+      status: 409,
+      code: "ONBOARDING_ALREADY_CONFIGURED",
+      message: "This workspace is already configured. Use `lifty update` to change it.",
+      cause: error,
+    });
+  }
+
   if (code === "PT409" && message.includes("workspace_already_exists")) {
     return new PublicError({
       status: 409,

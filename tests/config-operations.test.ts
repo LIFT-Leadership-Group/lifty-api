@@ -62,6 +62,65 @@ describe("config read operations", () => {
       code: "SUPABASE_INVALID_RESPONSE",
     });
   });
+
+  it.each([
+    ["legacy SQL", {
+      workspace_ref: "ws_opaque",
+      config: {
+        icp: {
+          version: 1,
+          digest: `sha256:${"a".repeat(64)}`,
+          label: "Default",
+          person_locations: ["Canada"],
+          organization_industries: ["software"],
+          organization_num_employees_ranges: ["51,200"],
+          person_seniorities: ["director"],
+          contact_email_status: "verified",
+          q_organization_domains_list: null,
+          q_keywords: null,
+          personas: [{ name: "Operations", titles: ["COO"] }],
+          max_stale_days: 90,
+          reject_extrapolated: true,
+          daily_target: 10,
+        },
+        workspace: {
+          version: `sha256:${"d".repeat(64)}`,
+          name: "Example",
+          description: null,
+        },
+      },
+    }],
+    ["LIF-722 SQL", {
+      workspace_ref: "ws_opaque",
+      config: {
+        icp: {
+          version: 1,
+          digest: `sha256:${"a".repeat(64)}`,
+          label: "Default",
+          person_locations: ["Canada"],
+          organization_industries: ["software"],
+          organization_num_employees_ranges: ["51,200"],
+          person_seniorities: ["director"],
+          contact_email_status: "verified",
+          q_organization_domains_list: null,
+          q_keywords: null,
+          personas: [{ name: "Operations", titles: ["COO"] }],
+          max_stale_days: 90,
+          reject_extrapolated: true,
+          daily_target: 10,
+        },
+        workspace: {
+          version: `sha256:${"d".repeat(64)}`,
+          name: "Example",
+          description: null,
+          daily_discovery_target: 30,
+        },
+      },
+    }],
+  ])("accepts the %s config shape during the rolling upgrade", async (_name, result) => {
+    const { client } = recordingClient(result);
+    await expect(getConfig({ ...session, client }, null)).resolves.toEqual(result);
+  });
 });
 
 describe("config update operations", () => {
@@ -161,6 +220,7 @@ describe("config update operations", () => {
   });
 
   it.each([
+    ["PT409", "lifty_multi_lane_config_unsupported", 409, "MULTI_LANE_CONFIG_UNSUPPORTED", "outside LIFTY"],
     ["PT400", "lifty_config_invalid: icp_unknown_key", 422, "CONFIG_INVALID", "(icp_unknown_key)"],
     ["PT400", "lifty_config_invalid: prompt_instruction", 422, "CONFIG_INVALID", "(prompt_instruction)"],
     ["PT413", "lifty_config_too_large: max_nodes", 413, "CONFIG_TOO_LARGE", null],
@@ -177,7 +237,10 @@ describe("config update operations", () => {
     async (databaseCode, databaseMessage, status, publicCode, fragment) => {
       const client = failingClient(databaseCode, databaseMessage);
       const rejection = expect(
-        submitConfigUpdate({ ...session, client }, { section: "icp", values: { x: 1 } }),
+        submitConfigUpdate({ ...session, client }, {
+          section: "icp",
+          values: { person_locations: ["Canada"] },
+        }),
       ).rejects;
       await rejection.toMatchObject({ status, code: publicCode });
       if (fragment) {
