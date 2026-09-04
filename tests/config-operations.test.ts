@@ -63,8 +63,8 @@ describe("config read operations", () => {
     });
   });
 
-  it.each([
-    ["legacy SQL", {
+  it("accepts the canonical post-LIF-746 config shape", async () => {
+    const result = {
       workspace_ref: "ws_opaque",
       config: {
         icp: {
@@ -81,16 +81,21 @@ describe("config read operations", () => {
           personas: [{ name: "Operations", titles: ["COO"] }],
           max_stale_days: 90,
           reject_extrapolated: true,
-          daily_target: 10,
         },
         workspace: {
           version: `sha256:${"d".repeat(64)}`,
           name: "Example",
           description: null,
+          daily_discovery_target: 30,
         },
       },
-    }],
-    ["LIF-722 SQL", {
+    };
+    const { client } = recordingClient(result);
+    await expect(getConfig({ ...session, client }, null)).resolves.toEqual(result);
+  });
+
+  it.each([
+    ["legacy ICP lane weight", {
       workspace_ref: "ws_opaque",
       config: {
         icp: {
@@ -117,9 +122,22 @@ describe("config read operations", () => {
         },
       },
     }],
-  ])("accepts the %s config shape during the rolling upgrade", async (_name, result) => {
+    ["missing workspace target", {
+      workspace_ref: "ws_opaque",
+      config: {
+        workspace: {
+          version: `sha256:${"d".repeat(64)}`,
+          name: "Example",
+          description: null,
+        },
+      },
+    }],
+  ])("rejects the %s bridge shape after the compatibility window", async (_name, result) => {
     const { client } = recordingClient(result);
-    await expect(getConfig({ ...session, client }, null)).resolves.toEqual(result);
+    await expect(getConfig({ ...session, client }, null)).rejects.toMatchObject({
+      status: 502,
+      code: "SUPABASE_INVALID_RESPONSE",
+    });
   });
 });
 
