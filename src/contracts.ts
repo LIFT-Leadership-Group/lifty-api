@@ -573,6 +573,11 @@ export const WorkspaceOverviewSchema = z
         })
         .strict(),
     ]),
+    configuration: z
+      .object({
+        icp_version: z.number().int().positive().nullable(),
+      })
+      .strict(),
     run: z.discriminatedUnion("state", [
       z.object({ state: z.literal("none") }).strict(),
       z

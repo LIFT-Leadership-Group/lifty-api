@@ -1079,7 +1079,7 @@ export function createApp(
 
   // One aggregate read so `lifty status` answers "is my HubSpot OK?" without
   // ever touching OAuth: workspace, onboarding import, first run, the latest
-  // config update, and per-provider connection + last sync.
+  // live ICP version, config update, and per-provider connection + last sync.
   app.get("/v1/status", async (context) => {
     const session = context.get("authSession");
     const workspace = await dependencies.getWorkspace(session);
@@ -1088,6 +1088,7 @@ export function createApp(
         WorkspaceOverviewSchema.parse({
           workspace: { state: "needs_workspace" },
           onboarding: { state: "none" },
+          configuration: { icp_version: null },
           run: { state: "none" },
           config_update: { state: "none" },
           integrations: {
@@ -1108,8 +1109,9 @@ export function createApp(
       );
     }
 
-    const [onboarding, run, sync, hubspot, configUpdate] = await Promise.all([
+    const [onboarding, config, run, sync, hubspot, configUpdate] = await Promise.all([
       dependencies.getOnboardingStatus(session),
+      dependencies.getConfig(session, "icp"),
       dependencies.getRunStatus(session),
       dependencies.getCrmSyncStatus(session),
       dependencies.getHubspotConnection(session),
@@ -1131,6 +1133,7 @@ export function createApp(
               submitted_at: onboarding.submitted_at,
               error_code: onboarding.error_code ?? null,
             },
+        configuration: { icp_version: config.config.icp?.version ?? null },
         run: run.state === "none"
           ? { state: "none" }
           : {

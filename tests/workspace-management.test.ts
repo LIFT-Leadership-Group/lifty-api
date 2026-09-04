@@ -98,6 +98,12 @@ describe("LIFTY API workspace management (P6)", () => {
   });
 
   it("aggregates status in one call and never touches OAuth", async () => {
+    const historicalUpdate: ConfigUpdateStatus = {
+      ...statusFixture,
+      changed_sections: ["icp"],
+      artifact_actions: { icp: "applied", tone: "none", prompt: "none", workspace: "none" },
+      icp_version: 9,
+    };
     const app = createApp({
       authenticate,
       getWorkspace: async () => ({
@@ -154,9 +160,18 @@ describe("LIFTY API workspace management (P6)", () => {
         connected_at: "2026-09-02T10:00:00Z",
         reconnect_required: false,
       }),
+      getConfig: async (_session, section) => {
+        expect(section).toBe("icp");
+        return {
+          ...configFixture,
+          config: {
+            icp: { ...configFixture.config.icp, version: 10 },
+          },
+        };
+      },
       getConfigUpdateStatus: async (_session, ref) => {
         expect(ref).toBeNull();
-        return statusFixture;
+        return historicalUpdate;
       },
       // Any OAuth attempt would hit the unconfigured default and 500.
     });
@@ -172,6 +187,7 @@ describe("LIFTY API workspace management (P6)", () => {
         submitted_at: "2026-09-01T21:00:00Z",
         error_code: null,
       },
+      configuration: { icp_version: 10 },
       run: {
         state: "succeeded",
         run_ref: "22222222-2222-4222-8222-222222222222",
@@ -182,7 +198,7 @@ describe("LIFTY API workspace management (P6)", () => {
         started_at: "2026-09-01T21:00:00Z",
         completed_at: "2026-09-01T21:20:00Z",
       },
-      config_update: statusFixture,
+      config_update: historicalUpdate,
       integrations: {
         hubspot: {
           available: true,
@@ -230,6 +246,7 @@ describe("LIFTY API workspace management (P6)", () => {
         workspace: { workspace_ref: "ws_opaque", name: "Example" },
       }),
       getHubspotConnection: async () => ({ provider: "hubspot", status: "not_connected" }),
+      getConfig: async () => configFixture,
       getConfigUpdateStatus: async () => ({ state: "none" }),
     });
 
@@ -263,6 +280,7 @@ describe("LIFTY API workspace management (P6)", () => {
     expect(await response.json()).toMatchObject({
       workspace: { state: "needs_workspace" },
       onboarding: { state: "none" },
+      configuration: { icp_version: null },
       run: { state: "none" },
       config_update: { state: "none" },
       integrations: { hubspot: { connected: false }, unipile: { connected: false } },
@@ -501,6 +519,7 @@ describe("LIFTY API workspace management (P6)", () => {
       getRunStatus: async () => ({ state: "none" }),
       getCrmSyncStatus: async () => ({ state: "none" }),
       getHubspotConnection: async () => ({ provider: "hubspot", status: "not_connected" }),
+      getConfig: async () => configFixture,
       getConfigUpdateStatus: async () => statusWithoutRequeue,
     });
 
