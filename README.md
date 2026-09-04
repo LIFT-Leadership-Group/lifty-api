@@ -42,6 +42,12 @@ browser origins. The two `/hubspot` routes are browser-facing but accept only a
 ten-minute, one-use capability or HubSpot's authorization response; they never
 render credentials or provider response bodies.
 
+New HubSpot connections require the exact LIFTY CRM contract: contacts,
+companies, and deals read/write; contact and company property-schema
+read/write; and the base `oauth` scope. Expanding the app contract does not
+expand existing HubSpot refresh tokens, so older connections report
+`reconnect_required` until the founder reconnects.
+
 ## Local development
 
 Requirements: Node.js `>=22.11.0` and npm.

@@ -13,8 +13,12 @@ export const HUBSPOT_REQUIRED_SCOPES: readonly string[] = Object.freeze([
   "crm.objects.contacts.write",
   "crm.objects.companies.read",
   "crm.objects.companies.write",
+  "crm.objects.deals.read",
+  "crm.objects.deals.write",
   "crm.schemas.contacts.read",
+  "crm.schemas.contacts.write",
   "crm.schemas.companies.read",
+  "crm.schemas.companies.write",
 ]);
 
 export interface HubspotTokenGrant {

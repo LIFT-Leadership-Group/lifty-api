@@ -168,7 +168,7 @@ describe("hosted HubSpot connection operations", () => {
       access_token: "initial-access",
       refresh_token: "initial-refresh",
       expires_in: 1800,
-      scopes: [...HUBSPOT_REQUIRED_SCOPES, "crm.objects.deals.read"],
+      scopes: [...HUBSPOT_REQUIRED_SCOPES, "crm.schemas.deals.read"],
       hub_id: 49072478,
     })) as typeof fetch;
     const operations = createHubspotConnectOperations({ ...SETTINGS, fetchImpl });

@@ -8,8 +8,12 @@ const REQUIRED_SCOPES = [
   "crm.objects.contacts.write",
   "crm.objects.companies.read",
   "crm.objects.companies.write",
+  "crm.objects.deals.read",
+  "crm.objects.deals.write",
   "crm.schemas.contacts.read",
+  "crm.schemas.contacts.write",
   "crm.schemas.companies.read",
+  "crm.schemas.companies.write",
 ];
 
 describe("HubSpot OAuth mechanics", () => {
@@ -77,7 +81,7 @@ describe("HubSpot OAuth mechanics", () => {
     expect(oauth.scopeSetMatchesExactly(REQUIRED_SCOPES.slice(1))).toBe(false);
     expect(oauth.scopeSetMatchesExactly([
       ...REQUIRED_SCOPES,
-      "crm.objects.deals.read",
+      "crm.schemas.deals.read",
     ])).toBe(false);
   });
 
