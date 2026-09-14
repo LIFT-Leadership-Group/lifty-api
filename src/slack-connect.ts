@@ -48,7 +48,7 @@ function mapConnectRpcError(error: unknown): PublicError {
   if (code === "PT403") {
     return new PublicError({
       status: 403, code: "FORBIDDEN",
-      message: "Only a LIFT admin with access to this workspace can create a Slack invitation.",
+      message: "You must belong to this workspace to create a Slack invitation.",
       cause: error,
     });
   }

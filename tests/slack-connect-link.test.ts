@@ -6,9 +6,9 @@ import { openSlackConnectIntent } from "../src/slack-state.js";
 const workspaceId = "63900000-0000-4000-a000-00000000000a";
 const settings = { clientId: "client", clientSecret: "secret", publicBaseUrl: "https://api.lifty.test", supabaseUrl: "https://db.test", publishableKey: "test" };
 const row = { intent_token: "a".repeat(64), workspace_id: workspaceId, workspace_name: "andSons", expires_in_seconds: 604800 };
-const session = { userId: "admin", client: {} };
+const session = { userId: "member", client: {} };
 const path = `/v1/workspaces/${workspaceId}/integrations/slack/connect-link`;
-describe("admin Slack invitations", () => {
+describe("workspace member Slack invitations", () => {
   it("uses the explicit workspace and seals the capability without exposing the session", async () => {
     const rpc = vi.fn(async () => ({ data: row, error: null }));
     const result = await createSlackConnectOperations(settings).createConnectLink({ ...session, client: { rpc } }, workspaceId);
@@ -26,6 +26,7 @@ describe("admin Slack invitations", () => {
     const error = await createSlackConnectOperations(settings).createConnectLink({ ...session, client: { rpc } }, workspaceId).catch(e => e);
     expect(error).toMatchObject({ status: 403, code: "FORBIDDEN" });
     expect(error.message).not.toContain("private-marker");
+    expect(error.message).toBe("You must belong to this workspace to create a Slack invitation.");
   });
   it("requires authentication before minting a link", async () => {
     const mint = vi.fn();
@@ -46,8 +47,8 @@ describe("admin Slack invitations", () => {
     expect(bad.status).toBe(400);
     expect(mint).toHaveBeenCalledTimes(1);
   });
-  it("preserves the backend admin denial", async () => {
-    const app = createApp({ authenticate: async () => ({ ok: true, session }), createSlackConnectLink: async () => { throw new PublicError({status:403,code:"FORBIDDEN",message:"Admin required"}); } });
+  it("preserves the backend membership denial", async () => {
+    const app = createApp({ authenticate: async () => ({ ok: true, session }), createSlackConnectLink: async () => { throw new PublicError({status:403,code:"FORBIDDEN",message:"Workspace membership required"}); } });
     expect((await app.request(path, {method:"POST",headers:{authorization:"Bearer test"}})).status).toBe(403);
   });
 });
