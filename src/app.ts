@@ -23,6 +23,8 @@ import {
   SlackNotificationChannelsSchema,
   UpsertNotificationDestinationRequestSchema,
   ProviderConnectStartSchema,
+  SlackConnectLinkSchema,
+  type SlackConnectLink,
   ProviderSchema,
   RunStatusSchema,
   StartRunResultSchema,
@@ -150,6 +152,7 @@ export interface AppDependencies {
   ): Promise<HubspotCallbackSuccess>;
   buildHubspotAuthorizeUrl(state: string): string | null;
   startSlackConnect(session: AuthSession): Promise<SlackConnectStart>;
+  createSlackConnectLink(session: AuthSession, workspaceId: string): Promise<SlackConnectLink>;
   getSlackConnection(session: AuthSession): Promise<SlackConnectionStatus>;
   completeSlackCallback(
     input: { code: string; state: string },
@@ -237,6 +240,24 @@ async function readRequestTextWithinLimit(
 }
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
+  app.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/v1/workspaces/{workspace_ref}/integrations/slack/connect-link",
+    operationId: "createAdminSlackConnectLink",
+    description: "Create a single-use, seven-day client invitation. Requires a LIFT admin with membership in the selected workspace.",
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ workspace_ref: z.uuid().openapi({ param: { name: "workspace_ref", in: "path" } }) }) },
+    responses: {
+      200: JsonResponse(SlackConnectLinkSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      403: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+      503: JsonResponse(ErrorResponseSchema),
+    },
+  });
+
   app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
     type: "http",
     scheme: "bearer",
@@ -621,7 +642,7 @@ function hubspotPage(title: string, message: string, success: boolean): string {
       </div>
       <h1>${title}</h1>
       <p>${message}</p>
-      <p class="hint">You can close this tab and return to your terminal.</p>
+      <p class="hint">You can close this tab.</p>
     </section>
   </main>
 </body>
@@ -772,6 +793,7 @@ const defaultDependencies: AppDependencies = {
     );
   },
   buildHubspotAuthorizeUrl: () => null,
+  createSlackConnectLink: async () => { throw new Error("createSlackConnectLink is not configured"); },
   startSlackConnect: async () => {
     throw new Error("startSlackConnect is not configured");
   },
@@ -1000,7 +1022,7 @@ export function createApp(
         context,
         200,
         "Slack is connected",
-        "LIFTY verified and saved the connection.",
+        "Your Slack workspace is connected. Invite @Lifty to the channel where you want notifications, then let LIFT know which channel you chose.",
       );
     } catch (error) {
       const callbackError = error instanceof SlackCallbackError
@@ -1606,6 +1628,14 @@ export function createApp(
   );
 
   // ---------------------------------------------------------------- integrations
+
+  app.post("/v1/workspaces/:workspace_ref/integrations/slack/connect-link", async (context) => {
+    const workspace = z.uuid().safeParse(context.req.param("workspace_ref"));
+    if (!workspace.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a valid workspace.");
+    const result = await dependencies.createSlackConnectLink(context.get("authSession"), workspace.data);
+    context.header("cache-control", "no-store");
+    return context.json(SlackConnectLinkSchema.parse(result));
+  });
 
   app.post("/v1/integrations/:provider/connect", async (context) => {
     const provider = resolveProvider(context);

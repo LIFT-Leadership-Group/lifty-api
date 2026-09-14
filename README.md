@@ -29,6 +29,7 @@ configured Hono app for programmatic use.
 - `PATCH /v1/config` — config update through the LIF-667 seam. Body: `{section, values}`, `{section: "prompt", instruction}`, or `{values}`. Filter/tone/workspace writes land synchronously; persona, tone, and prompt regenerations return `queued` and run through the `lifty-config-update` job (LIF-668). While one regeneration is queued any other change answers 409 `CONFIG_UPDATE_IN_FLIGHT`; re-sending the queued update re-attaches (LIF-681)
 - `GET /v1/config/updates/{submission_ref}` — poll a queued update (state, changed sections, new versions, error code)
 - `POST /v1/integrations/{provider}/connect` — mint a short-lived connect URL (`hubspot` or `slack`; `unipile` is reserved and answers 501 until its connect path exists)
+- `POST /v1/workspaces/{workspace_ref}/integrations/slack/connect-link` — admin-only seven-day client invitation for an explicit workspace; requires membership as well as LIFT admin status
 - `GET /v1/integrations/{provider}` — secret-free connection status
 - `DELETE /v1/integrations/{provider}` — disconnect: detaches the stored grant (unusable by LIFT from that moment), deactivates the integration, clears the portal pointer, and enqueues the `lifty-integration-revoke` job that revokes the grant at the provider best-effort and deletes the secret (LIF-681); 409 while a CRM sync is in flight. Founder confirmation is the skill's job (LIF-669)
 - `POST /v1/integrations/{provider}/sync` / `GET …/sync` — start / poll the CRM sync run (LIF-663)
@@ -47,9 +48,8 @@ configured Hono app for programmatic use.
 Slack disconnect deletes the stored Slack authorization directly; it has no HubSpot revocation job.
 
 The `/v1` endpoints accept `Authorization: Bearer <Supabase access token>`. No
-CORS middleware is enabled: the intended consumer is the CLI, not arbitrary
-browser origins. The four `/hubspot` and `/slack` OAuth routes are browser-facing but accept only a
-ten-minute, one-use capability or the provider's authorization response; they never
+CORS middleware is enabled: consumers are the CLI and authenticated dashboard server actions. The four `/hubspot` and `/slack` OAuth routes are browser-facing but accept only a
+one-use capability (ten minutes for founder connections, seven days for admin Slack invitations) or the provider's authorization response; they never
 render credentials or provider response bodies.
 
 New HubSpot connections require the exact LIFTY CRM contract: contacts,
@@ -86,3 +86,5 @@ DigitalOcean App Platform is the only hosted runtime. Agents can inspect or
 operate it with `npm run do:doctor`, `do:status`, `do:logs`, `do:smoke`, and
 `do:deploy -- <full-sha>`; the runbook documents the guardrails and
 prerequisites.
+
+Admin Slack invitations reuse `/slack/start` and `/slack/callback`. Reissuing replaces unused Slack invitations only for the selected workspace. The database rechecks the issuer's admin status, membership, and workspace activity when the callback consumes an admin invitation. Store neither generated links nor OAuth tokens in logs or durable evidence. Deploy migration `20260914180009_lif639_admin_slack_connect_links.sql` before this API, then the dashboard Settings card.

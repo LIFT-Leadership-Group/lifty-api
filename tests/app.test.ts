@@ -1078,6 +1078,8 @@ describe("LIFTY API", () => {
     const html = await response.text();
     expect(response.status).toBe(200);
     expect(html).toContain("Slack is connected");
+    expect(html).toContain("Invite @Lifty");
+    expect(html).not.toContain("terminal");
     expect(html).not.toContain(code);
     expect(html).not.toContain(state);
   });

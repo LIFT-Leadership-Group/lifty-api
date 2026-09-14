@@ -91,6 +91,7 @@ export function createProductionApp(config: ServiceConfig) {
       redirectUri: `${config.hubspot.publicBaseUrl}/hubspot/callback`,
       state,
     }),
+    createSlackConnectLink: slack?.createConnectLink ?? (async () => slackUnavailable()),
     startSlackConnect: slack?.startConnect ?? (async () => slackUnavailable()),
     getSlackConnection: slack?.getConnection ?? (async () => slackUnavailable()),
     completeSlackCallback: slack?.completeCallback ?? (async () => {
