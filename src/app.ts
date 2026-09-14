@@ -1,3 +1,4 @@
+import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
@@ -103,6 +104,7 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
   emailAvailable: boolean;
@@ -252,6 +254,7 @@ async function readRequestTextWithinLimit(
 }
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/apollo/allowance",operationId:"getApolloAllowance",security:[{bearerAuth:[]}],request:{params:z.object({workspace_ref:z.uuid()})},responses:{200:JsonResponse(ApolloAllowanceSchema),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -735,6 +738,7 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 }
 
 const defaultDependencies: AppDependencies = {
+  getApolloAllowance: async () => { throw new PublicError({status:503,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"Apollo allowance is not configured yet."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
   disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
@@ -1683,6 +1687,13 @@ export function createApp(
       return context.json(NotificationTestResultSchema.parse(result));
     },
   );
+
+  app.get("/v1/workspaces/:workspace_ref/apollo/allowance", async context => {
+    context.header("cache-control","no-store");
+    const parsed=z.uuid().safeParse(context.req.param("workspace_ref"));
+    if(!parsed.success)return errorJson(context,400,"INVALID_WORKSPACE","Choose a valid workspace ID.");
+    return context.json(ApolloAllowanceSchema.parse(await dependencies.getApolloAllowance(context.get("authSession"),parsed.data)));
+  });
 
   app.post("/v1/workspaces/:workspace_ref/retire", async (context) => {
     context.header("cache-control", "no-store");
