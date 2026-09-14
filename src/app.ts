@@ -244,7 +244,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     method: "post",
     path: "/v1/workspaces/{workspace_ref}/integrations/slack/connect-link",
     operationId: "createAdminSlackConnectLink",
-    description: "Create a single-use, seven-day client invitation. Requires a LIFT admin with membership in the selected workspace.",
+    description: "Create a single-use, seven-day client invitation. Requires membership in the selected active workspace.",
     security: [{ bearerAuth: [] }],
     request: { params: z.object({ workspace_ref: z.uuid().openapi({ param: { name: "workspace_ref", in: "path" } }) }) },
     responses: {
