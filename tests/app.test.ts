@@ -80,9 +80,14 @@ describe("LIFTY API", () => {
     expect(document.components?.securitySchemes).toHaveProperty("bearerAuth");
   });
 
-  it("keeps secret-bearing fields out of every public OpenAPI contract", async () => {
+  it("keeps secrets out of public contracts except the explicit write-only Apollo input", async () => {
     const document = await (await createApp().request("/openapi.json")).json();
-
+    const choices = document.paths["/v1/workspaces/{workspace_ref}/integrations/apollo/key-source"].post.requestBody.content["application/json"].schema.oneOf;
+    const ownChoice = choices.find((choice: {properties: {operation: {enum: string[]}}}) => choice.properties.operation.enum[0] === "own_key");
+    expect(ownChoice.properties.api_key).toMatchObject({type:"string",writeOnly:true,format:"password"});
+    // This exact request-only exception must never spread to any response,
+    // status schema, example, or other provider's input.
+    delete ownChoice.properties.api_key;
     expect(collectSecretBearingFieldNames(document)).toEqual([]);
     expect(collectSecretBearingFieldNames({
       access_token: { type: "string" },

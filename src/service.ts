@@ -1,4 +1,5 @@
 import { getApolloAllowance } from "./apollo-allowance.js";
+import { apolloCredentials } from "./apollo-credentials.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
@@ -65,6 +66,7 @@ export function createProductionApp(config: ServiceConfig) {
   };
   return createApp({
     getApolloAllowance,
+    apolloCredentials,
     ...(email ? {
       emailAvailable: true,
       emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
