@@ -109,7 +109,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     if(intent.account_id && intent.account_id!==parsed.data.account_id)fail("EMAIL_IDENTITY_MISMATCH");
     let identity;
     try{identity=await provider.readIdentity(parsed.data.account_id,intent.email);}catch(error){
-      if(error instanceof PublicError && error.code==="UNIPILE_IDENTITY_MISMATCH")await rpc("fail",{intent_ref:id,failure_code:"identity_mismatch"});
+      if(error instanceof PublicError && ["UNIPILE_IDENTITY_MISMATCH","UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code))await rpc("fail",{intent_ref:id,failure_code:"identity_mismatch"});
       throw error;
     }
     if(!identity.healthy)fail("EMAIL_PROVIDER_NOT_READY",503);
