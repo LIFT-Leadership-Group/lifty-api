@@ -87,4 +87,4 @@ operate it with `npm run do:doctor`, `do:status`, `do:logs`, `do:smoke`, and
 `do:deploy -- <full-sha>`; the runbook documents the guardrails and
 prerequisites.
 
-Admin Slack invitations reuse `/slack/start` and `/slack/callback`. Reissuing replaces unused Slack invitations only for the selected workspace. The database rechecks the issuer's admin status, membership, and workspace activity when the callback consumes an admin invitation. Store neither generated links nor OAuth tokens in logs or durable evidence. Deploy migration `20260914133846_lif639_admin_slack_connect_links.sql` before this API, then the dashboard Settings card.
+Admin Slack invitations reuse `/slack/start` and `/slack/callback`. Reissuing replaces unused Slack invitations only for the selected workspace. The database rechecks the issuer's admin status, membership, and workspace activity when the callback consumes an admin invitation. Store neither generated links nor OAuth tokens in logs or durable evidence. Deploy migration `20260914180009_lif639_admin_slack_connect_links.sql` before this API, then the dashboard Settings card.
