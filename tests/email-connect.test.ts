@@ -101,9 +101,9 @@ describe("email hosted auth boundary",()=>{
     await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_INTENT_EXPIRED"});
     expect(calls).toHaveLength(1);
   });
-  it("creates one single-use mail-only link without mailbox-history sync",async()=>{
+  it.each(["HostedAuthUrl","HostedAuthURL"])("accepts documented %s and creates one single-use mail-only link without mailbox-history sync",async(object)=>{
     const calls:Record<string,unknown>[]=[];
-    const provider=createUnipileProvider({...settings,fetchImpl:async(_url,init)=>{calls.push(JSON.parse(String(init?.body)));return json({object:"HostedAuthURL",url:"https://account.unipile.com/opaque"});}});
+    const provider=createUnipileProvider({...settings,fetchImpl:async(_url,init)=>{calls.push(JSON.parse(String(init?.body)));return json({object,url:"https://account.unipile.com/opaque"});}});
     await provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null});
     expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({single_use:true,providers:["GOOGLE","OUTLOOK"],sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
     expect(calls[0]).not.toHaveProperty("email");
@@ -111,7 +111,7 @@ describe("email hosted auth boundary",()=>{
   it("does not retry provider errors and redacts response bodies",async()=>{
     let calls=0;
     const provider=createUnipileProvider({...settings,fetchImpl:async()=>{calls++;return json({error:"provider-SECRET"},429);}});
-    await expect(provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null})).rejects.toMatchObject({code:"UNIPILE_UNAVAILABLE"});
+    await expect(provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null})).rejects.toMatchObject({code:"UNIPILE_HOSTED_HTTP_429"});
     expect(calls).toBe(1);
   });
   it("bounds stalled bodies",async()=>{
@@ -120,7 +120,60 @@ describe("email hosted auth boundary",()=>{
   });
   it("rejects provider redirect URLs outside the hosted auth origin",async()=>{
     const provider=createUnipileProvider({...settings,fetchImpl:async()=>json({object:"HostedAuthURL",url:"https://attacker.test/"})});
-    await expect(provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null})).rejects.toMatchObject({code:"UNIPILE_UNAVAILABLE"});
+    await expect(provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null})).rejects.toMatchObject({code:"UNIPILE_HOSTED_URL_INVALID"});
+  });
+});
+describe("hosted authorization lifecycle",()=>{
+  function authorizationHarness(failure?:"provider"|"save"|"schema") {
+    const operations:string[]=[];
+    let current="pending",hostedUrl:string|null=null,providerCalls=0;
+    const fetchImpl:typeof fetch=async(url,init)=>{
+      if(new URL(String(url)).hostname==="api1.unipile.com") {
+        providerCalls++;
+        expect(new URL(String(url)).pathname).toBe("/api/v1/hosted/accounts/link");
+        const body=JSON.parse(String(init?.body));
+        expect(body).toMatchObject({providers:["GOOGLE","OUTLOOK"],single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+        if(failure==="provider")return json({message:"provider-SECRET https://account.unipile.com/private-token"},401);
+        return json({object:failure==="schema"?"HostedAuthLink":"HostedAuthUrl",url:"https://account.unipile.com/opaque"});
+      }
+      const args=JSON.parse(String(init?.body));operations.push(args.p_operation);
+      if(args.p_operation==="intent")return json({...intent,state:current,hosted_url:hostedUrl});
+      if(args.p_operation==="issue_link"){
+        const claimed=current==="pending";if(claimed)current="issuing";return json({claimed});
+      }
+      if(args.p_operation==="save_link") {
+        if(failure==="save")return json({code:"PT409",message:"internal private-token detail"},409);
+        expect(current).toBe("issuing");hostedUrl=args.p_payload.url;current="ready";
+      }
+      if(args.p_operation==="fail") {
+        expect(args.p_payload).toEqual({intent_ref:id,failure_code:"link_failed"});current="failed";
+      }
+      return json({ok:true});
+    };
+    return {ops:createEmailConnectOperations({...settings,fetchImpl}),operations,providerCalls:()=>providerCalls};
+  }
+  it("persists current OpenAPI success through claim/provider/save and reuses the ready link without another POST",async()=>{
+    const h=authorizationHarness();
+    await expect(h.ops.authorize(state)).resolves.toBe("https://account.unipile.com/opaque");
+    expect(h.operations).toEqual(["intent","issue_link","save_link"]);
+    await expect(h.ops.authorize(state)).resolves.toBe("https://account.unipile.com/opaque");
+    expect(h.operations).toEqual(["intent","issue_link","save_link","intent"]);
+    expect(h.providerCalls()).toBe(1);
+  });
+  it.each([["provider","UNIPILE_HOSTED_HTTP_401"],["schema","UNIPILE_HOSTED_RESPONSE_INVALID"],["save","EMAIL_LINK_SAVE_FAILED"]] as const)("terminal %s failure preserves safe stage code without leaking bodies or retrying",async(failure,code)=>{
+    const h=authorizationHarness(failure);
+    const error=await h.ops.authorize(state).catch(error=>error);
+    expect(error).toMatchObject({code,status:502});
+    expect(String(error)+JSON.stringify(error)).not.toMatch(/private-token|provider-SECRET|account\.unipile/);
+    expect(h.operations).toEqual(failure==="save"?["intent","issue_link","save_link","fail"]:["intent","issue_link","fail"]);
+    await expect(h.ops.authorize(state)).rejects.toMatchObject({code:"EMAIL_INTENT_EXPIRED",status:410});
+    expect(h.operations.at(-1)).toBe("intent");expect(h.providerCalls()).toBe(1);
+  });
+  it("concurrent authorization contenders obtain at most one provider link",async()=>{
+    const h=authorizationHarness();
+    const results=await Promise.allSettled([h.ops.authorize(state),h.ops.authorize(state)]);
+    expect(results.filter(r=>r.status==="fulfilled")).toHaveLength(1);
+    expect(h.providerCalls()).toBe(1);expect(h.operations.filter(op=>op==="save_link")).toHaveLength(1);
   });
 });
 describe("email API",()=>{

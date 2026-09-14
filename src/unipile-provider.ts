@@ -39,6 +39,7 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
   const fetchImpl = settings.fetchImpl ?? fetch;
 
   async function request(path: string, body?: Record<string, unknown>): Promise<unknown> {
+    const hosted = path === "hosted/accounts/link";
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -49,6 +50,7 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
       });
       if (!response.ok) {
         void response.body?.cancel().catch(() => {});
+        if (hosted) throw failure(`UNIPILE_HOSTED_HTTP_${response.status}`);
         if (response.status === 404) throw failure("UNIPILE_ACCOUNT_NOT_FOUND", 409);
         throw failure();
       }
@@ -63,10 +65,11 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
           chunks.push(chunk);
         },
       }), { signal: controller.signal });
-      return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+      catch { throw failure(hosted ? "UNIPILE_HOSTED_RESPONSE_INVALID" : "UNIPILE_UNAVAILABLE"); }
     } catch (error) {
       if (error instanceof PublicError) throw error;
-      throw failure();
+      throw failure(hosted ? "UNIPILE_HOSTED_TRANSPORT_FAILED" : "UNIPILE_UNAVAILABLE");
     } finally { clearTimeout(timer); }
   }
 
@@ -78,11 +81,13 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
       notify_url: input.notifyUrl, single_use: true,
       sync_limit: { MAILING: "NO_HISTORY_SYNC" }, disabled_options: ["sync_limit"],
     });
-    const parsed = z.object({ object: z.literal("HostedAuthURL"), url: z.string().url() }).safeParse(raw);
-    if (!parsed.success) throw failure();
+    // Current OpenAPI/SDK use HostedAuthUrl; the hosted-auth guide still shows
+    // HostedAuthURL. Accept only these two documented discriminators.
+    const parsed = z.object({ object: z.enum(["HostedAuthUrl", "HostedAuthURL"]), url: z.string().url() }).safeParse(raw);
+    if (!parsed.success) throw failure("UNIPILE_HOSTED_RESPONSE_INVALID");
     const url = new URL(parsed.data.url);
     if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port
-      || url.username || url.password || url.hash) throw failure();
+      || url.username || url.password || url.hash) throw failure("UNIPILE_HOSTED_URL_INVALID");
     return url.toString();
   }
 
