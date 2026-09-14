@@ -1,4 +1,5 @@
 import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.js";
+import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
@@ -105,6 +106,7 @@ export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
+  apolloCredentials(session: AuthSession, workspace: string, input: ApolloCredentialInput): Promise<ApolloCredentialOutput>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
   emailAvailable: boolean;
@@ -255,6 +257,12 @@ async function readRequestTextWithinLimit(
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/apollo/allowance",operationId:"getApolloAllowance",security:[{bearerAuth:[]}],request:{params:z.object({workspace_ref:z.uuid()})},responses:{200:JsonResponse(ApolloAllowanceSchema),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/integrations/apollo/key-source",operationId:"getApolloCredentialChoice",security:[{bearerAuth:[]}],
+    request:{params:z.object({workspace_ref:z.uuid()})},
+    responses:{200:JsonResponse(ApolloCredentialResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/integrations/apollo/key-source",operationId:"setApolloCredentialChoice",security:[{bearerAuth:[]}],
+    request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:ApolloCredentialChoice}}}},
+    responses:{200:JsonResponse(ApolloCredentialResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -739,6 +747,7 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 
 const defaultDependencies: AppDependencies = {
   getApolloAllowance: async () => { throw new PublicError({status:503,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"Apollo allowance is not configured yet."}); },
+  apolloCredentials: async () => { throw new PublicError({status:503,code:"APOLLO_CREDENTIAL_UNAVAILABLE",message:"Apollo credential configuration is unavailable."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
   disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
@@ -1693,6 +1702,24 @@ export function createApp(
     const parsed=z.uuid().safeParse(context.req.param("workspace_ref"));
     if(!parsed.success)return errorJson(context,400,"INVALID_WORKSPACE","Choose a valid workspace ID.");
     return context.json(ApolloAllowanceSchema.parse(await dependencies.getApolloAllowance(context.get("authSession"),parsed.data)));
+  });
+  app.get("/v1/workspaces/:workspace_ref/integrations/apollo/key-source", async (context) => {
+    context.header("cache-control", "no-store");
+    const workspace = z.uuid().safeParse(context.req.param("workspace_ref"));
+    if (!workspace.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a valid workspace.");
+    return context.json(ApolloCredentialResult.parse(await dependencies.apolloCredentials(context.get("authSession"), workspace.data, {operation:"status"})));
+  });
+  app.post("/v1/workspaces/:workspace_ref/integrations/apollo/key-source", async (context) => {
+    context.header("cache-control", "no-store");
+    const workspace = z.uuid().safeParse(context.req.param("workspace_ref"));
+    if (!workspace.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a valid workspace.");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 8192);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Apollo credential request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide one Apollo credential choice as JSON."); }
+    const choice = ApolloCredentialChoice.safeParse(body);
+    if (!choice.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose platform_default or provide your own Apollo key.");
+    return context.json(ApolloCredentialResult.parse(await dependencies.apolloCredentials(context.get("authSession"), workspace.data, choice.data)));
   });
 
   app.post("/v1/workspaces/:workspace_ref/retire", async (context) => {
