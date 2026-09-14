@@ -8,7 +8,7 @@ const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8
 const secret="server-key-"+"x".repeat(40), email="founder@example.test";
 const state=sealEmailIntent(id,secret);
 const settings={dsn:"https://api1.unipile.com:13111",accessToken:"provider-SECRET",serverKey:secret,publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://project.supabase.co",publishableKey:"sb_public"};
-const account={id:"account_1",type:"GOOGLE_OAUTH",connection_params:{mail:{id:"mail_1",username:email}},sources:[{id:"mail_1",status:"OK"}]};
+const account={id:"account_1",type:"GOOGLE_OAUTH",connection_params:{mail:{id:"mail_1",username:email}},sources:[{id:"source_a",status:"OK"},{id:"source_b",status:"OK"}]};
 const owner={object:"AccountOwnerProfile",provider:"GMAIL",email,aliases:[{email,is_primary:true}]};
 const intent={state:"ready",intent_ref:id,workspace_ref:workspace,email,expires_at:new Date(Date.now()+120000).toISOString(),account_id:null,hosted_url:"https://account.unipile.com/example"};
 const body={status:"CREATION_SUCCESS",account_id:"account_1",name:emailCallbackName(id,secret)};
@@ -54,14 +54,14 @@ describe("email hosted auth boundary",()=>{
   it("leaves a temporarily unhealthy provider pending for callback redelivery",async()=>{
     const {ops,calls}=harness({identity:{...account,sources:[{id:"mail_1",status:"CONNECTING"}]}});
     await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_PROVIDER_NOT_READY"});
-    expect(calls.map(c=>c.operation)).toEqual(["intent"]);
+    expect(calls.map(c=>c.operation)).toEqual(["intent","record"]);
   });
-  it("rejects wrong IDs, SMTP/IMAP ambiguity and unrelated healthy sources",async()=>{
+  it("rejects wrong IDs, SMTP/IMAP ambiguity and unhealthy sources",async()=>{
     for(const identity of [{...account,id:"different"},{...account,type:"MAIL",connection_params:{mail:{smtp_user:email,imap_user:"other@example.test"}}}]){
       const {ops,calls}=harness({identity}); await expect(ops.callback(state,body)).rejects.toMatchObject({code:identity.type==="MAIL"?"UNIPILE_MAILBOX_UNVERIFIABLE":"UNIPILE_IDENTITY_MISMATCH"});
       expect(calls.some(c=>c.operation==="complete")).toBe(false);
     }
-    const {ops}=harness({identity:{...account,sources:[{id:"different",status:"OK"}]}});
+    const {ops}=harness({identity:{...account,sources:[{id:"different",status:"CONNECTING"}]}});
     await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_PROVIDER_NOT_READY"});
   });
   it("rejects matching IMAP/SMTP usernames without pretending they prove physical identity",async()=>{
@@ -214,5 +214,99 @@ describe("email disconnection",()=>{
   it("rejects cross-workspace disconnect without returning tenant data",async()=>{
     const ops=createEmailConnectOperations(settings);
     await expect(ops.disconnect({userId:id,client:{rpc:async()=>({data:null,error:{code:"PT403",message:"email_workspace_forbidden"}})}},"other")).rejects.toMatchObject({status:403,code:"EMAIL_WORKSPACE_FORBIDDEN"});
+  });
+});
+
+describe("durable callback reconciliation",()=>{
+  function reconciliationHarness(options:{hint?:string|null;health?:string;profile?:unknown;rpcError?:unknown;providerStatus?:number;hintWorkspace?:string;hintError?:unknown}={}){
+    let current="pending",failure:string|null=null;
+    const events:string[]=[];
+    const stored=()=>({state:current,workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,intent_ref:id,connection_ref:current==="connected"?workspace:null,account_id:current==="connected"?"account_1":null,failure_code:failure});
+    const client={rpc:async(name:string,args:Record<string,unknown>)=>{
+      events.push(`jwt:${name}:${args.p_operation}`);
+      if(options.rpcError)return {data:null,error:options.rpcError};
+      expect(args.p_server_key).toBe(secret);
+      if(name==="lifty_email_callback_hint"){
+        expect(args.p_operation).toBe("read");expect(args.p_payload).toEqual({workspace_ref:workspace,intent_ref:id});
+        return {data:{workspace_ref:options.hintWorkspace??workspace,intent_ref:id,account_id:options.hint===undefined?"account_1":options.hint},error:options.hintError??null};
+      }
+      return {data:stored(),error:null};
+    }};
+    const fetchImpl:typeof fetch=async(url,init)=>{
+      const path=new URL(String(url)).pathname;
+      if(path.includes("/api/v1/")){
+        events.push(path);
+        if(path.endsWith("/users/me")){
+          expect(new URL(String(url)).searchParams.get("account_id")).toBe("account_1");
+          return json(options.profile??owner);
+        }
+        expect(path).toBe("/api/v1/accounts/account_1");
+        return json({...account,sources:account.sources.map(source=>({...source,status:options.health??"OK"}))},options.providerStatus??200);
+      }
+      expect(path).toBe("/rest/v1/rpc/lifty_email_connection");
+      const args=JSON.parse(String(init?.body));events.push(`server:${args.p_operation}`);
+      if(args.p_operation==="complete"){
+        expect(args.p_payload).toEqual({intent_ref:id,account_id:"account_1",email});current="connected";
+      }else if(args.p_operation==="fail"){current="failed";failure=args.p_payload.failure_code;}
+      else throw new Error("Unexpected operation");
+      return json({ok:true});
+    };
+    return {ops:createEmailConnectOperations({...settings,fetchImpl}),session:{userId:id,client},events};
+  }
+  it("reconciles only a member-authorized durable hint, verifies primary, and never repeats completion on the next poll",async()=>{
+    const h=reconciliationHarness();
+    expect((await h.ops.status(h.session,"senja")).status).toBe("connected");
+    expect(h.events.slice(0,6)).toEqual(["jwt:lifty_email_connection:status","jwt:lifty_email_callback_hint:read","/api/v1/accounts/account_1","/api/v1/users/me","server:complete","jwt:lifty_email_connection:status"]);
+    expect((await h.ops.status(h.session,"senja")).status).toBe("connected");
+    expect(h.events.filter(event=>event==="server:complete")).toHaveLength(1);
+  });
+  it("does not discover accounts by email when the authenticated callback hint is absent",async()=>{
+    const h=reconciliationHarness({hint:null});
+    expect((await h.ops.status(h.session,"senja")).status).toBe("pending");
+    expect(h.events).toHaveLength(2);
+  });
+  it.each([{health:"CONNECTING"},{providerStatus:503},{providerStatus:404}])("keeps temporary provider readiness pending without OAuth, failure or completion: %j",async(options)=>{
+    const h=reconciliationHarness(options);
+    for(let i=0;i<2;i++)expect((await h.ops.status(h.session,"senja")).status).toBe("pending");
+    expect(h.events.some(event=>event.startsWith("server:"))).toBe(false);
+  });
+  it("fails mismatching authenticated primary instead of completing the hinted account",async()=>{
+    const h=reconciliationHarness({profile:{...owner,email:"foreign@example.test"}});
+    expect(await h.ops.status(h.session,"senja")).toMatchObject({status:"failed",failure_code:"identity_mismatch"});
+    expect(h.events).not.toContain("server:complete");
+  });
+  it("rejects membership revocation before provider reads",async()=>{
+    const h=reconciliationHarness({rpcError:{code:"PT403",message:"email_workspace_forbidden"}});
+    await expect(h.ops.status(h.session,"foreign")).rejects.toMatchObject({code:"EMAIL_WORKSPACE_FORBIDDEN",status:403});
+    expect(h.events).toHaveLength(1);
+  });
+  it.each([{hintWorkspace:"33333333-3333-4333-8333-333333333333"},{hintError:{code:"PT403",message:"email_callback_invalid"}},{hintError:{code:"PT410",message:"email_intent_expired"}}])("rejects foreign or inaccessible hint before provider reads: %j",async(options)=>{
+    const h=reconciliationHarness(options);
+    await expect(h.ops.status(h.session,"senja")).rejects.toBeDefined();
+    expect(h.events).toHaveLength(2);
+  });
+  it("stops callback processing if durable recording conflicts",async()=>{
+    let reads=0;
+    const ops=createEmailConnectOperations({...settings,fetchImpl:async(url,init)=>{
+      const path=new URL(String(url)).pathname;
+      if(path.includes("/api/v1/")){reads++;throw new Error("No provider read allowed");}
+      const args=JSON.parse(String(init?.body));
+      if(args.p_operation==="intent")return json(intent);
+      expect(path).toBe("/rest/v1/rpc/lifty_email_callback_hint");
+      expect(args.p_operation).toBe("record");
+      return json({code:"PT409",message:"email_callback_conflict"},409);
+    }});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_CALLBACK_CONFLICT",status:409});
+    expect(reads).toBe(0);
+  });
+  it("persists the immutable authenticated callback hint before any readiness failure",async()=>{
+    const {ops,calls}=harness({identity:{...account,sources:[{id:"source",status:"CONNECTING"}]}});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_PROVIDER_NOT_READY"});
+    expect(calls).toEqual([{operation:"intent",payload:{intent_ref:id}},{operation:"record",payload:{workspace_ref:workspace,intent_ref:id,account_id:"account_1",callback_name:body.name}}]);
+  });
+  it.each([[],[{id:"",status:"OK"}],[{id:" ",status:"OK"}],[{id:"duplicate",status:"OK"},{id:"duplicate",status:"OK"}],[{id:"a",status:"OK"},{id:"b",status:"ERROR"}]])("rejects missing, empty, duplicate or unhealthy source identities: %j",async(...sources)=>{
+    const {ops,calls}=harness({identity:{...account,sources}});
+    await expect(ops.callback(state,body)).rejects.toBeDefined();
+    expect(calls.some(call=>call.operation==="complete")).toBe(false);
   });
 });

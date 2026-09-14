@@ -33,22 +33,22 @@ function fail(code: string, status = 409): never {
 function mapRpcError(error: unknown): never {
   const parsed = z.object({code:z.string().optional(),message:z.string().optional()}).safeParse(error);
   const message = parsed.success ? parsed.data.message ?? "" : "";
-  const safe = ["email_workspace_forbidden","email_workspace_suspended","email_profile_conflict","email_intent_expired","email_identity_mismatch","email_account_taken","email_namespace_mismatch"];
+  const safe = ["email_workspace_forbidden","email_workspace_suspended","email_profile_conflict","email_intent_expired","email_identity_mismatch","email_account_taken","email_namespace_mismatch","email_callback_invalid","email_callback_conflict"];
   const code = safe.find(value=>message===value);
-  fail(code?.toUpperCase() ?? "EMAIL_CONNECTION_UNAVAILABLE", parsed.success && parsed.data.code==="PT403" ? 403 : code ? 409 : 502);
+  fail(code?.toUpperCase() ?? "EMAIL_CONNECTION_UNAVAILABLE", parsed.success && parsed.data.code==="PT403" ? 403 : parsed.success && parsed.data.code==="PT410" ? 410 : code ? 409 : 502);
 }
 export function createEmailConnectOperations(settings: EmailConnectSettings) {
   if(settings.serverKey.length<32) throw new Error("Invalid email server key.");
   const provider = createUnipileProvider(settings);
   const fetchImpl = settings.fetchImpl ?? fetch;
-  async function rpc(operation:string,payload:Record<string,unknown>,session?:AuthSession):Promise<unknown> {
+  async function rpc(operation:string,payload:Record<string,unknown>,session?:AuthSession,name:"lifty_email_connection"|"lifty_email_callback_hint"="lifty_email_connection"):Promise<unknown> {
     const args={p_server_key:settings.serverKey,p_operation:operation,p_payload:payload};
     if(session){
-      const {data,error}=await (session.client as RpcClient).rpc("lifty_email_connection",args);
+      const {data,error}=await (session.client as RpcClient).rpc(name,args);
       if(error)mapRpcError(error); return data;
     }
     try {
-      const response=await fetchImpl(`${settings.supabaseUrl}/rest/v1/rpc/lifty_email_connection`,{
+      const response=await fetchImpl(`${settings.supabaseUrl}/rest/v1/rpc/${name}`,{
         method:"POST",redirect:"error",signal:AbortSignal.timeout(15_000),headers:{apikey:settings.publishableKey,"content-type":"application/json"},body:JSON.stringify(args),
       });
       const data:unknown=await response.json();
@@ -58,7 +58,23 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
   const publicProfile=(value:z.infer<typeof Stored>)=>({provider:"unipile" as const,channel:"email" as const,workspace_ref:value.workspace_ref,email:value.email,
     mailbox_use:value.mailbox_use,daily_limit:value.daily_limit,warmup_required:value.mailbox_use==="outreach",sending_enabled:false as const});
   async function status(session:AuthSession,workspace:string):Promise<EmailStatus>{
-    const value=Stored.parse(await rpc("status",{workspace},session));
+    let value=Stored.parse(await rpc("status",{workspace},session));
+    if(value.state==="pending" && value.intent_ref && value.email){
+      const hint=z.object({workspace_ref:z.literal(value.workspace_ref),intent_ref:z.literal(value.intent_ref),account_id:z.string().regex(/^[A-Za-z0-9_-]{1,255}$/).nullable()})
+        .parse(await rpc("read",{workspace_ref:value.workspace_ref,intent_ref:value.intent_ref},session,"lifty_email_callback_hint"));
+      if(hint.account_id){
+        try {
+          const identity=await provider.readIdentity(hint.account_id,value.email);
+          if(identity.healthy)await rpc("complete",{intent_ref:value.intent_ref,account_id:identity.accountId,email:identity.email});
+        }catch(error){
+          if(error instanceof PublicError && ["UNIPILE_IDENTITY_MISMATCH","UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code))
+            await rpc("fail",{intent_ref:value.intent_ref,failure_code:"identity_mismatch"});
+          else if(!(error instanceof PublicError && ["UNIPILE_UNAVAILABLE","UNIPILE_ACCOUNT_NOT_FOUND"].includes(error.code)))throw error;
+        }
+        // Fresh caller-authorized state also observes concurrent disconnect/revocation.
+        value=Stored.parse(await rpc("status",{workspace},session));
+      }
+    }
     if(!value.email || value.state==="not_connected")return EmailConnectionStatus.parse({provider:"unipile",channel:"email",workspace_ref:value.workspace_ref,status:"not_connected"});
     let state=value.state;
     if(state==="connected" && value.account_id){
@@ -114,6 +130,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     const intent=Intent.parse(await rpc("intent",{intent_ref:id}));
     if(!["ready","completed"].includes(intent.state))fail("EMAIL_INTENT_EXPIRED",410);
     if(intent.account_id && intent.account_id!==parsed.data.account_id)fail("EMAIL_IDENTITY_MISMATCH");
+    await rpc("record",{workspace_ref:intent.workspace_ref,intent_ref:id,account_id:parsed.data.account_id,callback_name:parsed.data.name},undefined,"lifty_email_callback_hint");
     let identity;
     try{identity=await provider.readIdentity(parsed.data.account_id,intent.email);}catch(error){
       if(error instanceof PublicError && ["UNIPILE_IDENTITY_MISMATCH","UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code))await rpc("fail",{intent_ref:id,failure_code:"identity_mismatch"});

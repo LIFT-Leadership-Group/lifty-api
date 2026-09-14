@@ -102,7 +102,10 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
         message:"LIFTY cannot verify the physical mailbox for IMAP/SMTP accounts. Connect with Google or Outlook OAuth."});
     }
     if (!matches(mail.username) || !mail.id) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
-    const healthy = sources.filter(source => source.id === mail.id).length === 1 && sources.find(source => source.id === mail.id)?.status === "OK";
+    // Source IDs are independent of connection_params.mail.id. Until Unipile
+    // exposes a typed mail-source association, require every source to be healthy.
+    const healthy = sources.every(source => source.id.trim().length > 0 && source.status === "OK")
+      && new Set(sources.map(source => source.id)).size === sources.length;
     if (healthy) {
       // Account usernames can be aliases. The authenticated own-profile endpoint
       // supplies current primary evidence; it does not establish a stable Google sub.
