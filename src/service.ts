@@ -80,7 +80,7 @@ export function createProductionApp(config: ServiceConfig) {
     getOnboardingStatus,
     enqueueOnboardingImport: createOnboardingImportTrigger(config.trigger),
     startRun,
-    getRunStatus,
+    getRunStatus: session => getRunStatus(session, config.dashboardOrigin),
     enqueueFirstRun: createFirstRunTrigger(config.trigger),
     startCrmSyncRun,
     getCrmSyncStatus,

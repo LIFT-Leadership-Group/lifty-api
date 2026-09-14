@@ -142,6 +142,7 @@ const RunLeadSchema = z
     linkedin_url: z.string().nullable(),
     lead_ref: z.uuid().nullable().optional(),
     research_url: z.string().nullable().optional(),
+    research_available: z.boolean().optional(),
     tier: z.string().nullable(),
     fit_rationale: z.string().nullable(),
     stage: z.string().nullable(),

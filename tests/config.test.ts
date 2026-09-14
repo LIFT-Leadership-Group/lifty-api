@@ -16,6 +16,13 @@ const validEnvironment = {
 };
 
 describe("service configuration", () => {
+  it("defaults to the verified dashboard and accepts another HTTPS origin", () => {
+    expect(loadConfig(validEnvironment).dashboardOrigin).toBe("https://lift-gtm-dashboard.vercel.app");
+    expect(loadConfig({...validEnvironment,LIFTY_DASHBOARD_ORIGIN:"https://dashboard.example.com"}).dashboardOrigin).toBe("https://dashboard.example.com");
+  });
+  it.each(["http://dashboard.example.com","https://user:pass@example.com","https://example.com/path","https://example.com?q=x","https://example.com#x","https://example.com:444"])("rejects unsafe dashboard origin %s", origin => {
+    expect(() => loadConfig({...validEnvironment,LIFTY_DASHBOARD_ORIGIN:origin})).toThrow(/LIFTY_DASHBOARD_ORIGIN/);
+  });
   it("loads a publishable-key-only Supabase configuration", () => {
     const config = loadConfig(validEnvironment);
 

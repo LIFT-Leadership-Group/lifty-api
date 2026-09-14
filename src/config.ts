@@ -9,6 +9,7 @@ import type { EmailConnectSettings } from "./email-connect.js";
 type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
+  dashboardOrigin?: string;
   host: string;
   port: number;
   supabase: SupabaseAuthenticationConfig;
@@ -104,6 +105,10 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     required(environment, "PUBLIC_BASE_URL"),
     "PUBLIC_BASE_URL",
   );
+  const dashboardUrl = secureUrl(environment.LIFTY_DASHBOARD_ORIGIN?.trim() || "https://lift-gtm-dashboard.vercel.app", "LIFTY_DASHBOARD_ORIGIN");
+  if (dashboardUrl.protocol !== "https:" || dashboardUrl.username || dashboardUrl.password || dashboardUrl.port || dashboardUrl.pathname !== "/" || dashboardUrl.search || dashboardUrl.hash) {
+    throw new Error("LIFTY_DASHBOARD_ORIGIN must be an HTTPS origin without credentials, port or path.");
+  }
   const slackClientId = environment.SLACK_CLIENT_ID?.trim();
   const slackClientSecret = environment.SLACK_CLIENT_SECRET?.trim();
 
@@ -112,6 +117,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (emailValues.some(value => Boolean(value?.trim())) && !emailEnabled) throw new Error("Email connection requires all three email service settings.");
   if (emailEnabled && environment.LIFTY_EMAIL_SERVER_KEY!.trim().length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
   return {
+    dashboardOrigin: dashboardUrl.origin,
     email: emailEnabled ? {
       dsn: required(environment,"UNIPILE_DSN"), accessToken: required(environment,"UNIPILE_ACCESS_TOKEN"),
       serverKey: required(environment,"LIFTY_EMAIL_SERVER_KEY"),
