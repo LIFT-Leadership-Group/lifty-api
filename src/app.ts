@@ -264,6 +264,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     security: [{ bearerAuth: [] }],
     responses: {
       200: JsonResponse(WorkspaceOverviewSchema),
+      409: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
@@ -294,6 +295,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       200: JsonResponse(CreateWorkspaceResultSchema),
       400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
+      429: JsonResponse(ErrorResponseSchema),
       413: JsonResponse(ErrorResponseSchema),
       422: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
@@ -314,6 +316,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       200: JsonResponse(OnboardingPushResultSchema),
       400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
+      429: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
       413: JsonResponse(ErrorResponseSchema),
       422: JsonResponse(ErrorResponseSchema),
@@ -339,6 +342,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     responses: {
       200: JsonResponse(StartRunResultSchema),
       401: JsonResponse(ErrorResponseSchema),
+      429: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
@@ -793,6 +797,7 @@ export function createApp(
   const dependencies = { ...defaultDependencies, ...overrides };
   const app = new OpenAPIHono<AppEnvironment>();
   registerOpenApi(app);
+  const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
 
   app.use("*", async (context, next) => {
     const suppliedRequestId = RequestIdSchema.safeParse(
@@ -1075,6 +1080,27 @@ export function createApp(
     await next();
   });
 
+  // One shared per-user budget for expensive provisioning/run operations.
+  // Expired entries are removed on access, without a process-owning timer.
+  app.use("/v1/*", async (context, next) => {
+    if (context.req.method !== "POST" || ![
+      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs",
+    ].includes(context.req.path)) return next();
+    const now = Date.now();
+    for (const [key, window] of mutationWindows) {
+      if (window.resetsAt <= now) mutationWindows.delete(key);
+    }
+    const userId = context.get("authSession").userId;
+    const window = mutationWindows.get(userId) ?? { count: 0, resetsAt: now + 60_000 };
+    if (window.count >= 10) {
+      context.header("Retry-After", String(Math.ceil((window.resetsAt - now) / 1000)));
+      return errorJson(context, 429, "RATE_LIMITED", "Too many requests. Try again in a minute.");
+    }
+    window.count++;
+    mutationWindows.set(userId, window);
+    await next();
+  });
+
   // ---------------------------------------------------------------- status
 
   // One aggregate read so `lifty status` answers "is my HubSpot OK?" without
@@ -1111,7 +1137,15 @@ export function createApp(
 
     const [onboarding, config, run, sync, hubspot, configUpdate] = await Promise.all([
       dependencies.getOnboardingStatus(session),
-      dependencies.getConfig(session, "icp"),
+      dependencies.getConfig(session, "icp").then(
+        (value) => ({ icp_version: value.config.icp?.version ?? null }),
+        (error: unknown) => {
+          if (error instanceof PublicError && error.code === "MULTI_LANE_CONFIG_UNSUPPORTED") {
+            return { icp_version: null, managed_externally: true };
+          }
+          throw error;
+        },
+      ),
       dependencies.getRunStatus(session),
       dependencies.getCrmSyncStatus(session),
       dependencies.getHubspotConnection(session),
@@ -1133,7 +1167,7 @@ export function createApp(
               submitted_at: onboarding.submitted_at,
               error_code: onboarding.error_code ?? null,
             },
-        configuration: { icp_version: config.config.icp?.version ?? null },
+        configuration: config,
         run: run.state === "none"
           ? { state: "none" }
           : {

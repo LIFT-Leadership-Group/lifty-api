@@ -48,6 +48,8 @@ The request-scoped Supabase client aborts each database request after 10 seconds
 | `PUBLIC_BASE_URL` | Exact HTTPS DigitalOcean ingress used for OAuth redirects |
 | `HUBSPOT_CLIENT_ID` | Client ID for the reviewed HubSpot LIFTY app |
 | `HUBSPOT_CLIENT_SECRET` | Encrypted app-level secret for the HubSpot LIFTY app |
+| `SLACK_CLIENT_ID` | Client ID for the Slack OAuth app |
+| `SLACK_CLIENT_SECRET` | App-level secret for Slack OAuth |
 | `TRIGGER_SECRET_KEY` | Trigger.dev prod secret key used to enqueue `lifty-onboarding-import` |
 | `TRIGGER_API_URL` | Optional; defaults to `https://api.trigger.dev` |
 | `HOST` | Bind host, default `0.0.0.0` |
@@ -151,3 +153,7 @@ The database migrations live in the GTM engine repository, not here. Roll back
 the DigitalOcean deployment to the previous exact commit and mark affected
 HubSpot connections `reconnect_required` if a provider-grant regression is
 suspected. Existing provisioning idempotency makes a same-draft retry safe.
+
+## Request limits
+
+`POST /v1/workspace`, `POST /v1/onboarding`, and `POST /v1/workspace/runs` share a budget of ten requests per authenticated user per minute per API process. Exhaustion returns 429 `RATE_LIMITED` with `Retry-After`. The in-memory budget resets on restart and is not shared across replicas. Per-IP and fleet-wide limiting belong at ingress. Reads and OAuth callbacks do not consume this budget.

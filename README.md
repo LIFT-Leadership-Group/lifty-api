@@ -28,7 +28,7 @@ configured Hono app for programmatic use.
 - `GET /v1/config` / `GET /v1/config/{section}` — secret-free workspace config (`icp`, `tone`, `prompt`, `workspace`), each with a version stamp
 - `PATCH /v1/config` — config update through the LIF-667 seam. Body: `{section, values}`, `{section: "prompt", instruction}`, or `{values}`. Filter/tone/workspace writes land synchronously; persona, tone, and prompt regenerations return `queued` and run through the `lifty-config-update` job (LIF-668). While one regeneration is queued any other change answers 409 `CONFIG_UPDATE_IN_FLIGHT`; re-sending the queued update re-attaches (LIF-681)
 - `GET /v1/config/updates/{submission_ref}` — poll a queued update (state, changed sections, new versions, error code)
-- `POST /v1/integrations/{provider}/connect` — mint a short-lived connect URL (`hubspot`; `unipile` is reserved and answers 501 until its connect path exists)
+- `POST /v1/integrations/{provider}/connect` — mint a short-lived connect URL (`hubspot` or `slack`; `unipile` is reserved and answers 501 until its connect path exists)
 - `GET /v1/integrations/{provider}` — secret-free connection status
 - `DELETE /v1/integrations/{provider}` — disconnect: detaches the stored grant (unusable by LIFT from that moment), deactivates the integration, clears the portal pointer, and enqueues the `lifty-integration-revoke` job that revokes the grant at the provider best-effort and deletes the secret (LIF-681); 409 while a CRM sync is in flight. Founder confirmation is the skill's job (LIF-669)
 - `POST /v1/integrations/{provider}/sync` / `GET …/sync` — start / poll the CRM sync run (LIF-663)
@@ -36,10 +36,20 @@ configured Hono app for programmatic use.
 - `GET /hubspot/callback` — verify OAuth, refreshability, scopes, and portal;
   persist the encrypted grant and render a safe browser result
 
+- `GET /slack/start` — redirect a connect intent to Slack consent
+- `GET /slack/callback` — validate Slack authorization and persist the grant
+- `GET /v1/notifications` — notification configuration
+- `GET /v1/notifications/slack/channels` — available Slack destinations
+- `PUT /v1/notifications/destinations/slack` — configure a Slack destination
+- `PUT /v1/notifications/routes` — configure notification routing
+- `POST /v1/notifications/destinations/{destination_ref}/test` — test a destination
+
+Slack disconnect deletes the stored Slack authorization directly; it has no HubSpot revocation job.
+
 The `/v1` endpoints accept `Authorization: Bearer <Supabase access token>`. No
 CORS middleware is enabled: the intended consumer is the CLI, not arbitrary
-browser origins. The two `/hubspot` routes are browser-facing but accept only a
-ten-minute, one-use capability or HubSpot's authorization response; they never
+browser origins. The four `/hubspot` and `/slack` OAuth routes are browser-facing but accept only a
+ten-minute, one-use capability or the provider's authorization response; they never
 render credentials or provider response bodies.
 
 New HubSpot connections require the exact LIFTY CRM contract: contacts,

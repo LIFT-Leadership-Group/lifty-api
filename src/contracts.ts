@@ -584,6 +584,7 @@ export const WorkspaceOverviewSchema = z
     configuration: z
       .object({
         icp_version: z.number().int().positive().nullable(),
+        managed_externally: z.boolean().optional(),
       })
       .strict(),
     run: z.discriminatedUnion("state", [

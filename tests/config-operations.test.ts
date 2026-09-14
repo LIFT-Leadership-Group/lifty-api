@@ -247,6 +247,8 @@ describe("config update operations", () => {
     ["PT409", "lifty_config_update_in_flight", 409, "CONFIG_UPDATE_IN_FLIGHT", "still being applied"],
     ["PT409", "lifty_prompt_hand_tuned", 409, "PROMPT_HAND_TUNED", null],
     ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING", null],
+    ["PT409", "lifty_workspace_ambiguous", 409, "WORKSPACE_AMBIGUOUS", "founder account"],
+    ["PT409", "lifty_workspace_suspended", 409, "WORKSPACE_SUSPENDED", null],
     ["PT404", "lifty_config_update_missing", 404, "CONFIG_UPDATE_NOT_FOUND", null],
     ["PT401", "unauthenticated", 401, "UNAUTHORIZED", null],
     ["XX000", "private internal failure", 502, "SUPABASE_REQUEST_FAILED", null],
@@ -301,6 +303,8 @@ describe("disconnect operations", () => {
     ["PT409", "lifty_sync_in_flight", 409, "SYNC_IN_PROGRESS"],
     ["PT400", "lifty_provider_invalid", 400, "PROVIDER_INVALID"],
     ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING"],
+    ["PT409", "lifty_workspace_ambiguous", 409, "WORKSPACE_AMBIGUOUS"],
+    ["PT409", "lifty_workspace_suspended", 409, "WORKSPACE_SUSPENDED"],
   ])(
     "maps disconnect %s %s failures to a safe response",
     async (databaseCode, databaseMessage, status, publicCode) => {

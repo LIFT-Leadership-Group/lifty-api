@@ -93,6 +93,15 @@ function mapRpcError(error: unknown): PublicError {
   const code = typeof candidate?.code === "string" ? candidate.code : "";
   const message = typeof candidate?.message === "string" ? candidate.message : "";
 
+  if (code === "PT409" && message.includes("lifty_workspace_ambiguous")) {
+    return new PublicError({ status: 409, code: "WORKSPACE_AMBIGUOUS",
+      message: "Log in with the founder account for this workspace.", cause: error });
+  }
+  if (code === "PT409" && message.includes("lifty_workspace_suspended")) {
+    return new PublicError({ status: 409, code: "WORKSPACE_SUSPENDED",
+      message: "This workspace is suspended. Contact LIFT support.", cause: error });
+  }
+
   if (code === "PT409" && message.includes("lifty_multi_lane_config_unsupported")) {
     return new PublicError({
       status: 409,
@@ -343,7 +352,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 400,
       code: "PROVIDER_INVALID",
-      message: "Unknown provider. Supported providers: hubspot, unipile.",
+      message: "Unknown provider. Supported providers: hubspot, slack.",
       cause: error,
     });
   }
