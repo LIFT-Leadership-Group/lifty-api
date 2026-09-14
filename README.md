@@ -135,3 +135,6 @@ LIF-827 still owns Mailivery warmup/placement evidence and durable activation
 policy. LIF-828 must enforce the per-physical-mailbox 10/day budget atomically
 across all automated sends, retries and workspace resets before any sending is
 enabled. Personal-use exemption never invents historical warmup dates.
+
+
+Acquisition recovery is explicit and asynchronous: GET `/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}` reads status; POST `{operation:"request",expected_acquisition_ref:"UUID"}` requests authoritative task verification only. POST `{operation:"restart",expected_acquisition_ref:"UUID"}` restarts only the exact verified terminal acquisition, preserving the first-run cohort and historical allowance. Both mutations bind the selected workspace before SQL changes. Failed enqueue leaves its durable request/attempt intact; retry the same references. This requires the LIF-641 recovery DB/verifier deployment.

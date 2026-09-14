@@ -1,3 +1,4 @@
+import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
 import { getApolloAllowance } from "./apollo-allowance.js";
 import { apolloCredentials } from "./apollo-credentials.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
@@ -25,6 +26,7 @@ import {
   createConfigUpdateTrigger,
   createCrmSyncTrigger,
   createFirstRunTrigger,
+  createAcquisitionVerificationTrigger,
   createIntegrationRevocationTrigger,
   createNotificationDeliveryTrigger,
   createOnboardingImportTrigger,
@@ -65,6 +67,10 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    acquisitionRecovery: createAcquisitionRecoveryOperations({
+      enqueueVerification: createAcquisitionVerificationTrigger(config.trigger),
+      enqueueFirstRun: createFirstRunTrigger(config.trigger),
+    }),
     getApolloAllowance,
     apolloCredentials,
     ...(email ? {
