@@ -115,5 +115,9 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     if(!identity.healthy)fail("EMAIL_PROVIDER_NOT_READY",503);
     await rpc("complete",{intent_ref:id,account_id:identity.accountId,email:identity.email});
   }
-  return {start,status,authorize,callback};
+  async function disconnect(session:AuthSession,workspace:string):Promise<EmailStatus> {
+    await rpc("disconnect", {workspace}, session);
+    return status(session,workspace);
+  }
+  return {start,status,authorize,callback,disconnect};
 }

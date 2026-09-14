@@ -80,6 +80,7 @@ import {
 } from "./slack-connect.js";
 import { isSealedSlackState } from "./slack-state.js";
 
+import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 import { EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
@@ -101,9 +102,11 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
   emailAvailable: boolean;
   startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
   getEmailConnection(session: AuthSession, workspace: string): Promise<EmailStatus>;
+  disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
   authorizeEmail(state: string): Promise<string>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
@@ -247,6 +250,15 @@ async function readRequestTextWithinLimit(
 }
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/campaign/placement",operationId:"getEmailPlacement",security:[{bearerAuth:[]}],
+    request:{query:z.object({workspace:EmailConnectRequest.shape.workspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
+    responses:{200:JsonResponse(EmailPlacementResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/campaign",operationId:"emailCampaign",security:[{bearerAuth:[]}],
+    request:{body:{required:true,content:{"application/json":{schema:EmailCampaignRequest}}}},
+    responses:{200:JsonResponse(EmailCampaignResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/disconnect",operationId:"disconnectEmail",security:[{bearerAuth:[]}],
+    request:{body:{required:true,content:{"application/json":{schema:z.object({workspace:EmailConnectRequest.shape.workspace}).strict()}}}},
+    responses:{200:JsonResponse(EmailConnectionStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/connect",operationId:"startEmailConnect",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:EmailConnectRequest}}}},
     responses:{200:JsonResponse(EmailConnectResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
@@ -718,6 +730,8 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 }
 
 const defaultDependencies: AppDependencies = {
+  emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
+  disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   emailAvailable: false,
   startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
@@ -1663,6 +1677,36 @@ export function createApp(
       return context.json(NotificationTestResultSchema.parse(result));
     },
   );
+
+  app.get("/v1/email/campaign/placement", async (context) => {
+    context.header("cache-control", "no-store");
+    const parsed = EmailCampaignRequest.safeParse({operation:"placement-status",payload:context.req.query()});
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose the workspace, campaign and exact digest.");
+    return context.json(EmailPlacementResult.parse(await dependencies.emailCampaign(context.get("authSession"), parsed.data)));
+  });
+
+  app.post("/v1/email/campaign", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 128 * 1024);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Campaign request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide one campaign request as JSON."); }
+    const parsed = EmailCampaignRequest.safeParse(body);
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Check the campaign operation, workspace and required fields.");
+    const result = await dependencies.emailCampaign(context.get("authSession"), parsed.data);
+    return context.json(campaignResultFor(parsed.data.operation, result));
+  });
+
+  app.post("/v1/email/disconnect", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Email request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace."); }
+    const parsed = z.object({workspace:EmailConnectRequest.shape.workspace}).strict().safeParse(body);
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace explicitly.");
+    return context.json(EmailConnectionStatus.parse(await dependencies.disconnectEmail(context.get("authSession"), parsed.data.workspace)));
+  });
 
   app.post("/v1/email/connect", async (context) => {
     context.header("cache-control", "no-store");

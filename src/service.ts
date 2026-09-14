@@ -1,3 +1,4 @@
+import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
 
 import { randomBytes } from "node:crypto";
@@ -63,8 +64,10 @@ export function createProductionApp(config: ServiceConfig) {
   return createApp({
     ...(email ? {
       emailAvailable: true,
+      emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
       startEmailConnect: email.start,
       getEmailConnection: email.status,
+      disconnectEmail: email.disconnect,
       authorizeEmail: email.authorize,
       completeEmailCallback: email.callback,
     } : {}),
