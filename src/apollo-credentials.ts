@@ -11,7 +11,7 @@ export const ApolloCredentialResult = z.object({
   workspace_ref: z.uuid(), tool: z.literal("apollo"),
   key_source: z.enum(["platform_default", "own_key"]).nullable(),
   configured: z.boolean(), changed: z.boolean(),
-}).strict();
+}).strict().refine(value => !value.configured || value.key_source !== null);
 export type ApolloCredentialInput = z.infer<typeof ApolloCredentialChoice>;
 export type ApolloCredentialOutput = z.infer<typeof ApolloCredentialResult>;
 const messages: Record<string, string> = {

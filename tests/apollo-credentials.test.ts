@@ -28,6 +28,7 @@ describe("Apollo credential API boundary",()=>{
  it.each(["workspace_forbidden","workspace_not_lifty","workspace_suspended","apollo_execution_in_progress","apollo_platform_unavailable","apollo_platform_key_requires_default"])("preserves guard %s with safe errors",async message=>{
   const h=harness(null,{code:"PT409",message,details:key});const response=await h.app.request(path,post({operation:"own_key",api_key:key}));expect(response.status).toBe(409);expect(await response.text()).not.toContain(key);expect(h.rpc).toHaveBeenCalledTimes(1);
  });
+ it("rejects configured status with no source",async()=>{expect((await harness({...receipt,key_source:null}).app.request(path)).status).toBe(502);});
  it("fails closed on foreign receipt, unexpected secret fields and unknown errors",async()=>{
   for(const data of [{...receipt,workspace_ref:user},{...receipt,api_key:key},{...receipt,key_source:"platform_default"},{...receipt,configured:false}])expect((await harness(data).app.request(path,post({operation:"own_key",api_key:key}))).status).toBe(502);
   const h=harness(null,{code:"XX000",message:key});const response=await h.app.request(path,post({operation:"own_key",api_key:key}));expect(response.status).toBe(502);expect(await response.text()).not.toContain(key);expect(h.rpc).toHaveBeenCalledTimes(1);
