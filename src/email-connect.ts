@@ -89,15 +89,22 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     const id=open(state);
     const intent=Intent.parse(await rpc("intent",{intent_ref:id}));
     if(intent.state==="ready" && intent.hosted_url)return intent.hosted_url;
+    if(intent.state==="failed" || intent.state==="completed")fail("EMAIL_INTENT_EXPIRED",410);
     const claim=z.object({claimed:z.boolean()}).parse(await rpc("issue_link",{intent_ref:id}));
     if(!claim.claimed)fail("EMAIL_LINK_PENDING");
+    let phase:"create"|"save"="create";
     try {
       const url=await provider.createLink({correlation:emailCallbackName(id,settings.serverKey),
         notifyUrl:`${settings.publicBaseUrl}/unipile/callback?intent=${encodeURIComponent(state)}`,
         expiresAt:new Date(intent.expires_at).toISOString(),reconnectId:intent.account_id});
+      phase="save";
       await rpc("save_link",{intent_ref:id,url}); return url;
-    }catch{
-      await rpc("fail",{intent_ref:id,failure_code:"link_failed"});fail("EMAIL_CONNECTION_UNAVAILABLE",502);
+    }catch(error){
+      // Keep the existing SQL failure-code enum; diagnostic codes below are
+      // public/API-only and never include provider bodies, URLs or credentials.
+      await rpc("fail",{intent_ref:id,failure_code:"link_failed"});
+      if(phase==="create" && error instanceof PublicError && /^UNIPILE_HOSTED_(HTTP_[1-5][0-9]{2}|RESPONSE_INVALID|URL_INVALID|TRANSPORT_FAILED)$/.test(error.code))throw error;
+      fail(phase==="save"?"EMAIL_LINK_SAVE_FAILED":"EMAIL_LINK_CREATE_FAILED",502);
     }
   }
   async function callback(state:string,body:unknown):Promise<void>{
