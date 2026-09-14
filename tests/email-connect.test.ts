@@ -9,12 +9,14 @@ const secret="server-key-"+"x".repeat(40), email="founder@example.test";
 const state=sealEmailIntent(id,secret);
 const settings={dsn:"https://api1.unipile.com:13111",accessToken:"provider-SECRET",serverKey:secret,publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://project.supabase.co",publishableKey:"sb_public"};
 const account={id:"account_1",type:"GOOGLE_OAUTH",connection_params:{mail:{id:"mail_1",username:email}},sources:[{id:"mail_1",status:"OK"}]};
+const owner={object:"AccountOwnerProfile",provider:"GMAIL",email,aliases:[{email,is_primary:true}]};
 const intent={state:"ready",intent_ref:id,workspace_ref:workspace,email,expires_at:new Date(Date.now()+120000).toISOString(),account_id:null,hosted_url:"https://account.unipile.com/example"};
 const body={status:"CREATION_SUCCESS",account_id:"account_1",name:emailCallbackName(id,secret)};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json"}});
-function harness(options:{identity?:unknown;intent?:unknown;status?:number}={}){
+function harness(options:{identity?:unknown;owner?:unknown;intent?:unknown;status?:number}={}){
   const calls:{operation:string;payload:Record<string,unknown>}[]=[];
   const fetchImpl:typeof fetch=async(url,init)=>{
+    if(String(url).includes("/users/me?")){expect(new URL(String(url)).searchParams.get("account_id")).toBe("account_1");return json(options.owner??owner);}
     if(String(url).includes("/accounts/"))return json(options.identity??account,options.status??200);
     const args=JSON.parse(String(init?.body));
     expect(args.p_server_key).toBe(secret); calls.push({operation:args.p_operation,payload:args.p_payload});
@@ -56,11 +58,43 @@ describe("email hosted auth boundary",()=>{
   });
   it("rejects wrong IDs, SMTP/IMAP ambiguity and unrelated healthy sources",async()=>{
     for(const identity of [{...account,id:"different"},{...account,type:"MAIL",connection_params:{mail:{smtp_user:email,imap_user:"other@example.test"}}}]){
-      const {ops,calls}=harness({identity}); await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+      const {ops,calls}=harness({identity}); await expect(ops.callback(state,body)).rejects.toMatchObject({code:identity.type==="MAIL"?"UNIPILE_MAILBOX_UNVERIFIABLE":"UNIPILE_IDENTITY_MISMATCH"});
       expect(calls.some(c=>c.operation==="complete")).toBe(false);
     }
     const {ops}=harness({identity:{...account,sources:[{id:"different",status:"OK"}]}});
     await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_PROVIDER_NOT_READY"});
+  });
+  it("rejects matching IMAP/SMTP usernames without pretending they prove physical identity",async()=>{
+    const {ops,calls}=harness({identity:{...account,type:"MAIL",connection_params:{mail:{imap_user:email,smtp_user:email}}}});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_MAILBOX_UNVERIFIABLE",message:expect.stringContaining("IMAP/SMTP")});
+    expect(calls.some(c=>c.operation==="complete")).toBe(false);
+  });
+  it("requires the exact authenticated primary, not a matching login or default SendAs alias",async()=>{
+    for(const profile of [
+      {...owner,email:"primary@example.test"},
+      {...owner,aliases:[]},
+      {...owner,aliases:[{email,is_default:true}]},
+      {...owner,aliases:[{email,is_primary:true},{email,is_primary:true}]},
+      {...owner,aliases:[{email,is_primary:false},{email:"primary@example.test",is_primary:true}]},
+      {object:"AccountOwnerProfile",provider:"OUTLOOK",email,id:"other-provider-id"},
+    ]) {
+      const {ops,calls}=harness({owner:profile});
+      await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+      expect(calls.some(c=>c.operation==="complete")).toBe(false);
+    }
+  });
+  it("does not infer dots, plus tags or custom-domain alias equivalence",async()=>{
+    for(const primary of ["founder+alias@example.test","f.ounder@example.test","founder@other.test"]) {
+      const {ops,calls}=harness({owner:{...owner,email:primary,aliases:[{email:primary,is_primary:true}]}});
+      await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+      expect(calls.some(c=>c.operation==="complete")).toBe(false);
+    }
+  });
+  it("requires Outlook owner profile email and id rather than a configured UPN",async()=>{
+    const {ops,calls}=harness({identity:{...account,type:"OUTLOOK"},owner:{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email,user_principal_name:"alias@example.test"}});
+    await ops.callback(state,body);expect(calls.at(-1)?.operation).toBe("complete");
+    const missing=harness({identity:{...account,type:"OUTLOOK"},owner:{object:"AccountOwnerProfile",provider:"OUTLOOK",email}});
+    await expect(missing.ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
   });
   it("rejects stale or failed intents without provider side effects",async()=>{
     const {ops,calls}=harness({intent:{...intent,state:"failed"}});
@@ -71,7 +105,7 @@ describe("email hosted auth boundary",()=>{
     const calls:Record<string,unknown>[]=[];
     const provider=createUnipileProvider({...settings,fetchImpl:async(_url,init)=>{calls.push(JSON.parse(String(init?.body)));return json({object:"HostedAuthURL",url:"https://account.unipile.com/opaque"});}});
     await provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null});
-    expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({single_use:true,providers:"*:MAILING",sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+    expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({single_use:true,providers:["GOOGLE","OUTLOOK"],sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
     expect(calls[0]).not.toHaveProperty("email");
   });
   it("does not retry provider errors and redacts response bodies",async()=>{
