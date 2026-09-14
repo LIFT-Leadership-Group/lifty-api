@@ -93,7 +93,10 @@ describe("hosted Slack connection operations", () => {
     });
   });
 
-  it("maps replayed state to a safe callback error", async () => {
+  it.each([
+    ["lifty_connect_intent_replayed", "link_used", 409],
+    ["lifty_connect_intent_revoked", "link_revoked", 403],
+  ])("maps %s to a safe callback error", async (failure, reason, status) => {
     const marker = "provider-private-marker";
     const fetchImpl = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -115,7 +118,7 @@ describe("hosted Slack connection operations", () => {
           bot_id: "B123BOT",
         });
       }
-      return Response.json({ message: `lifty_connect_intent_replayed ${marker}` }, { status: 409 });
+      return Response.json({ message: `${failure} ${marker}` }, { status });
     }) as typeof fetch;
     const operations = createSlackConnectOperations({ ...SETTINGS, fetchImpl });
 
@@ -124,7 +127,7 @@ describe("hosted Slack connection operations", () => {
       state: sealSlackConnectIntent("c".repeat(64), SETTINGS.clientSecret),
     }).catch((caught) => caught as SlackCallbackError);
 
-    expect(error).toMatchObject({ reason: "link_used", status: 409 });
+    expect(error).toMatchObject({ reason, status });
     expect(JSON.stringify(error)).not.toContain(marker);
   });
 });

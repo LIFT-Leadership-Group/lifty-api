@@ -203,6 +203,12 @@ export const SlackConnectStartSchema = z
   })
   .strict();
 
+export const SlackConnectLinkSchema = SlackConnectStartSchema.extend({
+  workspace_id: z.uuid(),
+  workspace_name: z.string().min(1),
+}).strict();
+export type SlackConnectLink = z.infer<typeof SlackConnectLinkSchema>;
+
 export const ProviderConnectStartSchema = z.union([
   HubspotConnectStartSchema,
   SlackConnectStartSchema,
