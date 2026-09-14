@@ -11,5 +11,6 @@ describe('Apollo weekly allowance HTTP boundary',()=>{
  it('rejects invalid path without RPC',async()=>{const h=app();expect((await h.app.request('/v1/workspaces/invalid/apollo/allowance')).status).toBe(400);expect(h.rpc).not.toHaveBeenCalled();});
  it('preserves membership denial and redacts internal errors',async()=>{const h=app(null,{message:'lifty_workspace_forbidden',details:'private-key'});const r=await h.app.request(path);expect(r.status).toBe(403);expect(await r.text()).not.toContain('private-key');});
  it('rejects cross-tenant and inflated results',async()=>{for(const data of [{...status,workspace_ref:other},{...status,limit:26},{...status,remaining:30}])expect((await app(data).app.request(path)).status).toBe(502);});
- it('customer-owned is explicitly outside the configured allowance',async()=>{const data={...status,applies:false,key_source:'customer_owned',limit:null,remaining:null};expect(await (await app(data).app.request(path)).json()).toEqual(data);});
+ it('unconfigured remains explicit without invented allowance',async()=>{const data={...status,applies:false,key_source:'unconfigured',limit:null,remaining:null};expect(await (await app(data).app.request(path)).json()).toEqual(data);});
+ it('customer-owned is explicitly outside the configured allowance',async()=>{const data={...status,applies:false,key_source:'own_key',limit:null,remaining:null};expect(await (await app(data).app.request(path)).json()).toEqual(data);});
 });

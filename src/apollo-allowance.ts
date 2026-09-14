@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 export const ApolloAllowanceSchema=z.object({
- workspace_ref:z.uuid(),lifty:z.boolean(),applies:z.boolean(),key_source:z.enum(["platform_default","customer_owned"]),
+ workspace_ref:z.uuid(),lifty:z.boolean(),applies:z.boolean(),key_source:z.enum(["platform_default","own_key","unconfigured"]),
  limit:z.number().int().nonnegative().nullable(),used:z.number().int().nonnegative(),reserved:z.number().int().nonnegative(),
  remaining:z.number().int().nonnegative().nullable(),resets_at:z.string().datetime({offset:true}),
 });
