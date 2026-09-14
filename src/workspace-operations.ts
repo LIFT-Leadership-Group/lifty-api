@@ -352,7 +352,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 400,
       code: "PROVIDER_INVALID",
-      message: "Unknown provider. Supported providers: hubspot, slack.",
+      message: "Unknown provider. Supported providers: hubspot, unipile, slack.",
       cause: error,
     });
   }
