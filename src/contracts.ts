@@ -131,6 +131,7 @@ export const StartRunResultSchema = z
     requested_leads: z.number().int().positive(),
     workspace: WorkspaceReferenceSchema,
     created: z.boolean(),
+    attempt: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -140,6 +141,9 @@ const RunLeadSchema = z
     title: z.string().nullable(),
     company: z.string().nullable(),
     linkedin_url: z.string().nullable(),
+    lead_ref: z.uuid().nullable().optional(),
+    research_url: z.string().nullable().optional(),
+    research_available: z.boolean().optional(),
     tier: z.string().nullable(),
     fit_rationale: z.string().nullable(),
     stage: z.string().nullable(),

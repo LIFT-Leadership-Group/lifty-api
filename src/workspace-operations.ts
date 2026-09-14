@@ -503,7 +503,7 @@ export async function startRun(session: AuthSession): Promise<StartRunResult> {
   return parsed.data;
 }
 
-export async function getRunStatus(session: AuthSession): Promise<RunStatus> {
+export async function getRunStatus(session: AuthSession, dashboardOrigin = "https://lift-gtm-dashboard.vercel.app"): Promise<RunStatus> {
   const { data, error } = await getRpcClient(session).rpc<RunStatus>(
     "get_lifty_run_status",
   );
@@ -516,7 +516,12 @@ export async function getRunStatus(session: AuthSession): Promise<RunStatus> {
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }
-  return parsed.data;
+  if (parsed.data.state === "none" || parsed.data.leads === null) return parsed.data;
+  return {...parsed.data, leads: parsed.data.leads.map(lead => ({
+    ...lead,
+    research_url: lead.research_available === true && lead.lead_ref
+      ? `${dashboardOrigin}/protected/leads/${lead.lead_ref}` : null,
+  }))};
 }
 
 export async function startCrmSyncRun(

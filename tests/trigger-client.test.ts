@@ -93,6 +93,16 @@ describe("onboarding import trigger client", () => {
 });
 
 describe("first run trigger client", () => {
+  it("dedupes reattachment per attempt and wakes resumed runs with a fresh key", async () => {
+    const bodies: Array<{payload:{runId:string;attempt:number};options:{idempotencyKey:string}}> = [];
+    const enqueue=createFirstRunTrigger({...settings,fetchImpl:(async (_url,init)=>{bodies.push(JSON.parse(String(init?.body)));return jsonResponse(200,{id:"run"});}) as typeof fetch});
+    await enqueue("ledger",1);await enqueue("ledger",1);await enqueue("ledger",2);
+    expect(bodies[0]).toEqual(bodies[1]);
+    expect(bodies.map(body=>body.options.idempotencyKey)).toEqual(["lifty-first-run:ledger:1","lifty-first-run:ledger:1","lifty-first-run:ledger:2"]);
+    expect(bodies[2]?.payload).toEqual({runId:"ledger",attempt:2});
+    for(const invalid of [-1,1.5,NaN])await expect(enqueue("ledger",invalid)).rejects.toMatchObject({code:"IMPORT_ENQUEUE_FAILED"});
+    expect(bodies).toHaveLength(3);
+  });
   it("enqueues lifty-first-run with a run-scoped idempotency key", async () => {
     const requests: Array<{ url: string; body: unknown }> = [];
     const enqueue = createFirstRunTrigger({
@@ -110,9 +120,9 @@ describe("first run trigger client", () => {
       "https://api.trigger.test/api/v1/tasks/lifty-first-run/trigger",
     );
     expect(requests[0]?.body).toEqual({
-      payload: { runId: "22222222-2222-4222-8222-222222222222" },
+      payload: { runId: "22222222-2222-4222-8222-222222222222", attempt: 0 },
       options: {
-        idempotencyKey: "lifty-first-run:22222222-2222-4222-8222-222222222222",
+        idempotencyKey: "lifty-first-run:22222222-2222-4222-8222-222222222222:0",
         idempotencyKeyTTL: "1h",
       },
     });

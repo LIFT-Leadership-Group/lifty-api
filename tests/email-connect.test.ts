@@ -107,3 +107,25 @@ describe("email API",()=>{
     expect(response.status).toBe(500);
   });
 });
+
+describe("email disconnection",()=>{
+  it("requires an authenticated caller and explicit workspace, not account IDs",async()=>{
+    expect((await createApp().request("/v1/email/disconnect",{method:"POST"})).status).toBe(401);
+    const app=createApp({authenticate:async()=>({ok:true,session:{userId:id,client:{}}})});
+    for(const payload of [{},{workspace:"senja",account_id:"other"}]) {
+      expect((await app.request("/v1/email/disconnect",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)})).status).toBe(400);
+    }
+  });
+  it("disconnects via the caller JWT capability then returns durable state without contacting provider",async()=>{
+    const calls:Record<string,unknown>[]=[];
+    const client={rpc:async(name:string,args:Record<string,unknown>)=>{expect(name).toBe("lifty_email_connection");expect(args.p_server_key).toBe(secret);calls.push(args);return {data:{state:"disconnected",workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,connection_ref:id,intent_ref:null,account_id:"account_1"},error:null};}};
+    const ops=createEmailConnectOperations({...settings,fetchImpl:async()=>{throw new Error("Provider must not be contacted");}});
+    const result=await ops.disconnect({userId:id,client},"senja");
+    expect(result.status).toBe("disconnected");expect(calls.map(c=>c.p_operation)).toEqual(["disconnect","status"]);
+    expect(calls.every(c=>(c.p_payload as {workspace:string}).workspace==="senja")).toBe(true);
+  });
+  it("rejects cross-workspace disconnect without returning tenant data",async()=>{
+    const ops=createEmailConnectOperations(settings);
+    await expect(ops.disconnect({userId:id,client:{rpc:async()=>({data:null,error:{code:"PT403",message:"email_workspace_forbidden"}})}},"other")).rejects.toMatchObject({status:403,code:"EMAIL_WORKSPACE_FORBIDDEN"});
+  });
+});
