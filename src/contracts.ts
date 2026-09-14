@@ -626,8 +626,8 @@ export const WorkspaceOverviewSchema = z
           .strict(),
         unipile: z
           .object({
-            available: z.literal(false),
-            connected: z.literal(false),
+            available: z.boolean(),
+            connected: z.boolean(),
           })
           .strict(),
       })
