@@ -90,7 +90,7 @@ import {
 } from "./slack-connect.js";
 import { isSealedSlackState } from "./slack-state.js";
 
-import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
+import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 import { EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
@@ -309,6 +309,9 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/campaign/placement/preview",operationId:"previewEmailPlacement",security:[{bearerAuth:[]}],
+    request:{query:z.object({workspace:EmailConnectRequest.shape.workspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
+    responses:{200:JsonResponse(EmailPlacementPreview),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/campaign/placement",operationId:"getEmailPlacement",security:[{bearerAuth:[]}],
     request:{query:z.object({workspace:EmailConnectRequest.shape.workspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
     responses:{200:JsonResponse(EmailPlacementResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -1830,6 +1833,13 @@ export function createApp(
     const input = confirmation.success ? RetireWorkspaceRequest.safeParse({...confirmation.data,workspace_ref:context.req.param("workspace_ref")}) : null;
     if (!input?.success) return errorJson(context, 400, "INVALID_REQUEST", "Confirm the exact workspace ID, slug and name.");
     return context.json(RetireWorkspaceResult.parse(await dependencies.retireWorkspace(context.get("authSession"), input.data)));
+  });
+
+  app.get("/v1/email/campaign/placement/preview", async (context) => {
+    context.header("cache-control", "no-store");
+    const parsed = EmailCampaignRequest.safeParse({operation:"placement-preview",payload:context.req.query()});
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose the workspace, campaign and exact digest.");
+    return context.json(EmailPlacementPreview.parse(await dependencies.emailCampaign(context.get("authSession"), parsed.data)));
   });
 
   app.get("/v1/email/campaign/placement", async (context) => {
