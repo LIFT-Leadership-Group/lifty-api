@@ -1,4 +1,10 @@
-import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult, type AcquisitionRecoveryInput, type AcquisitionRecoveryOutput } from "./acquisition-recovery.js";
+import {
+  AcquisitionRecoveryBody,
+  AcquisitionRecoveryStatus,
+  AcquisitionRestartResult,
+  type AcquisitionRecoveryInput,
+  type AcquisitionRecoveryOutput,
+} from "./acquisition-recovery.js";
 import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.js";
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
@@ -258,8 +264,41 @@ async function readRequestTextWithinLimit(
 }
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
-  app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}",operationId:"getAcquisitionRecovery",security:[{bearerAuth:[]}],request:{params:z.object({workspace_ref:z.uuid(),first_run_ref:z.uuid()})},responses:{200:JsonResponse(AcquisitionRecoveryStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}",operationId:"requestOrRestartAcquisition",security:[{bearerAuth:[]}],request:{params:z.object({workspace_ref:z.uuid(),first_run_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:AcquisitionRecoveryBody}}}},responses:{200:JsonResponse(z.union([AcquisitionRecoveryStatus,AcquisitionRestartResult])),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}",
+    operationId: "getAcquisitionRecovery",
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ workspace_ref: z.uuid(), first_run_ref: z.uuid() }) },
+    responses: {
+      200: JsonResponse(AcquisitionRecoveryStatus),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      403: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}",
+    operationId: "requestOrRestartAcquisition",
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ workspace_ref: z.uuid(), first_run_ref: z.uuid() }),
+      body: {
+        required: true,
+        content: { "application/json": { schema: AcquisitionRecoveryBody } },
+      },
+    },
+    responses: {
+      200: JsonResponse(z.union([AcquisitionRecoveryStatus, AcquisitionRestartResult])),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      403: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/apollo/allowance",operationId:"getApolloAllowance",security:[{bearerAuth:[]}],request:{params:z.object({workspace_ref:z.uuid()})},responses:{200:JsonResponse(ApolloAllowanceSchema),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/integrations/apollo/key-source",operationId:"getApolloCredentialChoice",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()})},
@@ -751,7 +790,13 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 
 const defaultDependencies: AppDependencies = {
   getApolloAllowance: async () => { throw new PublicError({status:503,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"Apollo allowance is not configured yet."}); },
-  acquisitionRecovery: async () => { throw new PublicError({status:503,code:"ACQUISITION_RECOVERY_UNAVAILABLE",message:"Acquisition recovery is not configured."}); },
+  acquisitionRecovery: async () => {
+    throw new PublicError({
+      status: 503,
+      code: "ACQUISITION_RECOVERY_UNAVAILABLE",
+      message: "Acquisition recovery is not configured.",
+    });
+  },
   apolloCredentials: async () => { throw new PublicError({status:503,code:"APOLLO_CREDENTIAL_UNAVAILABLE",message:"Apollo credential configuration is unavailable."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
@@ -1702,21 +1747,52 @@ export function createApp(
     },
   );
 
-  app.get("/v1/workspaces/:workspace_ref/apollo/recovery/:first_run_ref", async context => {
-    context.header("cache-control","no-store");
-    const refs=z.object({workspace_ref:z.uuid(),first_run_ref:z.uuid()}).safeParse(context.req.param());
-    if(!refs.success)return errorJson(context,400,"INVALID_REQUEST","Choose exact workspace and first-run references.");
-    return context.json(AcquisitionRecoveryStatus.parse(await dependencies.acquisitionRecovery(context.get("authSession"),{...refs.data,operation:"status"})));
+  app.get("/v1/workspaces/:workspace_ref/apollo/recovery/:first_run_ref", async (context) => {
+    context.header("cache-control", "no-store");
+    const refs = z.object({
+      workspace_ref: z.uuid(),
+      first_run_ref: z.uuid(),
+    }).safeParse(context.req.param());
+    if (!refs.success) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Choose exact workspace and first-run references.");
+    }
+    const result = await dependencies.acquisitionRecovery(context.get("authSession"), {
+      ...refs.data,
+      operation: "status",
+    });
+    return context.json(AcquisitionRecoveryStatus.parse(result));
   });
-  app.post("/v1/workspaces/:workspace_ref/apollo/recovery/:first_run_ref", async context => {
-    context.header("cache-control","no-store");
-    const refs=z.object({workspace_ref:z.uuid(),first_run_ref:z.uuid()}).safeParse(context.req.param());
-    if(!refs.success)return errorJson(context,400,"INVALID_REQUEST","Choose exact workspace and first-run references.");
-    const raw=await readRequestTextWithinLimit(context.req.raw,4096);if(!raw.ok)return errorJson(context,413,"INVALID_REQUEST","Recovery request is too large.");
-    let body:unknown;try{body=JSON.parse(raw.text);}catch{return errorJson(context,400,"INVALID_REQUEST","Provide one recovery request as JSON.");}
-    const parsed=AcquisitionRecoveryBody.safeParse(body);if(!parsed.success)return errorJson(context,400,"INVALID_REQUEST","Choose recovery request or restart with the exact acquisition reference.");
-    const result=await dependencies.acquisitionRecovery(context.get("authSession"),{...refs.data,...parsed.data});
-    return context.json((parsed.data.operation==="restart"?AcquisitionRestartResult:AcquisitionRecoveryStatus).parse(result));
+  app.post("/v1/workspaces/:workspace_ref/apollo/recovery/:first_run_ref", async (context) => {
+    context.header("cache-control", "no-store");
+    const refs = z.object({
+      workspace_ref: z.uuid(),
+      first_run_ref: z.uuid(),
+    }).safeParse(context.req.param());
+    if (!refs.success) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Choose exact workspace and first-run references.");
+    }
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) {
+      return errorJson(context, 413, "INVALID_REQUEST", "Recovery request is too large.");
+    }
+    let body: unknown;
+    try {
+      body = JSON.parse(raw.text);
+    } catch {
+      return errorJson(context, 400, "INVALID_REQUEST", "Provide one recovery request as JSON.");
+    }
+    const parsed = AcquisitionRecoveryBody.safeParse(body);
+    if (!parsed.success) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Choose recovery request or restart with the exact acquisition reference.");
+    }
+    const result = await dependencies.acquisitionRecovery(context.get("authSession"), {
+      ...refs.data,
+      ...parsed.data,
+    });
+    const schema = parsed.data.operation === "restart"
+      ? AcquisitionRestartResult
+      : AcquisitionRecoveryStatus;
+    return context.json(schema.parse(result));
   });
 
   app.get("/v1/workspaces/:workspace_ref/apollo/allowance", async context => {

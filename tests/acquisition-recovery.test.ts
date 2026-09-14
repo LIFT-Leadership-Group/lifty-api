@@ -31,7 +31,7 @@ describe("explicit acquisition recovery",()=>{
  it("lost restart wakeup retries exact references/attempt without marking failure or creating a new run",async()=>{
   const h=harness(restart);h.first.mockRejectedValueOnce(new Error("private-trigger-credential"));const failed=await h.app.request(path,post("restart"));expect(failed.status).toBe(502);expect(await failed.text()).not.toContain("private-trigger-credential");expect((await h.app.request(path,post("restart"))).status).toBe(200);expect(h.rpc.mock.calls[0]).toEqual(h.rpc.mock.calls[1]);expect(h.first.mock.calls).toEqual([[run,1],[run,1]]);expect(h.rpc.mock.calls.every(call=>call[0]==="restart_lifty_acquisition")).toBe(true);
  });
- it.each(["acquisition_forbidden","acquisition_stale","acquisition_not_recoverable","acquisition_in_progress","recovery_restart_required"])("preserves guard %s without arbitrary SQL context",async message=>{
+ it.each(["acquisition_forbidden","acquisition_parent_history_incomplete","acquisition_stale","acquisition_not_recoverable","acquisition_in_progress","recovery_restart_required"])("preserves guard %s without arbitrary SQL context",async message=>{
   const h=harness(null,{code:"PT409",message,details:"private"});const response=await h.app.request(path,post());expect(response.status).toBe(409);expect(await response.text()).not.toContain("private");expect(h.first).not.toHaveBeenCalled();expect(h.verification).not.toHaveBeenCalled();
  });
  it("foreign or impossible projections never enqueue work",async()=>{
@@ -44,4 +44,36 @@ describe("explicit acquisition recovery",()=>{
   const requests=fetchImpl.mock.calls.map(call=>JSON.parse(String(call[1]?.body)));
   expect(requests[0]).toEqual(requests[1]);expect(requests[0].payload).toEqual({recoveryRef:recovery});expect(requests[0].options.idempotencyKey).toBe(`lifty-discovery-reconcile:${recovery}`);expect(requests[2]).toEqual(requests[3]);expect(requests[2].options.idempotencyKey).toBe(`lifty-first-run:${run}:1`);
  });
+});
+
+// SQL creates a new durable verification request after a blocked attempt or an
+// expired verifier lease. This boundary must use that new identity, rather than
+// retaining the first request's Trigger idempotency key.
+it.each(["blocked verification", "expired verifier lease"])("re-request after %s reaches a fresh verifier task", async () => {
+  const fresh = "55555555-5555-4555-8555-555555555555";
+  const fetchImpl = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+    new Response(JSON.stringify({ id: "task-run" }), { status: 200 }));
+  const verification = createAcquisitionVerificationTrigger({
+    apiUrl: "https://trigger.test",
+    secretKey: "fixture-server-key",
+    fetchImpl,
+  });
+  let call = 0;
+  const rpc = vi.fn(async () => ({
+    data: { ...status, recovery_ref: call++ === 0 ? recovery : fresh },
+    error: null,
+  }));
+  const operation = createAcquisitionRecoveryOperations({
+    enqueueVerification: verification,
+    enqueueFirstRun: async () => { throw new Error("must not start acquisition"); },
+  });
+  const input = { workspace_ref: workspace, first_run_ref: run,
+    operation: "request" as const, expected_acquisition_ref: run };
+  await operation({ userId: run, client: { rpc } }, input);
+  await operation({ userId: run, client: { rpc } }, input);
+  const bodies = fetchImpl.mock.calls.map((request) => JSON.parse(String(request[1]?.body)));
+  expect(bodies.map((body) => body.payload)).toEqual([{ recoveryRef: recovery }, { recoveryRef: fresh }]);
+  expect(bodies.map((body) => body.options.idempotencyKey)).toEqual([
+    `lifty-discovery-reconcile:${recovery}`, `lifty-discovery-reconcile:${fresh}`,
+  ]);
 });

@@ -67,7 +67,10 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
-    acquisitionRecovery: createAcquisitionRecoveryOperations({enqueueVerification:createAcquisitionVerificationTrigger(config.trigger),enqueueFirstRun:createFirstRunTrigger(config.trigger)}),
+    acquisitionRecovery: createAcquisitionRecoveryOperations({
+      enqueueVerification: createAcquisitionVerificationTrigger(config.trigger),
+      enqueueFirstRun: createFirstRunTrigger(config.trigger),
+    }),
     getApolloAllowance,
     apolloCredentials,
     ...(email ? {

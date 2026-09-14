@@ -182,7 +182,15 @@ function enqueueFailed(cause: unknown): PublicError {
 
 export function createAcquisitionVerificationTrigger(settings: TriggerClientSettings) {
   return async (recoveryRef: string) => {
-    if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(recoveryRef)) throw enqueueFailed(new Error("Invalid acquisition recovery reference"));
-    return triggerTask(settings, "lifty-discovery-reconcile", {recoveryRef}, `lifty-discovery-reconcile:${recoveryRef}`);
+    const validReference = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(recoveryRef);
+    if (!validReference) {
+      throw enqueueFailed(new Error("Invalid acquisition recovery reference"));
+    }
+    return triggerTask(
+      settings,
+      "lifty-discovery-reconcile",
+      { recoveryRef },
+      `lifty-discovery-reconcile:${recoveryRef}`,
+    );
   };
 }
