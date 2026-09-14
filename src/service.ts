@@ -1,3 +1,4 @@
+import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
 
@@ -65,6 +66,7 @@ export function createProductionApp(config: ServiceConfig) {
     ...(email ? {
       emailAvailable: true,
       emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
+      retireWorkspace: createWorkspaceRetirement(config.email!.serverKey),
       startEmailConnect: email.start,
       getEmailConnection: email.status,
       disconnectEmail: email.disconnect,
