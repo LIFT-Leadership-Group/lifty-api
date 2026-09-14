@@ -1,3 +1,5 @@
+import { createEmailConnectOperations } from "./email-connect.js";
+
 import { randomBytes } from "node:crypto";
 
 import { createApp } from "./app.js";
@@ -45,6 +47,7 @@ import {
 } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
+  const email = config.email ? createEmailConnectOperations(config.email) : null;
   const hubspot = createHubspotConnectOperations(config.hubspot);
   const slackSettings = config.slack;
   const slack = slackSettings
@@ -58,6 +61,13 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    ...(email ? {
+      emailAvailable: true,
+      startEmailConnect: email.start,
+      getEmailConnection: email.status,
+      authorizeEmail: email.authorize,
+      completeEmailCallback: email.callback,
+    } : {}),
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,
     createWorkspace,

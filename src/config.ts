@@ -4,6 +4,8 @@ import type { SupabaseAuthenticationConfig } from "./supabase-auth.js";
 import type { HubspotConnectSettings } from "./hubspot-connect.js";
 import type { SlackConnectSettings } from "./slack-connect.js";
 
+import type { EmailConnectSettings } from "./email-connect.js";
+
 type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
@@ -12,6 +14,7 @@ export interface ServiceConfig {
   supabase: SupabaseAuthenticationConfig;
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
   slack: Omit<SlackConnectSettings, "fetchImpl"> | null;
+  email?: Omit<EmailConnectSettings, "fetchImpl"> | null;
   trigger: {
     apiUrl: string;
     secretKey: string;
@@ -104,7 +107,17 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const slackClientId = environment.SLACK_CLIENT_ID?.trim();
   const slackClientSecret = environment.SLACK_CLIENT_SECRET?.trim();
 
+  const emailValues = [environment.UNIPILE_DSN, environment.UNIPILE_ACCESS_TOKEN, environment.LIFTY_EMAIL_SERVER_KEY];
+  const emailEnabled = emailValues.every(value => Boolean(value?.trim()));
+  if (emailValues.some(value => Boolean(value?.trim())) && !emailEnabled) throw new Error("Email connection requires all three email service settings.");
+  if (emailEnabled && environment.LIFTY_EMAIL_SERVER_KEY!.trim().length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
   return {
+    email: emailEnabled ? {
+      dsn: required(environment,"UNIPILE_DSN"), accessToken: required(environment,"UNIPILE_ACCESS_TOKEN"),
+      serverKey: required(environment,"LIFTY_EMAIL_SERVER_KEY"),
+      publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
+      supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
+    } : null,
     host: environment.HOST?.trim() || "0.0.0.0",
     port: parsePort(environment.PORT),
     supabase: {

@@ -80,6 +80,8 @@ import {
 } from "./slack-connect.js";
 import { isSealedSlackState } from "./slack-state.js";
 
+import { EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
+
 const MAX_REQUEST_BYTES = 132 * 1024;
 // The create-workspace body carries only a bounded name and description.
 const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
@@ -99,6 +101,11 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  emailAvailable: boolean;
+  startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
+  getEmailConnection(session: AuthSession, workspace: string): Promise<EmailStatus>;
+  authorizeEmail(state: string): Promise<string>;
+  completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
   createWorkspace(
@@ -240,6 +247,11 @@ async function readRequestTextWithinLimit(
 }
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
+  app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/connect",operationId:"startEmailConnect",security:[{bearerAuth:[]}],
+    request:{body:{required:true,content:{"application/json":{schema:EmailConnectRequest}}}},
+    responses:{200:JsonResponse(EmailConnectResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/email",operationId:"getEmailConnection",security:[{bearerAuth:[]}],
+    request:{query:z.object({workspace:EmailConnectRequest.shape.workspace})},responses:{200:JsonResponse(EmailConnectionStatus),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({
     method: "post",
     path: "/v1/workspaces/{workspace_ref}/integrations/slack/connect-link",
@@ -706,6 +718,11 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 }
 
 const defaultDependencies: AppDependencies = {
+  emailAvailable: false,
+  startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
+  getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
+  authorizeEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
+  completeEmailCallback: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
@@ -1049,6 +1066,25 @@ export function createApp(
       );
     }
   });
+  app.get("/unipile/start", async (context) => {
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
+    const target = await dependencies.authorizeEmail(context.req.query("intent") ?? "");
+    const url = new URL(target);
+    if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
+      throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"LIFTY could not prepare the email connection."});
+    }
+    return context.redirect(target, 303);
+  });
+  app.post("/unipile/callback", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Invalid email callback.");
+    let payload: unknown;
+    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Invalid email callback."); }
+    await dependencies.completeEmailCallback(context.req.query("intent") ?? "", payload);
+    return context.json({ok:true});
+  });
   app.doc("/openapi.json", {
     openapi: "3.1.0",
     info: {
@@ -1106,7 +1142,7 @@ export function createApp(
   // Expired entries are removed on access, without a process-owning timer.
   app.use("/v1/*", async (context, next) => {
     if (context.req.method !== "POST" || ![
-      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs",
+      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/email/connect",
     ].includes(context.req.path)) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {
@@ -1157,7 +1193,7 @@ export function createApp(
       );
     }
 
-    const [onboarding, config, run, sync, hubspot, configUpdate] = await Promise.all([
+    const [onboarding, config, run, sync, hubspot, configUpdate, email] = await Promise.all([
       dependencies.getOnboardingStatus(session),
       dependencies.getConfig(session, "icp").then(
         (value) => ({ icp_version: value.config.icp?.version ?? null }),
@@ -1172,6 +1208,7 @@ export function createApp(
       dependencies.getCrmSyncStatus(session),
       dependencies.getHubspotConnection(session),
       dependencies.getConfigUpdateStatus(session, null),
+      dependencies.emailAvailable ? dependencies.getEmailConnection(session, workspace.workspace.workspace_ref) : Promise.resolve(null),
     ]);
 
     return context.json(
@@ -1227,7 +1264,7 @@ export function createApp(
                   completed_at: sync.completed_at,
                 },
           },
-          unipile: { available: false, connected: false },
+          unipile: { available: dependencies.emailAvailable, connected: email?.status === "connected" },
         },
       }),
     );
@@ -1626,6 +1663,23 @@ export function createApp(
       return context.json(NotificationTestResultSchema.parse(result));
     },
   );
+
+  app.post("/v1/email/connect", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Email connection request is too large.");
+    let payload: unknown;
+    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace, email and mailbox_use."); }
+    const parsed = EmailConnectRequest.safeParse(payload);
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace, email and mailbox_use (personal or outreach).");
+    return context.json(EmailConnectResult.parse(await dependencies.startEmailConnect(context.get("authSession"), parsed.data)));
+  });
+  app.get("/v1/email", async (context) => {
+    context.header("cache-control", "no-store");
+    const workspace = EmailConnectRequest.shape.workspace.safeParse(context.req.query("workspace"));
+    if (!workspace.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace.");
+    return context.json(EmailConnectionStatus.parse(await dependencies.getEmailConnection(context.get("authSession"), workspace.data)));
+  });
 
   // ---------------------------------------------------------------- integrations
 

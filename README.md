@@ -88,3 +88,48 @@ operate it with `npm run do:doctor`, `do:status`, `do:logs`, `do:smoke`, and
 prerequisites.
 
 Admin Slack invitations reuse `/slack/start` and `/slack/callback`. Reissuing replaces unused Slack invitations only for the selected workspace. The database rechecks the issuer's admin status, membership, and workspace activity when the callback consumes an admin invitation. Store neither generated links nor OAuth tokens in logs or durable evidence. Deploy migration `20260914180009_lif639_admin_slack_connect_links.sql` before this API, then the dashboard Settings card.
+
+## Hosted email connection (LIF-827)
+
+The CLI uses `POST /v1/email/connect` with `{workspace, email, mailbox_use}` and
+polls `GET /v1/email?workspace=<slug-or-id>`. Workspace membership is explicit;
+it never relies on the operator's default workspace. `personal` means a mailbox
+the founder already uses regularly, including business-domain mailboxes; its
+recorded declaration exempts warmup. New/dedicated `outreach` mailboxes require
+warmup. The profile fixes the configurable ceiling at 10 automated emails/day.
+This connection slice does not send mail or enable sender/channel/default routes.
+The actual atomic daily send budget and activation checks remain in LIF-828.
+
+The browser goes through `/unipile/start` to a single-use Unipile email-only
+hosted link without mailbox-history sync. `/unipile/callback` requires an opaque
+intent and a server-generated correlation MAC, then independently rereads the
+bound account ID, exact email and mail-source health before persisting anything.
+It handles `CREATION_SUCCESS` and `RECONNECTED`. Revoked membership, suspended
+workspaces, stale intents and identity changes fail closed; repeated completed
+callbacks cannot reactivate a disconnected account.
+
+Deployment order:
+
+1. Apply `lif827_hosted_email_connections` in the GTM Engine migration root and
+   align the source filename with the production ledger's actual version.
+2. Generate a dedicated random `LIFTY_EMAIL_SERVER_KEY` (at least 32 characters)
+   in the deployment secret manager. Provision only its SHA-256 digest plus the
+   stable Unipile organization/credential namespace into
+   `private.lifty_email_server_config`. The namespace is NOT the DSN. No seed
+   config is shipped, so an unconfigured deployment remains closed.
+3. Configure `UNIPILE_DSN`, `UNIPILE_ACCESS_TOKEN`, and that dedicated key in the
+   API deployment. Never add a Supabase service-role key to this API. The new
+   narrow RPC needs both the API key and current user membership (or a verified
+   provider callback backed by the stored issuer).
+4. Run the repository's verification/deployment scripts and publish a new CLI
+   version through the existing reviewed release process. A merge alone does
+   not publish or configure this feature. Existing CLI next.10 lacks the new
+   flags until a new version is released.
+5. Confirm with a real non-production mailbox, including reconnection and
+   expired/forged callbacks. Unit HTTP contracts and SQL fixture tests are not
+   live OAuth acceptance evidence.
+
+LIF-827 still owns Mailivery warmup/placement evidence and durable activation
+policy. LIF-828 must enforce the per-physical-mailbox 10/day budget atomically
+across all automated sends, retries and workspace resets before any sending is
+enabled. Personal-use exemption never invents historical warmup dates.
