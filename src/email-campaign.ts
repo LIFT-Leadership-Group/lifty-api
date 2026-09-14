@@ -65,7 +65,7 @@ export function createEmailCampaignOperations(serverKey: string) {
     const client = session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
     let response;
     const placement = parsed.operation === "placement" || parsed.operation === "placement-status" || parsed.operation === "placement-confirm";
-    try { response = await client.rpc(placement ? "lifty_email_placement" : "lifty_email_campaign", { p_server_key: serverKey, p_operation: placement ? (parsed.operation === "placement" ? "start" : parsed.operation === "placement-confirm" ? "confirm" : "status") : parsed.operation, p_payload: parsed.payload }); }
+    try { response = parsed.operation === "placement-preview" ? await client.rpc("lifty_email_placement_preview", {p_server_key:serverKey,p_payload:parsed.payload}) : await client.rpc(placement ? "lifty_email_placement" : "lifty_email_campaign", { p_server_key: serverKey, p_operation: placement ? (parsed.operation === "placement" ? "start" : parsed.operation === "placement-confirm" ? "confirm" : "status") : parsed.operation, p_payload: parsed.payload }); }
     catch { mapError(null); }
     if (response.error) mapError(response.error);
     try {

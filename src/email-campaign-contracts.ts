@@ -22,6 +22,7 @@ export const EmailCampaignRequest = z.discriminatedUnion("operation", [
   request("pause", campaign),
   request("placement", { ...campaign, digest }),
   request("placement-status", { ...campaign, digest }),
+  request("placement-preview", { ...campaign, digest }),
   request("placement-confirm", { ...campaign, digest, placement_ref: reference, test_ref: z.string().regex(/^[A-Za-z0-9_-]{1,255}$/), seed_count: z.number().int().min(1).max(10), confirm_seeds: z.literal(true) }),
   request("suppress", { workspace, lead_ref: reference }),
   request("provider", { workspace, channel: z.enum(["email", "linkedin"]), provider: z.enum(["unipile", "smartlead", "heyreach"]) }),
@@ -49,7 +50,16 @@ export const EmailPlacementResult = z.object({
   test_ref: z.string().regex(/^[A-Za-z0-9_-]{1,255}$/).nullable().optional(),
   reason: PlacementReason.nullable().optional(),
 });
+export const EmailPlacementPreview = EmailPlacementResult.extend({
+  seed_emails: z.array(z.email().max(254)).min(1).max(1000).nullable(),
+}).superRefine((value,ctx)=>{
+  const seeds=value.seed_emails;
+  if(seeds===null ? value.test_ref!=null || value.seed_count!=null :
+    !value.test_ref || seeds.length!==value.seed_count || new Set(seeds.map(email=>email.toLowerCase())).size!==seeds.length)
+    ctx.addIssue({code:"custom",message:"Placement seed snapshot is inconsistent."});
+});
 export const EmailCampaignResult = z.union([
+  EmailPlacementPreview,
   EmailCampaignPreview,
   EmailPlacementResult,
   z.object({ lead_ref: reference, email: z.email(), workspace_ref: reference }),
@@ -58,15 +68,17 @@ export const EmailCampaignResult = z.union([
 ]);
 export type EmailCampaignOutput = z.infer<typeof EmailCampaignResult>;
 export function campaignResultFor(operation: EmailCampaignInput["operation"], data: unknown): EmailCampaignOutput {
-  if (["placement", "placement-status", "placement-confirm"].includes(operation) && data && typeof data === "object" && !Array.isArray(data)) {
+  if (["placement", "placement-status", "placement-confirm", "placement-preview"].includes(operation) && data && typeof data === "object" && !Array.isArray(data)) {
     const raw = data as Record<string, unknown>;
     if (raw.reason !== null && raw.reason !== undefined && !PlacementReason.safeParse(raw.reason).success) {
       const {reason: _reason, ...safe} = raw;
       data = safe;
     }
   }
-  const result = EmailCampaignResult.parse(data);
-  const matches = ["placement", "placement-status", "placement-confirm"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "provider" ? "existing_executions_unchanged" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
+  // Preview must not fall through to the older status schema and lose its list.
+  const result = operation === "placement-preview" ? EmailPlacementPreview.parse(data) :
+    ["placement", "placement-status", "placement-confirm"].includes(operation) ? EmailPlacementResult.parse(data) : EmailCampaignResult.parse(data);
+  const matches = ["placement", "placement-status", "placement-confirm", "placement-preview"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "provider" ? "existing_executions_unchanged" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
   if (!matches) throw new Error("Invalid campaign operation response.");
   return result;
 }

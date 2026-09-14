@@ -158,3 +158,71 @@ describe("placement SQL error contract",()=>{
     expect(result.status).toBe(409);const body=await result.json();expect(body.error.code).toBe(message.toUpperCase());expect(JSON.stringify(body)).not.toContain("private database context");expect(h.rpc).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("member-only exact placement seed preview",()=>{
+  const seedPreview={workspace_ref:workspace,campaign_ref:reference,digest,placement_ref:reference,status:"awaiting_confirmation",passed:null,seed_count:2,test_ref:"99",seed_emails:["seed@example.test","detection@example.test"]};
+  const url=`/v1/email/campaign/placement/preview?workspace=${workspace}&campaign_ref=${reference}&digest=${digest}`;
+  it("authenticates before accessing seed recipients",async()=>{
+    const emailCampaign=vi.fn();
+    const response=await createApp({emailCampaign}).request(url);
+    expect(response.status).toBe(401);expect(emailCampaign).not.toHaveBeenCalled();
+  });
+  it("returns exact stored recipients including detection through the caller JWT read-only capability",async()=>{
+    const h=harness({data:{...seedPreview,tracking_code:"private-provider-code",provider_body:{secret}},error:null});
+    const response=await h.app.request(url);
+    expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual(seedPreview);
+    expect(h.rpc).toHaveBeenCalledExactlyOnceWith("lifty_email_placement_preview",{p_server_key:secret,p_payload:{workspace,campaign_ref:reference,digest}});
+  });
+  it("supports the operation through POST without falling through to status or losing the list",async()=>{
+    const h=harness({data:seedPreview,error:null});
+    const response=await h.app.request("/v1/email/campaign",post(request("placement-preview",{digest})));
+    expect(response.status).toBe(200);expect(await response.json()).toEqual(seedPreview);
+    expect(h.rpc).toHaveBeenCalledExactlyOnceWith("lifty_email_placement_preview",{p_server_key:secret,p_payload:{workspace:"senja",campaign_ref:reference,digest}});
+  });
+  it("preserves null before an authenticated provider test exists without fabricating recipients",async()=>{
+    const pending={...seedPreview,status:"queued",seed_emails:null,seed_count:null,test_ref:null};
+    const h=harness({data:pending,error:null});
+    expect(await (await h.app.request(url)).json()).toEqual(pending);
+  });
+  it.each([
+    {seed_emails:undefined}, {seed_emails:[]}, {seed_emails:["bad address"]},
+    {seed_emails:["seed@example.test","SEED@example.test"]}, {seed_count:3},
+    {test_ref:null}, {seed_emails:null}, {seed_emails:null,test_ref:null},
+    {campaign_ref:workspace}, {workspace_ref:reference}, {digest:"b".repeat(64)},
+  ])("fails closed on incomplete or foreign stored seed snapshots: %j",async(override)=>{
+    const h=harness({data:{...seedPreview,...override},error:null});
+    const response=await h.app.request(url);
+    expect(response.status).toBe(502);expect(await response.text()).not.toContain("seed@example.test");
+  });
+  it("still exposes a blocked larger batch for informed review without weakening the ten-recipient confirmation cap",async()=>{
+    const large={...seedPreview,status:"blocked",reason:"seed_batch_exceeds_daily_limit",seed_count:11,seed_emails:Array.from({length:11},(_,i)=>`seed${i}@example.test`)};
+    const h=harness({data:large,error:null});
+    expect(await (await h.app.request(url)).json()).toEqual(large);
+    const confirmation={workspace,campaign_ref:reference,digest,placement_ref:reference,test_ref:"99",seed_count:11,confirm_seeds:true};
+    expect((await h.app.request("/v1/email/campaign",post({operation:"placement-confirm",payload:confirmation}))).status).toBe(400);
+    expect(h.rpc).toHaveBeenCalledTimes(1);
+  });
+  it.each(["email_workspace_forbidden","email_placement_forbidden","email_placement_campaign_stale"])("honors SQL isolation and current campaign validation: %s",async(message)=>{
+    const h=harness({data:null,error:{code:message.endsWith("stale")?"PT409":"PT403",message}});
+    const response=await h.app.request(url);
+    expect(response.status).toBe(message.endsWith("stale")?409:403);expect(h.rpc).toHaveBeenCalledTimes(1);
+  });
+  it("keeps old placement status responses unchanged even if a database result contains internal seed data",async()=>{
+    const h=harness({data:seedPreview,error:null});
+    const response=await h.app.request(url.replace("/preview?","?"));
+    const {seed_emails:_,...oldStatus}=seedPreview;
+    expect(await response.json()).toEqual(oldStatus);
+    expect(h.rpc).toHaveBeenCalledWith("lifty_email_placement",expect.objectContaining({p_operation:"status"}));
+  });
+  it("does not retry reads or echo unknown provider/database bodies",async()=>{
+    const h=harness({data:null,error:{message:"private-provider-code",code:"XX000"}});
+    const response=await h.app.request(url);
+    expect(response.status).toBe(502);expect(await response.text()).not.toContain("private-provider-code");expect(h.rpc).toHaveBeenCalledTimes(1);
+  });
+  it("documents a separate authenticated preview response",async()=>{
+    const doc=await (await createApp().request("/openapi.json")).json();
+    expect(doc.paths["/v1/email/campaign/placement/preview"].get.operationId).toBe("previewEmailPlacement");
+    expect(JSON.stringify(doc.paths["/v1/email/campaign/placement/preview"])).toContain("seed_emails");
+  });
+});
