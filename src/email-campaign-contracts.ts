@@ -22,6 +22,7 @@ export const EmailCampaignRequest = z.discriminatedUnion("operation", [
   request("pause", campaign),
   request("placement", { ...campaign, digest }),
   request("placement-status", { ...campaign, digest }),
+  request("placement-confirm", { ...campaign, digest, placement_ref: reference, test_ref: z.string().regex(/^[A-Za-z0-9_-]{1,255}$/), seed_count: z.number().int().min(1).max(10), confirm_seeds: z.literal(true) }),
   request("suppress", { workspace, lead_ref: reference }),
   request("provider", { workspace, channel: z.enum(["email", "linkedin"]), provider: z.enum(["unipile", "smartlead", "heyreach"]) }),
 ]);
@@ -40,10 +41,13 @@ export const EmailCampaignPreview = z.object({
   steps: z.array(z.object({ step_ref: reference, position: z.number().int().min(1).max(5), state: z.enum(["pending", "accepted", "canceled"]), due_at: z.string().nullable(), intent_ref: reference.nullable(), accepted_at: z.string().nullable() })),
   replies: z.array(z.object({ message_ref: reference, received_at: z.string() })),
 });
+const PlacementReason = z.enum(["seed_batch_exceeds_daily_limit", "seed_confirmation_required", "workspace_suspended", "campaign_changed", "sender_disconnected", "confirmation_expired", "provider_unavailable", "ambiguous", "invalid_response", "provider_rejected", "insufficient_credits"]);
 export const EmailPlacementResult = z.object({
   workspace_ref: reference, campaign_ref: reference, digest, placement_ref: reference,
   status: z.enum(["queued", "running", "completed", "failed", "awaiting_confirmation", "ambiguous", "blocked", "ready"]),
   passed: z.boolean().nullable(), seed_count: z.number().int().min(0).nullable(),
+  test_ref: z.string().regex(/^[A-Za-z0-9_-]{1,255}$/).nullable().optional(),
+  reason: PlacementReason.nullable().optional(),
 });
 export const EmailCampaignResult = z.union([
   EmailCampaignPreview,
@@ -54,8 +58,15 @@ export const EmailCampaignResult = z.union([
 ]);
 export type EmailCampaignOutput = z.infer<typeof EmailCampaignResult>;
 export function campaignResultFor(operation: EmailCampaignInput["operation"], data: unknown): EmailCampaignOutput {
+  if (["placement", "placement-status", "placement-confirm"].includes(operation) && data && typeof data === "object" && !Array.isArray(data)) {
+    const raw = data as Record<string, unknown>;
+    if (raw.reason !== null && raw.reason !== undefined && !PlacementReason.safeParse(raw.reason).success) {
+      const {reason: _reason, ...safe} = raw;
+      data = safe;
+    }
+  }
   const result = EmailCampaignResult.parse(data);
-  const matches = ["placement", "placement-status"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "provider" ? "existing_executions_unchanged" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
+  const matches = ["placement", "placement-status", "placement-confirm"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "provider" ? "existing_executions_unchanged" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
   if (!matches) throw new Error("Invalid campaign operation response.");
   return result;
 }

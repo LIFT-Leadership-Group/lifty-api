@@ -4,6 +4,15 @@ import { PublicError } from "./errors.js";
 import { EmailCampaignRequest, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 
 const messages: Record<string, string> = {
+  email_service_forbidden: "The email campaign service is unavailable. Contact LIFT support.",
+  email_user_required: "Sign in to LIFTY before operating this campaign.",
+  email_placement_campaign_stale: "The campaign changed. Preview its current digest before requesting or confirming placement.",
+  email_placement_campaign_unavailable: "Placement is available only while this campaign is a draft or approved.",
+  email_mailbox_unbound: "Connect and verify the exact sending account before requesting placement.",
+  email_placement_not_started: "No placement test exists for this campaign version. Request one first.",
+  email_placement_forbidden: "Choose a placement request from this workspace and campaign.",
+  email_placement_confirmation_mismatch: "The placement reference, provider test or seed count changed. Read status and review the exact batch again.",
+  email_placement_not_confirmable: "This placement test cannot be confirmed in its current state. Read status before continuing.",
   email_placement_unavailable: "Placement checks are not available yet. Sending remains blocked.",
   email_placement_confirmation_required: "Review the placement recipients and explicitly authorize the test before any seed messages are sent.",
   email_placement_ambiguous: "The placement request has an uncertain result. Check status; do not create another test.",
@@ -24,10 +33,17 @@ const messages: Record<string, string> = {
   email_sender_unhealthy: "The sending account is disconnected or its health check expired. Reconnect or refresh its health before sending.",
   email_sender_identity_mismatch: "The connected account no longer matches the approved sender.",
   email_warmup_required: "This new or dedicated outreach mailbox requires verified warmup before sending.",
-  email_placement_required: "A recent successful placement check is required for this exact campaign.",
+  email_placement_required: "A recent successful placement check is required for this sending account.",
   email_safety_check_required: "A recent successful safety check is required before sending.",
   email_target_mismatch: "The recipient changed. Prepare and approve the campaign again.",
   email_target_suppressed: "This recipient is suppressed. No campaign email will be sent.",
+  email_critical_hold: "The sending account has a safety hold. Resolve the reported health or complaint issue before sending.",
+  email_placement_request_required: "Request a placement test through LIFTY before authorizing any test recipients.",
+  email_placement_unauthorized: "This placement request is not authorized to send. Check its current status and exact seed confirmation.",
+  email_placement_replay_conflict: "The placement test details changed. Check the existing test; do not create another send request.",
+  email_channel_inactive: "Email sending is paused for this workspace or sending account.",
+  email_campaign_inactive: "This campaign is paused, replaced or no longer active.",
+  email_step_not_due: "The next campaign message is not due yet.",
   email_immutable_record: "Prepare a new campaign version instead of changing an existing execution.",
 };
 function mapError(error: unknown): never {
@@ -48,14 +64,15 @@ export function createEmailCampaignOperations(serverKey: string) {
     // server key grants this RPC capability, never unrestricted table access.
     const client = session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
     let response;
-    const placement = parsed.operation === "placement" || parsed.operation === "placement-status";
-    try { response = await client.rpc(placement ? "lifty_email_placement" : "lifty_email_campaign", { p_server_key: serverKey, p_operation: placement ? (parsed.operation === "placement" ? "start" : "status") : parsed.operation, p_payload: parsed.payload }); }
+    const placement = parsed.operation === "placement" || parsed.operation === "placement-status" || parsed.operation === "placement-confirm";
+    try { response = await client.rpc(placement ? "lifty_email_placement" : "lifty_email_campaign", { p_server_key: serverKey, p_operation: placement ? (parsed.operation === "placement" ? "start" : parsed.operation === "placement-confirm" ? "confirm" : "status") : parsed.operation, p_payload: parsed.payload }); }
     catch { mapError(null); }
     if (response.error) mapError(response.error);
     try {
       const result = campaignResultFor(parsed.operation, response.data);
       if (("campaign_ref" in parsed.payload && parsed.payload.campaign_ref && "campaign_ref" in result && parsed.payload.campaign_ref !== result.campaign_ref)
         || ("digest" in parsed.payload && "digest" in result && parsed.payload.digest !== result.digest)
+        || (parsed.operation === "placement-confirm" && "placement_ref" in result && (result.placement_ref !== parsed.payload.placement_ref || result.test_ref !== parsed.payload.test_ref || result.seed_count !== parsed.payload.seed_count))
         || ("workspace_ref" in result && /^[a-f0-9-]{36}$/i.test(parsed.payload.workspace) && result.workspace_ref !== parsed.payload.workspace)) throw new Error("Campaign response identity mismatch.");
       return result;
     }

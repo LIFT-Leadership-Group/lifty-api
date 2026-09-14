@@ -125,3 +125,36 @@ describe("placement request lifecycle",()=>{
     expect(result.content.steps).toEqual(content.steps);
   });
 });
+
+describe("explicit placement seed confirmation",()=>{
+  const placement={workspace_ref:workspace,campaign_ref:reference,digest,placement_ref:reference,status:"ready",passed:null,seed_count:4,test_ref:"test_1"};
+  const payload={workspace:"senja",campaign_ref:reference,digest,placement_ref:reference,test_ref:"test_1",seed_count:4,confirm_seeds:true};
+  it("requires exact references, count and explicit true then passes only to confirm RPC",async()=>{
+    const h=harness({data:placement,error:null});
+    for(const missing of ["placement_ref","test_ref","seed_count","confirm_seeds"]) {
+      const incomplete={...payload};delete incomplete[missing as keyof typeof incomplete];
+      expect((await h.app.request("/v1/email/campaign",post({operation:"placement-confirm",payload:incomplete}))).status).toBe(400);
+    }
+    expect(h.rpc).not.toHaveBeenCalled();
+    const result=await h.app.request("/v1/email/campaign",post({operation:"placement-confirm",payload}));
+    expect(result.status).toBe(200);expect(await result.json()).toEqual(placement);
+    expect(h.rpc).toHaveBeenCalledWith("lifty_email_placement",{p_server_key:secret,p_operation:"confirm",p_payload:payload});
+  });
+  it("rejects false confirmation or more than ten seeds before making a call",async()=>{
+    const h=harness();for(const override of [{confirm_seeds:false},{seed_count:11},{seed_count:0}])expect((await h.app.request("/v1/email/campaign",post({operation:"placement-confirm",payload:{...payload,...override}}))).status).toBe(400);
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+  it("preserves public test reference and drops unrecognized provider reason text",async()=>{
+    const h=harness({data:{...placement,reason:"provider-private-content"},error:null});
+    const response=await h.app.request("/v1/email/campaign",post(request("placement",{digest})));
+    const result=await response.json();expect(result.test_ref).toBe("test_1");expect(result.reason).toBeUndefined();
+  });
+});
+
+describe("placement SQL error contract",()=>{
+  it.each(["email_placement_campaign_stale","email_mailbox_unbound","email_placement_not_started","email_placement_confirmation_mismatch","email_placement_not_confirmable"])("renders actionable %s without database details",async message=>{
+    const h=harness({data:null,error:{code:"PT409",message,details:"private database context"}});
+    const result=await h.app.request("/v1/email/campaign",post(request("placement",{digest})));
+    expect(result.status).toBe(409);const body=await result.json();expect(body.error.code).toBe(message.toUpperCase());expect(JSON.stringify(body)).not.toContain("private database context");expect(h.rpc).toHaveBeenCalledTimes(1);
+  });
+});
