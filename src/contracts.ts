@@ -131,6 +131,7 @@ export const StartRunResultSchema = z
     requested_leads: z.number().int().positive(),
     workspace: WorkspaceReferenceSchema,
     created: z.boolean(),
+    attempt: z.number().int().nonnegative().optional(),
   })
   .strict();
 

@@ -1421,11 +1421,11 @@ export function createApp(
   });
 
   app.post("/v1/workspace/runs", async (context) => {
-    const result = await dependencies.startRun(context.get("authSession"));
-    // Enqueue on every start, including a re-attach: the run-scoped
+    const result = StartRunResultSchema.parse(await dependencies.startRun(context.get("authSession")));
+    // Enqueue on every start, including a re-attach: the run-and-attempt-scoped
     // idempotency key makes it a no-op when the run is already enqueued and
     // self-heals an enqueue lost after the ledger insert.
-    await dependencies.enqueueFirstRun(result.run_ref);
+    await dependencies.enqueueFirstRun(result.run_ref, result.attempt ?? 0);
     return context.json(StartRunResultSchema.parse(result));
   });
 

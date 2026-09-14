@@ -82,15 +82,17 @@ export function createOnboardingImportTrigger(
   };
 }
 
-export type EnqueueFirstRun = (runId: string) => Promise<{ id: string }>;
+export type EnqueueFirstRun = (runId: string, attempt?: number) => Promise<{ id: string }>;
 
 export function createFirstRunTrigger(
   settings: TriggerClientSettings,
 ): EnqueueFirstRun {
-  // Always the same key per ledger run: a re-attached `lifty run` re-triggers
-  // idempotently, which also self-heals an enqueue lost after the RPC insert.
-  return async (runId) =>
-    triggerTask(settings, FIRST_RUN_TASK_ID, { runId }, `${FIRST_RUN_TASK_ID}:${runId}`);
+  // Reattachment reuses the attempt key; resuming a failed ledger run must
+  // get a fresh wakeup instead of deduping against its finished Trigger run.
+  return async (runId, attempt = 0) => {
+    if (!Number.isSafeInteger(attempt) || attempt < 0) throw enqueueFailed(new Error("Invalid run attempt"));
+    return triggerTask(settings, FIRST_RUN_TASK_ID, { runId, attempt }, `${FIRST_RUN_TASK_ID}:${runId}:${attempt}`);
+  };
 }
 
 export type EnqueueCrmSync = (runId: string) => Promise<{ id: string }>;

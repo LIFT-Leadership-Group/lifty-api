@@ -460,6 +460,15 @@ describe("LIFTY API", () => {
     created,
   });
 
+  it("propagates a resumed run attempt without creating another ledger run", async () => {
+    const enqueued:unknown[]=[];
+    const result={...startRunFixture(false),attempt:2};
+    const app=createApp({authenticate:async()=>({ok:true,session:{userId:"founder",client:{}}}),startRun:async()=>result,enqueueFirstRun:async(runId,attempt)=>{enqueued.push({runId,attempt});return {id:"wake"};}});
+    const response=await app.request("/v1/workspace/runs",{method:"POST"});
+    expect(response.status).toBe(200);expect(await response.json()).toEqual(result);
+    expect(enqueued).toEqual([{runId:result.run_ref,attempt:2}]);
+  });
+
   it("starts the first run and enqueues exactly one job", async () => {
     const enqueued: string[] = [];
     const app = createApp({
