@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+export const EmailPolicy = z.discriminatedUnion("version", [
+  z.object({ version: z.literal("strict.v1"), revision: z.uuid().nullable(), placement_required: z.literal(true), habitual_only: z.literal(false) }).strict(),
+  z.object({ version: z.literal("lifty.personal-beta.v1"), revision: z.uuid(), placement_required: z.literal(false), habitual_only: z.literal(true) }).strict(),
+]);
+
 export const EmailConnectRequest = z.object({
   workspace: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
   email: z.email().max(254).transform(value => value.toLowerCase()),
@@ -11,6 +16,7 @@ const profile = {
   provider: z.literal("unipile"), channel: z.literal("email"),
   workspace_ref: z.uuid(), email: z.email(), mailbox_use: z.enum(["personal", "outreach"]),
   daily_limit: z.number().int().min(1).max(10),
+  email_policy: EmailPolicy.optional(),
   warmup_required: z.boolean(), sending_enabled: z.literal(false),
 };
 export const EmailConnectionStatus = z.discriminatedUnion("status", [
