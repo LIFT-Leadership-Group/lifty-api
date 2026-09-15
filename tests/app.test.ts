@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { localConfiguration } from "./onboarding-fixtures.js";
+
 import { createApp } from "../src/app.js";
 import { PublicError } from "../src/errors.js";
 import { HubspotCallbackError } from "../src/hubspot-connect.js";
@@ -364,7 +366,8 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
-      submitOnboarding: async (session, receivedDraft) => {
+      submitOnboarding: async (session, receivedDraft, receivedConfiguration) => {
+        expect(receivedConfiguration).toEqual(localConfiguration);
         if (session.userId !== "founder-123") throw new Error("wrong actor");
         if (JSON.stringify(receivedDraft) !== JSON.stringify(draft)) {
           throw new Error("wrong draft");
@@ -383,7 +386,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft }),
+      body: JSON.stringify({ draft, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(200);
@@ -420,7 +423,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" } }),
+      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(200);
@@ -450,7 +453,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" } }),
+      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(200);
@@ -608,7 +611,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" } }),
+      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
     });
     const responseText = await response.text();
 
@@ -642,7 +645,7 @@ describe("LIFTY API", () => {
     expect(JSON.parse(responseText)).toEqual({
       error: {
         code: "INVALID_REQUEST",
-        message: "The onboarding push must contain one JSON object named draft.",
+        message: "The onboarding push must contain JSON objects named draft and configuration.",
       },
       request_id: "33333333-3333-4333-8333-333333333333",
     });
@@ -696,7 +699,7 @@ describe("LIFTY API", () => {
         "content-type": "application/json",
         "content-length": String(133 * 1024),
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" } }),
+      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(413);
@@ -775,7 +778,7 @@ describe("LIFTY API", () => {
         "content-type": "application/json",
         "x-request-id": "55555555-5555-4555-8555-555555555555",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" } }),
+      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
     });
     const responseText = await response.text();
     const logText = JSON.stringify(logEvents);

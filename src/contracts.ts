@@ -39,9 +39,35 @@ export const CreateWorkspaceResultSchema = z
   })
   .strict();
 
+/** Shared with Jobs agent-output.ts; generated locally and validated before receipt. */
+export const LocalOnboardingConfigurationSchema = z.object({
+  contract_version: z.literal("lifty-onboarding-config.v1"),
+  context_version: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  icp_config: z.object({
+    label: z.string().min(1).max(120),
+    person_locations: z.array(z.string().min(1)).nullable(),
+    organization_industries: z.array(z.string().min(1)).min(1).nullable(),
+    organization_num_employees_ranges: z.array(z.string().regex(/^[0-9]+,([0-9]+)?$/)).min(1).nullable(),
+    person_seniorities: z.array(z.string().min(1)).nullable(),
+    personas: z.array(z.object({
+      name: z.string().min(1),
+      titles: z.array(z.string().min(1)).min(1),
+    }).strict()).min(1),
+  }).strict(),
+  scout_overlay: z.string().min(200),
+}).strict();
+
+export const OnboardingContextSchema = z.object({
+  contract_version: z.literal("lifty-onboarding-config.v1"),
+  context_version: LocalOnboardingConfigurationSchema.shape.context_version,
+  workspace: WorkspaceReferenceSchema.extend({ description: z.string().nullable() }),
+  scout_global_base: z.string().nullable(),
+}).strict();
+
 export const SubmitOnboardingRequestSchema = z
   .object({
     draft: z.record(z.string(), z.unknown()),
+    configuration: LocalOnboardingConfigurationSchema,
   })
   .strict();
 
@@ -673,3 +699,6 @@ export type UpsertNotificationDestinationRequest = z.infer<
 >;
 export type SetNotificationRouteRequest = z.infer<typeof SetNotificationRouteRequestSchema>;
 export type NotificationTestResult = z.infer<typeof NotificationTestResultSchema>;
+
+export type LocalOnboardingConfiguration = z.infer<typeof LocalOnboardingConfigurationSchema>;
+export type OnboardingContext = z.infer<typeof OnboardingContextSchema>;

@@ -23,6 +23,8 @@ import {
   type CreateWorkspaceResult,
   DisconnectResponseSchema,
   IntegrationConnectionStatusSchema,
+  OnboardingContextSchema,
+  LocalOnboardingConfigurationSchema,
   OnboardingPushResultSchema,
   OnboardingStatusSchema,
   NotificationConfigSchema,
@@ -50,6 +52,8 @@ import {
   type DisconnectResult,
   type HubspotConnectStart,
   type HubspotConnectionStatus,
+  type OnboardingContext,
+  type LocalOnboardingConfiguration,
   type OnboardingStatus,
   type OnboardingSubmission,
   type NotificationConfig,
@@ -140,7 +144,9 @@ export interface AppDependencies {
   submitOnboarding(
     session: AuthSession,
     draft: Record<string, unknown>,
+    configuration: LocalOnboardingConfiguration,
   ): Promise<OnboardingSubmission>;
+  getOnboardingContext(session: AuthSession): Promise<OnboardingContext>;
   getOnboardingStatus(session: AuthSession): Promise<OnboardingStatus>;
   enqueueOnboardingImport: EnqueueOnboardingImport;
   startRun(session: AuthSession): Promise<StartRunResult>;
@@ -450,6 +456,18 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       409: JsonResponse(ErrorResponseSchema),
       413: JsonResponse(ErrorResponseSchema),
       422: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/onboarding/context",
+    operationId: "getOnboardingContext",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(OnboardingContextSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
   });
@@ -847,6 +865,9 @@ const defaultDependencies: AppDependencies = {
   },
   submitOnboarding: async () => {
     throw new Error("submitOnboarding is not configured");
+  },
+  getOnboardingContext: async () => {
+    throw new Error("getOnboardingContext is not configured");
   },
   getOnboardingStatus: async () => {
     throw new Error("getOnboardingStatus is not configured");
@@ -1506,19 +1527,28 @@ export function createApp(
     } catch {
       parsedJson = null;
     }
-    const body = SubmitOnboardingRequestSchema.safeParse(parsedJson);
-    if (!body.success) {
-      return errorJson(
-        context,
-        400,
-        "INVALID_REQUEST",
-        "The onboarding push must contain one JSON object named draft.",
-      );
+    const envelope = z.object({
+      draft: z.record(z.string(), z.unknown()),
+      configuration: z.unknown().optional(),
+    }).strict().safeParse(parsedJson);
+    if (!envelope.success) {
+      return errorJson(context, 400, "INVALID_REQUEST",
+        "The onboarding push must contain JSON objects named draft and configuration.");
+    }
+    if (envelope.data.configuration == null) {
+      return errorJson(context, 422, "LOCAL_CONFIGURATION_REQUIRED",
+        "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
+    }
+    const configuration = LocalOnboardingConfigurationSchema.safeParse(envelope.data.configuration);
+    if (!configuration.success) {
+      return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
+        "Regenerate the local configuration using the current onboarding contract and context.");
     }
 
     const submission = await dependencies.submitOnboarding(
       context.get("authSession"),
-      body.data.draft,
+      envelope.data.draft,
+      configuration.data,
     );
 
     // An already-imported draft needs no run; anything else gets exactly one.
@@ -1542,6 +1572,12 @@ export function createApp(
         created: submission.created,
       }),
     );
+  });
+
+  app.get("/v1/onboarding/context", async (context) => {
+    context.header("cache-control", "no-store");
+    const result = await dependencies.getOnboardingContext(context.get("authSession"));
+    return context.json(OnboardingContextSchema.parse(result));
   });
 
   app.get("/v1/onboarding", async (context) => {

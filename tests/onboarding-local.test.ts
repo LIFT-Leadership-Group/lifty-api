@@ -1,0 +1,110 @@
+import { describe, expect, it, vi } from "vitest";
+import { createApp } from "../src/app.js";
+import { getOnboardingContext, submitOnboarding } from "../src/workspace-operations.js";
+import { localConfiguration, onboardingContext } from "./onboarding-fixtures.js";
+
+const session = { userId: "founder", client: {} };
+const authenticate = async () => ({ ok: true as const, session });
+const draft = { schema_version: "2.1" };
+
+function push(app: ReturnType<typeof createApp>, body: unknown) {
+  return app.request("/v1/onboarding", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("locally generated onboarding", () => {
+  it.each([undefined, null])("requires local configuration before persisting or enqueuing (%s)", async (configuration) => {
+    const submit = vi.fn();
+    const enqueue = vi.fn();
+    const app = createApp({ authenticate, submitOnboarding: submit, enqueueOnboardingImport: enqueue });
+    const response = await push(app, { draft, configuration });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: { code: "LOCAL_CONFIGURATION_REQUIRED", message: expect.stringContaining("Upgrade LIFTY") } });
+    expect(submit).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ...localConfiguration, contract_version: "unsupported" },
+    { ...localConfiguration, context_version: "old" },
+    { ...localConfiguration, workspace_ref: "foreign-workspace" },
+    { ...localConfiguration, icp_config: { ...localConfiguration.icp_config, api_key: "private-candidate" } },
+    { ...localConfiguration, icp_config: { ...localConfiguration.icp_config, organization_num_employees_ranges: ["big"] } },
+    { ...localConfiguration, scout_overlay: "private-candidate" },
+  ])("rejects invalid local candidates without echoing or enqueuing", async (configuration) => {
+    const submit = vi.fn();
+    const enqueue = vi.fn();
+    const log = vi.fn();
+    const response = await push(createApp({ authenticate, submitOnboarding: submit, enqueueOnboardingImport: enqueue, log }), { draft, configuration });
+    expect(response.status).toBe(422);
+    const body = await response.text();
+    expect(JSON.parse(body)).toMatchObject({ error: { code: "LOCAL_CONFIGURATION_INVALID" } });
+    expect(body).not.toContain("private-candidate");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private-candidate");
+    expect(submit).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it("requires authentication to read local generation context", async () => {
+    const getContext = vi.fn();
+    const response = await createApp({ getOnboardingContext: getContext }).request("/v1/onboarding/context");
+    expect(response.status).toBe(401);
+    expect(getContext).not.toHaveBeenCalled();
+  });
+
+  it("reads no-store context using only the authenticated session", async () => {
+    const getContext = vi.fn(async () => onboardingContext);
+    const response = await createApp({ authenticate, getOnboardingContext: getContext }).request("/v1/onboarding/context?workspace_ref=foreign-workspace");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual(onboardingContext);
+    expect(getContext).toHaveBeenCalledExactlyOnceWith(session);
+  });
+
+  it("publishes local configuration and context in the API contract", async () => {
+    const document = await (await createApp().request("/openapi.json")).json();
+    const schema = document.paths["/v1/onboarding"].post.requestBody.content["application/json"].schema;
+    expect(schema.required).toEqual(["draft", "configuration"]);
+    expect(schema.properties.configuration.required).toEqual(["contract_version", "context_version", "icp_config", "scout_overlay"]);
+    expect(document.paths["/v1/onboarding/context"].get).toMatchObject({ operationId: "getOnboardingContext", security: [{ bearerAuth: [] }] });
+  });
+
+  it("gets context with no caller-controlled RPC arguments", async () => {
+    const rpc = vi.fn(async () => ({ data: [onboardingContext], error: null }));
+    expect(await getOnboardingContext({ ...session, client: { rpc } })).toEqual(onboardingContext);
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("get_lifty_onboarding_context");
+  });
+
+  it("rejects unexpected context fields without exposing RPC content", async () => {
+    const rpc = vi.fn(async () => ({ data: { ...onboardingContext, api_key: "private-context" }, error: null }));
+    await expect(getOnboardingContext({ ...session, client: { rpc } })).rejects.toMatchObject({ code: "SUPABASE_INVALID_RESPONSE" });
+  });
+
+  it.each([
+    ["PT400", "lifty_configuration_required", 422, "LOCAL_CONFIGURATION_REQUIRED"],
+    ["PT400", "lifty_configuration_invalid: private-candidate", 422, "LOCAL_CONFIGURATION_INVALID"],
+    ["PT409", "lifty_onboarding_context_stale", 409, "ONBOARDING_CONTEXT_STALE"],
+    ["PT409", "lifty_configuration_mismatch", 409, "LOCAL_CONFIGURATION_MISMATCH"],
+    ["PT409", "lifty_prompt_hand_tuned", 409, "PROMPT_HAND_TUNED"],
+  ])("maps %s / %s without logging candidate content", async (code, message, status, publicCode) => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code, message, details: "private-candidate" } }));
+    const enqueue = vi.fn();
+    const log = vi.fn();
+    const app = createApp({
+      authenticate: async () => ({ ok: true, session: { ...session, client: { rpc } } }),
+      submitOnboarding,
+      enqueueOnboardingImport: enqueue,
+      log,
+    });
+    const response = await push(app, { draft, configuration: localConfiguration });
+    expect(response.status).toBe(status);
+    const body = await response.text();
+    expect(JSON.parse(body)).toMatchObject({ error: { code: publicCode } });
+    expect(body).not.toContain("private-candidate");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private-candidate");
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+});

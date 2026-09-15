@@ -20,7 +20,8 @@ configured Hono app for programmatic use.
 - `GET /cli/auth` — hosted founder sign-in and loopback CLI authorization
 - `GET /v1/workspace` — authenticated founder workspace state
 - `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
-- `POST /v1/onboarding` — authenticated draft submission; queues one onboarding-import run (LIF-656)
+- `POST /v1/onboarding` — authenticated `{draft, configuration}` submission; queues deterministic validation and application of locally generated ICP/Scout configuration (LIF-851). Missing configuration fails with `LOCAL_CONFIGURATION_REQUIRED`; no server agent fallback.
+- `GET /v1/onboarding/context` — authenticated founder-scoped workspace and Scout rules for local generation; includes the contract and context versions required by the push. Refresh and regenerate on `ONBOARDING_CONTEXT_STALE`.
 - `GET /v1/onboarding` — authenticated import status with a secret-free config summary
 - `POST /v1/workspace/runs` — start (or re-attach to) the first ICP run of five leads (LIF-657)
 - `GET /v1/workspace/runs` — run state, progress, and researched results
