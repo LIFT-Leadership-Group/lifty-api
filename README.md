@@ -14,9 +14,43 @@ configured Hono app for programmatic use.
 
 ## API
 
+### Agent task context
+
+`GET /v1/context/onboarding`, `GET /v1/context/workspace`, and
+`GET /v1/context/campaign` return public product
+instructions, references and input schemas. They work before login and contain
+no tenant data or Scout base. The installed CLI requests
+`client_contract=lifty-cli-context.v1`; the response uses `lifty-context.v1`, a
+task identifier and a content revision. Responses are not cached by the CLI.
+
+Edit task guidance in `src/agent-context/`. Workspace/campaign transport schemas
+are generated from the API's Zod contracts. Business validation remains in the
+API/RPCs; a JSON Schema cannot describe every rule. Private generation context
+remains at authenticated `GET /v1/onboarding/context` and supplies its current
+configuration schema, generation rules and workspace fingerprint.
+
+For this client contract, preserve the installed command names, payload
+envelopes, local draft readiness/confirmation invariants and writer interfaces.
+Adding onboarding configuration fields or workspace values does not require
+editing the installed skill. The CLI still enforces campaign input/preview
+contracts and local confirmation rules; preserve those in this profile.
+Changes outside these supported shapes, removing required local fields or
+introducing commands the client cannot execute require a new client
+contract/release; do not publish those instructions to this profile.
+The revision identifies content and is
+not itself a signal of incompatibility or permission to mutate a workspace.
+
+Build copies the public assets into `dist/agent-context/` for the Node container.
+Deploy this endpoint before releasing the matching CLI/skill bundle; old CLI
+commands remain available. If context retrieval fails, the new skill preserves
+local work and stops dependent writes rather than using stale examples.
+
+### Routes
+
 - `GET /healthz` — liveness
 - `GET /readyz` — process readiness after configuration and app construction
 - `GET /openapi.json` — generated OpenAPI 3.1 contract
+- `GET /v1/context/{task}` — public task guidance for onboarding, workspace or campaign
 - `GET /cli/auth` — hosted founder sign-in and loopback CLI authorization
 - `GET /v1/workspace` — authenticated founder workspace state
 - `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
@@ -248,3 +282,7 @@ Onboarding publication runs a deterministic linter before storing a receipt or q
 ### Company mapping for the local agent
 
 `GET /v1/integrations/hubspot/company-mapping/context` returns current portal properties, mappings, task instructions and the candidate schema. `POST /v1/integrations/hubspot/company-mapping` forwards a bounded candidate through the caller-scoped Edge Function. The server validates, provisions additive schema changes, atomically inserts missing mappings and reads back before returning `verified: true`. Provider secrets stay in the backend. Deploy the LIF-854 DB migration and `lifty-company-mapping` function before this API; release the matching CLI last.
+Company setup guidance is served to `lifty-cli-context.v2` clients. The existing
+`lifty-cli-context.v1` profile keeps its compatible task guidance; the response
+envelope remains `lifty-context.v1`. Install/release the matching CLI after the
+company mapping backend is available.

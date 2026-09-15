@@ -1,0 +1,201 @@
+{
+  "title": "LIFTY pre-authentication onboarding draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "stage",
+    "company",
+    "primary_motion",
+    "parked_secondary_motions",
+    "icp",
+    "personas",
+    "calibration",
+    "outreach",
+    "research_findings",
+    "founder_statement_history"
+  ],
+  "properties": {
+    "schema_version": {"const": "2.1"},
+    "status": {"const": "ready_for_auth"},
+    "stage": {"const": "icp_bootstrap"},
+    "company": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "example_companies"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 20},
+        "example_companies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "primary_motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "outcome"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "outcome": {"type": "string", "minLength": 1}
+      }
+    },
+    "parked_secondary_motions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "status": {"const": "parked"}
+        }
+      }
+    },
+    "icp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "industries_in",
+        "industries_out",
+        "size",
+        "hard_disqualifiers",
+        "operating_state_split"
+      ],
+      "properties": {
+        "industries_in": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "industries_out": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "size": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["floor", "ceiling", "unit"],
+          "properties": {
+            "floor": {"type": "number", "exclusiveMinimum": 0},
+            "ceiling": {"type": ["number", "null"], "exclusiveMinimum": 0},
+            "unit": {"type": "string", "minLength": 1}
+          }
+        },
+        "hard_disqualifiers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "operating_state_split": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["states", "priority"],
+          "properties": {
+            "states": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "fit"],
+                "properties": {
+                  "name": {"type": "string", "minLength": 1},
+                  "fit": {"type": "string", "minLength": 1}
+                }
+              }
+            },
+            "priority": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "personas": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "role", "titles", "tell"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "role": {"enum": ["decision_maker", "influencer"]},
+          "titles": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "tell": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "lead_target"],
+      "properties": {
+        "status": {"const": "pending_sample"},
+        "lead_target": {"const": 5}
+      }
+    },
+    "outreach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {"const": "deferred_until_sample_accepted"}
+      }
+    },
+    "research_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "value",
+          "source",
+          "state",
+          "used_in_configuration",
+          "founder_confirmation"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dotted path to the real configured output field when used_in_configuration is true."
+          },
+          "value": {
+            "description": "Must deep-equal the configured field resolved from field when used_in_configuration is true."
+          },
+          "source": {"type": "string", "minLength": 1},
+          "state": {
+            "enum": ["inferred", "founder_confirmed", "founder_corrected"]
+          },
+          "used_in_configuration": {
+            "type": "boolean",
+            "description": "True only after founder confirmation or correction and exact placement at field."
+          },
+          "founder_confirmation": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "founder_statement_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "field", "value"],
+        "properties": {
+          "sequence": {"type": "integer", "minimum": 1},
+          "field": {"type": "string", "minLength": 1},
+          "value": {}
+        }
+      }
+    }
+  }
+}
