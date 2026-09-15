@@ -190,6 +190,9 @@ export interface AppDependencies {
     scriptNonce: string;
     connectOrigin?: string;
   } | null;
+  renderPasswordRecoveryPage(page: "request" | "update"): {
+    html: string; scriptNonce: string; connectOrigin: string;
+  } | null;
   checkReadiness(): Promise<boolean>;
   log(event: LogEvent): void;
 }
@@ -912,6 +915,7 @@ const defaultDependencies: AppDependencies = {
   },
   buildSlackAuthorizeUrl: () => null,
   renderCliAuthPage: () => null,
+  renderPasswordRecoveryPage: () => null,
   checkReadiness: async () => true,
   log: (event) => process.stderr.write(`${JSON.stringify(event)}\n`),
 };
@@ -948,6 +952,22 @@ export function createApp(
       ? context.json({ status: "ready" })
       : context.json({ status: "unready" }, 503);
   });
+  for (const [route, mode] of [["/auth/password-reset", "request"], ["/auth/password-update", "update"]] as const) {
+    app.get(route, (context) => {
+      const page = dependencies.renderPasswordRecoveryPage(mode);
+      if (!page || !/^[A-Za-z0-9_-]{16,128}$/.test(page.scriptNonce)
+        || !/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(page.connectOrigin)) {
+        return hubspotHtmlResponse(context, 503, "Password recovery unavailable", "Try again in a moment.");
+      }
+      return context.html(page.html, 200, {
+        "cache-control": "no-store",
+        "content-security-policy": ["default-src 'none'", `script-src 'nonce-${page.scriptNonce}'`,
+          "style-src 'unsafe-inline'", `connect-src ${page.connectOrigin}`, "base-uri 'none'",
+          "form-action 'none'", "frame-ancestors 'none'"].join("; "),
+        "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+      });
+    });
+  }
   app.get("/cli/auth", (context) => {
     const state = context.req.query("state") ?? "";
     const portValue = context.req.query("port") ?? "";

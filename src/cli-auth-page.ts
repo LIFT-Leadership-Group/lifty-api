@@ -1,3 +1,5 @@
+import { authBrowserScript } from "./auth-browser.js";
+
 export interface CliAuthPageOptions {
   supabaseUrl: string;
   publishableKey: string;
@@ -63,6 +65,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
         <p id="auth-error" class="error" role="alert" hidden></p>
         <button class="primary" id="submit" type="submit">Sign in</button>
       </form>
+      <p><a href="/auth/password-reset" target="_blank" rel="noopener noreferrer" style="color:#c7cbd2">Forgot your password?</a></p>
       <p><span id="mode-prompt">New to LIFTY?</span> <button class="link" id="switch-mode" type="button">Create account</button></p>
     </section>
     <section class="card" id="approve-card" hidden>
@@ -89,13 +92,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
     const approveCard = byId("approve-card");
     const doneCard = byId("done-card");
 
-    function safeAuthMessage(payload, selectedMode) {
-      const marker = String(payload && (payload.code || payload.error_code || payload.msg || payload.message) || "");
-      if (/signup.*disabled|signups?.*not.*allowed/i.test(marker)) return "New accounts are invite-only. Ask LIFT for an invite, then sign in here.";
-      if (/already.*registered/i.test(marker)) return "That email already has an account. Sign in instead.";
-      if (/invalid.*login|invalid.*credential/i.test(marker)) return "The email or password is incorrect.";
-      return selectedMode === "sign-in" ? "We couldn't sign you in. Try again." : "We couldn't create the account. Try again.";
-    }
+    ${authBrowserScript}
 
     function setMode(nextMode) {
       mode = nextMode;
@@ -113,24 +110,17 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
     byId("switch-mode").addEventListener("click", () => setMode(mode === "sign-in" ? "create" : "sign-in"));
     byId("auth-form").addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (byId("submit").disabled) return;
+      const selectedMode = mode;
       const submit = byId("submit");
       const error = byId("auth-error");
       error.hidden = true;
       submit.disabled = true;
       const email = byId("email").value;
       const password = byId("password").value;
-      const endpoint = mode === "sign-in" ? "/auth/v1/token?grant_type=password" : "/auth/v1/signup";
+      const endpoint = selectedMode === "sign-in" ? "/auth/v1/token?grant_type=password" : "/auth/v1/signup";
       try {
-        const response = await fetch(config.supabaseUrl + endpoint, {
-          method: "POST",
-          headers: { "apikey": config.publishableKey, "content-type": "application/json" },
-          body: JSON.stringify({ email, password }),
-          cache: "no-store",
-          credentials: "omit",
-          referrerPolicy: "no-referrer"
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw { payload };
+        const payload = await authRequest(endpoint, { body: { email, password } });
         const candidate = payload.session || payload;
         if (!candidate.access_token || !candidate.refresh_token) {
           error.textContent = "Check your email to confirm the account, then run lifty login again.";
@@ -147,9 +137,10 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
         authCard.hidden = true;
         approveCard.hidden = false;
       } catch (caught) {
-        error.textContent = safeAuthMessage(caught && caught.payload, mode);
+        error.textContent = safeAuthMessage(caught, selectedMode);
         error.hidden = false;
       } finally {
+        byId("password").value = "";
         submit.disabled = false;
       }
     });

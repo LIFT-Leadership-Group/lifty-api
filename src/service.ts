@@ -9,6 +9,7 @@ import { randomBytes } from "node:crypto";
 
 import { createApp } from "./app.js";
 import { renderCliAuthPage } from "./cli-auth-page.js";
+import { renderPasswordRecoveryPage } from "./password-recovery-page.js";
 import { loadConfig, type ServiceConfig } from "./config.js";
 import { PublicError } from "./errors.js";
 import { createHubspotConnectOperations } from "./hubspot-connect.js";
@@ -145,6 +146,18 @@ export function createProductionApp(config: ServiceConfig) {
         }),
         scriptNonce,
         connectOrigin: new URL(config.supabase.supabaseUrl).origin,
+      };
+    },
+    renderPasswordRecoveryPage: (page) => {
+      const scriptNonce = randomBytes(18).toString("base64url");
+      return {
+        html: renderPasswordRecoveryPage({
+          supabaseUrl: config.supabase.supabaseUrl,
+          publishableKey: config.supabase.publishableKey,
+          publicBaseUrl: config.hubspot.publicBaseUrl,
+          scriptNonce, page,
+        }),
+        scriptNonce, connectOrigin: new URL(config.supabase.supabaseUrl).origin,
       };
     },
     checkReadiness: createSupabaseReadinessCheck(config.supabase),
