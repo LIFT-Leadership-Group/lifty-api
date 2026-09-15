@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EmailConnectRequest } from "./email-contracts.js";
+import { EmailPolicy, EmailConnectRequest } from "./email-contracts.js";
 
 const workspace = EmailConnectRequest.shape.workspace;
 const reference = z.uuid();
@@ -32,7 +32,9 @@ export type EmailCampaignInput = z.infer<typeof EmailCampaignRequest>;
 const state = z.enum(["draft", "approved", "active", "paused", "completed", "replied", "suppressed"]);
 export const EmailCampaignPreview = z.object({
   campaign_ref: reference, workspace_ref: reference, state, version_ref: reference, digest,
+  email_policy: EmailPolicy.optional(), placement_required: z.boolean().optional(), placement_performed: z.boolean().optional(),
   content: z.object({
+    email_policy: EmailPolicy.optional(),
     name: z.string().max(200), connection_ref: reference, provider: z.enum(["unipile", "smartlead"]), sender_email: z.email(),
     lead_ref: reference, recipient_email: z.email(), start_at: z.string(), daily_limit: z.literal(10), stop_on_reply: z.literal(true),
     steps: z.array(step).min(1).max(5),

@@ -310,3 +310,16 @@ describe("durable callback reconciliation",()=>{
     expect(calls.some(call=>call.operation==="complete")).toBe(false);
   });
 });
+
+describe("backend beta connection policy",()=>{
+  const beta={version:"lifty.personal-beta.v1",revision:id,placement_required:false,habitual_only:true};
+  it.each(["personal","outreach"] as const)("returns truthful beta requirements for %s without provider I/O",async mailbox_use=>{
+    const ops=createEmailConnectOperations({...settings,fetchImpl:async()=>{throw new Error("no provider I/O on start");}});
+    const result=await ops.start({userId:id,client:{rpc:async()=>({error:null,data:{state:"pending",workspace_ref:workspace,email,mailbox_use,daily_limit:10,intent_ref:id,expires_at:intent.expires_at,email_policy:beta}})}},{workspace:"senja",email,mailbox_use});
+    expect(result.email_policy).toEqual(beta);expect(result.warmup_required).toBe(false);expect(result.sending_enabled).toBe(false);
+  });
+  it("rejects forged policy requests before RPC",async()=>{
+    const ops=createEmailConnectOperations({...settings,fetchImpl:async()=>{throw Error("unexpected");}});
+    await expect(ops.start({userId:id,client:{rpc:async()=>{throw Error("unexpected RPC");}}},{workspace:"senja",email,mailbox_use:"personal",skip_placement:true} as never)).rejects.toThrow();
+  });
+});
