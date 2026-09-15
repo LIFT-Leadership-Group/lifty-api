@@ -288,3 +288,35 @@ describe("durable recovery and cancellation",()=>{
   const h=harness({data:null,error:{code:"PT409",message:"email_approval_stale"}});const res=await h.app.request("/v1/email/campaign",post(request("cancel",{digest,confirm_cancel:true})));expect(res.status).toBe(409);expect((await res.json()).error.code).toBe("EMAIL_APPROVAL_STALE");expect(h.rpc).toHaveBeenCalledTimes(1);
  });
 });
+
+
+describe("physical mailbox identity blocker contract",()=>{
+  it.each(["approve", "activate", "placement"])("preserves safe409 for %s without exposing principal details",async operation=>{
+    const privateId="private-mailbox-principal-fixture";
+    const h=harness({data:null,error:{code:"PT409",message:"email_principal_unavailable",details:privateId,hint:"provider-proof-private"}});
+    const req=request(operation,{digest});
+    const res=await h.app.request("/v1/email/campaign",post(req));
+    expect(res.status).toBe(409);
+    const data=await res.json();
+    expect(data.error).toEqual({code:"EMAIL_PRINCIPAL_UNAVAILABLE",message:"The sending mailbox identity could not be verified. Sending is blocked."});
+    expect(JSON.stringify(data)).not.toContain(privateId);expect(JSON.stringify(data)).not.toContain("provider-proof-private");
+    expect(h.rpc).toHaveBeenCalledExactlyOnceWith(operation==="placement"?"lifty_email_placement":"lifty_email_campaign",{p_server_key:secret,p_operation:operation==="placement"?"start":operation,p_payload:req.payload});
+  });
+  it.each([null,"send_unconfirmed","accepted_unlinked","connection_unavailable","reply_read_incomplete"])("keeps preview blocker separate from recovery reason %s",async reason=>{
+    const recovery={state:reason===null?"ready":"blocked",reason,checked_at:null,cancel_allowed:true};
+    const h=harness({data:{...preview,blockers:["email_principal_unavailable"],recovery,principal_id:"private-principal-fixture"},error:null});
+    const res=await h.app.request("/v1/email/campaign",post(request("preview")));
+    expect(res.status).toBe(200);const data=await res.json();
+    expect(data.blockers).toEqual(["email_principal_unavailable"]);expect(data.recovery).toEqual(recovery);
+    expect(JSON.stringify(data)).not.toContain("private-principal-fixture");
+  });
+  it("does not admit the identity blocker as a new recovery reason",async()=>{
+    const h=harness({data:{...preview,recovery:{state:"blocked",reason:"email_principal_unavailable",checked_at:null,cancel_allowed:true}},error:null});
+    expect((await h.app.request("/v1/email/campaign",post(request("status")))).status).toBe(502);
+  });
+  it("preserves existing sender identity mismatch behavior",async()=>{
+    const h=harness({data:null,error:{code:"PT409",message:"email_sender_identity_mismatch"}});
+    const res=await h.app.request("/v1/email/campaign",post(request("activate",{digest})));
+    expect(res.status).toBe(409);expect((await res.json()).error).toEqual({code:"EMAIL_SENDER_IDENTITY_MISMATCH",message:"The connected account no longer matches the approved sender."});
+  });
+});
