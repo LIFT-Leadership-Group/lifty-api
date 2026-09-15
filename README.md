@@ -203,6 +203,14 @@ The backend owns atomic reservations: 5 invitations/day, 25 invitations in a
 rolling 7 days, 5 messages/day, weekdays 09:00–17:00 in the founder timezone,
 and 15–45 minute spacing. There are no extra steps or editable schedules.
 
+### Workspace retirement limitation
+
+LinkedIn v1 cannot retire a workspace with a bound LinkedIn account or retained
+LinkedIn history. Retirement returns `409 WORKSPACE_LINKEDIN_RETENTION_REQUIRED`.
+Disconnecting LinkedIn stops sending but preserves account records and historical
+sending limits; it does not remove this retirement guard. Retention-safe workspace
+retirement needs a separate change.
+
 ### Deployment and acceptance
 
 1. Apply the LIF-844 SQL migration, retaining the existing account/action ledger,

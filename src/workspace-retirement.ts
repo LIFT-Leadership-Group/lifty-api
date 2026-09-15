@@ -17,6 +17,7 @@ const messages: Record<string,string> = {
   workspace_not_lifty: "Only a workspace created by LIFTY can be retired through this command.",
   workspace_cross_tenant_reference: "This workspace has shared references that prevent safe retirement. Contact LIFT support.",
   workspace_retirement_blocked: "The workspace cannot be safely retired yet. Contact LIFT support.",
+  workspace_linkedin_retention_required: "LinkedIn v1 cannot retire a workspace with a bound account or LinkedIn history. Disconnect LinkedIn to stop sending; historical sending limits and account records must be retained.",
   workspace_email_disconnect_required: "Disconnect email through LIFTY before retiring this workspace.",
   workspace_integration_disconnect_required: "Disconnect HubSpot through LIFTY before retiring this workspace.",
   workspace_integration_revocation_pending: "HubSpot authorization revocation is still pending. Wait for it to finish before retrying retirement.",
