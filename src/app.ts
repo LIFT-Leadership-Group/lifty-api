@@ -1,4 +1,10 @@
 import {
+  companyMapping,
+  CompanyMappingContextSchema,
+  CompanyMappingReceiptSchema,
+  CompanyMappingError,
+} from "./company-mapping.js";
+import {
   AcquisitionRecoveryBody,
   AcquisitionRecoveryStatus,
   AcquisitionRestartResult,
@@ -171,6 +177,7 @@ export interface AppDependencies {
   disconnectIntegration(session: AuthSession, provider: Provider): Promise<DisconnectResult>;
   enqueueIntegrationRevocation: EnqueueIntegrationRevocation;
   getNotificationConfig(session: AuthSession): Promise<NotificationConfig>;
+  companyMapping: typeof companyMapping;
   listSlackNotificationChannels(session: AuthSession): Promise<SlackNotificationChannels>;
   upsertNotificationDestination(
     session: AuthSession,
@@ -666,6 +673,35 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   });
   app.openAPIRegistry.registerPath({
     method: "get",
+    path: "/v1/integrations/hubspot/company-mapping/context",
+    operationId: "getCompanyMappingContext",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(CompanyMappingContextSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/v1/integrations/hubspot/company-mapping",
+    operationId: "applyCompanyMapping",
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: { content: { "application/json": { schema: z.record(z.string(), z.unknown()) } } },
+    },
+    responses: {
+      200: JsonResponse(CompanyMappingReceiptSchema),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      422: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
     path: "/v1/notifications/slack/channels",
     operationId: "listSlackNotificationChannels",
     security: [{ bearerAuth: [] }],
@@ -920,6 +956,9 @@ const defaultDependencies: AppDependencies = {
   },
   getNotificationConfig: async () => {
     throw new Error("getNotificationConfig is not configured");
+  },
+  companyMapping: async () => {
+    throw new Error("companyMapping is not configured");
   },
   listSlackNotificationChannels: async () => {
     throw new Error("listSlackNotificationChannels is not configured");
@@ -1290,6 +1329,7 @@ export function createApp(
     return context.json(
       {
         error: { code: publicError.code, message: publicError.message,
+          ...(publicError instanceof CompanyMappingError ? { issues: publicError.issues } : {}),
           ...(context.req.path === "/v1/onboarding" && onboardingRepairIssues(publicError.code)
             ? { issues: onboardingRepairIssues(publicError.code) } : {}),
         },
@@ -1321,7 +1361,7 @@ export function createApp(
   // Expired entries are removed on access, without a process-owning timer.
   app.use("/v1/*", async (context, next) => {
     if (context.req.method !== "POST" || ![
-      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/email/connect", "/v1/linkedin/connect",
+      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/linkedin/connect",
     ].includes(context.req.path)) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {
@@ -1757,6 +1797,23 @@ export function createApp(
         error_code: state === "queued" ? null : submission.error_code ?? null,
       }),
     );
+  });
+
+  app.get("/v1/integrations/hubspot/company-mapping/context", async (context) => {
+    const result = await dependencies.companyMapping(context.get("authSession"), "context");
+    return context.json(CompanyMappingContextSchema.parse(result));
+  });
+  app.post("/v1/integrations/hubspot/company-mapping", async (context) => {
+    const body = await readRequestTextWithinLimit(context.req.raw, MAX_CREATE_WORKSPACE_BYTES);
+    if (!body.ok) return errorJson(context, 413, "PAYLOAD_TOO_LARGE", "The company configuration exceeds 16 KiB.");
+    let plan: unknown;
+    try {
+      plan = JSON.parse(body.text);
+    } catch {
+      return errorJson(context, 400, "INVALID_JSON", "Send a JSON company configuration.");
+    }
+    const result = await dependencies.companyMapping(context.get("authSession"), "apply", plan);
+    return context.json(CompanyMappingReceiptSchema.parse(result));
   });
 
   // ------------------------------------------------------------ notifications

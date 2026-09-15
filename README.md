@@ -244,3 +244,7 @@ Provider contracts checked: [account readback](https://developer.unipile.com/ref
 [Hosted Auth](https://developer.unipile.com/docs/hosted-auth).
 
 Onboarding publication runs a deterministic linter before storing a receipt or queuing a job. A `422 LOCAL_CONFIGURATION_INVALID` response includes up to 20 `error.issues` entries with `{code, path, message, suggestion}`; paths are JSON pointers rooted at `/configuration` or `/draft`. The local agent can repair technical issues and push again. Diagnostics never include submitted targeting values or prompt text. Checks cover schema, confirmed personas/titles, employee bounds, Apollo seniorities, duplicates, required Scout sections, the 52,000 character budget, and copied global Scout instructions. Semantic fit still depends on the founder-confirmed draft.
+
+### Company mapping for the local agent
+
+`GET /v1/integrations/hubspot/company-mapping/context` returns current portal properties, mappings, task instructions and the candidate schema. `POST /v1/integrations/hubspot/company-mapping` forwards a bounded candidate through the caller-scoped Edge Function. The server validates, provisions additive schema changes, atomically inserts missing mappings and reads back before returning `verified: true`. Provider secrets stay in the backend. Deploy the LIF-854 DB migration and `lifty-company-mapping` function before this API; release the matching CLI last.
