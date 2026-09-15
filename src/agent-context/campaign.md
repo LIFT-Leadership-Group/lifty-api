@@ -10,6 +10,17 @@ Resolve the CLI as `<active-project>/.lifty/bin/lifty.mjs`; refuse it if it is
 missing, not a real file, or resolves outside the project's `.lifty` directory.
 Every command below runs as `node <active-project>/.lifty/bin/lifty.mjs <verb>`.
 
+## Handoff from targeting review
+
+When arriving from onboarding or a targeting change, follow
+`references.calibration`: the founder must explicitly confirm the current
+complete Tier A sample before Unipile connection/setup. Do not treat the
+search result or ICP confirmation as that approval. Once confirmed, continue
+with the requested connection and collect only missing account declarations.
+This confirmation authorizes the connection setup step, not sending.
+A separate request to manage an existing account or campaign follows its
+explicit scope and does not require repeating an unrelated calibration.
+
 ## Email campaigns
 
 If no eligible email account is connected, offer an optional Gmail/Google
