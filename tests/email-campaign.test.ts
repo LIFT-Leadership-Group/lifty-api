@@ -239,3 +239,28 @@ describe("beta campaign contracts",()=>{
     expect(res.status).toBe(409);expect((await res.json()).error.code).toBe(message.toUpperCase());
   });
 });
+
+describe("durable recovery and cancellation",()=>{
+ const recovery={state:"blocked",reason:"send_unconfirmed",checked_at:null,cancel_allowed:true};
+ const recoveryPreview={...preview,state:"active",execution_ref:reference,execution_state:"active",recovery,steps:[{step_ref:reference,position:1,state:"pending",due_at:"2026-09-15T12:00:00Z",intent_ref:reference,accepted_at:null,delivery_state:"ambiguous",delivery_status:"unconfirmed"}]};
+ const canceled={...recoveryPreview,state:"canceled",execution_state:"canceled",recovery:{...recovery,state:"canceled",cancel_allowed:false},steps:recoveryPreview.steps.map(step=>({...step,state:"canceled"}))};
+ it("returns recovery and actual uncertain delivery state without private receipt data",async()=>{
+  const h=harness({data:{...recoveryPreview,private_receipt:"SECRET"},error:null});const res=await h.app.request("/v1/email/campaign",post(request("status")));
+  expect(res.status).toBe(200);const data=await res.json();expect(data.recovery).toEqual(recovery);expect(data.steps[0].delivery_status).toBe("unconfirmed");expect(JSON.stringify(data)).not.toContain("SECRET");
+ });
+ it("cancel is exact, explicitly confirmed and uses authenticated narrow recovery RPC",async()=>{
+  const h=harness({data:canceled,error:null});const req=request("cancel",{digest,confirm_cancel:true});
+  const res=await h.app.request("/v1/email/campaign",post(req));expect(res.status).toBe(200);
+  expect(h.rpc).toHaveBeenCalledWith("lifty_email_campaign_recovery",{p_server_key:secret,p_operation:"cancel",p_payload:req.payload});
+  expect((await res.json()).state).toBe("canceled");
+ });
+ it.each([{digest},{confirm_cancel:true},{digest,confirm_cancel:false},{digest,confirm_cancel:true,retry_send:true}])("rejects incomplete or privileged cancellation %j",async fields=>{
+  const h=harness({data:canceled,error:null});const res=await h.app.request("/v1/email/campaign",post(request("cancel",fields)));expect(res.status).toBe(400);expect(h.rpc).not.toHaveBeenCalled();
+ });
+ it.each([recoveryPreview,{...canceled,recovery:undefined},{...canceled,steps:recoveryPreview.steps},{...canceled,campaign_ref:workspace}])("never claims cancellation from an unconfirmed or foreign result",async data=>{
+  const h=harness({data,error:null});const res=await h.app.request("/v1/email/campaign",post(request("cancel",{digest,confirm_cancel:true})));expect(res.status).toBe(502);
+ });
+ it("stale cancellation preserves explicit digest blocker",async()=>{
+  const h=harness({data:null,error:{code:"PT409",message:"email_approval_stale"}});const res=await h.app.request("/v1/email/campaign",post(request("cancel",{digest,confirm_cancel:true})));expect(res.status).toBe(409);expect((await res.json()).error.code).toBe("EMAIL_APPROVAL_STALE");expect(h.rpc).toHaveBeenCalledTimes(1);
+ });
+});

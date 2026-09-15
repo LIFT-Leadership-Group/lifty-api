@@ -20,6 +20,7 @@ export const EmailCampaignRequest = z.discriminatedUnion("operation", [
   request("approve", { ...campaign, digest }),
   request("activate", { ...campaign, digest }),
   request("pause", campaign),
+  request("cancel", { ...campaign, digest, confirm_cancel: z.literal(true) }),
   request("placement", { ...campaign, digest }),
   request("placement-status", { ...campaign, digest }),
   request("placement-preview", { ...campaign, digest }),
@@ -29,8 +30,13 @@ export const EmailCampaignRequest = z.discriminatedUnion("operation", [
 ]);
 export type EmailCampaignInput = z.infer<typeof EmailCampaignRequest>;
 
-const state = z.enum(["draft", "approved", "active", "paused", "completed", "replied", "suppressed"]);
+const state = z.enum(["draft", "approved", "active", "paused", "completed", "replied", "suppressed", "canceled"]);
 export const EmailCampaignPreview = z.object({
+  recovery: z.object({
+    state: z.enum(["ready", "checking", "blocked", "canceled"]),
+    reason: z.enum(["send_unconfirmed", "accepted_unlinked", "connection_unavailable", "reply_read_incomplete"]).nullable(),
+    checked_at: z.iso.datetime({ offset: true }).nullable(), cancel_allowed: z.boolean(),
+  }).optional(),
   campaign_ref: reference, workspace_ref: reference, state, version_ref: reference, digest,
   email_policy: EmailPolicy.optional(), placement_required: z.boolean().optional(), placement_performed: z.boolean().optional(),
   content: z.object({
@@ -40,8 +46,8 @@ export const EmailCampaignPreview = z.object({
     steps: z.array(step).min(1).max(5),
   }),
   approved: z.boolean(), mailbox_use: z.enum(["personal", "outreach"]).nullable(), blockers: z.array(z.string().regex(/^email_[a-z_]+$/)),
-  execution_ref: reference.nullable(), execution_state: z.enum(["active", "paused", "completed", "replied", "suppressed", "superseded"]).nullable(),
-  steps: z.array(z.object({ step_ref: reference, position: z.number().int().min(1).max(5), state: z.enum(["pending", "accepted", "canceled"]), due_at: z.string().nullable(), intent_ref: reference.nullable(), accepted_at: z.string().nullable() })),
+  execution_ref: reference.nullable(), execution_state: z.enum(["active", "paused", "completed", "replied", "suppressed", "superseded", "canceled"]).nullable(),
+  steps: z.array(z.object({ step_ref: reference, position: z.number().int().min(1).max(5), state: z.enum(["pending", "accepted", "canceled"]), delivery_state: z.enum(["reserved", "dispatching", "accepted", "ambiguous", "rejected", "canceled"]).nullable().optional(), delivery_status: z.enum(["unsent", "sent", "unconfirmed", "accepted_unlinked", "canceled"]).optional(), due_at: z.string().nullable(), intent_ref: reference.nullable(), accepted_at: z.string().nullable() })),
   replies: z.array(z.object({ message_ref: reference, received_at: z.string() })),
 });
 const PlacementReason = z.enum(["seed_batch_exceeds_daily_limit", "seed_confirmation_required", "workspace_suspended", "campaign_changed", "sender_disconnected", "confirmation_expired", "provider_unavailable", "ambiguous", "invalid_response", "provider_rejected", "insufficient_credits"]);
@@ -81,6 +87,7 @@ export function campaignResultFor(operation: EmailCampaignInput["operation"], da
   const result = operation === "placement-preview" ? EmailPlacementPreview.parse(data) :
     ["placement", "placement-status", "placement-confirm"].includes(operation) ? EmailPlacementResult.parse(data) : EmailCampaignResult.parse(data);
   const matches = ["placement", "placement-status", "placement-confirm", "placement-preview"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "provider" ? "existing_executions_unchanged" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
+  if (operation === "cancel" && (!("content" in result) || result.state !== "canceled" || result.execution_state !== "canceled" || result.recovery?.state !== "canceled" || result.recovery.cancel_allowed || result.steps.some(step => step.state === "pending"))) throw new Error("Cancellation was not confirmed.");
   if (!matches) throw new Error("Invalid campaign operation response.");
   return result;
 }
