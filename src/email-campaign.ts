@@ -32,6 +32,7 @@ const messages: Record<string, string> = {
   email_execution_terminal: "This campaign execution has ended. Prepare and approve a new version.",
   email_sender_unhealthy: "The sending account is disconnected or its health check expired. Reconnect or refresh its health before sending.",
   email_sender_identity_mismatch: "The connected account no longer matches the approved sender.",
+  email_principal_unavailable: "The sending mailbox identity could not be verified. Sending is blocked.",
   email_policy_changed: "The email policy changed. Prepare this campaign again, review its new digest, and approve it before activation.",
   email_beta_mailbox_use_required: "The beta supports only mailboxes you already use regularly for personal or business correspondence. Disconnect and choose another account; managed warmup is not available in this beta.",
   email_declaration_required: "A current workspace member must declare the sending mailbox’s use before sending.",
