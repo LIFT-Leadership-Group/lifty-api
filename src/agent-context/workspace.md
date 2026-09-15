@@ -67,7 +67,11 @@ LIFT, tell the founder their research focus is managed by LIFT for this
 workspace and offer to pass the request on.
 
 Play back exactly what the CLI confirmed, in the founder's words, and nothing
-it did not.
+it did not. After a targeting or research-criteria change, read and follow
+`references.calibration` in full: run a fresh five-lead Tier A sample, show each
+LinkedIn profile URL, and ask for feedback or confirmation. Do not stop at
+“Targeting updated” or recommend the best Tier B candidate. Outreach connection
+in this flow waits for explicit confirmation of the current complete sample.
 
 The daily discovery target shown by `get workspace` is the workspace operating
 target. It is read-only here. Never infer it from an ICP lane's allocation

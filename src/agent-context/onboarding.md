@@ -4,9 +4,9 @@
 Build one founder-confirmed ICP bootstrap, save it privately in the active
 project. `lifty login` creates the workspace; you generate its discovery and
 research configuration locally using the current onboarding context.
-`lifty push` validates and applies it, `lifty run` researches the first five
-leads, and `lifty status` shows where things stand at any point.
-Do not configure outreach during this flow.
+`lifty push` validates and applies it, `lifty run` searches for five researched
+Tier A leads, and `lifty status` shows where things stand at any point.
+Review and confirm the Tier A sample before proceeding to outreach connection.
 
 ## Already onboarded?
 
@@ -58,8 +58,9 @@ Completion means exactly:
 - `lifty login` has returned successfully with a named workspace;
 - `lifty push` has finished with the configuration imported and its secret-free
   ICP + research prompt summary shown to the founder; and
-- `lifty run` has finished with the researched leads (tier and fit rationale)
-  shown to the founder.
+- the five Tier A leads, fit rationales and LinkedIn profile URLs have been
+  shown and the founder has explicitly confirmed this sample. A quality
+  shortfall or unanswered feedback question keeps calibration pending.
 
 When HubSpot connection was part of the founder's request, completion also
 requires `lifty connect hubspot` to report the secret-free portal ID as
@@ -178,21 +179,18 @@ only output shape.
     before resubmitting. A hand-tuned or already-configured workspace must be
     preserved. Never start the first lead run until import is confirmed.
 12. Tell the founder their targeting is live and LIFTY is now going to find
-    and research their first five leads — nothing sends, nothing touches
+    and research five Tier A leads for review — nothing sends, nothing touches
     their CRM:
 
     ```text
     node <active-project>/.lifty/bin/lifty.mjs run
     ```
 
-    The run stays attached and can take a while (discovery plus research).
-    When it finishes, present every lead the CLI returned — person, company,
-    tier, and why it fits — faithfully: never add, drop, or embellish a
-    result, but write it as your findings, not a pasted CLI dump. Call out
-    the strongest lead. If the run times out while still working, tell the
-    founder the research keeps going and you'll check back shortly — then
-    check `lifty status` later. If it fails, rerun it once before explaining
-    the error in plain words.
+    The run stays attached and can take a while. Read and follow
+    `references.calibration` in full: it owns the Tier A sample, LinkedIn
+    links, feedback loop and explicit confirmation before outreach connection.
+    If the run times out, research may still be running; check `lifty status`
+    and re-attach with `lifty run` to retrieve the final results.
 13. At any point, `lifty status` shows the installation, workspace,
     configuration, run, and HubSpot state in one read:
 
@@ -228,7 +226,10 @@ only output shape.
     that did not happen: never tell the founder their leads are in HubSpot
     without the CLI's receipt. If the sync fails or times out, say so
     plainly; `lifty sync` re-attaches, so running it again is always safe.
-16. Offer optional Gmail connection once the workspace exists. Gmail includes
+16. Only after the founder explicitly confirms the complete current Tier A
+    sample, proceed to the Unipile account connection they requested. Fetch
+    `lifty context campaign` for current connection instructions. Offer Gmail
+    if email is their chosen channel; otherwise skip to their chosen channel. Gmail includes
     Google Workspace business accounts; Outlook is not supported in this beta. Ask whether
     the founder wants to connect an existing mailbox now or skip it. If they
     choose to connect, ask for its exact address and whether it is already used
@@ -252,7 +253,8 @@ only output shape.
     enters credentials only in that browser flow. If interrupted, check with
     `connect unipile --workspace <workspace-ref> --status`. Connection does not
     activate sending. Skipping this option never blocks onboarding.
-17. Offer optional LinkedIn connection. Ask whether the founder wants to connect
+17. After the same sample confirmation, offer LinkedIn through Unipile if
+    LinkedIn is the chosen channel. Ask whether the founder wants to connect
     their existing habitual-use account now or skip it. Before connecting,
     obtain their IANA timezone and an explicit declaration that they already
     use the account regularly and have no other automation running on it.
@@ -273,12 +275,11 @@ only output shape.
     <workspace-ref> --status`. Connecting or reconnecting never activates
     sending. Campaign preview, exact approval and activation happen later,
     only when requested. Skipping LinkedIn never blocks onboarding.
-18. Stop after the run results and any requested provider connections/sync. Close with momentum, in founder language: they've seen their
-    first five researched leads — in their CRM if they connected HubSpot —
-    and outreach stays off; optional sender connections have not activated sends. Say
-    that plainly. Add one sentence: from here on, changes happen by asking —
-    "cambiá mi targeting", "conectá HubSpot", "is my HubSpot OK?" — and you
-    take care of it. No mechanics.
+18. End the sample review with the explicit feedback question in
+    `references.calibration` and wait. Once they confirm, continue to the
+    requested Unipile connection; do not close with only “Outreach stays off.”
+    Report the connection receipt when it succeeds. Sending remains subject
+    to the separate exact campaign approval.
 
 ## Hard stops
 
@@ -300,5 +301,5 @@ only output shape.
   command after a workspace exists and the founder chooses that connection.
 - Do not enable outreach or send anything. The first run researches leads
   only.
-- Do not ask campaign/outreach setup questions during onboarding. The optional
-  sender connection declarations above are the explicit exceptions.
+- Do not ask campaign/outreach setup questions or begin sender connections
+  before explicit confirmation of the complete current Tier A sample.
