@@ -27,6 +27,15 @@ describe("workspace retirement API boundary",()=>{
  it.each(["workspace_forbidden","workspace_identity_mismatch","workspace_not_lifty","workspace_cross_tenant_reference","workspace_retirement_blocked","workspace_email_disconnect_required","workspace_integration_disconnect_required","workspace_integration_revocation_pending"])("preserves SQL guard %s without exposing details",async message=>{
   const h=harness(null,{code:"PT409",message,details:"private-db-context"});const response=await h.app.request(path,post());expect(response.status).toBe(409);const text=await response.text();expect(text).toContain(message.toUpperCase());expect(text).not.toContain("private-db-context");expect(h.rpc).toHaveBeenCalledTimes(1);
  });
+ it("explains LinkedIn history retention without suggesting a retry or exposing database details",async()=>{
+  const h=harness(null,{code:"PT409",message:"workspace_linkedin_retention_required",details:"private-account-history"});
+  const response=await h.app.request(path,post());
+  expect(response.status).toBe(409);
+  const result=await response.json();
+  expect(result.error).toEqual({code:"WORKSPACE_LINKEDIN_RETENTION_REQUIRED",message:"LinkedIn v1 cannot retire a workspace with a bound account or LinkedIn history. Disconnect LinkedIn to stop sending; historical sending limits and account records must be retained."});
+  expect(JSON.stringify(result)).not.toMatch(/private-account-history|Retry/);
+  expect(h.rpc).toHaveBeenCalledTimes(1);
+ });
  it("supports exact request replay without broadening the identity",async()=>{
   const h=harness();await h.app.request(path,post());await h.app.request(path,post());expect(h.rpc.mock.calls[0]).toEqual(h.rpc.mock.calls[1]);
  });

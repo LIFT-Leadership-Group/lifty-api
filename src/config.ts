@@ -4,6 +4,7 @@ import type { SupabaseAuthenticationConfig } from "./supabase-auth.js";
 import type { HubspotConnectSettings } from "./hubspot-connect.js";
 import type { SlackConnectSettings } from "./slack-connect.js";
 
+import type { LinkedinConnectSettings } from "./linkedin-connect.js";
 import type { EmailConnectSettings } from "./email-connect.js";
 
 type Environment = Record<string, string | undefined>;
@@ -16,6 +17,7 @@ export interface ServiceConfig {
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
   slack: Omit<SlackConnectSettings, "fetchImpl"> | null;
   email?: Omit<EmailConnectSettings, "fetchImpl"> | null;
+  linkedin?: Omit<LinkedinConnectSettings, "fetchImpl"> | null;
   trigger: {
     apiUrl: string;
     secretKey: string;
@@ -112,12 +114,25 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const slackClientId = environment.SLACK_CLIENT_ID?.trim();
   const slackClientSecret = environment.SLACK_CLIENT_SECRET?.trim();
 
-  const emailValues = [environment.UNIPILE_DSN, environment.UNIPILE_ACCESS_TOKEN, environment.LIFTY_EMAIL_SERVER_KEY];
-  const emailEnabled = emailValues.every(value => Boolean(value?.trim()));
-  if (emailValues.some(value => Boolean(value?.trim())) && !emailEnabled) throw new Error("Email connection requires all three email service settings.");
-  if (emailEnabled && environment.LIFTY_EMAIL_SERVER_KEY!.trim().length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
+  const providerValues = [environment.UNIPILE_DSN, environment.UNIPILE_ACCESS_TOKEN];
+  const providerReady = providerValues.every(value => Boolean(value?.trim()));
+  const emailKey = environment.LIFTY_EMAIL_SERVER_KEY?.trim();
+  const linkedinKey = environment.LIFTY_LINKEDIN_SERVER_KEY?.trim();
+  const emailEnabled = Boolean(emailKey);
+  const linkedinEnabled = Boolean(linkedinKey);
+  if ((emailEnabled || linkedinEnabled) && !providerReady) throw new Error("Unipile requires both UNIPILE_DSN and UNIPILE_ACCESS_TOKEN.");
+  if (providerValues.some(value => Boolean(value?.trim())) && !emailEnabled && !linkedinEnabled) throw new Error("Unipile requires a dedicated email or LinkedIn service key.");
+  if (emailKey && emailKey.length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
+  if (linkedinKey && linkedinKey.length < 32) throw new Error("LIFTY_LINKEDIN_SERVER_KEY must contain at least 32 characters.");
+  if (linkedinKey && linkedinKey === emailKey) throw new Error("LinkedIn requires a server key distinct from email.");
   return {
     dashboardOrigin: dashboardUrl.origin,
+    linkedin: linkedinEnabled ? {
+      dsn: required(environment, "UNIPILE_DSN"), accessToken: required(environment, "UNIPILE_ACCESS_TOKEN"),
+      serverKey: required(environment, "LIFTY_LINKEDIN_SERVER_KEY"),
+      publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
+      supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
+    } : null,
     email: emailEnabled ? {
       dsn: required(environment,"UNIPILE_DSN"), accessToken: required(environment,"UNIPILE_ACCESS_TOKEN"),
       serverKey: required(environment,"LIFTY_EMAIL_SERVER_KEY"),

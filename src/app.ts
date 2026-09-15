@@ -90,6 +90,8 @@ import {
 } from "./slack-connect.js";
 import { isSealedSlackState } from "./slack-state.js";
 
+import { LinkedinCampaignRequest, LinkedinCampaignResult, linkedinCampaignResultFor, type LinkedinCampaignInput, type LinkedinCampaignOutput } from "./linkedin-campaign-contracts.js";
+import { LinkedinConnectRequest, LinkedinConnectResult, LinkedinConnectionStatus, LinkedinWorkspaceRequest, LinkedinDisconnectRequest, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 import { EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 
@@ -117,6 +119,12 @@ export interface AppDependencies {
   apolloCredentials(session: AuthSession, workspace: string, input: ApolloCredentialInput): Promise<ApolloCredentialOutput>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
+  linkedinCampaign(session: AuthSession, input: LinkedinCampaignInput): Promise<LinkedinCampaignOutput>;
+  startLinkedinConnect(session: AuthSession, input: LinkedinConnectInput): Promise<LinkedinStart>;
+  getLinkedinConnection(session: AuthSession, workspace: string): Promise<LinkedinStatus>;
+  disconnectLinkedin(session: AuthSession, workspace: string): Promise<LinkedinStatus>;
+  authorizeLinkedin(state: string): Promise<string>;
+  completeLinkedinCallback(state: string, body: unknown): Promise<void>;
   emailAvailable: boolean;
   startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
   getEmailConnection(session: AuthSession, workspace: string): Promise<EmailStatus>;
@@ -312,6 +320,18 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/connect", operationId: "startLinkedinConnect", security: [{ bearerAuth: [] }],
+    request: { body: { required: true, content: { "application/json": { schema: LinkedinConnectRequest } } } },
+    responses: { 200: JsonResponse(LinkedinConnectResult), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 429: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
+  app.openAPIRegistry.registerPath({ method: "get", path: "/v1/linkedin", operationId: "getLinkedinConnection", security: [{ bearerAuth: [] }],
+    request: { query: LinkedinWorkspaceRequest },
+    responses: { 200: JsonResponse(LinkedinConnectionStatus), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
+  app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/disconnect", operationId: "disconnectLinkedin", security: [{ bearerAuth: [] }],
+    request: { body: { required: true, content: { "application/json": { schema: LinkedinDisconnectRequest } } } },
+    responses: { 200: JsonResponse(LinkedinConnectionStatus), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
+  app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/campaign", operationId: "linkedinCampaign", security: [{ bearerAuth: [] }],
+    request: { body: { required: true, content: { "application/json": { schema: LinkedinCampaignRequest } } } },
+    responses: { 200: JsonResponse(LinkedinCampaignResult), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/campaign/placement/preview",operationId:"previewEmailPlacement",security:[{bearerAuth:[]}],
     request:{query:z.object({workspace:EmailConnectRequest.shape.workspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
     responses:{200:JsonResponse(EmailPlacementPreview),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -805,6 +825,12 @@ const defaultDependencies: AppDependencies = {
   },
   apolloCredentials: async () => { throw new PublicError({status:503,code:"APOLLO_CREDENTIAL_UNAVAILABLE",message:"Apollo credential configuration is unavailable."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
+  linkedinCampaign: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn campaigns are not configured yet." }); },
+  startLinkedinConnect: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
+  getLinkedinConnection: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
+  disconnectLinkedin: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
+  authorizeLinkedin: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
+  completeLinkedinCallback: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
   disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   emailAvailable: false,
@@ -1172,6 +1198,25 @@ export function createApp(
       );
     }
   });
+  app.get("/unipile/linkedin/start", async (context) => {
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
+    const target = await dependencies.authorizeLinkedin(context.req.query("intent") ?? "");
+    const url = new URL(target);
+    if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
+      throw new PublicError({ status: 502, code: "LINKEDIN_INVALID_HANDOFF", message: "LIFTY could not prepare the LinkedIn connection." });
+    }
+    return context.redirect(target, 303);
+  });
+  app.post("/unipile/linkedin/callback", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Invalid LinkedIn callback.");
+    let payload: unknown;
+    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Invalid LinkedIn callback."); }
+    await dependencies.completeLinkedinCallback(context.req.query("intent") ?? "", payload);
+    return context.json({ ok: true });
+  });
   app.get("/unipile/start", async (context) => {
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
@@ -1248,7 +1293,7 @@ export function createApp(
   // Expired entries are removed on access, without a process-owning timer.
   app.use("/v1/*", async (context, next) => {
     if (context.req.method !== "POST" || ![
-      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/email/connect",
+      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/email/connect", "/v1/linkedin/connect",
     ].includes(context.req.path)) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {
@@ -1867,6 +1912,44 @@ export function createApp(
     const parsed = EmailCampaignRequest.safeParse({operation:"placement-status",payload:context.req.query()});
     if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose the workspace, campaign and exact digest.");
     return context.json(EmailPlacementResult.parse(await dependencies.emailCampaign(context.get("authSession"), parsed.data)));
+  });
+
+  app.post("/v1/linkedin/campaign", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 32 * 1024);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "LinkedIn campaign request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide one campaign request as JSON."); }
+    const parsed = LinkedinCampaignRequest.safeParse(body);
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Check the LinkedIn campaign operation, workspace and required fields.");
+    const result = await dependencies.linkedinCampaign(context.get("authSession"), parsed.data);
+    return context.json(linkedinCampaignResultFor(parsed.data, result));
+  });
+  app.post("/v1/linkedin/connect", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "LinkedIn connection request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide the workspace, timezone and account declarations."); }
+    const parsed = LinkedinConnectRequest.safeParse(body);
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose an IANA timezone and declare a personal account without other automation.");
+    return context.json(LinkedinConnectResult.parse(await dependencies.startLinkedinConnect(context.get("authSession"), parsed.data)));
+  });
+  app.get("/v1/linkedin", async (context) => {
+    context.header("cache-control", "no-store");
+    const parsed = LinkedinWorkspaceRequest.safeParse(context.req.query());
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace.");
+    return context.json(LinkedinConnectionStatus.parse(await dependencies.getLinkedinConnection(context.get("authSession"), parsed.data.workspace)));
+  });
+  app.post("/v1/linkedin/disconnect", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "LinkedIn request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace and confirm disconnection."); }
+    const parsed = LinkedinDisconnectRequest.safeParse(body);
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace and explicitly confirm disconnection.");
+    return context.json(LinkedinConnectionStatus.parse(await dependencies.disconnectLinkedin(context.get("authSession"), parsed.data.workspace)));
   });
 
   app.post("/v1/email/campaign", async (context) => {
