@@ -9,6 +9,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
+import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -24,6 +25,7 @@ import {
   DisconnectResponseSchema,
   IntegrationConnectionStatusSchema,
   OnboardingContextSchema,
+  OnboardingGenerationContextSchema,
   LocalOnboardingConfigurationSchema,
   OnboardingPushResultSchema,
   OnboardingStatusSchema,
@@ -232,6 +234,7 @@ const ErrorResponseSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
+    issues: z.array(OnboardingLintIssueSchema).max(20).optional(),
   }),
   request_id: z.string(),
 });
@@ -465,7 +468,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     operationId: "getOnboardingContext",
     security: [{ bearerAuth: [] }],
     responses: {
-      200: JsonResponse(OnboardingContextSchema),
+      200: JsonResponse(OnboardingGenerationContextSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
@@ -795,9 +798,10 @@ function errorJson(
   status: ContentfulStatusCode,
   code: string,
   message: string,
+  issues?: OnboardingLintIssue[],
 ): Response {
   return context.json(
-    { error: { code, message }, request_id: context.get("requestId") },
+    { error: { code, message, ...(issues ? { issues } : {}) }, request_id: context.get("requestId") },
     status,
   );
 }
@@ -1285,7 +1289,10 @@ export function createApp(
     });
     return context.json(
       {
-        error: { code: publicError.code, message: publicError.message },
+        error: { code: publicError.code, message: publicError.message,
+          ...(context.req.path === "/v1/onboarding" && onboardingRepairIssues(publicError.code)
+            ? { issues: onboardingRepairIssues(publicError.code) } : {}),
+        },
         request_id: context.get("requestId"),
       },
       publicError.status as ContentfulStatusCode,
@@ -1539,16 +1546,22 @@ export function createApp(
       return errorJson(context, 422, "LOCAL_CONFIGURATION_REQUIRED",
         "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
     }
-    const configuration = LocalOnboardingConfigurationSchema.safeParse(envelope.data.configuration);
-    if (!configuration.success) {
+    const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft);
+    if (!lint.success) {
       return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
-        "Regenerate the local configuration using the current onboarding contract and context.");
+        "Repair the local configuration using these issues and push it again.", lint.issues);
+    }
+    const generationContext = await dependencies.getOnboardingContext(context.get("authSession"));
+    const contextualLint = lintLocalOnboardingConfiguration(lint.configuration, envelope.data.draft, generationContext.scout_global_base);
+    if (!contextualLint.success) {
+      return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
+        "Repair the local configuration using these issues and push it again.", contextualLint.issues);
     }
 
     const submission = await dependencies.submitOnboarding(
       context.get("authSession"),
       envelope.data.draft,
-      configuration.data,
+      lint.configuration,
     );
 
     // An already-imported draft needs no run; anything else gets exactly one.
@@ -1577,7 +1590,11 @@ export function createApp(
   app.get("/v1/onboarding/context", async (context) => {
     context.header("cache-control", "no-store");
     const result = await dependencies.getOnboardingContext(context.get("authSession"));
-    return context.json(OnboardingContextSchema.parse(result));
+    return context.json(OnboardingGenerationContextSchema.parse({
+      ...OnboardingContextSchema.parse(result),
+      generation_rules: ONBOARDING_GENERATION_RULES,
+      configuration_schema: z.toJSONSchema(LocalOnboardingConfigurationSchema),
+    }));
   });
 
   app.get("/v1/onboarding", async (context) => {

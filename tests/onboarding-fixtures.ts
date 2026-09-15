@@ -11,7 +11,7 @@ export const localConfiguration: LocalOnboardingConfiguration = {
     person_seniorities: null,
     personas: [{ name: "Founder", titles: ["Founder"] }],
   },
-  scout_overlay: "Local research instructions. ".repeat(12),
+  scout_overlay: ["## ICP gate", "Local research instructions. ".repeat(12), "## Hard disqualifiers", "Reject agencies.", "## Size gate", "Use the confirmed size.", "## Tier definitions", "Use A/B/C/non-ICP tiers."].join("\n"),
 };
 
 export const onboardingContext: OnboardingContext = {

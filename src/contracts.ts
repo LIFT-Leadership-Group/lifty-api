@@ -64,6 +64,11 @@ export const OnboardingContextSchema = z.object({
   scout_global_base: z.string().nullable(),
 }).strict();
 
+export const OnboardingGenerationContextSchema = OnboardingContextSchema.extend({
+  generation_rules: z.string().min(1),
+  configuration_schema: z.record(z.string(), z.unknown()),
+});
+
 export const SubmitOnboardingRequestSchema = z
   .object({
     draft: z.record(z.string(), z.unknown()),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { localConfiguration } from "./onboarding-fixtures.js";
+import { localConfiguration, onboardingContext } from "./onboarding-fixtures.js";
 
 import { createApp } from "../src/app.js";
 import { PublicError } from "../src/errors.js";
@@ -359,13 +359,14 @@ describe("LIFTY API", () => {
   });
 
   it("submits the draft and queues exactly one import run", async () => {
-    const draft = { schema_version: "2.1", status: "ready_for_auth" };
+    const draft = { schema_version: "2.1", status: "ready_for_auth", personas: localConfiguration.icp_config.personas };
     const enqueueCalls: Array<{ submissionId: string; fresh: boolean }> = [];
     const app = createApp({
       authenticate: async () => ({
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding: async (session, receivedDraft, receivedConfiguration) => {
         expect(receivedConfiguration).toEqual(localConfiguration);
         if (session.userId !== "founder-123") throw new Error("wrong actor");
@@ -410,6 +411,7 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding: async () => submissionFixture("imported"),
       enqueueOnboardingImport: async () => {
         enqueued = true;
@@ -423,7 +425,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(200);
@@ -440,6 +442,7 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding: async () => submissionFixture("failed"),
       enqueueOnboardingImport: async (_submissionId, options) => {
         enqueueCalls.push({ fresh: options.fresh });
@@ -453,7 +456,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(200);
@@ -597,6 +600,7 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding: async () => ({
         ...submissionFixture("pending"),
         api_key: providerToken,
@@ -611,7 +615,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
     });
     const responseText = await response.text();
 
@@ -686,6 +690,7 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding: async () => {
         provisioned = true;
         throw new Error("must not submit");
@@ -699,7 +704,7 @@ describe("LIFTY API", () => {
         "content-type": "application/json",
         "content-length": String(133 * 1024),
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(413);
@@ -729,6 +734,7 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding: async () => {
         provisioned = true;
         throw new Error("must not submit");
@@ -760,6 +766,7 @@ describe("LIFTY API", () => {
         ok: true,
         session: { userId: "founder-123", client: { kind: "scoped" } },
       }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding: async () => {
         throw new PublicError({
           status: 409,
@@ -778,7 +785,7 @@ describe("LIFTY API", () => {
         "content-type": "application/json",
         "x-request-id": "55555555-5555-4555-8555-555555555555",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1" }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
     });
     const responseText = await response.text();
     const logText = JSON.stringify(logEvents);

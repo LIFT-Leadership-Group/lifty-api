@@ -21,7 +21,7 @@ configured Hono app for programmatic use.
 - `GET /v1/workspace` — authenticated founder workspace state
 - `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
 - `POST /v1/onboarding` — authenticated `{draft, configuration}` submission; queues deterministic validation and application of locally generated ICP/Scout configuration (LIF-851). Missing configuration fails with `LOCAL_CONFIGURATION_REQUIRED`; no server agent fallback.
-- `GET /v1/onboarding/context` — authenticated founder-scoped workspace and Scout rules for local generation; includes the contract and context versions required by the push. Refresh and regenerate on `ONBOARDING_CONTEXT_STALE`.
+- `GET /v1/onboarding/context` — authenticated founder-scoped workspace and Scout rules for local generation; includes the contract and context versions required by the push. Includes server-owned `generation_rules` and `configuration_schema` for the local agent. Refresh and regenerate on `ONBOARDING_CONTEXT_STALE`.
 - `GET /v1/onboarding` — authenticated import status with a secret-free config summary
 - `POST /v1/workspace/runs` — start (or re-attach to) the first ICP run of five leads (LIF-657)
 - `GET /v1/workspace/runs` — run state, progress, and researched results
@@ -242,3 +242,5 @@ suite. These tests do not claim live Hosted Auth or recipient delivery acceptanc
 Provider contracts checked: [account readback](https://developer.unipile.com/reference/accountscontroller_getaccountbyid),
 [own-profile readback](https://developer.unipile.com/reference/userscontroller_getaccountownerprofile),
 [Hosted Auth](https://developer.unipile.com/docs/hosted-auth).
+
+Onboarding publication runs a deterministic linter before storing a receipt or queuing a job. A `422 LOCAL_CONFIGURATION_INVALID` response includes up to 20 `error.issues` entries with `{code, path, message, suggestion}`; paths are JSON pointers rooted at `/configuration` or `/draft`. The local agent can repair technical issues and push again. Diagnostics never include submitted targeting values or prompt text. Checks cover schema, confirmed personas/titles, employee bounds, Apollo seniorities, duplicates, required Scout sections, the 52,000 character budget, and copied global Scout instructions. Semantic fit still depends on the founder-confirmed draft.

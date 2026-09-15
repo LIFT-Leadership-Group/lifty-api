@@ -5,7 +5,7 @@ import { localConfiguration, onboardingContext } from "./onboarding-fixtures.js"
 
 const session = { userId: "founder", client: {} };
 const authenticate = async () => ({ ok: true as const, session });
-const draft = { schema_version: "2.1" };
+const draft = { schema_version: "2.1", personas: localConfiguration.icp_config.personas };
 
 function push(app: ReturnType<typeof createApp>, body: unknown) {
   return app.request("/v1/onboarding", {
@@ -60,8 +60,21 @@ describe("locally generated onboarding", () => {
     const response = await createApp({ authenticate, getOnboardingContext: getContext }).request("/v1/onboarding/context?workspace_ref=foreign-workspace");
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual(onboardingContext);
+    expect(await response.json()).toMatchObject({ ...onboardingContext, generation_rules: expect.stringContaining("52,000"), configuration_schema: expect.objectContaining({ type: "object" }) });
     expect(getContext).toHaveBeenCalledExactlyOnceWith(session);
+  });
+
+  it("rejects copied global instructions before receipt or enqueue", async () => {
+    const submit = vi.fn();
+    const enqueue = vi.fn();
+    const log = vi.fn();
+    const configuration = { ...localConfiguration, scout_overlay: `${localConfiguration.scout_overlay}\n${onboardingContext.scout_global_base}` };
+    const response = await push(createApp({ authenticate, getOnboardingContext: async () => onboardingContext, submitOnboarding: submit, enqueueOnboardingImport: enqueue, log }), { draft, configuration });
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: { code: "LOCAL_CONFIGURATION_INVALID", issues: [{ code: "global_base_copied", path: "/configuration/scout_overlay", suggestion: expect.any(String) }] } });
+    expect(submit).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain(configuration.scout_overlay);
   });
 
   it("publishes local configuration and context in the API contract", async () => {
@@ -95,6 +108,7 @@ describe("locally generated onboarding", () => {
     const log = vi.fn();
     const app = createApp({
       authenticate: async () => ({ ok: true, session: { ...session, client: { rpc } } }),
+      getOnboardingContext: async () => onboardingContext,
       submitOnboarding,
       enqueueOnboardingImport: enqueue,
       log,
@@ -103,6 +117,7 @@ describe("locally generated onboarding", () => {
     expect(response.status).toBe(status);
     const body = await response.text();
     expect(JSON.parse(body)).toMatchObject({ error: { code: publicCode } });
+    if (publicCode === "ONBOARDING_CONTEXT_STALE") expect(JSON.parse(body).error.issues).toEqual([expect.objectContaining({ path: "/configuration/context_version" })]);
     expect(body).not.toContain("private-candidate");
     expect(JSON.stringify(log.mock.calls)).not.toContain("private-candidate");
     expect(enqueue).not.toHaveBeenCalled();
