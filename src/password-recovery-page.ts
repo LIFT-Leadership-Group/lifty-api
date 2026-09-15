@@ -105,7 +105,7 @@ byId("update-form").addEventListener("submit", async event => {
     byId("new-link").hidden = true;
     byId("title").textContent = "Password changed";
     byId("description").textContent = "Sign in with your new password in the original LIFTY login tab, then approve the CLI normally.";
-    showMessage("Your password was changed. This recovery page has not authorized the CLI.", true);
+    showMessage("Your password was changed. Sign in again to continue.", true);
     // Best effort: revoke only this recovery session, without claiming immediate
     // JWT invalidation or logging out the user's other product sessions.
     try { await authRequest("/auth/v1/logout?scope=local", {accessToken:completedToken}); } catch {}
@@ -139,7 +139,7 @@ async function startRecovery() {
     if (!pageActive) return;
     if (!user || typeof user.id !== "string" || !user.id) { invalidLink(); return; }
     accessToken = candidate; expiresAt = Math.min(expiry, Date.now() + lifetime * 1000);
-    byId("description").textContent = "Enter and confirm your new password. This will not authorize the CLI.";
+    byId("description").textContent = "Enter and confirm your new password.";
     byId("update-form").hidden = false;
     byId("update-submit").disabled = false;
   } catch (error) {

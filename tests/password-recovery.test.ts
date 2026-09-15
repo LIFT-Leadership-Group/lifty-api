@@ -126,7 +126,7 @@ describe("recovery link and password update browser behavior",()=>{
     expect(calls[2]?.[0]).toBe(options.supabaseUrl+"/auth/v1/logout?scope=local");
     expect(calls.every(([url])=>url.startsWith(options.supabaseUrl+"/auth/v1/"))).toBe(true);
     expect(JSON.stringify(calls)).not.toContain("PRIVATE_REFRESH");expect(b.get("title").textContent).toBe("Password changed");
-    expect(b.get("message").textContent).toContain("has not authorized the CLI");expect(b.get("new-password").value).toBe("");
+    expect(b.get("message").textContent).toBe("Your password was changed. Sign in again to continue.");expect(b.get("new-password").value).toBe("");
     await update(b);expect(fetcher).toHaveBeenCalledTimes(3);
   });
   it.each(["","#error=access_denied&error_code=otp_expired&error_description=PRIVATE","#type=signup&access_token="+token+"&expires_in=3600",fragment+"&type=recovery",fragment+"&access_token="+token,fragment.replace("3600","0"),fragment+"&expires_at=1","?access_token=PRIVATE"+fragment,"#type=recovery&access_token=bad&expires_in=3600"])("rejects malformed, expired, reused or query-supplied capability %#",async tail=>{
