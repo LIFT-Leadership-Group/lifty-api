@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
-import { EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
+import { EmailPolicy, EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 import { createUnipileProvider, type UnipileProviderSettings } from "./unipile-provider.js";
 import { sealEmailIntent, openEmailIntent, emailCallbackName, validEmailCallbackName } from "./email-state.js";
 
@@ -15,6 +15,7 @@ interface RpcClient { rpc(name: string,args: Record<string,unknown>): Promise<{d
 const Stored = z.object({
   state: z.enum(["not_connected","pending","connected","disconnected","failed","revoked"]),
   workspace_ref: z.uuid(), email: z.email().optional(), mailbox_use: z.enum(["personal","outreach"]).optional(),
+  email_policy: EmailPolicy.optional(),
   daily_limit: z.number().int().min(1).max(10).optional(),
   account_id: z.string().nullable().optional(), connection_ref: z.uuid().nullable().optional(), intent_ref: z.uuid().nullable().optional(),
   expires_at: z.string().optional(), failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed"]).nullable().optional(),
@@ -23,7 +24,7 @@ const Intent = z.object({state:z.enum(["pending","issuing","ready","completed","
 function fail(code: string, status = 409): never {
   const messages: Record<string,string> = {
     EMAIL_WORKSPACE_FORBIDDEN: "Choose a workspace you belong to.",
-    EMAIL_PROFILE_CONFLICT: "This workspace already has a different email or mailbox-use declaration. Contact LIFT to change it.",
+    EMAIL_PROFILE_CONFLICT: "Disconnect this workspace’s email first, then run connect again with a mailbox you use regularly.",
     EMAIL_INTENT_EXPIRED: "This email connection link expired. Run the connect command again.",
     EMAIL_LINK_PENDING: "An email connection link is being prepared. Try opening it again shortly.",
     EMAIL_IDENTITY_MISMATCH: "Authorize the exact email address you selected in LIFTY.",
@@ -56,7 +57,9 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     }catch(error){if(error instanceof PublicError)throw error; fail("EMAIL_CONNECTION_UNAVAILABLE",502);}
   }
   const publicProfile=(value:z.infer<typeof Stored>)=>({provider:"unipile" as const,channel:"email" as const,workspace_ref:value.workspace_ref,email:value.email,
-    mailbox_use:value.mailbox_use,daily_limit:value.daily_limit,warmup_required:value.mailbox_use==="outreach",sending_enabled:false as const});
+    mailbox_use:value.mailbox_use,daily_limit:value.daily_limit,
+    ...(value.email_policy ? {email_policy:value.email_policy} : {}),
+    warmup_required:value.email_policy?.habitual_only ? false : value.mailbox_use==="outreach",sending_enabled:false as const});
   async function status(session:AuthSession,workspace:string):Promise<EmailStatus>{
     let value=Stored.parse(await rpc("status",{workspace},session));
     if(value.state==="pending" && value.intent_ref && value.email){
