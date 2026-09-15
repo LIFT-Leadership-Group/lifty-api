@@ -9,6 +9,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
+import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -23,6 +24,9 @@ import {
   type CreateWorkspaceResult,
   DisconnectResponseSchema,
   IntegrationConnectionStatusSchema,
+  OnboardingContextSchema,
+  OnboardingGenerationContextSchema,
+  LocalOnboardingConfigurationSchema,
   OnboardingPushResultSchema,
   OnboardingStatusSchema,
   NotificationConfigSchema,
@@ -50,6 +54,8 @@ import {
   type DisconnectResult,
   type HubspotConnectStart,
   type HubspotConnectionStatus,
+  type OnboardingContext,
+  type LocalOnboardingConfiguration,
   type OnboardingStatus,
   type OnboardingSubmission,
   type NotificationConfig,
@@ -140,7 +146,9 @@ export interface AppDependencies {
   submitOnboarding(
     session: AuthSession,
     draft: Record<string, unknown>,
+    configuration: LocalOnboardingConfiguration,
   ): Promise<OnboardingSubmission>;
+  getOnboardingContext(session: AuthSession): Promise<OnboardingContext>;
   getOnboardingStatus(session: AuthSession): Promise<OnboardingStatus>;
   enqueueOnboardingImport: EnqueueOnboardingImport;
   startRun(session: AuthSession): Promise<StartRunResult>;
@@ -226,6 +234,7 @@ const ErrorResponseSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
+    issues: z.array(OnboardingLintIssueSchema).max(20).optional(),
   }),
   request_id: z.string(),
 });
@@ -450,6 +459,18 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       409: JsonResponse(ErrorResponseSchema),
       413: JsonResponse(ErrorResponseSchema),
       422: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/onboarding/context",
+    operationId: "getOnboardingContext",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: JsonResponse(OnboardingGenerationContextSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
   });
@@ -777,9 +798,10 @@ function errorJson(
   status: ContentfulStatusCode,
   code: string,
   message: string,
+  issues?: OnboardingLintIssue[],
 ): Response {
   return context.json(
-    { error: { code, message }, request_id: context.get("requestId") },
+    { error: { code, message, ...(issues ? { issues } : {}) }, request_id: context.get("requestId") },
     status,
   );
 }
@@ -847,6 +869,9 @@ const defaultDependencies: AppDependencies = {
   },
   submitOnboarding: async () => {
     throw new Error("submitOnboarding is not configured");
+  },
+  getOnboardingContext: async () => {
+    throw new Error("getOnboardingContext is not configured");
   },
   getOnboardingStatus: async () => {
     throw new Error("getOnboardingStatus is not configured");
@@ -1264,7 +1289,10 @@ export function createApp(
     });
     return context.json(
       {
-        error: { code: publicError.code, message: publicError.message },
+        error: { code: publicError.code, message: publicError.message,
+          ...(context.req.path === "/v1/onboarding" && onboardingRepairIssues(publicError.code)
+            ? { issues: onboardingRepairIssues(publicError.code) } : {}),
+        },
         request_id: context.get("requestId"),
       },
       publicError.status as ContentfulStatusCode,
@@ -1506,19 +1534,34 @@ export function createApp(
     } catch {
       parsedJson = null;
     }
-    const body = SubmitOnboardingRequestSchema.safeParse(parsedJson);
-    if (!body.success) {
-      return errorJson(
-        context,
-        400,
-        "INVALID_REQUEST",
-        "The onboarding push must contain one JSON object named draft.",
-      );
+    const envelope = z.object({
+      draft: z.record(z.string(), z.unknown()),
+      configuration: z.unknown().optional(),
+    }).strict().safeParse(parsedJson);
+    if (!envelope.success) {
+      return errorJson(context, 400, "INVALID_REQUEST",
+        "The onboarding push must contain JSON objects named draft and configuration.");
+    }
+    if (envelope.data.configuration == null) {
+      return errorJson(context, 422, "LOCAL_CONFIGURATION_REQUIRED",
+        "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
+    }
+    const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft);
+    if (!lint.success) {
+      return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
+        "Repair the local configuration using these issues and push it again.", lint.issues);
+    }
+    const generationContext = await dependencies.getOnboardingContext(context.get("authSession"));
+    const contextualLint = lintLocalOnboardingConfiguration(lint.configuration, envelope.data.draft, generationContext.scout_global_base);
+    if (!contextualLint.success) {
+      return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
+        "Repair the local configuration using these issues and push it again.", contextualLint.issues);
     }
 
     const submission = await dependencies.submitOnboarding(
       context.get("authSession"),
-      body.data.draft,
+      envelope.data.draft,
+      lint.configuration,
     );
 
     // An already-imported draft needs no run; anything else gets exactly one.
@@ -1542,6 +1585,16 @@ export function createApp(
         created: submission.created,
       }),
     );
+  });
+
+  app.get("/v1/onboarding/context", async (context) => {
+    context.header("cache-control", "no-store");
+    const result = await dependencies.getOnboardingContext(context.get("authSession"));
+    return context.json(OnboardingGenerationContextSchema.parse({
+      ...OnboardingContextSchema.parse(result),
+      generation_rules: ONBOARDING_GENERATION_RULES,
+      configuration_schema: z.toJSONSchema(LocalOnboardingConfigurationSchema),
+    }));
   });
 
   app.get("/v1/onboarding", async (context) => {

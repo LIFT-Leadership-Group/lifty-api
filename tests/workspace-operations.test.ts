@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { localConfiguration } from "./onboarding-fixtures.js";
 
 import {
   createWorkspace,
@@ -159,10 +160,10 @@ describe("workspace RPC operations", () => {
     };
 
     await expect(
-      submitOnboarding({ userId: "founder-123", client }, draft),
+      submitOnboarding({ userId: "founder-123", client }, draft, localConfiguration),
     ).resolves.toEqual(expected);
     expect(calls).toEqual([
-      { name: "submit_lifty_onboarding", args: { draft } },
+      { name: "submit_lifty_onboarding", args: { draft, configuration: localConfiguration } },
     ]);
   });
 
@@ -183,7 +184,7 @@ describe("workspace RPC operations", () => {
     };
 
     await expect(
-      submitOnboarding({ userId: "founder-123", client }, { draft: true }),
+      submitOnboarding({ userId: "founder-123", client }, { draft: true }, localConfiguration),
     ).rejects.toMatchObject({
       status: 502,
       code: "SUPABASE_INVALID_RESPONSE",
@@ -239,7 +240,7 @@ describe("workspace RPC operations", () => {
     };
 
     await expect(
-      submitOnboarding({ userId: "founder-123", client }, { draft: true }),
+      submitOnboarding({ userId: "founder-123", client }, { draft: true }, localConfiguration),
     ).rejects.toMatchObject({
       status: 409,
       code: "WORKSPACE_ALREADY_EXISTS",
@@ -276,7 +277,7 @@ describe("workspace RPC operations", () => {
       };
 
       await expect(
-        submitOnboarding({ userId: "founder-123", client }, { draft: true }),
+        submitOnboarding({ userId: "founder-123", client }, { draft: true }, localConfiguration),
       ).rejects.toMatchObject({ status, code: publicCode });
     },
   );

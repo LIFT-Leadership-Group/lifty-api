@@ -11,6 +11,9 @@ import {
   type CreateWorkspaceResult,
   DisconnectResultSchema,
   type DisconnectResult,
+  OnboardingContextSchema,
+  type OnboardingContext,
+  type LocalOnboardingConfiguration,
   OnboardingStatusSchema,
   type OnboardingStatus,
   OnboardingSubmissionSchema,
@@ -111,6 +114,22 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (code === "PT400" && message.includes("lifty_configuration_required")) {
+    return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED",
+      message: "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.", cause: error });
+  }
+  if (code === "PT400" && message.startsWith("lifty_configuration_invalid:")) {
+    return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_INVALID",
+      message: "Regenerate the local configuration using the current onboarding contract and context.", cause: error });
+  }
+  if (code === "PT409" && message.includes("lifty_configuration_mismatch")) {
+    return new PublicError({ status: 409, code: "LOCAL_CONFIGURATION_MISMATCH",
+      message: "The configuration does not match the onboarding receipt. Fetch fresh onboarding context and push the local configuration again.", cause: error });
+  }
+  if (code === "PT409" && message.includes("lifty_onboarding_context_stale")) {
+    return new PublicError({ status: 409, code: "ONBOARDING_CONTEXT_STALE",
+      message: "The workspace or Scout rules changed. Fetch fresh onboarding context and regenerate the local configuration before pushing.", cause: error });
+  }
   if (code === "PT409" && message.includes("lifty_onboarding_already_configured")) {
     return new PublicError({
       status: 409,
@@ -452,10 +471,11 @@ export async function createWorkspace(
 export async function submitOnboarding(
   session: AuthSession,
   draft: Record<string, unknown>,
+  configuration: LocalOnboardingConfiguration,
 ): Promise<OnboardingSubmission> {
   const { data, error } = await getRpcClient(session).rpc<OnboardingSubmission>(
     "submit_lifty_onboarding",
-    { draft },
+    { draft, configuration },
   );
 
   if (error) {
@@ -466,6 +486,18 @@ export async function submitOnboarding(
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }
+  return parsed.data;
+}
+
+export async function getOnboardingContext(
+  session: AuthSession,
+): Promise<OnboardingContext> {
+  const { data, error } = await getRpcClient(session).rpc<OnboardingContext>(
+    "get_lifty_onboarding_context",
+  );
+  if (error) throw mapRpcError(error);
+  const parsed = OnboardingContextSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) throw invalidResponse(parsed.error);
   return parsed.data;
 }
 
