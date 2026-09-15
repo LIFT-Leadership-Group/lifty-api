@@ -27,11 +27,11 @@
     "@supabase/server": "1.4.1",
     "@supabase/supabase-js": "2.112.4",
     "hono": "4.13.5",
+    "jose": "6.2.10",
     "zod": "4.5.1"
   },
   "devDependencies": {
     "@types/node": "22.13.14",
-    "jose": "6.2.10",
     "tsx": "4.23.12",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
