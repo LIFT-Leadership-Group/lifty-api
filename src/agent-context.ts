@@ -6,6 +6,7 @@ import { EmailCampaignRequest } from "./email-campaign-contracts.js";
 import { LinkedinCampaignRequest } from "./linkedin-campaign-contracts.js";
 
 export const AGENT_CLIENT_CONTRACT = "lifty-cli-context.v1";
+export const COMPANY_MAPPING_CLIENT_CONTRACT = "lifty-cli-context.v2";
 export const AgentContextSchema = z.object({
   format: z.literal("lifty-context.v1"),
   task: z.string().min(1),
@@ -18,6 +19,7 @@ export const AgentContextSchema = z.object({
 // Only checked-in public guidance goes here. Tenant data and the Scout base
 // remain behind the existing authenticated /v1/onboarding/context boundary.
 const interview = readFileSync(new URL("./agent-context/interview.md", import.meta.url), "utf8");
+const companyMapping = readFileSync(new URL("./agent-context/company-mapping.md", import.meta.url), "utf8");
 const documents = {
   onboarding: {
     instructions: readFileSync(new URL("./agent-context/onboarding.md", import.meta.url), "utf8"),
@@ -39,10 +41,14 @@ const documents = {
   },
 };
 
-export function getAgentContext(task: string) {
+export function getAgentContext(task: string, clientContract = AGENT_CLIENT_CONTRACT) {
   if (!Object.hasOwn(documents, task)) return null;
   const document = documents[task as keyof typeof documents];
-  const content = { format: "lifty-context.v1" as const, task, ...document };
+  const content = { format: "lifty-context.v1" as const, task, ...document,
+    // v1 clients cannot execute the company commands. Keep their guidance intact.
+    ...(clientContract === COMPANY_MAPPING_CLIENT_CONTRACT && task !== "campaign"
+      ? { instructions: `${document.instructions}\n${companyMapping}` } : {}),
+  };
   const revision = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
   return AgentContextSchema.parse({ ...content, revision });
 }

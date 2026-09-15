@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 
 describe("public agent task context", () => {
+  it("serves company setup only to clients with the company command contract", async () => {
+    const app = createApp();
+    for (const task of ["onboarding", "workspace"]) {
+      const legacy = await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v1`)).json();
+      const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v2`);
+      expect(response.status).toBe(200);
+      const current = await response.json();
+      expect(legacy.instructions).not.toContain("crm companies context");
+      expect(current.instructions).toContain("required before HubSpot sync");
+      expect(current.instructions).toContain("crm companies context");
+      expect(current.instructions).toContain("crm companies apply --input -");
+      expect(current.revision).not.toBe(legacy.revision);
+      expect(current.schemas).toEqual(legacy.schemas);
+    }
+  });
   it("serves onboarding guidance before login without reading a workspace", async () => {
     const app = createApp({
       authenticate: async () => { throw new Error("public context must not authenticate"); },

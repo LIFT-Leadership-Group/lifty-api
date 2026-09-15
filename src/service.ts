@@ -1,3 +1,4 @@
+import { companyMapping } from "./company-mapping.js";
 import { createLinkedinConnectOperations } from "./linkedin-connect.js";
 import { createLinkedinCampaignOperations } from "./linkedin-campaign.js";
 import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
@@ -119,6 +120,7 @@ export function createProductionApp(config: ServiceConfig) {
     enqueueNotificationDelivery: createNotificationDeliveryTrigger(config.trigger),
     getNotificationConfig,
     listSlackNotificationChannels,
+    companyMapping,
     upsertNotificationDestination,
     setNotificationRoute,
     enqueueNotificationTest,
