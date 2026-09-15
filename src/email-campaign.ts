@@ -47,6 +47,8 @@ const messages: Record<string, string> = {
   email_placement_replay_conflict: "The placement test details changed. Check the existing test; do not create another send request.",
   email_channel_inactive: "Email sending is paused for this workspace or sending account.",
   email_campaign_inactive: "This campaign is paused, replaced or no longer active.",
+  email_recovery_required: "This execution needs delivery or reply verification before another email can send. Check status; do not resend an unconfirmed email.",
+  email_cancel_confirmation_required: "Cancel using the exact campaign digest and explicit cancellation confirmation.",
   email_step_not_due: "The next campaign message is not due yet.",
   email_immutable_record: "Prepare a new campaign version instead of changing an existing execution.",
 };
@@ -69,7 +71,7 @@ export function createEmailCampaignOperations(serverKey: string) {
     const client = session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
     let response;
     const placement = parsed.operation === "placement" || parsed.operation === "placement-status" || parsed.operation === "placement-confirm";
-    try { response = parsed.operation === "placement-preview" ? await client.rpc("lifty_email_placement_preview", {p_server_key:serverKey,p_payload:parsed.payload}) : await client.rpc(placement ? "lifty_email_placement" : "lifty_email_campaign", { p_server_key: serverKey, p_operation: placement ? (parsed.operation === "placement" ? "start" : parsed.operation === "placement-confirm" ? "confirm" : "status") : parsed.operation, p_payload: parsed.payload }); }
+    try { response = parsed.operation === "placement-preview" ? await client.rpc("lifty_email_placement_preview", {p_server_key:serverKey,p_payload:parsed.payload}) : await client.rpc(parsed.operation === "cancel" ? "lifty_email_campaign_recovery" : placement ? "lifty_email_placement" : "lifty_email_campaign", { p_server_key: serverKey, p_operation: placement ? (parsed.operation === "placement" ? "start" : parsed.operation === "placement-confirm" ? "confirm" : "status") : parsed.operation, p_payload: parsed.payload }); }
     catch { mapError(null); }
     if (response.error) mapError(response.error);
     try {

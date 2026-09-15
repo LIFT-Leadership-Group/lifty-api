@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
-import { createGoogleMailboxProofVerifier } from "./google-mailbox-proof.js";
+import { createGoogleMailboxProofVerifier } from "../src/google-mailbox-proof.js";
 const now = new Date("2026-09-15T12:00:00Z");
 const clientId = "fixture.apps.googleusercontent.com";
 const accessToken = "fake-access-token-for-unit-tests";
