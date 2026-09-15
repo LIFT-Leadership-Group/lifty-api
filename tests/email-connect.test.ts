@@ -36,7 +36,7 @@ describe("email hosted auth boundary",()=>{
     await expect(ops.callback(state,{...body,name:"0".repeat(64)})).rejects.toMatchObject({code:"EMAIL_CALLBACK_INVALID"});
     expect(calls).toEqual([]);
   });
-  it("confirms exact mailbox and source health before completing a tenant-bound intent",async()=>{
+  it("accepts a Google Workspace custom-domain primary after verifying mailbox and source health",async()=>{
     const {ops,calls}=harness(); await ops.callback(state,body);
     expect(calls.at(-1)).toEqual({operation:"complete",payload:{intent_ref:id,account_id:"account_1",email}});
   });
@@ -90,23 +90,50 @@ describe("email hosted auth boundary",()=>{
       expect(calls.some(c=>c.operation==="complete")).toBe(false);
     }
   });
-  it("requires Outlook owner profile email and id rather than a configured UPN",async()=>{
-    const {ops,calls}=harness({identity:{...account,type:"OUTLOOK"},owner:{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email,user_principal_name:"alias@example.test"}});
-    await ops.callback(state,body);expect(calls.at(-1)?.operation).toBe("complete");
-    const missing=harness({identity:{...account,type:"OUTLOOK"},owner:{object:"AccountOwnerProfile",provider:"OUTLOOK",email}});
-    await expect(missing.ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+  it.each(["CREATION_SUCCESS","RECONNECTED"])("rejects Outlook %s even with a matching custom-domain owner and never completes",async(status)=>{
+    const {ops,calls}=harness({identity:{...account,type:"OUTLOOK"},
+      owner:{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email},
+      intent:{...intent,account_id:status==="RECONNECTED"?"account_1":null}});
+    await expect(ops.callback(state,{...body,status})).rejects.toMatchObject({status:409,code:"UNIPILE_MAILBOX_UNVERIFIABLE",message:expect.stringContaining("Gmail only")});
+    expect(calls.some(c=>c.operation==="complete")).toBe(false);
+    expect(calls.at(-1)).toEqual({operation:"fail",payload:{intent_ref:id,failure_code:"identity_mismatch"}});
+  });
+  it.each(["status","start"] as const)("rejects an existing Outlook connection on %s instead of reporting it healthy",async(operation)=>{
+    const operations:string[]=[],providerPaths:string[]=[];
+    const client={rpc:async(_name:string,args:Record<string,unknown>)=>{
+      operations.push(String(args.p_operation));
+      return {data:{state:"connected",workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,
+        account_id:"account_1",connection_ref:id,intent_ref:null},error:null};
+    }};
+    const ops=createEmailConnectOperations({...settings,fetchImpl:async(url)=>{
+      providerPaths.push(new URL(String(url)).pathname);
+      return json({...account,type:"OUTLOOK"});
+    }});
+    const result=operation==="status"?ops.status({userId:id,client},"senja")
+      :ops.start({userId:id,client},{workspace:"senja",email,mailbox_use:"personal"});
+    await expect(result).rejects.toMatchObject({status:409,code:"UNIPILE_MAILBOX_UNVERIFIABLE",message:expect.stringContaining("Gmail only")});
+    expect(operations).toEqual([operation]);
+    expect(providerPaths).toEqual(["/api/v1/accounts/account_1"]);
   });
   it("rejects stale or failed intents without provider side effects",async()=>{
     const {ops,calls}=harness({intent:{...intent,state:"failed"}});
     await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_INTENT_EXPIRED"});
     expect(calls).toHaveLength(1);
   });
-  it.each(["HostedAuthUrl","HostedAuthURL"])("accepts documented %s and creates one single-use mail-only link without mailbox-history sync",async(object)=>{
+  it.each(["HostedAuthUrl","HostedAuthURL"])("accepts documented %s and creates one single-use Gmail-only link without mailbox-history sync",async(object)=>{
     const calls:Record<string,unknown>[]=[];
     const provider=createUnipileProvider({...settings,fetchImpl:async(_url,init)=>{calls.push(JSON.parse(String(init?.body)));return json({object,url:"https://account.unipile.com/opaque"});}});
     await provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null});
-    expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({single_use:true,providers:["GOOGLE","OUTLOOK"],sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+    expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({single_use:true,providers:["GOOGLE"],sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
     expect(calls[0]).not.toHaveProperty("email");
+  });
+  it("keeps Gmail reconnection pinned to the existing account without offering another provider",async()=>{
+    const calls:Record<string,unknown>[]=[];
+    const provider=createUnipileProvider({...settings,fetchImpl:async(_url,init)=>{calls.push(JSON.parse(String(init?.body)));return json({object:"HostedAuthUrl",url:"https://account.unipile.com/opaque"});}});
+    await provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:"account_1"});
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({type:"reconnect",reconnect_account:"account_1",single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+    expect(calls[0]).not.toHaveProperty("providers");
   });
   it("does not retry provider errors and redacts response bodies",async()=>{
     let calls=0;
@@ -132,7 +159,7 @@ describe("hosted authorization lifecycle",()=>{
         providerCalls++;
         expect(new URL(String(url)).pathname).toBe("/api/v1/hosted/accounts/link");
         const body=JSON.parse(String(init?.body));
-        expect(body).toMatchObject({providers:["GOOGLE","OUTLOOK"],single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+        expect(body).toMatchObject({providers:["GOOGLE"],single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
         if(failure==="provider")return json({message:"provider-SECRET https://account.unipile.com/private-token"},401);
         return json({object:failure==="schema"?"HostedAuthLink":"HostedAuthUrl",url:"https://account.unipile.com/opaque"});
       }
@@ -218,7 +245,7 @@ describe("email disconnection",()=>{
 });
 
 describe("durable callback reconciliation",()=>{
-  function reconciliationHarness(options:{hint?:string|null;health?:string;profile?:unknown;rpcError?:unknown;providerStatus?:number;hintWorkspace?:string;hintError?:unknown}={}){
+  function reconciliationHarness(options:{hint?:string|null;health?:string;accountType?:string;profile?:unknown;rpcError?:unknown;providerStatus?:number;hintWorkspace?:string;hintError?:unknown}={}){
     let current="pending",failure:string|null=null;
     const events:string[]=[];
     const stored=()=>({state:current,workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,intent_ref:id,connection_ref:current==="connected"?workspace:null,account_id:current==="connected"?"account_1":null,failure_code:failure});
@@ -241,7 +268,7 @@ describe("durable callback reconciliation",()=>{
           return json(options.profile??owner);
         }
         expect(path).toBe("/api/v1/accounts/account_1");
-        return json({...account,sources:account.sources.map(source=>({...source,status:options.health??"OK"}))},options.providerStatus??200);
+        return json({...account,type:options.accountType??account.type,sources:account.sources.map(source=>({...source,status:options.health??"OK"}))},options.providerStatus??200);
       }
       expect(path).toBe("/rest/v1/rpc/lifty_email_connection");
       const args=JSON.parse(String(init?.body));events.push(`server:${args.p_operation}`);
@@ -274,6 +301,15 @@ describe("durable callback reconciliation",()=>{
     const h=reconciliationHarness({profile:{...owner,email:"foreign@example.test"}});
     expect(await h.ops.status(h.session,"senja")).toMatchObject({status:"failed",failure_code:"identity_mismatch"});
     expect(h.events).not.toContain("server:complete");
+  });
+  it.each(["OK","CONNECTING"])("fails a durable Outlook hint with %s health instead of recovering an unsupported connection",async(health)=>{
+    const h=reconciliationHarness({accountType:"OUTLOOK",health,
+      profile:{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email}});
+    expect(await h.ops.status(h.session,"senja")).toMatchObject({status:"failed",failure_code:"identity_mismatch"});
+    expect(h.events).not.toContain("server:complete");
+    expect(h.events).not.toContain("/api/v1/users/me");
+    expect((await h.ops.status(h.session,"senja")).status).toBe("failed");
+    expect(h.events.filter(event=>event==="server:fail")).toHaveLength(1);
   });
   it("rejects membership revocation before provider reads",async()=>{
     const h=reconciliationHarness({rpcError:{code:"PT403",message:"email_workspace_forbidden"}});
