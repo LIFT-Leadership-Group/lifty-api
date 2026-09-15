@@ -102,8 +102,12 @@ warmup. The profile fixes the configurable ceiling at 10 automated emails/day.
 This connection slice does not send mail or enable sender/channel/default routes.
 The actual atomic daily send budget and activation checks remain in LIF-828.
 
-The browser goes through `/unipile/start` to a single-use Unipile email-only
-hosted link without mailbox-history sync. `/unipile/callback` requires an opaque
+The browser goes through `/unipile/start` to a single-use Unipile Gmail-only
+hosted link without mailbox-history sync. Gmail includes Google Workspace
+addresses on corporate domains; the authenticated provider determines eligibility.
+Outlook and IMAP/SMTP are unsupported in v1. Account readback enforces this
+restriction for callbacks, reconnections and status recovery, including old links.
+`/unipile/callback` requires an opaque
 intent and a server-generated correlation MAC, then independently rereads the
 bound account ID, exact email and mail-source health before persisting anything.
 It handles `CREATION_SUCCESS` and `RECONNECTED`. Revoked membership, suspended

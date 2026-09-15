@@ -1,11 +1,8 @@
 import { z } from "zod";
 import { PublicError } from "./errors.js";
 
-const OwnerProfile = z.discriminatedUnion("provider", [
-  z.object({object:z.literal("AccountOwnerProfile"),provider:z.literal("GMAIL"),email:z.email(),
-    aliases:z.array(z.object({email:z.email(),is_primary:z.boolean().optional()}))}),
-  z.object({object:z.literal("AccountOwnerProfile"),provider:z.literal("OUTLOOK"),id:z.string().min(1),email:z.email()}),
-]);
+const OwnerProfile = z.object({object:z.literal("AccountOwnerProfile"),provider:z.literal("GMAIL"),email:z.email(),
+  aliases:z.array(z.object({email:z.email(),is_primary:z.boolean().optional()}))});
 const AccountId = z.string().regex(/^[A-Za-z0-9_-]{1,255}$/);
 const Account = z.object({
   id: AccountId,
@@ -76,7 +73,7 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
   async function createLink(input: { correlation: string; notifyUrl: string; expiresAt: string; reconnectId: string | null }): Promise<string> {
     const raw = await request("hosted/accounts/link", {
       type: input.reconnectId ? "reconnect" : "create",
-      ...(input.reconnectId ? { reconnect_account: AccountId.parse(input.reconnectId) } : { providers: ["GOOGLE", "OUTLOOK"] }),
+      ...(input.reconnectId ? { reconnect_account: AccountId.parse(input.reconnectId) } : { providers: ["GOOGLE"] }),
       api_url: base.origin, expiresOn: input.expiresAt, name: input.correlation,
       notify_url: input.notifyUrl, single_use: true,
       sync_limit: { MAILING: "NO_HISTORY_SYNC" }, disabled_options: ["sync_limit"],
@@ -97,9 +94,11 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
     if (!parsed.success || parsed.data.id !== accountId) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
     const { type, connection_params: { mail }, sources } = parsed.data;
     const matches = (value: string | undefined) => value?.toLowerCase() === expectedEmail;
-    if (type === "MAIL") {
+    // The v1 beta accepts Gmail, including Google Workspace. Provider readback,
+    // never the email domain, also gates old links, reconnections and recovery.
+    if (type !== "GOOGLE_OAUTH") {
       throw new PublicError({status:409,code:"UNIPILE_MAILBOX_UNVERIFIABLE",
-        message:"LIFTY cannot verify the physical mailbox for IMAP/SMTP accounts. Connect with Google or Outlook OAuth."});
+        message:"LIFTY’s email beta supports Gmail only, including Google Workspace. Connect with Google OAuth; Outlook and IMAP/SMTP accounts are not supported."});
     }
     if (!matches(mail.username) || !mail.id) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
     // Source IDs are independent of connection_params.mail.id. Until Unipile
@@ -110,12 +109,9 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
       // Account usernames can be aliases. The authenticated own-profile endpoint
       // supplies current primary evidence; it does not establish a stable Google sub.
       const owner = OwnerProfile.safeParse(await request(`users/me?account_id=${encodeURIComponent(accountId)}`));
-      if (!owner.success || owner.data.provider !== (type === "GOOGLE_OAUTH" ? "GMAIL" : "OUTLOOK")
-        || !matches(owner.data.email)) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
-      if (owner.data.provider === "GMAIL") {
-        const primary = owner.data.aliases.filter(alias => alias.is_primary === true);
-        if (primary.length !== 1 || !matches(primary[0]?.email)) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
-      }
+      if (!owner.success || !matches(owner.data.email)) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
+      const primary = owner.data.aliases.filter(alias => alias.is_primary === true);
+      if (primary.length !== 1 || !matches(primary[0]?.email)) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
     }
     return { accountId, email: expectedEmail, type, healthy };
   }
