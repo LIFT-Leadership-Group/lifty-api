@@ -6,6 +6,7 @@ RUN npm ci
 
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
+COPY scripts/copy-context-assets.mjs ./scripts/copy-context-assets.mjs
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine AS runtime

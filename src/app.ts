@@ -9,6 +9,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
+import { AGENT_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -1297,6 +1298,31 @@ export function createApp(
       },
       publicError.status as ContentfulStatusCode,
     );
+  });
+
+  // Task documentation is public so an agent can interview before sign-in.
+  // Register only this GET before authentication; every business route stays scoped.
+  app.get("/v1/context/:task", (context) => {
+    context.header("cache-control", "no-store");
+    const clientContract = context.req.query("client_contract") ?? AGENT_CLIENT_CONTRACT;
+    if (clientContract !== AGENT_CLIENT_CONTRACT) {
+      return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Update the installed LIFTY CLI and skill to retrieve current instructions.");
+    }
+    const document = getAgentContext(context.req.param("task"));
+    if (!document) return errorJson(context, 404, "CONTEXT_NOT_FOUND", "No instructions are available for this task.");
+    return context.json(document);
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get", path: "/v1/context/{task}", operationId: "getAgentTaskContext", security: [],
+    request: {
+      params: z.object({ task: z.string().min(1).max(64) }),
+      query: z.object({ client_contract: z.string().optional() }),
+    },
+    responses: {
+      200: { ...JsonResponse(AgentContextSchema), description: "Public task instructions and input schemas; no workspace data" },
+      404: { description: "Unknown task" },
+      409: { description: "Unsupported client contract" },
+    },
   });
 
   app.use("/v1/*", async (context, next) => {

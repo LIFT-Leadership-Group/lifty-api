@@ -8,7 +8,7 @@
     "node": ">=22.11.0"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-context-assets.mjs",
     "dev": "tsx watch src/server.ts",
     "do:deploy": "bash scripts/digitalocean.sh deploy",
     "do:doctor": "bash scripts/digitalocean.sh doctor",

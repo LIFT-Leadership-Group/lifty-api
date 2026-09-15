@@ -14,9 +14,43 @@ configured Hono app for programmatic use.
 
 ## API
 
+### Agent task context
+
+`GET /v1/context/onboarding`, `GET /v1/context/workspace`, and
+`GET /v1/context/campaign` return public product
+instructions, references and input schemas. They work before login and contain
+no tenant data or Scout base. The installed CLI requests
+`client_contract=lifty-cli-context.v1`; the response uses `lifty-context.v1`, a
+task identifier and a content revision. Responses are not cached by the CLI.
+
+Edit task guidance in `src/agent-context/`. Workspace/campaign transport schemas
+are generated from the API's Zod contracts. Business validation remains in the
+API/RPCs; a JSON Schema cannot describe every rule. Private generation context
+remains at authenticated `GET /v1/onboarding/context` and supplies its current
+configuration schema, generation rules and workspace fingerprint.
+
+For this client contract, preserve the installed command names, payload
+envelopes, local draft readiness/confirmation invariants and writer interfaces.
+Adding onboarding configuration fields or workspace values does not require
+editing the installed skill. The CLI still enforces campaign input/preview
+contracts and local confirmation rules; preserve those in this profile.
+Changes outside these supported shapes, removing required local fields or
+introducing commands the client cannot execute require a new client
+contract/release; do not publish those instructions to this profile.
+The revision identifies content and is
+not itself a signal of incompatibility or permission to mutate a workspace.
+
+Build copies the public assets into `dist/agent-context/` for the Node container.
+Deploy this endpoint before releasing the matching CLI/skill bundle; old CLI
+commands remain available. If context retrieval fails, the new skill preserves
+local work and stops dependent writes rather than using stale examples.
+
+### Routes
+
 - `GET /healthz` — liveness
 - `GET /readyz` — process readiness after configuration and app construction
 - `GET /openapi.json` — generated OpenAPI 3.1 contract
+- `GET /v1/context/{task}` — public task guidance for onboarding, workspace or campaign
 - `GET /cli/auth` — hosted founder sign-in and loopback CLI authorization
 - `GET /v1/workspace` — authenticated founder workspace state
 - `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
