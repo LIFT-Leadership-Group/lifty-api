@@ -158,3 +158,74 @@ The recovery page never calls the CLI loopback endpoint or grants workspace acce
 Validation: browser-script tests execute the delivered inline JavaScript against mocked Auth REST responses, plus public-route/CSP and production-composition checks. They do not prove live email delivery or project Auth configuration. A live test must be performed by the account owner after deploying and allowlisting the exact URL; only the owner enters the new password.
 
 Primary contracts: [password recovery guide](https://supabase.com/docs/guides/auth/passwords), [Auth REST schema](https://github.com/supabase/auth/blob/master/openapi.yaml), [official Auth client recovery/transport](https://github.com/supabase/auth-js/blob/master/src/GoTrueClient.ts), [redirect allowlist](https://supabase.com/docs/guides/auth/redirect-urls). No mandatory email-verification or leaked-password setting is introduced.
+
+## LinkedIn v1 control plane (LIF-844)
+
+`POST /v1/linkedin/connect` accepts only the workspace, founder IANA timezone,
+`account_use: "personal"`, and `other_automation: false`. The declaration means
+an account the founder uses regularly and does not automate with another tool.
+The API returns a short-lived URL under `/unipile/linkedin/start`; the browser
+uses a single-use, LinkedIn-only Hosted Auth link. It does not inherit the email
+provider picker or MAILING synchronization options.
+
+The signed intent and callback correlation MAC have LinkedIn-specific purposes.
+`/unipile/linkedin/callback` records an immutable account hint, then verifies
+`GET /api/v1/accounts/{account_id}` and `GET /api/v1/users/me?account_id=...` using
+the provider credential. Both responses must identify LinkedIn and the same
+profile; every source must have a unique nonblank ID and `OK` health. Only the
+selected profile ID, safe profile URL and display name cross the API boundary.
+A callback body never establishes identity by itself. A provider outage keeps
+the hint so authenticated `GET /v1/linkedin?workspace=...` can finish readback.
+Workspace membership is checked before reconciliation and again by completion.
+
+Status verifies account health and writes unhealthy or unverifiable readback to
+the connection through a caller-scoped RPC. Disconnect accepts
+`{ "workspace": "slug-or-id", "confirm": true }` at
+`POST /v1/linkedin/disconnect`; it pauses the durable connection and campaigns.
+Connection, healthy recovery and reconnect do not activate outbound. A healthy,
+already active account may truthfully report `sending_enabled: true`; every
+new or reconnecting account stays inactive until explicit campaign activation.
+
+`POST /v1/linkedin/campaign` accepts `{ "operation": ..., "payload": ... }`:
+
+| Operation | Payload |
+| --- | --- |
+| `prepare` | `workspace`, `lead_id`, `connection_ref`, exact plain-text `text` (1–3000 characters), optional `campaign_ref` |
+| `preview`, `status` | `workspace`, `campaign_ref` |
+| `approve`, `activate`, `pause`, `cancel` | `workspace`, `campaign_ref`, exact `digest`, `confirm: true` |
+
+The preview fixes an invitation without a note, followed by one message after
+verified acceptance. It includes the exact message, recipient, connection,
+version, digest, policy, action outcomes and blockers. A material change creates
+a new version and invalidates approval. Delivery receipts and uncertain outcomes
+remain inspectable; the API does not send or retry an invitation or message.
+The backend owns atomic reservations: 5 invitations/day, 25 invitations in a
+rolling 7 days, 5 messages/day, weekdays 09:00–17:00 in the founder timezone,
+and 15–45 minute spacing. There are no extra steps or editable schedules.
+
+### Deployment and acceptance
+
+1. Apply the LIF-844 SQL migration, retaining the existing account/action ledger,
+   canonical `lead_events` and cross-channel reply/suppression guards.
+2. Provision a random `LIFTY_LINKEDIN_SERVER_KEY` of at least 32 characters and
+   its SHA-256 digest plus the stable Unipile namespace in
+   `private.lifty_linkedin_server_config`. Use a key different from email.
+3. Configure that key, `UNIPILE_DSN` and `UNIPILE_ACCESS_TOKEN` in the API. Either
+   channel can be enabled independently. The API rejects service-role Supabase
+   credentials. Member operations keep the caller JWT and the dedicated RPC
+   capability; browser operations recheck the durable intent issuer in SQL.
+4. Deploy the matching SQL, Jobs/Edge runtime and API commits and publish the
+   CLI through the existing release process. Inspect `/openapi.json` for the
+   strict public contracts. A local commit does not enable sending.
+5. Run the explicitly authorized account/recipient acceptance journey and
+   record invite, acceptance, message and reply receipts and canonical events.
+   Confirm paused recovery, cross-tenant isolation, no duplicate events/sends,
+   cross-channel stop and zero accidental pending work before founders.
+
+`npm run verify` covers mocked HTTP/provider shapes, purpose separation,
+callbacks, caller-scoped RPCs, public schemas and the existing email regression
+suite. These tests do not claim live Hosted Auth or recipient delivery acceptance.
+
+Provider contracts checked: [account readback](https://developer.unipile.com/reference/accountscontroller_getaccountbyid),
+[own-profile readback](https://developer.unipile.com/reference/userscontroller_getaccountownerprofile),
+[Hosted Auth](https://developer.unipile.com/docs/hosted-auth).

@@ -1,3 +1,5 @@
+import { createLinkedinConnectOperations } from "./linkedin-connect.js";
+import { createLinkedinCampaignOperations } from "./linkedin-campaign.js";
 import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
 import { getApolloAllowance } from "./apollo-allowance.js";
 import { apolloCredentials } from "./apollo-credentials.js";
@@ -54,6 +56,7 @@ import {
 } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
+  const linkedin = config.linkedin ? createLinkedinConnectOperations(config.linkedin) : null;
   const email = config.email ? createEmailConnectOperations(config.email) : null;
   const hubspot = createHubspotConnectOperations(config.hubspot);
   const slackSettings = config.slack;
@@ -74,6 +77,14 @@ export function createProductionApp(config: ServiceConfig) {
     }),
     getApolloAllowance,
     apolloCredentials,
+    ...(linkedin ? {
+      linkedinCampaign: createLinkedinCampaignOperations(config.linkedin!.serverKey),
+      startLinkedinConnect: linkedin.start,
+      getLinkedinConnection: linkedin.status,
+      disconnectLinkedin: linkedin.disconnect,
+      authorizeLinkedin: linkedin.authorize,
+      completeLinkedinCallback: linkedin.callback,
+    } : {}),
     ...(email ? {
       emailAvailable: true,
       emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
