@@ -87,7 +87,12 @@ export function campaignResultFor(operation: EmailCampaignInput["operation"], da
   const result = operation === "placement-preview" ? EmailPlacementPreview.parse(data) :
     ["placement", "placement-status", "placement-confirm"].includes(operation) ? EmailPlacementResult.parse(data) : EmailCampaignResult.parse(data);
   const matches = ["placement", "placement-status", "placement-confirm", "placement-preview"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "provider" ? "existing_executions_unchanged" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
-  if (operation === "cancel" && (!("content" in result) || result.state !== "canceled" || result.execution_state !== "canceled" || result.recovery?.state !== "canceled" || result.recovery.cancel_allowed || result.steps.some(step => step.state === "pending"))) throw new Error("Cancellation was not confirmed.");
+  if (operation === "cancel") {
+    if (!("content" in result)) throw new Error("Cancellation was not confirmed.");
+    const executionCanceled = result.execution_ref !== null && result.execution_state === "canceled";
+    const neverExecuted = result.execution_ref === null && result.execution_state === null && result.steps.length === 0;
+    if (result.state !== "canceled" || (!executionCanceled && !neverExecuted) || result.recovery?.state !== "canceled" || result.recovery.cancel_allowed || result.steps.some(step => step.state === "pending")) throw new Error("Cancellation was not confirmed.");
+  }
   if (!matches) throw new Error("Invalid campaign operation response.");
   return result;
 }

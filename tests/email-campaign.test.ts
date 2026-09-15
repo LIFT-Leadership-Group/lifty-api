@@ -254,6 +254,30 @@ describe("durable recovery and cancellation",()=>{
   expect(h.rpc).toHaveBeenCalledWith("lifty_email_campaign_recovery",{p_server_key:secret,p_operation:"cancel",p_payload:req.payload});
   expect((await res.json()).state).toBe("canceled");
  });
+ it.each(["draft", "approved"])("cancels a %s campaign without inventing an execution", async state => {
+  const data = {...preview, state, approved:state === "approved", recovery:{state:"ready", reason:null, checked_at:null, cancel_allowed:true}};
+  const h = harness({data,error:null});
+  const status = await h.app.request("/v1/email/campaign",post(request("status")));
+  expect(status.status).toBe(200); expect((await status.json()).recovery.cancel_allowed).toBe(true);
+  data.state = "canceled"; data.recovery.state = "canceled"; data.recovery.cancel_allowed = false;
+  const req = request("cancel",{digest,confirm_cancel:true});
+  const res = await h.app.request("/v1/email/campaign",post(req));
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({state:"canceled",execution_ref:null,execution_state:null,steps:[],recovery:{state:"canceled",cancel_allowed:false}});
+  expect(h.rpc).toHaveBeenLastCalledWith("lifty_email_campaign_recovery",{p_server_key:secret,p_operation:"cancel",p_payload:req.payload});
+  expect(h.rpc).toHaveBeenCalledTimes(2);
+ });
+ it.each([
+  {...canceled,execution_ref:null},
+  {...canceled,execution_state:null,steps:[]},
+  {...canceled,execution_ref:null,execution_state:null},
+  {...canceled,execution_ref:undefined,execution_state:null,steps:[]},
+  {...canceled,execution_ref:"invalid",steps:[]},
+ ])("rejects inconsistent canceled execution shape %#",async data=>{
+  const h=harness({data,error:null});
+  const res=await h.app.request("/v1/email/campaign",post(request("cancel",{digest,confirm_cancel:true})));
+  expect(res.status).toBe(502);expect(h.rpc).toHaveBeenCalledTimes(1);
+ });
  it.each([{digest},{confirm_cancel:true},{digest,confirm_cancel:false},{digest,confirm_cancel:true,retry_send:true}])("rejects incomplete or privileged cancellation %j",async fields=>{
   const h=harness({data:canceled,error:null});const res=await h.app.request("/v1/email/campaign",post(request("cancel",fields)));expect(res.status).toBe(400);expect(h.rpc).not.toHaveBeenCalled();
  });
