@@ -9,6 +9,7 @@ export const COMPANY_OPERATION_TIMEOUT_MS = 55_000;
 const PROVIDER_REQUEST_TIMEOUT_MS = 15_000;
 export interface CompanyMappingSettings {
   serverKey: string;
+  readOnly?: boolean;
   fetch?: typeof fetch;
   /** A short injected budget makes timeout recovery deterministic in tests. */
   operationTimeoutMs?: number;
@@ -58,10 +59,11 @@ export async function runCompanyMapping(
   session: AuthSession, settings: CompanyMappingSettings, action: "context" | "apply",
   input?: unknown, options: CompanyMappingOptions = {},
 ) {
+  if (action === "apply" && settings.readOnly) throw new MappingError("MAINTENANCE_READ_ONLY", 503);
   const plan = action === "apply" ? parsePlan(input) : undefined;
-  const workspaceRef = options.workspaceRef ?? plan?.workspace_ref;
+  const workspaceRef = options.workspaceRef?.toLowerCase() ?? plan?.workspace_ref;
   if (workspaceRef !== undefined && !z.uuid().safeParse(workspaceRef).success) throw new MappingError("INVALID_WORKSPACE", 400);
-  if (plan && options.workspaceRef && plan.workspace_ref !== options.workspaceRef) throw new MappingError("WORKSPACE_OR_PORTAL_CHANGED", 409);
+  if (plan && options.workspaceRef && plan.workspace_ref !== workspaceRef) throw new MappingError("WORKSPACE_OR_PORTAL_CHANGED", 409);
   const requestId = randomUUID();
   const controller = new AbortController();
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;

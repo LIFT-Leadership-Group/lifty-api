@@ -140,7 +140,7 @@ export function parsePlan(value: unknown): Plan {
       suggestion: "Fetch company-mapping context and regenerate the complete plan. Use distinct internal enum values.",
     }]);
   }
-  return parsed.data;
+  return { ...parsed.data, workspace_ref: parsed.data.workspace_ref.toLowerCase() };
 }
 export function desiredMappings(
   plan: Pick<Plan, "type_values" | "tier_values">,

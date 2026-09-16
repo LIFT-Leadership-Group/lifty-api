@@ -95,3 +95,18 @@ it("deployment readiness checks the actual versioned CRM capability without tena
  const app=createApp({checkCompanyReadiness:async()=>false});expect((await app.request("/readyz/crm")).status).toBe(503);
  expect(await (await createApp({checkCompanyReadiness:async()=>true}).request("/readyz/crm")).json()).toEqual({status:"ready",capability:"lifty-crm-company.v1"});
 });
+
+it("maintenance freeze rejects apply before any provider or storage side effect; context remains readable",async()=>{
+ const f=fixture();const run=createCompanyMapping({serverKey:key,fetch:f.provider,readOnly:true});
+ await expect(run(f.session,"apply",{})).rejects.toMatchObject({code:"MAINTENANCE_READ_ONLY",status:503});
+ expect(f.rpc).not.toHaveBeenCalled();expect(f.provider).not.toHaveBeenCalled();
+ expect(await run(f.session,"context")).toMatchObject({status:"action_needed"});
+});
+
+it("UUID workspace selection accepts equivalent uppercase text", async()=>{
+ const f=fixture();f.state.workspace_ref="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+ const original=f.rpc.getMockImplementation()!;
+ f.rpc.mockImplementation(async(name,args)=>args.p_operation==="credential"?{data:{secret:JSON.stringify(f.grant),credential_version:"c".repeat(64),workspace_ref:f.state.workspace_ref,integration_ref:integration,portal_id:"123"},error:null}:original(name,args));
+ expect(await f.run(f.session,"context",undefined,{workspaceRef:f.state.workspace_ref.toUpperCase()})).toMatchObject({workspace_ref:f.state.workspace_ref});
+ expect(f.rpc.mock.calls[0]?.[1].p_payload.workspace_ref).toBe(f.state.workspace_ref);
+});

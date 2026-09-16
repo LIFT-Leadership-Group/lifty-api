@@ -10,7 +10,7 @@ import type { EmailConnectSettings } from "./email-connect.js";
 type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
-  crm?: { serverKey: string } | null;
+  crm?: { serverKey: string; readOnly: boolean } | null;
   dashboardOrigin?: string;
   host: string;
   port: number;
@@ -130,7 +130,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (linkedinKey && linkedinKey === emailKey) throw new Error("LinkedIn requires a server key distinct from email.");
   if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
-    crm: crmKey ? { serverKey: crmKey } : null,
+    crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,
     dashboardOrigin: dashboardUrl.origin,
     linkedin: linkedinEnabled ? {
       dsn: required(environment, "UNIPILE_DSN"), accessToken: required(environment, "UNIPILE_ACCESS_TOKEN"),

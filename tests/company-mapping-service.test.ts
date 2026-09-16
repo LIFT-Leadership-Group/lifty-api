@@ -221,3 +221,8 @@ it("connection changed mid-flight cannot publish or mutate another portal", asyn
   );
   assert.deepEqual(f.writes, ["options:type"]);
 });
+
+it("canonicalizes equivalent UUID plan text without changing its contract schema",async()=>{
+ const plan=await fixture().plan();plan.workspace_ref="AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+ assert.equal(parsePlan(plan).workspace_ref,"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+});
