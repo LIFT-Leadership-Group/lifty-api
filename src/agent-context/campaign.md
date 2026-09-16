@@ -12,15 +12,29 @@ Every command below runs as `node <active-project>/.lifty/bin/lifty.mjs <verb>`.
 
 ## Handoff from targeting review
 
-When arriving from onboarding or a targeting change, follow
-`references.calibration`: the founder must explicitly confirm the current
-complete five-lead A/B sample before Unipile connection/setup. A B-only sample
-needs explicit acceptance; C leads never count. Do not treat the
-search result or ICP confirmation as that approval. Once confirmed, continue
-with the requested connection and collect only missing account declarations.
-This confirmation authorizes the connection setup step, not sending.
-A separate request to manage an existing account or campaign follows its
-explicit scope and does not require repeating an unrelated calibration.
+When the founder asks to continue outreach setup, proceed with their chosen
+channel and collect only its missing account declarations. Follow
+`references.calibration` for lead-quality feedback, but a pending or stale
+sample, fewer than five leads, no Tier A leads, exhausted discovery allowance,
+or an unconnected CRM does not block account connection or message drafting.
+Setup and calibration have separate progress; report both honestly.
+
+The founder may explicitly choose Tier B recipients. Inspect saved evidence
+against the current targeting, preserve recorded grades, and identify the exact
+intended recipients. An ICP update invalidates the old sample's acceptance,
+not every account connection or usable fact about every existing lead. Reuse
+evidence when it supports current fit; do not acquire a new cohort merely to
+continue setup or claim an old grade was freshly produced by Scout.
+
+Without a recipient or a healthy account, help choose channel, sender, copy
+and timing and retain a clearly labeled draft. Call campaign prepare/preview
+only when their real required inputs exist; do not invent lead references or
+claim a local draft is a saved campaign. Missing prerequisites block their
+dependent operation, not all setup. Before activation, resolve actual
+recipient/account/preview blockers and obtain explicit approval of the exact
+preview and authorization to send. Choosing B leads or connecting an account
+does not by itself grant that approval. No five-lead or Tier-A-only gate is
+added to the campaign workflow.
 
 ## Email campaigns
 

@@ -57,11 +57,31 @@ exclusion. A ceiling and industries out may stay unknown. If the founder
 bundles two operating states, ask which is primary only when the distinction
 changes the initial search.
 
+Ask whether there is a size ceiling before treating it as open. Reuse an
+already stated ceiling and preserve its unit: "$5M ARR" is neither $5M total
+revenue nor an employee count. "Small companies" needs a numeric range.
+"Fewer than 100 employees" means a maximum of 99, not 100.
+
+Start with the founder's core fit and actual exclusions. Present strong-fit
+candidates first and let sample feedback add preferences later. Missing public
+signals do not create extra requirements for A. Confirmed size and geography
+limits still apply; inclusion does not authorize exceeding them.
+
 ### Initial search boundaries
 
 Record `icp.discovery` from confirmed founder intent. Reuse any search
 boundaries already supplied, and ask one coherent question only for the
 missing search decision. Explain what would otherwise remain broad.
+
+Resolve geography and company headcount independently, even when a keyword
+or another filter is already present. For each, obtain a boundary or the
+founder's explicit choice to leave it unrestricted. Ask for the desired
+market instead of leading with a proposal to search worldwide. For example:
+"Which countries should the companies be based in? Does the buyer also need
+to be based there?" In the size block: "You set $500k–$5M ARR. What team sizes
+should we search, or do you want no employee limit?" Explain that headcount
+helps discovery because this search cannot filter ARR directly. Reuse answers
+already given; a general "sounds good" cannot confirm an unmentioned boundary.
 
 - `person_locations` constrains where buyers live or work.
 - `organization_locations` constrains company headquarters. Do not substitute
@@ -84,6 +104,13 @@ For an ARR target, preserve the ARR boundary for research and use headcount
 only if the founder approves that proxy. If all native boundaries remain
 unset, explain that search is broad and obtain their acceptance once. Do not
 convert missing geography into silent worldwide targeting.
+
+Clarify whether an additional employee limit is only a discovery proxy or
+also a hard requirement. Keep the ARR target in `icp.size`, the approved
+employee discovery range in `employee_range_proxy`, and an independently
+confirmed hard headcount exclusion in `hard_disqualifiers`. A proxy alone
+must not become an exclusion. Record explicit unrestricted decisions in the
+existing founder statement history and use null in their schema fields.
 
 ### Initial personas
 
@@ -111,7 +138,8 @@ Write the draft as soon as these items exist:
 3. A numeric size floor plus its unit.
 4. At least one hard exclusion.
 5. At least one persona with role, title, and organizational tell.
-6. Confirmed discovery boundaries, or explicit acceptance of a broad search.
+6. Geography and employee-size decisions are each confirmed, including any
+   explicit unrestricted choice; wholly broad search is explicitly accepted.
    Record them in `icp.discovery` using the current schema.
 
 Industries in are also required for the initial search. Empty example-company
@@ -131,10 +159,13 @@ C leads never count, and a B-only sample needs explicit acceptance. Follow
 - tooling judgment;
 - boundary cases and targeting refinements.
 
-Outreach remains `deferred_until_sample_accepted`. Do not ask about tone,
-forbidden copy moves, sender voice, CTA, channels, or sequence preferences in
-the pre-auth interview. A research or CRM-only workspace never needs those
-answers.
+The draft uses the existing `deferred_until_sample_accepted` outreach status;
+preserve that schema value. It does not prohibit a later founder request to
+connect accounts or draft outreach before calibration is complete. Keep the
+pre-auth interview focused on targeting rather than requiring tone, sender
+voice, CTA, channels or sequences. When the founder asks to work on outreach,
+follow campaign context and ask only for the next step's missing inputs.
+A research or CRM-only workspace never needs outreach answers.
 
 ## Close
 
