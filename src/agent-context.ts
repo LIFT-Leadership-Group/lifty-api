@@ -20,16 +20,17 @@ export const AgentContextSchema = z.object({
 // remain behind the existing authenticated /v1/onboarding/context boundary.
 const interview = readFileSync(new URL("./agent-context/interview.md", import.meta.url), "utf8");
 const companyMapping = readFileSync(new URL("./agent-context/company-mapping.md", import.meta.url), "utf8");
+const calibration = readFileSync(new URL("./agent-context/calibration.md", import.meta.url), "utf8");
 const documents = {
   onboarding: {
     instructions: readFileSync(new URL("./agent-context/onboarding.md", import.meta.url), "utf8"),
     schemas: { draft: JSON.parse(readFileSync(new URL("./agent-context/draft.schema.json", import.meta.url), "utf8")) },
-    references: { interview, configuration: readFileSync(new URL("./agent-context/configuration.md", import.meta.url), "utf8") },
+    references: { interview, calibration, configuration: readFileSync(new URL("./agent-context/configuration.md", import.meta.url), "utf8") },
   },
   workspace: {
     instructions: readFileSync(new URL("./agent-context/workspace.md", import.meta.url), "utf8"),
     schemas: { config_update: z.toJSONSchema(ConfigUpdateRequestSchema, { io: "input" }) },
-    references: { interview },
+    references: { interview, calibration },
   },
   campaign: {
     instructions: readFileSync(new URL("./agent-context/campaign.md", import.meta.url), "utf8"),
@@ -37,7 +38,7 @@ const documents = {
       email_campaign: z.toJSONSchema(EmailCampaignRequest, { io: "input" }),
       linkedin_campaign: z.toJSONSchema(LinkedinCampaignRequest, { io: "input" }),
     },
-    references: {},
+    references: { calibration },
   },
 };
 

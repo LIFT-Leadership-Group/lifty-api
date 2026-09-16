@@ -90,8 +90,9 @@ fields.
 
 ## Deferred stages
 
-The workspace draft records a pending calibration on the first five researched
-leads (`lead_target: 5`). Sample review owns:
+The workspace draft records a pending calibration on five researched Tier A
+leads (`lead_target: 5`), each with a LinkedIn profile URL. Follow
+`references.calibration` for the feedback and confirmation gate. Sample review owns:
 
 - negative or low-value titles;
 - observed reply patterns;
