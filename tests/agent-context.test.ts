@@ -15,6 +15,9 @@ describe("public agent task context", () => {
       const current = await response.json();
       expect(Object.keys(current.schemas).length).toBeGreaterThan(0);
       expect(current.references.calibration).toBeDefined();
+      expect(current.instructions).toContain("<installed-runner>");
+      expect(current.instructions).toContain("project or global");
+      expect(current.instructions).not.toContain("<active-project>/.lifty/bin/lifty.mjs");
       if (task !== "campaign") expect(current.instructions).toContain("crm companies context");
     }
   });

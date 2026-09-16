@@ -1,35 +1,21 @@
 
 # LIFTY founder onboarding
 
-## Authorization links
+## Authentication and connection guidance
 
-For login and every account connection, show the actual URL returned by the
-persisted CLI as a clickable Markdown link in the conversation. Never invent,
-reuse an expired link, or open one automatically with browser tools, `open`,
-`xdg-open` or another app. Let the founder choose their browser and profile.
-Run authorization commands with `LIFTY_NO_BROWSER=1` for older installed CLIs.
-For connection commands, use `--no-wait` to return the link immediately. If an
-older CLI rejects that flag before making a request, omit it, keep the process
-running and read its first output without waiting for authorization to finish.
-Do not start another connection attempt just to recover the URL.
+Read the installed entry skill's `references/onboarding-auth.md` in full for
+session/API checks, the live login callback lifecycle and the common provider
+connection handoff. It owns the shared authentication instructions. Use its
+verified runner and installation scope/profile arguments for lifecycle `status`;
+private drafts still belong to the active project. A failed read is unverified,
+not proof of sign-out, disconnection or a missing workspace.
 
-Use the founder's language. If the email is already known, the Spanish handoff
-is ``[Conectá `<email>` acá](<returned-url>).`` followed by:
-"Avisame cuando termines la autorización y verifico la conexión. No se enviará
-ningún email." Use the real address and URL, never the placeholders. If the
-address is not known, label the link "Conectá tu cuenta acá"; do not ask for an
-address solely to label the link. For login, say "Iniciá sesión acá"; name
-HubSpot, Slack or LinkedIn when connecting those accounts.
-
-End the turn after giving the link. When the founder says authorization is
-complete, verify through the CLI before reporting success: email/LinkedIn use
-`connect <provider> --workspace <workspace-ref> --status`, HubSpot uses `status`,
-and Slack uses `notifications`. If a process is still running, read its result.
-For explicit HubSpot reauthorization, retain the waiting process rather than
-`--no-wait`: its check requires a new grant, not the old connected status.
-Login also keeps its callback listener running; show its URL promptly and read
-its result after the founder replies. Never claim connection from a pending
-handoff, silently restart an expired attempt, or activate sending.
+Provider details come from fresh stage context: `context crm` for HubSpot,
+`context notifications` for Slack and `context sending-accounts` for Unipile
+LinkedIn/email. Follow their current methods, routes, schemas and retry timing.
+The shared handoff is GET current state, POST connection/reconnection, show the
+real returned link immediately, and GET the same attempt after authorization.
+Verify the current attempt even when a previous connection remains healthy.
 
 Build one founder-confirmed ICP bootstrap, save it privately in the active
 project. `lifty login` creates the workspace; you generate its discovery and
@@ -102,8 +88,8 @@ Completion means exactly:
   preventing requested outreach setup. Report these as separate outcomes.
 
 When HubSpot connection was part of the founder's request, completion also
-requires `lifty connect hubspot` to report the secret-free portal ID as
-connected, and — when the first run already produced researched leads —
+requires the CRM stage to verify the current attempt and report the
+secret-free portal ID as connected, and — when the first run already produced researched leads —
 `lifty sync` to report how many of them landed in that portal. OAuth
 credentials remain backend-only.
 
@@ -242,49 +228,21 @@ only output shape.
     configuration, run, and HubSpot state in one read:
 
     ```text
-    node "<installed-runner>" status
+    node "<installed-runner>" status <resolved-installation-arguments>
     ```
 
-14. If HubSpot connection was part of the founder's request, say in one
-    sentence what connecting unlocks — LIFTY can put its researched leads
-    into their CRM, and nothing sends — then run the persisted CLI's hosted
-    OAuth flow:
+14. If HubSpot connection was part of the founder's request, fetch
+    `context crm` and follow its current guide, operation schemas and connection
+    reference. Explain that connecting lets Lifty put researched leads into
+    their CRM and does not send outreach. Read the current state, start the
+    supported connection/reconnection, immediately show the actual returned URL
+    and verify the same attempt after the founder finishes. An old connected
+    portal is insufficient evidence for a new authorization. Preserve a working
+    connection during reconnection. If HubSpot reports an admin/permission
+    blocker, use the stage's current repair instructions and do not claim an
+    approval request was sent unless the founder submitted it. If HubSpot was
+    not requested, offer it as a next step without starting authorization.
 
-    ```text
-    LIFTY_NO_BROWSER=1 node "<installed-runner>" connect hubspot --no-wait
-    ```
-
-    The CLI returns the short-lived connection URL. Show it using the
-    authorization-link handoff above and verify after the founder replies. The founder approves the reviewed LIFTY app
-    in HubSpot; never ask for a client ID, client secret, authorization code,
-    access token, or refresh token. Report the connection in plain words with
-    the portal ID and nothing else from the CLI output. If HubSpot was not
-    requested, offer it as an available next step and do not run it.
-
-    Check `lifty status` first. Reuse a connected portal when it does not need
-    reauthorization. If the founder explicitly asks to reauthorize an existing
-    connection, use `connect hubspot --reconnect` when the installed CLI supports
-    it; older CLIs use `connect hubspot`. Do not disconnect a working integration
-    just to refresh its consent. A previous connected status is not proof that
-    a new authorization finished.
-
-    If HubSpot says the user lacks permissions or the app's scopes are not
-    approved, give them an admin handoff immediately. Explain that a HubSpot
-    super admin for the intended portal must approve Lifty's required permissions
-    under Settings > Integrations > Connected Apps > Approved apps. Previous
-    approval can cover an older permission set. Draft a short request naming
-    their workspace and portal, and include the exact fresh connection link
-    returned by the CLI for them to share. Do not send the request yourself.
-    The admin can open that link and authorize without the founder's Lifty login.
-    Links expire after ten minutes, so if the admin is not ready, preserve the
-    workspace and generate a new link when they are. Do not claim HubSpot sent an
-    approval request unless the founder actually submitted one in HubSpot.
-
-    A request for a fresh HubSpot link means rerun the HubSpot connection command.
-    Run Lifty login only if the CLI reports an expired or invalid Lifty session.
-    For a server error, report that this attempt did not complete and check
-    connection status before retrying. Never report company syncing as ready
-    until the connection and company mapping checks succeed.
 15. After the connection succeeds, when the first run has researched leads,
     push them into the founder's HubSpot:
 
@@ -300,55 +258,23 @@ only output shape.
     workspace policy. If sync fails or times out, `lifty sync` safely reattaches
     to active work or retries the still-qualified failed cohort. Claim complete
     delivery only when all stages are confirmed by the receipt.
-16. When the founder chooses outreach setup, proceed to the Unipile account
-    connection they requested, even if sample review is pending. Fetch
-    `lifty context campaign` for current connection instructions. Offer Gmail
-    if email is their chosen channel; otherwise skip to their chosen channel. Gmail includes
-    Google Workspace business accounts; Outlook is not supported in this beta. Ask whether
-    the founder wants to connect an existing mailbox now or skip it. If they
-    choose to connect, ask for its exact address and whether it is already used
-    regularly for their own correspondence (`personal`) or is new/dedicated to
-    outreach (`outreach`). Do not infer this from the email domain. Say that
-    personal or business correspondence mailboxes qualify for the habitual-use beta.
-    The beta performs no placement and has no managed warmup. New/dedicated
-    outreach mailboxes cannot send; explain this and offer another habitual-use
-    account. If needed, disconnect first and reconnect with the other account.
-    Explain the limit: at most 10 automated emails per day from this mailbox.
-    Obtain the workspace reference from the CLI's workspace receipt; never
-    guess another tenant. Run only after the founder chooses to connect:
-
-    ```bash
-    LIFTY_NO_BROWSER=1 node "<installed-runner>" connect unipile --no-wait \
-      --workspace <workspace-ref> --email <exact-address> --mailbox-use personal
-    ```
-
-    Use `--mailbox-use outreach` for a new/dedicated mailbox. Show the returned
-    link using the handoff above. The founder enters credentials only in the
-    hosted flow. After they confirm authorization, check with
-    `connect unipile --workspace <workspace-ref> --status`. Connection does not
-    activate sending. Skipping this option never blocks onboarding.
-17. During requested outreach setup, offer LinkedIn through Unipile if
-    LinkedIn is the chosen channel. Ask whether the founder wants to connect
-    their existing habitual-use account now or skip it. Before connecting,
-    obtain their IANA timezone and an explicit declaration that they already
-    use the account regularly and have no other automation running on it.
-    If another automation tool is active, do not connect. Explain the beta:
-    five invitations per day, 25 in a rolling seven days and five messages per
-    day, weekdays 09:00–17:00 in their timezone. Invites have no note; a campaign
-    can send one message after acceptance. Conversation then continues manually.
-    Use the workspace reference returned by the CLI. After those declarations:
-
-    ```bash
-    LIFTY_NO_BROWSER=1 node "<installed-runner>" connect linkedin --no-wait \
-      --workspace <workspace-ref> --timezone <IANA-timezone> \
-      --account-use personal --no-other-automation
-    ```
-
-    Show the link and wait for the founder to confirm authorization.
-    Credentials stay in the browser. Then verify with `connect linkedin --workspace
-    <workspace-ref> --status`. Connecting or reconnecting never activates
-    sending. Campaign preview, exact approval and activation happen later,
-    only when requested. Skipping LinkedIn never blocks onboarding.
+16. When the founder chooses email setup, fetch `context sending-accounts`
+    and follow its current email operation schema, even while sample review is
+    pending. Briefly recommend a Gmail/Google Workspace account they already
+    use regularly when appropriate under the current policy. Hosted selection
+    handles provider, account and habitual-use declarations; do not add an
+    email-address or mailbox-use questionnaire. GET the current state, POST
+    when the founder chooses connection, show the real returned link immediately
+    and verify GET for that same attempt. The founder enters credentials only
+    in the hosted flow. Connecting does not activate sending; skipping this
+    option never blocks onboarding.
+17. For requested LinkedIn setup, use the same `context sending-accounts`
+    guide and its current LinkedIn declarations and operation schema. Ask only
+    for missing required inputs. Keep credentials in the browser, show the
+    actual returned link immediately and verify the current attempt. Do not
+    infer reconnection success from an older healthy grant. Connection and
+    reconnection never authorize messages or invitations. Follow campaign
+    context for exact preview, approval and activation when requested.
 18. Ask for sample feedback as described in `references.calibration`.
     If the founder instead asks to continue outreach setup or use Tier B leads,
     honor that request and advance the supported setup steps. Preserve pending
@@ -372,8 +298,8 @@ only output shape.
   successfully, and do not run `run` before push reports the configuration
   imported.
 - Do not manually install provider apps or invent provider authorization URLs.
-  Use the persisted CLI's reviewed `connect hubspot`, `connect unipile`, or `connect linkedin`
-  command after a workspace exists and the founder chooses that connection.
+  Use the current CRM, notifications or sending-accounts stage operation
+  after a workspace exists and the founder chooses that connection.
 - Do not enable outreach or send anything. The first run researches leads
   only.
 - Do not treat sample acceptance, account connection or campaign drafting as
