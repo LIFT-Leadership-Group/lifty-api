@@ -6,7 +6,8 @@ const Identifier = z.string().regex(/^[A-Za-z0-9_-]{1,255}$/);
 const Account = z.object({
   object: z.literal("Account"), id: Identifier, type: z.literal("LINKEDIN"),
   connection_params: z.object({ im: z.object({ id: Identifier, publicIdentifier: z.string().optional() }) }),
-  sources: z.array(z.object({ id: z.string(), status: z.string() })),
+  // v1 source statuses; unknown future values are failed verification reads.
+  sources: z.array(z.object({ id: z.string(), status: z.enum(["OK", "STOPPED", "ERROR", "CREDENTIALS", "PERMISSIONS", "CONNECTING"]) })),
 });
 // These are selected fields of the documented v1 AccountOwnerProfile. Other
 // provider fields are deliberately dropped, including email and credentials.
@@ -63,7 +64,6 @@ export function createLinkedinProvider(settings: UnipileProviderSettings) {
         void response.body?.cancel().catch(() => {});
         if (hosted) throw failure(`HOSTED_HTTP_${response.status}`);
         if (response.status === 404) throw failure("ACCOUNT_NOT_FOUND", 409);
-        if (response.status === 401 || response.status === 403) throw failure("ACCOUNT_UNHEALTHY", 409);
         throw failure();
       }
       if (!response.body) throw failure();
@@ -98,19 +98,22 @@ export function createLinkedinProvider(settings: UnipileProviderSettings) {
   async function readIdentity(accountId: string, expectedProfileId?: string | null): Promise<LinkedinIdentity> {
     if (!Identifier.safeParse(accountId).success) throw failure("IDENTITY_MISMATCH", 409);
     const parsed = Account.safeParse(await request(`accounts/${encodeURIComponent(accountId)}`));
-    if (!parsed.success || parsed.data.id !== accountId) throw failure("IDENTITY_MISMATCH", 409);
+    if (!parsed.success) throw failure();
+    if (parsed.data.id !== accountId) throw failure("IDENTITY_MISMATCH", 409);
     const { connection_params: { im }, sources } = parsed.data;
     if (expectedProfileId && im.id !== expectedProfileId) throw failure("IDENTITY_MISMATCH", 409);
     const validSources = sources.length > 0 && sources.every(source => source.id.trim().length > 0)
       && new Set(sources.map(source => source.id)).size === sources.length;
+    if (!validSources) throw failure();
     const healthy = validSources && sources.every(source => source.status === "OK");
     const healthStatus: LinkedinHealth = healthy ? "running" : !validSources ? "unknown" :
-      sources.some(source => source.status === "CREDENTIALS") ? "credentials" :
+      sources.some(source => ["CREDENTIALS", "PERMISSIONS"].includes(source.status)) ? "credentials" :
       sources.some(source => source.status === "ERROR") ? "errored" :
       sources.some(source => source.status === "STOPPED") ? "disconnected" : "unknown";
     if (!healthy) return { accountId, profileId: im.id, profileUrl: null, displayName: null, healthy, healthStatus };
     const owner = Owner.safeParse(await request(`users/me?account_id=${encodeURIComponent(accountId)}`));
-    if (!owner.success || owner.data.provider_id !== im.id || (expectedProfileId && owner.data.provider_id !== expectedProfileId))
+    if (!owner.success) throw failure();
+    if (owner.data.provider_id !== im.id || (expectedProfileId && owner.data.provider_id !== expectedProfileId))
       throw failure("IDENTITY_MISMATCH", 409);
     return { accountId, profileId: owner.data.provider_id, profileUrl: profileUrl(owner.data),
       displayName: `${owner.data.first_name} ${owner.data.last_name}`.trim() || null, healthy, healthStatus };

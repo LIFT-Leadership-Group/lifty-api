@@ -23,6 +23,7 @@ export const LINKEDIN_POLICY = LinkedinPolicy.parse({ invitations_per_day: 5, in
 export const LinkedinConnectRequest = z.object({
   workspace: LinkedinWorkspace, timezone: LinkedinTimezone,
   account_use: z.literal("personal"), other_automation: z.literal(false),
+  reconnect: z.boolean().optional(),
 }).strict();
 export const LinkedinWorkspaceRequest = z.object({ workspace: LinkedinWorkspace }).strict();
 export const LinkedinDisconnectRequest = LinkedinWorkspaceRequest.extend({ confirm: z.literal(true) }).strict();
@@ -45,8 +46,14 @@ export const LinkedinConnectionStatus = z.discriminatedUnion("status", [
     ctx.addIssue({ code: "custom", message: "LinkedIn connection health and outbound state are inconsistent." });
 });
 export const LinkedinConnectResult = z.discriminatedUnion("status", [
-  z.object({ ...profile, status: z.literal("pending"), sending_enabled: z.literal(false), connect_url: z.url(), intent_ref: z.uuid(), expires_in_seconds: z.number().int().min(1).max(1800) }).strict(),
+  z.object({ ...profile, status: z.literal("pending"), sending_enabled: z.literal(false), connect_url: z.url(), intent_ref: z.uuid(), expires_in_seconds: z.number().int().min(1).max(1800), expires_at: z.iso.datetime({ offset: true }).optional() }).strict(),
   z.object({ ...profile, status: z.literal("connected"), profile_id: LinkedinProfileId, connection_ref: z.uuid(), health_status: z.literal("running") }).strict(),
+]);
+// Preserve the original public handoff for installed clients; stages consume
+// the full internal result above and expose their own attempt contract.
+export const LegacyLinkedinConnectResult = z.discriminatedUnion("status", [
+  LinkedinConnectResult.options[0].omit({ expires_at: true }),
+  LinkedinConnectResult.options[1],
 ]);
 export type LinkedinConnectInput = z.infer<typeof LinkedinConnectRequest>;
 export type LinkedinStart = z.infer<typeof LinkedinConnectResult>;

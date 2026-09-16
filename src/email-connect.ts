@@ -14,13 +14,13 @@ export interface EmailConnectSettings extends UnipileProviderSettings {
 interface RpcClient { rpc(name: string,args: Record<string,unknown>): Promise<{data:unknown;error:unknown}> }
 const Stored = z.object({
   state: z.enum(["not_connected","pending","connected","disconnected","failed","revoked"]),
-  workspace_ref: z.uuid(), email: z.email().optional(), mailbox_use: z.enum(["personal","outreach"]).optional(),
+  workspace_ref: z.uuid(), email: z.email().nullish(), mailbox_use: z.enum(["personal","outreach"]).nullish(),
   email_policy: EmailPolicy.optional(),
   daily_limit: z.number().int().min(1).max(10).optional(),
   account_id: z.string().nullable().optional(), connection_ref: z.uuid().nullable().optional(), intent_ref: z.uuid().nullable().optional(),
   expires_at: z.string().optional(), failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed"]).nullable().optional(),
 });
-const Intent = z.object({state:z.enum(["pending","issuing","ready","completed","failed"]),intent_ref:z.uuid(),workspace_ref:z.uuid(),email:z.email(),expires_at:z.string(),account_id:z.string().nullable(),hosted_url:z.url().nullable()});
+const Intent = z.object({state:z.enum(["pending","issuing","ready","completed","failed"]),intent_ref:z.uuid(),workspace_ref:z.uuid(),email:z.email().nullable(),expires_at:z.string(),account_id:z.string().nullable(),hosted_url:z.url().nullable(),selection_required:z.boolean().optional()});
 function fail(code: string, status = 409): never {
   const messages: Record<string,string> = {
     EMAIL_WORKSPACE_FORBIDDEN: "Choose a workspace you belong to.",
@@ -56,13 +56,13 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
       if(!response.ok)mapRpcError(data); return data;
     }catch(error){if(error instanceof PublicError)throw error; fail("EMAIL_CONNECTION_UNAVAILABLE",502);}
   }
-  const publicProfile=(value:z.infer<typeof Stored>)=>({provider:"unipile" as const,channel:"email" as const,workspace_ref:value.workspace_ref,email:value.email,
-    mailbox_use:value.mailbox_use,daily_limit:value.daily_limit,
+  const publicProfile=(value:z.infer<typeof Stored>)=>({provider:"unipile" as const,channel:"email" as const,workspace_ref:value.workspace_ref,email:value.email??null,
+    mailbox_use:value.mailbox_use??null,daily_limit:value.daily_limit,
     ...(value.email_policy ? {email_policy:value.email_policy} : {}),
     warmup_required:value.email_policy?.habitual_only ? false : value.mailbox_use==="outreach",sending_enabled:false as const});
-  async function status(session:AuthSession,workspace:string):Promise<EmailStatus>{
+  async function status(session:AuthSession,workspace:string,attemptRef?:string):Promise<EmailStatus>{
     let value=Stored.parse(await rpc("status",{workspace},session));
-    if(value.state==="pending" && value.intent_ref && value.email){
+    if(value.state==="pending" && value.intent_ref && (!attemptRef || value.intent_ref===attemptRef)){
       const hint=z.object({workspace_ref:z.literal(value.workspace_ref),intent_ref:z.literal(value.intent_ref),account_id:z.string().regex(/^[A-Za-z0-9_-]{1,255}$/).nullable()})
         .parse(await rpc("read",{workspace_ref:value.workspace_ref,intent_ref:value.intent_ref},session,"lifty_email_callback_hint"));
       if(hint.account_id){
@@ -70,6 +70,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
           const identity=await provider.readIdentity(hint.account_id,value.email);
           if(identity.healthy)await rpc("complete",{intent_ref:value.intent_ref,account_id:identity.accountId,email:identity.email});
         }catch(error){
+          if(error instanceof PublicError && error.code==="UNIPILE_UNAVAILABLE")throw error;
           if(error instanceof PublicError && ["UNIPILE_IDENTITY_MISMATCH","UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code))
             await rpc("fail",{intent_ref:value.intent_ref,failure_code:"identity_mismatch"});
           else if(!(error instanceof PublicError && ["UNIPILE_UNAVAILABLE","UNIPILE_ACCOUNT_NOT_FOUND"].includes(error.code)))throw error;
@@ -78,7 +79,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
         value=Stored.parse(await rpc("status",{workspace},session));
       }
     }
-    if(!value.email || value.state==="not_connected")return EmailConnectionStatus.parse({provider:"unipile",channel:"email",workspace_ref:value.workspace_ref,status:"not_connected"});
+    if(value.state==="not_connected")return EmailConnectionStatus.parse({provider:"unipile",channel:"email",workspace_ref:value.workspace_ref,status:"not_connected"});
     let state=value.state;
     if(state==="connected" && value.account_id){
       try {if(!(await provider.readIdentity(value.account_id,value.email)).healthy)state="disconnected";}
@@ -101,12 +102,13 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     if(!Number.isFinite(seconds)||seconds<=0)fail("EMAIL_INTENT_EXPIRED");
     const state=sealEmailIntent(value.intent_ref,settings.serverKey);
     return EmailConnectResult.parse({...publicProfile(value),status:"pending",intent_ref:value.intent_ref,
-      connect_url:`${settings.publicBaseUrl}/unipile/start?intent=${encodeURIComponent(state)}`,expires_in_seconds:seconds});
+      connect_url:`${settings.publicBaseUrl}/unipile/start?intent=${encodeURIComponent(state)}`,expires_in_seconds:seconds,expires_at:value.expires_at});
   }
   function open(state:string):string {try{return openEmailIntent(state,settings.serverKey);}catch{fail("EMAIL_INTENT_EXPIRED",410);}}
   async function authorize(state:string):Promise<string>{
     const id=open(state);
     const intent=Intent.parse(await rpc("intent",{intent_ref:id}));
+    if(intent.selection_required)throw new PublicError({status:409,code:"EMAIL_DECLARATION_REQUIRED",message:"Confirm your regular personal Gmail account use in the hosted connection flow."});
     if(intent.state==="ready" && intent.hosted_url)return intent.hosted_url;
     if(intent.state==="failed" || intent.state==="completed")fail("EMAIL_INTENT_EXPIRED",410);
     const claim=z.object({claimed:z.boolean()}).parse(await rpc("issue_link",{intent_ref:id}));
@@ -146,5 +148,10 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     await rpc("disconnect", {workspace}, session);
     return status(session,workspace);
   }
-  return {start,status,authorize,callback,disconnect};
+  async function declare(state:string):Promise<string>{
+    const id=open(state);
+    await rpc("declare",{intent_ref:id,mailbox_use:"personal"});
+    return authorize(state);
+  }
+  return {start,status,authorize,callback,disconnect,declare};
 }

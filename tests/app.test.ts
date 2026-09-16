@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { localConfiguration, onboardingContext } from "./onboarding-fixtures.js";
+import { localConfiguration, onboardingContext, confirmedDraft } from "./onboarding-fixtures.js";
 
 import { createApp } from "../src/app.js";
 import { PublicError } from "../src/errors.js";
@@ -359,7 +359,7 @@ describe("LIFTY API", () => {
   });
 
   it("submits the draft and queues exactly one import run", async () => {
-    const draft = { schema_version: "2.1", status: "ready_for_auth", personas: localConfiguration.icp_config.personas };
+    const draft = confirmedDraft;
     const enqueueCalls: Array<{ submissionId: string; fresh: boolean }> = [];
     const app = createApp({
       authenticate: async () => ({
@@ -425,7 +425,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: confirmedDraft, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(200);
@@ -456,7 +456,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: confirmedDraft, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(200);
@@ -615,7 +615,7 @@ describe("LIFTY API", () => {
         authorization: "Bearer valid-token",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: confirmedDraft, configuration: localConfiguration }),
     });
     const responseText = await response.text();
 
@@ -704,7 +704,7 @@ describe("LIFTY API", () => {
         "content-type": "application/json",
         "content-length": String(133 * 1024),
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: confirmedDraft, configuration: localConfiguration }),
     });
 
     expect(response.status).toBe(413);
@@ -785,7 +785,7 @@ describe("LIFTY API", () => {
         "content-type": "application/json",
         "x-request-id": "55555555-5555-4555-8555-555555555555",
       },
-      body: JSON.stringify({ draft: { schema_version: "2.1", personas: localConfiguration.icp_config.personas }, configuration: localConfiguration }),
+      body: JSON.stringify({ draft: confirmedDraft, configuration: localConfiguration }),
     });
     const responseText = await response.text();
     const logText = JSON.stringify(logEvents);
@@ -972,6 +972,7 @@ describe("LIFTY API", () => {
   it("fails a denied HubSpot callback without attempting a token exchange", async () => {
     let completed = false;
     const response = await createApp({
+      denyHubspotCallback: async () => {},
       completeHubspotCallback: async () => {
         completed = true;
         throw new Error("must not exchange");
@@ -988,7 +989,7 @@ describe("LIFTY API", () => {
   it("gives an admin recovery path without reflecting provider error details", async () => {
     let completed = false;
     const state = sealHubspotConnectIntent("e".repeat(64), "test-secret");
-    const response = await createApp({ completeHubspotCallback: async () => {
+    const response = await createApp({ denyHubspotCallback: async () => {}, completeHubspotCallback: async () => {
       completed = true;
       return { portalId: "123", hubDomain: null };
     }}).request(`/hubspot/callback?error=insufficient_scope&error_description=private-provider-detail&state=${state}`);

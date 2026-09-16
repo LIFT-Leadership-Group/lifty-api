@@ -46,21 +46,28 @@ describe("LinkedIn provider readback", () => {
     expect(h.requests).toHaveLength(2);
   });
   it.each([
-    { account: { ...account, type: "GOOGLE_OAUTH" } },
     { account: { ...account, id: "foreign_account" } },
+    { owner: { ...owner, provider_id: "ACoOther" } },
+  ])("rejects positively verified account/profile identity mismatch: %j", async options => {
+    await expect(provider(options).adapter.readIdentity("account_1", "ACoFounder")).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_IDENTITY_MISMATCH" });
+  });
+  it.each([
+    { account: { ...account, type: "GOOGLE_OAUTH" } },
     { owner: { ...owner, provider: "GMAIL" } },
     { owner: { ...owner, object: "UserProfile" } },
-    { owner: { ...owner, provider_id: "ACoOther" } },
     { owner: { ...owner, provider_id: "" } },
-  ])("rejects account/profile identity mismatch: %j", async options => {
-    await expect(provider(options).adapter.readIdentity("account_1", "ACoFounder")).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_IDENTITY_MISMATCH" });
+    { account: { ...account, sources: [] } },
+    { account: { ...account, sources: [{ id: "", status: "OK" }] } },
+    { account: { ...account, sources: [{ id: "s", status: "OK" }, { id: "s", status: "OK" }] } },
+    { account: { ...account, sources: [{ id: "s", status: "" }] } },
+    { account: { ...account, sources: [{ id: "s", status: "NEW_UNKNOWN_STATUS" }] } },
+  ])("leaves malformed or unrecognized provider evidence unverified: %j", async options => {
+    await expect(provider(options).adapter.readIdentity("account_1", "ACoFounder")).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_UNAVAILABLE" });
   });
   it("compares the current canonical profile against a reconnect pin", async () => {
     await expect(provider().adapter.readIdentity("account_1", "ACoPreviouslyBound")).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_IDENTITY_MISMATCH" });
   });
   it.each([
-    [[], "unknown"], [[{ id: "", status: "OK" }], "unknown"],
-    [[{ id: "s", status: "OK" }, { id: "s", status: "OK" }], "unknown"],
     [[{ id: "s", status: "CREDENTIALS" }], "credentials"],
     [[{ id: "s", status: "CONNECTING" }], "unknown"],
     [[{ id: "s", status: "ERROR" }], "errored"],

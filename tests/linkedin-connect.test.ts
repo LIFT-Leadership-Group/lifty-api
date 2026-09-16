@@ -108,10 +108,15 @@ describe("LinkedIn connection lifecycle", () => {
     expect(h.events.slice(0, 6)).toEqual(["jwt:lifty_linkedin_connection:status", "jwt:lifty_linkedin_callback_hint:read", "/api/v1/accounts/account_1", "/api/v1/users/me", "server:lifty_linkedin_connection:complete", "jwt:lifty_linkedin_connection:status"]);
     expect(h.calls.filter(call => call.operation === "complete")).toHaveLength(1);
   });
-  it.each([{ hint: null }, { providerStatus: 503 }, { providerStatus: 404 }, { source: "CONNECTING" }])("keeps pending without a usable hint or ready provider: %j", async options => {
+  it.each([{ hint: null }, { providerStatus: 404 }, { source: "CONNECTING" }])("keeps pending without a usable hint or ready provider: %j", async options => {
     const h = harness(options);
     expect(await h.ops.status(h.session, "senja")).toMatchObject({ status: "pending", sending_enabled: false });
     expect(h.calls.some(call => ["complete", "fail"].includes(call.operation))).toBe(false);
+  });
+  it.each(["pending", "connected"] as const)("leaves %s authorization/grant unchanged when provider health is unavailable", async initial => {
+    const h = harness({ initial, providerStatus: 503 });
+    await expect(h.ops.status(h.session, "senja")).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_UNAVAILABLE" });
+    expect(h.calls.some(call => ["health", "fail", "complete", "disconnect"].includes(call.operation))).toBe(false);
   });
   it.each([{ hintWorkspace: connection }, { rpcError: { code: "PT403", message: "linkedin_workspace_forbidden" } }, { hintError: { code: "PT403", message: "linkedin_callback_invalid" } }])("rejects foreign or revoked hint before provider reads: %j", async options => {
     const h = harness(options); await expect(h.ops.status(h.session, "senja")).rejects.toBeDefined();
@@ -150,5 +155,28 @@ describe("LinkedIn connection lifecycle", () => {
     expect(h.events.filter(event => event === "/api/v1/hosted/accounts/link")).toHaveLength(1);
     await expect(h.ops.authorize(state)).resolves.toBe("https://account.unipile.com/opaque");
     expect(h.events.filter(event => event === "/api/v1/hosted/accounts/link")).toHaveLength(1);
+  });
+});
+
+describe("LinkedIn exact-attempt and transient verification", () => {
+  it.each(["pending", "connected"])("does not mutate a %s connection after an incomplete owner read", async initial => {
+    const h = harness({ initial, owner: { object: "AccountOwnerProfile", provider: "LINKEDIN" } });
+    await expect(h.ops.status(h.session, "senja", initial === "pending" ? id : undefined)).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_UNAVAILABLE" });
+    expect(h.calls.some(call => ["health", "fail", "complete", "disconnect"].includes(call.operation))).toBe(false);
+  });
+  it("does not reconcile a different latest pending attempt as the requested one", async () => {
+    const h = harness();
+    expect((await h.ops.status(h.session, "senja", workspace)).status).toBe("pending");
+    expect(h.calls.map(call => call.operation)).toEqual(["status"]);
+  });
+});
+
+describe("provider access and source reads remain unverified", () => {
+  it.each([{ providerStatus: 401 }, { providerStatus: 403 }, { source: "" }, { source: "FUTURE_STATUS" }])("preserves a healthy grant and pending attempt for failed evidence %j", async options => {
+    for (const initial of ["connected", "pending"]) {
+      const h = harness({ initial, ...options, outbound: true });
+      await expect(h.ops.status(h.session, "senja")).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_UNAVAILABLE" });
+      expect(h.calls.some(call => ["health", "fail", "complete", "disconnect"].includes(call.operation))).toBe(false);
+    }
   });
 });

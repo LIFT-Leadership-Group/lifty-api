@@ -6,6 +6,7 @@ import {
   type HubspotConnectionStatus,
 } from "./contracts.js";
 import { PublicError } from "./errors.js";
+import { recordOAuthFailure } from "./connection-attempt.js";
 import {
   HUBSPOT_REQUIRED_SCOPES,
   exchangeAuthorizationCode,
@@ -110,6 +111,7 @@ export interface HubspotConnectOperations {
   startConnect(session: AuthSession): Promise<HubspotConnectStart>;
   getConnection(session: AuthSession): Promise<HubspotConnectionStatus>;
   completeCallback(input: { code: string; state: string }): Promise<HubspotCallbackSuccess>;
+  denyCallback(state: string): Promise<void>;
 }
 
 export function createHubspotConnectOperations(
@@ -140,6 +142,7 @@ export function createHubspotConnectOperations(
       provider: "hubspot",
       connect_url: `${publicBaseUrl}/hubspot/start?intent=${encodeURIComponent(state)}`,
       expires_in_seconds: expiresIn,
+      ...(data.attempt_ref !== undefined ? { attempt_ref: data.attempt_ref, expires_at: data.expires_at } : {}),
     });
   }
 
@@ -280,7 +283,26 @@ export function createHubspotConnectOperations(
     return { portalId: account.portalId, hubDomain };
   }
 
-  return { startConnect, getConnection, completeCallback };
+  async function failCallback(state: string, status: "denied" | "failed", code: string) {
+    // Decryption authenticates the domain-separated callback state before the
+    // private intent token is used to update the exact durable intent.
+    const intentToken = openHubspotConnectIntent(state, settings.clientSecret);
+    await recordOAuthFailure({ provider: "hubspot", intentToken, status, code,
+      supabaseUrl: settings.supabaseUrl, publishableKey: settings.publishableKey, fetchImpl });
+  }
+  return { startConnect, getConnection,
+    denyCallback: state => failCallback(state, "denied", "authorization_denied"),
+    completeCallback: async input => {
+      try { return await completeCallback(input); }
+      catch (error) {
+        if (error instanceof HubspotCallbackError && !["link_invalid", "link_used", "link_expired"].includes(error.reason)) {
+          try { await failCallback(input.state, "failed", error.reason === "exchange_failed" ? "token_exchange_failed" : "callback_failed"); }
+          catch { /* Preserve the original safe failure; reads remain unverified if persistence failed. */ }
+        }
+        throw error;
+      }
+    },
+  };
 }
 
 export { HUBSPOT_REQUIRED_SCOPES };

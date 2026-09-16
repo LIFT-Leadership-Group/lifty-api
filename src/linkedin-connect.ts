@@ -73,6 +73,9 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     let status: LinkedinHealth = "unknown";
     try { status = (await provider.readIdentity(value.account_id, value.profile_id)).healthStatus; }
     catch (error) {
+      // A timeout/provider outage is not evidence of revoked credentials. Do
+      // not write unknown health and disconnect a previously healthy grant.
+      if (error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_UNAVAILABLE") throw error;
       if (!identityMismatch(error) && !providerPending(error)) throw error;
       status = error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_ACCOUNT_NOT_FOUND" ? "disconnected" :
         error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_ACCOUNT_UNHEALTHY" ? "credentials" : "unknown";
@@ -80,10 +83,10 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     await rpc("health", { workspace, connection_ref: value.connection_ref, account_id: value.account_id, profile_id: value.profile_id, status }, session);
     return readStored(session, workspace);
   }
-  async function status(session: AuthSession, workspace: string): Promise<LinkedinStatus> {
+  async function status(session: AuthSession, workspace: string, attemptRef?: string): Promise<LinkedinStatus> {
     let value = await readStored(session, workspace);
     let completed = false;
-    if (value.state === "pending" && value.intent_ref) {
+    if (value.state === "pending" && value.intent_ref && (!attemptRef || value.intent_ref === attemptRef)) {
       const hint = z.object({ workspace_ref: z.literal(value.workspace_ref), intent_ref: z.literal(value.intent_ref), account_id: LinkedinProfileId.nullable() })
         .parse(await rpc("read", { workspace_ref: value.workspace_ref, intent_ref: value.intent_ref }, session, "lifty_linkedin_callback_hint"));
       if (hint.account_id) {
@@ -91,6 +94,7 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
           const identity = await provider.readIdentity(hint.account_id, value.profile_id);
           if (identity.healthy) { await complete(value.intent_ref, identity); completed = true; }
         } catch (error) {
+          if (error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_UNAVAILABLE") throw error;
           if (identityMismatch(error)) await rpc("fail", { intent_ref: value.intent_ref, failure_code: "identity_mismatch" });
           else if (!providerPending(error)) throw error;
         }
@@ -119,7 +123,8 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     if (!Number.isFinite(seconds) || seconds <= 0) linkedinFailure("LINKEDIN_INTENT_EXPIRED", 410);
     const state = sealLinkedinIntent(value.intent_ref, settings.serverKey);
     return LinkedinConnectResult.parse({ ...profile(value), status: "pending", sending_enabled: false, intent_ref: value.intent_ref,
-      connect_url: `${settings.publicBaseUrl}/unipile/linkedin/start?intent=${encodeURIComponent(state)}`, expires_in_seconds: seconds });
+      connect_url: `${settings.publicBaseUrl}/unipile/linkedin/start?intent=${encodeURIComponent(state)}`, expires_in_seconds: seconds,
+      expires_at: value.expires_at });
   }
   function open(state: string) {
     try { return openLinkedinIntent(state, settings.serverKey); }

@@ -1,5 +1,5 @@
 import { CrmSyncReceiptSchema } from "./crm-sync-receipt.js";
-import { z } from "zod";
+import { z } from "@hono/zod-openapi";
 import { LocalConfigUpdateConfigurationSchema, LocalOnboardingConfigurationSchema } from "./generated/lifty-configuration.js";
 
 const WorkspaceReferenceSchema = z
@@ -210,6 +210,8 @@ export const HubspotConnectStartSchema = z
     provider: z.literal("hubspot"),
     connect_url: z.string().url(),
     expires_in_seconds: z.number().int().positive(),
+    attempt_ref: z.uuid().optional(),
+    expires_at: z.iso.datetime({ offset: true }).optional(),
   })
   .strict();
 
@@ -238,6 +240,8 @@ export const SlackConnectStartSchema = z
     provider: z.literal("slack"),
     connect_url: z.string().url(),
     expires_in_seconds: z.number().int().positive(),
+    attempt_ref: z.uuid().optional(),
+    expires_at: z.iso.datetime({ offset: true }).optional(),
   })
   .strict();
 
@@ -250,6 +254,12 @@ export type SlackConnectLink = z.infer<typeof SlackConnectLinkSchema>;
 export const ProviderConnectStartSchema = z.union([
   HubspotConnectStartSchema,
   SlackConnectStartSchema,
+]);
+// Existing installed clients reject additional handoff keys. Keep the public
+// legacy response distinct from internal results consumed by stage adapters.
+export const LegacyProviderConnectStartSchema = z.union([
+  HubspotConnectStartSchema.omit({ attempt_ref: true, expires_at: true }),
+  SlackConnectStartSchema.omit({ attempt_ref: true, expires_at: true }),
 ]);
 
 export const SlackConnectionStatusSchema = z.discriminatedUnion("status", [

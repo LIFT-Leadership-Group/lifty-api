@@ -8,6 +8,7 @@ import {
   type SlackConnectionStatus,
 } from "./contracts.js";
 import { PublicError } from "./errors.js";
+import { recordOAuthFailure } from "./connection-attempt.js";
 import { exchangeAndVerifySlackGrant } from "./slack-oauth.js";
 import { openSlackConnectIntent, sealSlackConnectIntent } from "./slack-state.js";
 
@@ -108,6 +109,7 @@ export interface SlackConnectOperations {
   createConnectLink(session: AuthSession, workspaceId: string): Promise<SlackConnectLink>;
   getConnection(session: AuthSession): Promise<SlackConnectionStatus>;
   completeCallback(input: { code: string; state: string }): Promise<SlackCallbackSuccess>;
+  denyCallback(state: string): Promise<void>;
 }
 
 export function createSlackConnectOperations(
@@ -136,6 +138,7 @@ export function createSlackConnectOperations(
       provider: "slack",
       connect_url: `${publicBaseUrl}/slack/start?intent=${encodeURIComponent(state)}`,
       expires_in_seconds: expiresIn,
+      ...(data.attempt_ref !== undefined ? { attempt_ref: data.attempt_ref, expires_at: data.expires_at } : {}),
     });
   }
 
@@ -265,5 +268,22 @@ export function createSlackConnectOperations(
     return { teamId: grant.teamId, teamName: grant.teamName };
   }
 
-  return { startConnect, createConnectLink, getConnection, completeCallback };
+  async function failCallback(state: string, status: "denied" | "failed", code: string) {
+    const intentToken = openSlackConnectIntent(state, settings.clientSecret);
+    await recordOAuthFailure({ provider: "slack", intentToken, status, code,
+      supabaseUrl: settings.supabaseUrl, publishableKey: settings.publishableKey, fetchImpl });
+  }
+  return { startConnect, createConnectLink, getConnection,
+    denyCallback: state => failCallback(state, "denied", "authorization_denied"),
+    completeCallback: async input => {
+      try { return await completeCallback(input); }
+      catch (error) {
+        if (error instanceof SlackCallbackError && !["link_invalid", "link_used", "link_expired", "link_revoked"].includes(error.reason)) {
+          try { await failCallback(input.state, "failed", error.reason === "exchange_failed" ? "token_exchange_failed" : "callback_failed"); }
+          catch { /* Preserve the original safe failure; reads remain unverified if persistence failed. */ }
+        }
+        throw error;
+      }
+    },
+  };
 }

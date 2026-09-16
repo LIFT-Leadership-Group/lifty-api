@@ -98,6 +98,7 @@ export function createProductionApp(config: ServiceConfig) {
       getEmailConnection: email.status,
       disconnectEmail: email.disconnect,
       authorizeEmail: email.authorize,
+      declareEmail: email.declare,
       completeEmailCallback: email.callback,
     } : {}),
     authenticate: createSupabaseAuthenticator(config.supabase),
@@ -132,6 +133,7 @@ export function createProductionApp(config: ServiceConfig) {
     startHubspotConnect: hubspot.startConnect,
     getHubspotConnection: hubspot.getConnection,
     completeHubspotCallback: hubspot.completeCallback,
+    denyHubspotCallback: hubspot.denyCallback,
     buildHubspotAuthorizeUrl: (state) => buildAuthorizationUrl({
       clientId: config.hubspot.clientId,
       redirectUri: `${config.hubspot.publicBaseUrl}/hubspot/callback`,
@@ -140,6 +142,7 @@ export function createProductionApp(config: ServiceConfig) {
     createSlackConnectLink: slack?.createConnectLink ?? (async () => slackUnavailable()),
     startSlackConnect: slack?.startConnect ?? (async () => slackUnavailable()),
     getSlackConnection: slack?.getConnection ?? (async () => slackUnavailable()),
+    denySlackCallback: slack?.denyCallback ?? (async () => slackUnavailable()),
     completeSlackCallback: slack?.completeCallback ?? (async () => {
       throw new SlackCallbackError(
         "server_misconfigured",

@@ -180,7 +180,8 @@ describe("hosted HubSpot connection operations", () => {
       reason: "scope_mismatch",
       status: 403,
     });
-    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(String((fetchImpl as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])).toContain("fail_lifty_connect_attempt");
   });
 
   it("maps replayed state to a safe callback error without copying provider tokens", async () => {
@@ -208,5 +209,28 @@ describe("hosted HubSpot connection operations", () => {
 
     expect(error).toMatchObject({ reason: "link_used", status: 409 });
     expect(JSON.stringify(error)).not.toContain(privateMarker);
+  });
+});
+
+
+describe("correlated hubspot authorization outcomes", () => {
+  it("returns the durable attempt UUID and expiry without exposing the intent secret", async () => {
+    const ref = "11111111-1111-4111-8111-111111111111", expiry = "2099-09-16T20:00:00Z";
+    const operations = createHubspotConnectOperations({ ...SETTINGS, fetchImpl: vi.fn() as typeof fetch });
+    const result = await operations.startConnect(sessionWithRpc(async () => ({ data: { intent_token: "c".repeat(64), expires_in_seconds: 600, attempt_ref: ref, expires_at: expiry }, error: null })));
+    expect(result).toMatchObject({ attempt_ref: ref, expires_at: expiry });
+    expect(JSON.stringify(result)).not.toContain("c".repeat(64));
+  });
+  it("records observed denial using only cryptographically verified callback state", async () => {
+    const fetchImpl = vi.fn(async () => Response.json({ ok: true }));
+    const operations = createHubspotConnectOperations({ ...SETTINGS, fetchImpl });
+    const state = sealHubspotConnectIntent("d".repeat(64), SETTINGS.clientSecret);
+    await operations.denyCallback(state);
+    const [url, request] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`${SETTINGS.supabaseUrl}/rest/v1/rpc/fail_lifty_connect_attempt`);
+    expect(JSON.parse(String(request.body))).toEqual({ p_provider: "hubspot", p_intent_token: "d".repeat(64), p_status: "denied", p_error_code: "authorization_denied" });
+    expect(request.redirect).toBe("error");
+    await expect(operations.denyCallback("forged-state")).rejects.toBeDefined();
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 });

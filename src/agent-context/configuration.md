@@ -1,26 +1,112 @@
-# Local onboarding configuration contract
+# Local configuration artifacts
 
-After login, fetch the current context with `lifty onboarding-context`. Read
-`.lifty/onboarding-context.json` and the current `.lifty/onboarding-draft.json`.
-Read `generation_rules` and `configuration_schema` in the authenticated
-context as the current server requirements, plus `scout_global_base` as the
-research contract. This reference explains their interpretation; follow the current authenticated rules and schema for business fields and
-validation requirements.
-You, the agent on the founder's computer, generate the complete configuration.
-The server validates and applies it; onboarding uses no hosted generation agent.
+## First configuration: save fresh private context
 
-Produce exactly `{ "icp_config": { ... }, "scout_overlay": "..." }` following
-the current authenticated `configuration_schema`. Pass that JSON over stdin
-to `scripts/write-onboarding-config.mjs`; never construct the artifact yourself.
-The context's `configuration_schema` describes the full API configuration;
-use its `icp_config` and `scout_overlay` properties for generation. The writer
-owns its version fields, so omit those from stdin.
-The writer copies the actual draft into `source_draft` and wraps your output with
-`contract_version: "lifty-onboarding-config.v1"` and the fetched `context_version`.
-The version is an opaque server fingerprint: never invent, edit or calculate it.
-A changed draft requires generation again; the CLI compares the entire source
-draft with the current draft before sending. A context-stale response requires
-fetching context and regenerating against the new global base.
+After login, fetch `context targeting` and read its current operations, draft
+schema and references. `stage targeting onboarding_context` returns private
+JSON only; it does not save `.lifty/onboarding-context.json`. Capture successful
+stdout in memory, validate it and save through the installed helper. For example,
+execute this JavaScript locally with the resolved paths substituted (paths only,
+never business content or credentials in command arguments):
+
+```javascript
+const { execFileSync } = await import("node:child_process");
+const { pathToFileURL } = await import("node:url");
+const helpers = await import(pathToFileURL("<skill-root>/scripts/onboarding-configuration.mjs"));
+const project = "<active-project>";
+const directory = helpers.privateOnboardingDirectory(project);
+const context = JSON.parse(execFileSync(process.execPath,
+  ["<installed-runner>", "stage", "targeting", "onboarding_context"], { encoding: "utf8" }));
+helpers.writePrivateOnboardingJson(directory, "onboarding-context.json",
+  helpers.validateOnboardingContext(context));
+```
+
+A command failure stops this recipe; never save an error as generation context.
+The helper verifies ownership/symlinks, enforces directory 0700 and files 0600,
+and maintains the private ignore entries. Do not use ordinary shell redirection
+to create these files. Use it for the bounded JSON diagnostics/receipts described
+below too; omit credentials and never print private context to the conversation.
+
+Read the saved context's `generation_rules`, `configuration_schema` and
+`scout_global_base`, plus the current private draft. Generate locally from those
+current server requirements. At present the generated business fields are
+`icp_config` and `scout_overlay`; follow the fetched schema if these fields
+change. No hosted generation agent supplies them. Send generated JSON on stdin
+to `scripts/write-onboarding-config.mjs --project-dir <active-project> --input -`.
+The writer owns version metadata, so omit it from generated input. It binds the
+actual saved draft as `source_draft`, copies the context's version, and writes
+`.lifty/onboarding-config.json` privately. A local save does not validate business
+policy; the API does that. Never invent/edit a context fingerprint.
+
+Before submission, use `readPrivateOnboardingJson(directory,
+"onboarding-draft.json")` and `readMatchingConfiguration(project, draft)` from
+the same helper. The latter compares the entire source draft, checks metadata,
+private files and the 132 KiB combined size limit. A changed draft requires
+regeneration, not rebinding old generated content. Then submit exactly once:
+
+```javascript
+const draft = helpers.readPrivateOnboardingJson(directory, "onboarding-draft.json");
+const configuration = helpers.readMatchingConfiguration(project, draft);
+const request = { body: { draft, configuration } };
+helpers.writePrivateOnboardingJson(directory, "onboarding-validation.json", { state: "prepared", request });
+const receipt = JSON.parse(execFileSync(process.execPath,
+  ["<installed-runner>", "stage", "targeting", "post", "--input", "-"],
+  { input: JSON.stringify(request), encoding: "utf8" }));
+helpers.writePrivateOnboardingJson(directory, "onboarding-validation.json", { request, receipt });
+```
+
+These snippets share bindings in one local script/session. Preserve the prepared
+request on failure; capture any JSON error from failed stdout privately without
+claiming it was accepted. Research criteria and commercial voice share this
+first transaction: do not POST again for each stage. The generic CLI neither
+polls nor saves diagnostics/receipts automatically. Explicitly follow:
+
+```text
+node "<installed-runner>" stage targeting onboarding_status
+node "<installed-runner>" stage targeting get
+```
+
+Poll status with bounded waits while the import is pending, retaining the
+receipt and request. Only a confirmed imported status plus saved stage readback
+establishes completion. Read research-criteria and commercial-voice GET as needed
+for the full configuration summary. Start sample review only after import.
+
+## Later configuration edits
+
+For targeting, research-criteria or commercial-voice, refresh `context <stage>`,
+GET saved state, then `stage <stage> generation_context`. Capture successful JSON
+and use `writePrivateOnboardingJson` to save `config-context.json`. Its
+`current_config`, confirmed `onboarding_draft`, Scout base, `generation_rules`
+and `configuration_schema` govern the artifact. Preserve unrelated intent and
+copy the opaque contract/context versions unchanged. For ICP changes preserve
+the complete persona set; for tone/prompt-only edits follow the schema's persona
+rules. Do not use the first-onboarding writer for update artifacts.
+
+Build the current PATCH body including its generated `configuration`; save that
+exact body as `config-update.json` with the helper before sending. Read it back
+with `readPrivateOnboardingJson` and send `{ "body": <saved-body> }` on stdin:
+
+```text
+node "<installed-runner>" stage <stage> patch --input -
+node "<installed-runner>" stage <stage> update_status --input -
+node "<installed-runner>" stage <stage> get
+```
+
+Save the returned receipt or JSON error privately in `config-validation.json`.
+The status input is `{ "path": { "submission_ref": "<exact-returned-ref>" } }`.
+A queued receipt means saved, not applied; poll the exact receipt explicitly,
+then GET the live values and research rules before confirming completion.
+
+After an uncertain PATCH, do not reconstruct or replace the request. Read
+`config-update.json` and invoke the published `resolve_update` operation with
+`{ "body": <same-saved-body> }`, including the artifact. Follow any returned
+submission receipt. If resolution authoritatively returns `state: none`, at most
+one retry of that exact original PATCH is allowed; resolve/check it again after
+any further uncertainty. If a receipt is already known, read `update_status`
+first. Failed reads leave the outcome unknown; preserve files and report the
+uncertainty rather than looping submissions. Applied/unchanged updates are not
+retried. Business metadata edits have no artifact resolver: use stage GET and
+any returned receipt instead.
 
 ## Apollo discovery configuration
 
@@ -165,31 +251,34 @@ provider credentials or operational tools.
 
 ## Apply and repair
 
-After the writer succeeds, `lifty push` sends `{draft, configuration}` and polls
-until the validated artifacts have been applied. It does not generate them.
-The server enforces the current contract/context, prompt lint and protected
-workspace rules. Only after `imported` may the first lead run begin.
+The server enforces the current schemas, confirmed draft decisions, prompt lint
+and protected-workspace rules before persistence. Preserve the draft and exact
+artifact until the outcome is known.
 
-- `LOCAL_CONFIGURATION_REQUIRED`: generate and save the artifact locally.
-- `LOCAL_CONFIGURATION_STALE`: reread the changed draft and regenerate.
-- `LOCAL_CONFIGURATION_INVALID`: read `.lifty/onboarding-validation.json`.
-  Each `issues` entry has `code`, `path`, `message`, `suggestion`; use them to
-  repair the generated fields against the schema and current global base.
-  Save with the writer and push again. The server rejects these errors before
-  enqueueing an import. A later accepted push clears previous diagnostics.
-- `ONBOARDING_CONTEXT_STALE`: fetch context again, reread the base, regenerate,
-  save and push once. Do not edit only the fingerprint.
-- `PROMPT_HAND_TUNED` or `ONBOARDING_ALREADY_CONFIGURED`: preserve the existing
-  configuration; use the workspace-management flow or contact support.
-- Timeout/network interruption: use `lifty status` to see whether the import
-  finished; the same unchanged artifact can reattach safely.
+- `LOCAL_CONFIGURATION_REQUIRED` or local source-draft mismatch: generate/save
+  against the current confirmed draft and private context.
+- `LOCAL_CONFIGURATION_INVALID`: capture the returned JSON error and its
+  `issues` privately with the helper (`onboarding-validation.json` for first
+  setup, `config-validation.json` for edits). Paths/messages/suggestions guide
+  local technical repair. Only a confirmed pre-persistence rejection permits
+  correcting and submitting a replacement; do not assume a network error is one.
+- `ONBOARDING_CONTEXT_STALE` or `CONFIG_CONTEXT_STALE`: fetch the corresponding
+  private context and regenerate; never edit only the fingerprint.
+- `PROMPT_HAND_TUNED`, multi-lane restrictions or `ONBOARDING_ALREADY_CONFIGURED`:
+  preserve existing configuration; stop first setup and use the appropriate
+  supported stage edit or explain the restriction.
+- Initial POST timeout/network interruption: retain the exact prepared request
+  and check `onboarding_status`, then saved stage state. Do not automatically
+  POST again, including after a failed read or a status that has not caught up.
+  If unconfirmed, preserve the artifact and explain what remains uncertain.
+- Later PATCH timeout: use the exact-artifact resolver/receipt workflow above;
+  the generic CLI does not perform this recovery for you.
 
-Automatically attempt up to three technical repairs: read diagnostics, fix,
-write, push. Preserve the confirmed draft. The founder need not interpret JSON
-or validator errors; ask only when business intent is missing or ambiguous.
-If the same technical issue persists after three repairs, preserve the files
-and report that setup could not finish. Never fall back to a hosted generation
-agent or rerun unchanged invalid output. Total request limit: 132 KiB with draft.
+Attempt at most three technical repairs after definite validation rejection.
+Ask the founder only for missing or ambiguous business intent. Preserve files
+and report the blocker if repairs are exhausted; do not rerun unchanged invalid
+output or fall back to hosted generation. A field/route change calls for fresh
+context, not a new CLI release. Keep total initial payload within 132 KiB.
 
 ## Worked example
 
