@@ -31,5 +31,11 @@ export const EmailConnectResult = z.discriminatedUnion("status", [
   z.object({ ...profile, status: z.literal("pending"), connect_url: z.url(), intent_ref: z.uuid(), expires_in_seconds: z.number().int().min(1).max(1800), expires_at: z.iso.datetime({ offset: true }).optional() }).strict(),
   z.object({ ...profile, status: z.literal("connected"), connection_ref: z.uuid() }).strict(),
 ]);
+// Preserve the original public handoff for installed clients; stages consume
+// the full internal result above and expose their own attempt contract.
+export const LegacyEmailConnectResult = z.discriminatedUnion("status", [
+  EmailConnectResult.options[0].omit({ expires_at: true }),
+  EmailConnectResult.options[1],
+]);
 export type EmailStatus = z.infer<typeof EmailConnectionStatus>;
 export type EmailStart = z.infer<typeof EmailConnectResult>;

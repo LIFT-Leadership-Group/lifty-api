@@ -52,6 +52,7 @@ import {
   SlackNotificationChannelsSchema,
   UpsertNotificationDestinationRequestSchema,
   ProviderConnectStartSchema,
+  LegacyProviderConnectStartSchema,
   SlackConnectLinkSchema,
   type SlackConnectLink,
   ProviderSchema,
@@ -112,9 +113,9 @@ import {
 import { isSealedSlackState } from "./slack-state.js";
 
 import { LinkedinCampaignRequest, LinkedinCampaignResult, linkedinCampaignResultFor, type LinkedinCampaignInput, type LinkedinCampaignOutput } from "./linkedin-campaign-contracts.js";
-import { LinkedinConnectRequest, LinkedinConnectResult, LinkedinConnectionStatus, LinkedinWorkspaceRequest, LinkedinDisconnectRequest, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
+import { LinkedinConnectRequest, LinkedinConnectResult, LegacyLinkedinConnectResult, LinkedinConnectionStatus, LinkedinWorkspaceRequest, LinkedinDisconnectRequest, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
-import { EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
+import { EmailConnectRequest, EmailConnectResult, LegacyEmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
 // The create-workspace body carries only a bounded name and description.
@@ -361,7 +362,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/connect", operationId: "startLinkedinConnect", security: [{ bearerAuth: [] }],
     request: { body: { required: true, content: { "application/json": { schema: LinkedinConnectRequest } } } },
-    responses: { 200: JsonResponse(LinkedinConnectResult), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 429: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
+    responses: { 200: JsonResponse(LegacyLinkedinConnectResult), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 429: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
   app.openAPIRegistry.registerPath({ method: "get", path: "/v1/linkedin", operationId: "getLinkedinConnection", security: [{ bearerAuth: [] }],
     request: { query: LinkedinWorkspaceRequest },
     responses: { 200: JsonResponse(LinkedinConnectionStatus), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
@@ -385,7 +386,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     responses:{200:JsonResponse(EmailConnectionStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/connect",operationId:"startEmailConnect",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:EmailConnectRequest}}}},
-    responses:{200:JsonResponse(EmailConnectResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+    responses:{200:JsonResponse(LegacyEmailConnectResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email",operationId:"getEmailConnection",security:[{bearerAuth:[]}],
     request:{query:z.object({workspace:EmailConnectRequest.shape.workspace})},responses:{200:JsonResponse(EmailConnectionStatus),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({
@@ -661,7 +662,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     security: [{ bearerAuth: [] }],
     request: { params: ProviderPathParams },
     responses: {
-      200: JsonResponse(ProviderConnectStartSchema),
+      200: JsonResponse(LegacyProviderConnectStartSchema),
       400: JsonResponse(ErrorResponseSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
@@ -2249,7 +2250,9 @@ export function createApp(
     try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide the workspace, timezone and account declarations."); }
     const parsed = LinkedinConnectRequest.safeParse(body);
     if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose an IANA timezone and declare a personal account without other automation.");
-    return context.json(LinkedinConnectResult.parse(await dependencies.startLinkedinConnect(context.get("authSession"), parsed.data)));
+    const result = LinkedinConnectResult.parse(await dependencies.startLinkedinConnect(context.get("authSession"), parsed.data));
+    if (result.status === "pending") delete result.expires_at;
+    return context.json(LegacyLinkedinConnectResult.parse(result));
   });
   app.get("/v1/linkedin", async (context) => {
     context.header("cache-control", "no-store");
@@ -2299,7 +2302,9 @@ export function createApp(
     try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace and the current email connection fields."); }
     const parsed = EmailConnectRequest.safeParse(payload);
     if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace; legacy email and mailbox_use must be supplied together.");
-    return context.json(EmailConnectResult.parse(await dependencies.startEmailConnect(context.get("authSession"), parsed.data)));
+    const result = EmailConnectResult.parse(await dependencies.startEmailConnect(context.get("authSession"), parsed.data));
+    if (result.status === "pending") delete result.expires_at;
+    return context.json(LegacyEmailConnectResult.parse(result));
   });
   app.get("/v1/email", async (context) => {
     context.header("cache-control", "no-store");
@@ -2327,7 +2332,9 @@ export function createApp(
     const result = provider.provider === "hubspot"
       ? await dependencies.startHubspotConnect(context.get("authSession"))
       : await dependencies.startSlackConnect(context.get("authSession"));
-    return context.json(ProviderConnectStartSchema.parse(result));
+    const validated = ProviderConnectStartSchema.parse(result);
+    return context.json(LegacyProviderConnectStartSchema.parse({ provider: validated.provider,
+      connect_url: validated.connect_url, expires_in_seconds: validated.expires_in_seconds }));
   });
 
   app.get("/v1/integrations/:provider", async (context) => {

@@ -255,6 +255,12 @@ export const ProviderConnectStartSchema = z.union([
   HubspotConnectStartSchema,
   SlackConnectStartSchema,
 ]);
+// Existing installed clients reject additional handoff keys. Keep the public
+// legacy response distinct from internal results consumed by stage adapters.
+export const LegacyProviderConnectStartSchema = z.union([
+  HubspotConnectStartSchema.omit({ attempt_ref: true, expires_at: true }),
+  SlackConnectStartSchema.omit({ attempt_ref: true, expires_at: true }),
+]);
 
 export const SlackConnectionStatusSchema = z.discriminatedUnion("status", [
   z

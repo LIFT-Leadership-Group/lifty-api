@@ -49,6 +49,12 @@ export const LinkedinConnectResult = z.discriminatedUnion("status", [
   z.object({ ...profile, status: z.literal("pending"), sending_enabled: z.literal(false), connect_url: z.url(), intent_ref: z.uuid(), expires_in_seconds: z.number().int().min(1).max(1800), expires_at: z.iso.datetime({ offset: true }).optional() }).strict(),
   z.object({ ...profile, status: z.literal("connected"), profile_id: LinkedinProfileId, connection_ref: z.uuid(), health_status: z.literal("running") }).strict(),
 ]);
+// Preserve the original public handoff for installed clients; stages consume
+// the full internal result above and expose their own attempt contract.
+export const LegacyLinkedinConnectResult = z.discriminatedUnion("status", [
+  LinkedinConnectResult.options[0].omit({ expires_at: true }),
+  LinkedinConnectResult.options[1],
+]);
 export type LinkedinConnectInput = z.infer<typeof LinkedinConnectRequest>;
 export type LinkedinStart = z.infer<typeof LinkedinConnectResult>;
 export type LinkedinStatus = z.infer<typeof LinkedinConnectionStatus>;
