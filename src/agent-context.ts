@@ -7,6 +7,7 @@ import { LinkedinCampaignRequest } from "./linkedin-campaign-contracts.js";
 
 export const AGENT_CLIENT_CONTRACT = "lifty-cli-context.v1";
 export const COMPANY_MAPPING_CLIENT_CONTRACT = "lifty-cli-context.v2";
+export const LOCAL_CONFIG_CLIENT_CONTRACT = "lifty-cli-context.v3";
 export const AgentContextSchema = z.object({
   format: z.literal("lifty-context.v1"),
   task: z.string().min(1),
@@ -44,10 +45,12 @@ const documents = {
 
 export function getAgentContext(task: string, clientContract = AGENT_CLIENT_CONTRACT) {
   if (!Object.hasOwn(documents, task)) return null;
-  const document = documents[task as keyof typeof documents];
+  const document = task === "workspace" && clientContract !== LOCAL_CONFIG_CLIENT_CONTRACT
+    ? { instructions: "Your installed LIFTY CLI cannot perform local configuration updates. Upgrade the installed CLI and skills, then fetch workspace context again before changing targeting, personas, tone or prompts. Hosted generation is no longer available. Read-only get/status and simple workspace name/description updates remain available. Never send a legacy regeneration request.", schemas: {}, references: {} }
+    : documents[task as keyof typeof documents];
   const content = { format: "lifty-context.v1" as const, task, ...document,
     // v1 clients cannot execute the company commands. Keep their guidance intact.
-    ...(clientContract === COMPANY_MAPPING_CLIENT_CONTRACT && task !== "campaign"
+    ...([COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT].includes(clientContract) && task !== "campaign"
       ? { instructions: `${document.instructions}\n${companyMapping}` } : {}),
   };
   const revision = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;

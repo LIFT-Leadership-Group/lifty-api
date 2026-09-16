@@ -1,3 +1,4 @@
+import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
 import {
   type CompanyMappingOperation,
   CompanyMappingContextSchema,
@@ -15,12 +16,15 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
+import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
+  ConfigUpdateContextSchema,
+  ConfigUpdateGenerationContextSchema,
+  type ConfigUpdateContext,
   ConfigSectionSchema,
   ConfigUpdateRequestSchema,
   ConfigUpdateResultSchema,
@@ -164,6 +168,7 @@ export interface AppDependencies {
   startCrmSyncRun(session: AuthSession): Promise<StartCrmSyncResult>;
   getCrmSyncStatus(session: AuthSession): Promise<CrmSyncStatus>;
   enqueueCrmSync: EnqueueCrmSync;
+  getConfigUpdateContext(session: AuthSession): Promise<ConfigUpdateContext>;
   getConfig(session: AuthSession, section: ConfigSection | null): Promise<WorkspaceConfig>;
   submitConfigUpdate(
     session: AuthSession,
@@ -469,6 +474,13 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       413: JsonResponse(ErrorResponseSchema),
       422: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get", path: "/v1/config/context", operationId: "getConfigUpdateContext",
+    security: [{ bearerAuth: [] }], responses: {
+      200: JsonResponse(ConfigUpdateGenerationContextSchema), 401: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema),
     },
   });
   app.openAPIRegistry.registerPath({
@@ -943,6 +955,7 @@ const defaultDependencies: AppDependencies = {
   getConfig: async () => {
     throw new Error("getConfig is not configured");
   },
+  getConfigUpdateContext: async () => { throw new Error("getConfigUpdateContext is not configured"); },
   submitConfigUpdate: async () => {
     throw new Error("submitConfigUpdate is not configured");
   },
@@ -1357,7 +1370,7 @@ export function createApp(
   app.get("/v1/context/:task", (context) => {
     context.header("cache-control", "no-store");
     const clientContract = context.req.query("client_contract") ?? AGENT_CLIENT_CONTRACT;
-    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT].includes(clientContract)) {
+    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT].includes(clientContract)) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Update the installed LIFTY CLI and skill to retrieve current instructions.");
     }
     const document = getAgentContext(context.req.param("task"), clientContract);
@@ -1703,6 +1716,15 @@ export function createApp(
     return context.json(WorkspaceConfigSchema.parse(result));
   });
 
+  app.get("/v1/config/context", async (context) => {
+    context.header("cache-control", "no-store");
+    const result = await dependencies.getConfigUpdateContext(context.get("authSession"));
+    return context.json(ConfigUpdateGenerationContextSchema.parse({
+      ...ConfigUpdateContextSchema.parse(result), generation_rules: CONFIG_UPDATE_GENERATION_RULES,
+      configuration_schema: z.toJSONSchema(LocalConfigUpdateConfigurationSchema),
+    }));
+  });
+
   // Registered before `/v1/config/:section` so the literal segment wins.
   app.get("/v1/config/updates/:submission_ref", async (context) => {
     const ref = SubmissionRefSchema.safeParse(context.req.param("submission_ref"));
@@ -1768,6 +1790,11 @@ export function createApp(
     }
     const body = ConfigUpdateRequestSchema.safeParse(parsedJson);
     if (!body.success) {
+      if (parsedJson && typeof parsedJson === "object" && "configuration" in parsedJson
+        && !LocalConfigUpdateConfigurationSchema.safeParse(parsedJson.configuration).success) {
+        const lint = lintLocalConfigUpdateConfiguration(parsedJson.configuration, {});
+        if (!lint.success) return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID", "Repair the local update artifact using the published schema.", lint.issues);
+      }
       return errorJson(
         context,
         400,
@@ -1776,12 +1803,29 @@ export function createApp(
       );
     }
 
+    if (body.data.configuration) {
+      const current = await dependencies.getConfigUpdateContext(context.get("authSession"));
+      const request = body.data;
+      // A mismatched version can be an exact imported retry. SQL distinguishes
+      // that replay from a new stale artifact before any write; validate fresh
+      // artifacts against the current snapshot only.
+      if (request.configuration?.context_version === current.context_version) {
+        const patch = "section" in request ? request.section === "icp" ? request.values : {} : request.values.icp;
+        const desiredIcp = { ...current.current_config.config.icp, ...(patch && typeof patch === "object" && !Array.isArray(patch) ? patch : {}) };
+        const lint = lintLocalConfigUpdateConfiguration(request.configuration, desiredIcp, current.scout_global_base);
+        if (!lint.success) return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID", "Repair the local update using these issues and submit it again.", lint.issues.map(issue => ({ ...issue,
+          path: issue.path.replace("/desired_icp", "section" in request && request.section === "icp" ? "/values" : "/values/icp"),
+      })));
+      }
+    }
+
     const submission = await dependencies.submitConfigUpdate(
       context.get("authSession"),
       body.data,
     );
 
-    // Direct writes (filters, tone, workspace) already landed inside the RPC.
+    // Simple metadata already landed. Generated configuration is stored as a
+    // pending submission; its fields and artifacts publish together at import.
     // Anything flagged for regeneration gets exactly one job; a replay of a
     // still-pending digest re-enqueues idempotently (self-healing a lost
     // enqueue), and a previously failed regeneration gets a fresh run keyed on
@@ -1807,8 +1851,8 @@ export function createApp(
       runRef = submission.submission_ref;
     }
 
-    // A synchronous filter-only write lands a new lane version inside the RPC
-    // but its receipt carries no version; read it back so the CLI can name it.
+    // A historical synchronous filter-only receipt can carry a lane version
+    // only in readback; preserve that compatible receipt projection.
     let icpVersion = submission.icp_version ?? null;
     if (
       icpVersion === null
