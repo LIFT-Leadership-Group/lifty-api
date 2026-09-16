@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { createCompanyMapping } from "../src/company-mapping.js";
 import { createCompanyReadinessCheck } from "../src/company-mapping/readiness.js";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { COMPANY_OPERATION_TIMEOUT_MS } from "../src/company-mapping/runtime.js";
 import type { Property, Mapping } from "../src/company-mapping/contract.js";
 import { HUBSPOT_OAUTH_SCOPES } from "../src/generated/hubspot-grant-policy.js";

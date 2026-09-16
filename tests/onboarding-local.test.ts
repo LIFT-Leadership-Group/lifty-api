@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { getOnboardingContext, submitOnboarding } from "../src/workspace-operations.js";
 import { localConfiguration, onboardingContext, confirmedDraft } from "./onboarding-fixtures.js";
 
@@ -16,7 +16,7 @@ function push(app: ReturnType<typeof createApp>, body: unknown) {
 }
 
 describe("locally generated onboarding", () => {
-  it.each(["v4", "v5"])("requires explicit discovery intent from a %s client before saving a draft", async version => {
+  it.each(["v5"])("requires explicit discovery intent from a %s client before saving a draft", async version => {
     const submit = vi.fn(); const enqueue = vi.fn();
     const app = createApp({ authenticate, submitOnboarding: submit, enqueueOnboardingImport: enqueue, getOnboardingContext: async () => onboardingContext });
     const response = await app.request("/v1/onboarding", { method: "POST",

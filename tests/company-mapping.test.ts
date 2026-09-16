@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { createCompanyMapping, CompanyMappingError } from "../src/company-mapping.js";
 const ws = "85400000-0000-4000-a000-000000000001";
 const receipt = {

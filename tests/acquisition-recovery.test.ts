@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from "vitest";
-import {createApp} from "../src/app.js";
+import {createCurrentClient as createApp} from "./current-client.js";
 import {createAcquisitionRecoveryOperations} from "../src/acquisition-recovery.js";
 import {createAcquisitionVerificationTrigger,createFirstRunTrigger} from "../src/trigger-client.js";
 const workspace="22222222-2222-4222-8222-222222222222",run="11111111-1111-4111-8111-111111111111",next="33333333-3333-4333-8333-333333333333",recovery="44444444-4444-4444-8444-444444444444";

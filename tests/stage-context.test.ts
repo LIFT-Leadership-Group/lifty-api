@@ -58,7 +58,7 @@ describe("runtime stage context", () => {
   });
 
   it("keeps active entry and linked workflows on published stage operations", () => {
-    const contexts = [...stages, "onboarding", "workspace", "campaign"].map(task => getAgentContext(task, STAGE_CLIENT_CONTRACT)!);
+    const contexts = [...stages, "onboarding", "workspace", "campaign"].map(task => getAgentContext(task)!);
     const guides = contexts.flatMap(context => [context.instructions, ...Object.values(context.references)]);
     // Former recommendations escaped the dynamic contract despite a working
     // generic transport. Check all reachable guide text, including references.
@@ -71,29 +71,11 @@ describe("runtime stage context", () => {
         expect(stageOperations[match[1]!]![match[2]!], match[0]).toBeDefined();
       }
     }
-    const targeting = getAgentContext("targeting", STAGE_CLIENT_CONTRACT)!;
+    const targeting = getAgentContext("targeting")!;
     expect(targeting.references.configuration).toContain("readMatchingConfiguration");
     expect(targeting.references.configuration).toContain("does not save");
     expect(targeting.references.configuration).toContain("same-saved-body");
     expect(targeting.references.configuration).toContain("onboarding_status");
-  });
-
-  it("keeps v4 clients on executable legacy workflows while v5 uses stages", async () => {
-    const app = createApp();
-    for (const task of ["onboarding", "workspace", "campaign"]) {
-      const legacy = await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v4`)).json();
-      const current = await (await app.request(`/v1/context/${task}?client_contract=${STAGE_CLIENT_CONTRACT}`)).json();
-      const legacyGuides = [legacy.instructions, ...Object.values(legacy.references)].join("\n");
-      // v4 has get/update/campaign commands but no stage command or stage input
-      // envelope. Reject a wrong-profile response anywhere in its references.
-      expect(legacyGuides).not.toMatch(/context stages|stage <stage>|stage (?:targeting|business|campaigns|crm|sample-review) (?:get|post|patch|onboarding_context|mapping_context)/);
-      expect(Object.keys(legacy.schemas).length).toBeGreaterThan(0);
-      expect(legacy.instructions).not.toContain("Upgrade the installed LIFTY CLI");
-      expect(current.instructions).toContain("context stages");
-      expect(current.revision).not.toBe(legacy.revision);
-      if (task === "workspace") expect(legacyGuides).toContain("get icp");
-      if (task === "campaign") expect(legacyGuides).toContain("campaign linkedin");
-    }
   });
 
   it("returns 404 for built-in object names and unknown tasks", async () => {
@@ -106,13 +88,13 @@ describe("runtime stage context", () => {
 
   it("changes the revision when API-owned fields or routes change", () => {
     const operation = stageOperations.business!.get!;
-    const original = getAgentContext("business", STAGE_CLIENT_CONTRACT)!;
+    const original = getAgentContext("business")!;
     const oldRoute = operation.route;
     const oldQuery = operation.request.query;
     try {
       operation.route = "/v1/workspace/business-current";
       operation.request.query = { type: "object", properties: { view: { type: "string" } } };
-      const changed = getAgentContext("business", STAGE_CLIENT_CONTRACT)!;
+      const changed = getAgentContext("business")!;
       expect(changed.revision).not.toBe(original.revision);
       expect(changed.operations?.get?.route).toBe(operation.route);
       expect(changed.operations?.get?.request.query).toEqual(operation.request.query);
@@ -156,7 +138,7 @@ describe("runtime stage context", () => {
     expect(SendingAccountStartSchema.safeParse({ channel: "email" }).success).toBe(true);
     expect(SendingAccountStartSchema.safeParse({ channel: "email", email: "asked-before-link@example.test" }).success).toBe(false);
     for (const stage of ["crm", "sending-accounts", "notifications"]) {
-      const context = getAgentContext(stage, STAGE_CLIENT_CONTRACT)!;
+      const context = getAgentContext(stage)!;
       expect(context.references.connections).toContain("retry_after_seconds");
       expect(context.references.connections).toContain("previous healthy grant");
       expect(context.references.connections).toContain("denied");
@@ -164,9 +146,9 @@ describe("runtime stage context", () => {
       expect(context.operations?.get?.request.query.properties).toHaveProperty("attempt_ref");
       expect(context.operations?.post?.responses["200"]?.required).toEqual(["status", "attempt_ref", "connection_url", "expires_at"]);
     }
-    expect(getAgentContext("crm", STAGE_CLIENT_CONTRACT)!.instructions).toContain("HubSpot account/portal consent");
-    expect(getAgentContext("notifications", STAGE_CLIENT_CONTRACT)!.instructions).toContain("Slack workspace consent");
-    expect(getAgentContext("sending-accounts", STAGE_CLIENT_CONTRACT)!.instructions).toContain("hosted LinkedIn");
-    expect(getAgentContext("sending-accounts", STAGE_CLIENT_CONTRACT)!.instructions).toContain("hosted email");
+    expect(getAgentContext("crm")!.instructions).toContain("HubSpot account/portal consent");
+    expect(getAgentContext("notifications")!.instructions).toContain("Slack workspace consent");
+    expect(getAgentContext("sending-accounts")!.instructions).toContain("hosted LinkedIn");
+    expect(getAgentContext("sending-accounts")!.instructions).toContain("hosted email");
   });
 });

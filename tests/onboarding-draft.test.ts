@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { lintOnboardingDraft } from "../src/onboarding-draft.js";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { confirmedDraft, localConfiguration, onboardingContext } from "./onboarding-fixtures.js";
 
 const finding = { field: "company.name", value: "Example", source: "Founder's website", state: "founder_confirmed", used_in_configuration: true, founder_confirmation: "Confirmed" };

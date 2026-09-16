@@ -1,5 +1,5 @@
 import { describe,it,expect,vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { createWorkspaceRetirement } from "../src/workspace-retirement.js";
 const workspace="22222222-2222-4222-8222-222222222222",user="11111111-1111-4111-8111-111111111111",key="retirement-test-"+"x".repeat(40);
 const body={confirm_slug:"senja",confirm_name:"Senja"};
