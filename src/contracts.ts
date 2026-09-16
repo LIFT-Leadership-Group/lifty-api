@@ -1,3 +1,4 @@
+import { CrmSyncReceiptSchema } from "./crm-sync-receipt.js";
 import { z } from "zod";
 
 const WorkspaceReferenceSchema = z
@@ -406,13 +407,18 @@ export const CrmSyncStatusSchema = z.discriminatedUnion("state", [
       requested_leads: z.number().int().positive(),
       leads_synced: z.number().int().nonnegative().nullable(),
       error_code: z.string().nullable(),
+      crm_sync_receipt: CrmSyncReceiptSchema.nullable().optional(),
       portal_id: z.string().regex(/^[0-9]{1,20}$/).nullable(),
       started_at: z.string().min(1),
       completed_at: z.string().nullable(),
       workspace: WorkspaceReferenceSchema,
     })
     .strict(),
-]);
+]).superRefine((result, ctx) => {
+  if (result.state === "succeeded" && result.crm_sync_receipt && result.crm_sync_receipt.status !== "complete") {
+    ctx.addIssue({ code: "custom", message: "A successful sync requires complete delivery" });
+  }
+});
 
 // ---------------------------------------------------------------- P6 config
 
