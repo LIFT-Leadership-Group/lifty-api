@@ -554,7 +554,20 @@ printf '%s\\t%s\\n' '${expectedCommit}' 'refs/heads/main'
     expect(calls).not.toContain("apps create-deployment");
   });
 
-  it("deploys only the expected remote commit and verifies the active source", () => {
+  it.each([
+    ["--trace"],
+    ["--force-rebuild", "--trace"],
+    ["--force-rebuild=false"],
+    [""],
+  ])("rejects unsupported deploy arguments: %j", (...options) => {
+    const result = spawnSync("bash", [script, "deploy", expectedCommit, ...options], {
+      encoding: "utf8",
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("deploy accepts only <full-sha> [--force-rebuild]");
+  });
+
+  it.each([false, true])("deploys and verifies the expected source (force rebuild: %s)", (forceRebuild) => {
     const fakeBin = mkdtempSync(join(tmpdir(), "lifty-doctl-test-"));
     const fakeDoctl = join(fakeBin, "doctl");
     const fakeCurl = join(fakeBin, "curl");
@@ -618,7 +631,7 @@ esac
     chmodSync(fakeGit, 0o755);
 
     try {
-      const result = spawnSync("bash", [script, "deploy", expectedCommit], {
+      const result = spawnSync("bash", [script, "deploy", expectedCommit, ...(forceRebuild ? ["--force-rebuild"] : [])], {
         encoding: "utf8",
         env: {
           ...process.env,
@@ -635,7 +648,7 @@ esac
       );
       const doctlCalls = readFileSync(calls, "utf8");
       expect(doctlCalls).toContain(
-        "apps create-deployment app-123 --force-rebuild --wait -o json",
+        `apps create-deployment app-123${forceRebuild ? " --force-rebuild" : ""} --wait -o json`,
       );
       expect(doctlCalls).not.toContain("apps update");
     } finally {

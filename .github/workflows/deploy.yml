@@ -19,6 +19,14 @@ name: Deploy
 on:
   push:
     branches: [main]
+    # Human documentation is not a runtime input. Do not exclude **/*.md:
+    # src/agent-context Markdown is packaged and must still deploy.
+    paths-ignore:
+      - AGENTS.md
+      - CLAUDE.md
+      - README.md
+      - RUNBOOK.md
+      - docs/**
   workflow_dispatch:
 
 # One deploy at a time; never cancel an in-flight deployment.
