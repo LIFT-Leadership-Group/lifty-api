@@ -155,14 +155,13 @@ only output shape.
 9. After a successful write, tell the founder — one plain sentence — that
    everything they confirmed is saved privately on their machine and you're
    sharing the sign-in link. No file paths, formats, or writer mechanics.
-   Resolve
-   the persisted CLI as `<active-project>/.lifty/bin/lifty.mjs`; refuse to use
-   it if it is missing, not a real file, or resolves outside the active
-   project's `.lifty` directory.
+   Use `<installed-runner>` verified by the installed entry skill's runner
+   resolver. Its scope may be project or global; do not infer its path from
+   `<active-project>`, which still owns the private draft and configuration.
 10. Start the login handoff, show its link and keep its listener running:
 
     ```text
-    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs login \
+    LIFTY_NO_BROWSER=1 node "<installed-runner>" login \
       --project-dir <active-project>
     ```
 
@@ -176,7 +175,7 @@ only output shape.
 11. After login succeeds, fetch the authenticated workspace context:
 
     ```text
-    node <active-project>/.lifty/bin/lifty.mjs onboarding-context \
+    node "<installed-runner>" onboarding-context \
       --project-dir <active-project>
     ```
 
@@ -204,7 +203,7 @@ only output shape.
     Generate once for the current inputs; when the writer succeeds, apply:
 
     ```text
-    node <active-project>/.lifty/bin/lifty.mjs push \
+    node "<installed-runner>" push \
       --project-dir <active-project>
     ```
 
@@ -231,7 +230,7 @@ only output shape.
     Do not promise five A leads. This run sends nothing and does not touch CRM:
 
     ```text
-    node <active-project>/.lifty/bin/lifty.mjs run
+    node "<installed-runner>" run
     ```
 
     The run stays attached and can take a while. Read and follow
@@ -243,7 +242,7 @@ only output shape.
     configuration, run, and HubSpot state in one read:
 
     ```text
-    node <active-project>/.lifty/bin/lifty.mjs status
+    node "<installed-runner>" status
     ```
 
 14. If HubSpot connection was part of the founder's request, say in one
@@ -252,7 +251,7 @@ only output shape.
     OAuth flow:
 
     ```text
-    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs connect hubspot --no-wait
+    LIFTY_NO_BROWSER=1 node "<installed-runner>" connect hubspot --no-wait
     ```
 
     The CLI returns the short-lived connection URL. Show it using the
@@ -290,7 +289,7 @@ only output shape.
     push them into the founder's HubSpot:
 
     ```text
-    node <active-project>/.lifty/bin/lifty.mjs sync
+    node "<installed-runner>" sync
     ```
 
     The CLI starts the sync, waits, and reports contact, research and company
@@ -319,7 +318,7 @@ only output shape.
     guess another tenant. Run only after the founder chooses to connect:
 
     ```bash
-    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs connect unipile --no-wait \
+    LIFTY_NO_BROWSER=1 node "<installed-runner>" connect unipile --no-wait \
       --workspace <workspace-ref> --email <exact-address> --mailbox-use personal
     ```
 
@@ -340,7 +339,7 @@ only output shape.
     Use the workspace reference returned by the CLI. After those declarations:
 
     ```bash
-    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs connect linkedin --no-wait \
+    LIFTY_NO_BROWSER=1 node "<installed-runner>" connect linkedin --no-wait \
       --workspace <workspace-ref> --timezone <IANA-timezone> \
       --account-use personal --no-other-automation
     ```

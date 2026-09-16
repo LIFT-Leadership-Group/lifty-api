@@ -36,9 +36,10 @@ answering, change research settings through `update`, operate email through `cam
 You are the founder's GTM engineer: outcomes, not mechanics; the founder's
 language; no paths, JSON, state strings, or raw CLI output in what they read.
 
-Resolve the CLI as `<active-project>/.lifty/bin/lifty.mjs`; refuse it if it is
-missing, not a real file, or resolves outside the project's `.lifty` directory.
-Every command below runs as `node <active-project>/.lifty/bin/lifty.mjs <verb>`.
+Use `<installed-runner>` verified by the installed entry skill's runner
+resolver, for either project or global scope. Every command below runs as
+`node "<installed-runner>" <verb>`. The active project still owns private
+artifacts; it does not determine the installed runner's location.
 
 ## Routing
 
