@@ -70,17 +70,18 @@ describe("email hosted auth boundary",()=>{
     expect(calls.some(c=>c.operation==="complete")).toBe(false);
   });
   it("requires the exact authenticated primary, not a matching login or default SendAs alias",async()=>{
-    for(const profile of [
-      {...owner,email:"primary@example.test"},
-      {...owner,aliases:[]},
-      {...owner,aliases:[{email,is_default:true}]},
-      {...owner,aliases:[{email,is_primary:true},{email,is_primary:true}]},
-      {...owner,aliases:[{email,is_primary:false},{email:"primary@example.test",is_primary:true}]},
-      {object:"AccountOwnerProfile",provider:"OUTLOOK",email,id:"other-provider-id"},
-    ]) {
+    for(const [profile,code] of [
+      [{...owner,email:"primary@example.test"},"UNIPILE_IDENTITY_MISMATCH"],
+      [{...owner,aliases:[]},"UNIPILE_UNAVAILABLE"],
+      [{...owner,aliases:[{email,is_default:true}]},"UNIPILE_UNAVAILABLE"],
+      [{...owner,aliases:[{email,is_primary:true},{email,is_primary:true}]},"UNIPILE_UNAVAILABLE"],
+      [{...owner,aliases:[{email,is_primary:false},{email:"primary@example.test",is_primary:true}]},"UNIPILE_IDENTITY_MISMATCH"],
+      [{object:"AccountOwnerProfile",provider:"OUTLOOK",email,id:"other-provider-id"},"UNIPILE_UNAVAILABLE"],
+    ] as const) {
       const {ops,calls}=harness({owner:profile});
-      await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+      await expect(ops.callback(state,body)).rejects.toMatchObject({code});
       expect(calls.some(c=>c.operation==="complete")).toBe(false);
+      if(code==="UNIPILE_UNAVAILABLE")expect(calls.some(c=>c.operation==="fail")).toBe(false);
     }
   });
   it("does not infer dots, plus tags or custom-domain alias equivalence",async()=>{
@@ -292,9 +293,14 @@ describe("durable callback reconciliation",()=>{
     expect((await h.ops.status(h.session,"senja")).status).toBe("pending");
     expect(h.events).toHaveLength(2);
   });
-  it.each([{health:"CONNECTING"},{providerStatus:503},{providerStatus:404}])("keeps temporary provider readiness pending without OAuth, failure or completion: %j",async(options)=>{
+  it.each([{health:"CONNECTING"},{providerStatus:404}])("keeps temporary provider readiness pending without OAuth, failure or completion: %j",async(options)=>{
     const h=reconciliationHarness(options);
     for(let i=0;i<2;i++)expect((await h.ops.status(h.session,"senja")).status).toBe("pending");
+    expect(h.events.some(event=>event.startsWith("server:"))).toBe(false);
+  });
+  it("retains a pending authorization when a provider GET fails",async()=>{
+    const h=reconciliationHarness({providerStatus:503});
+    await expect(h.ops.status(h.session,"senja")).rejects.toMatchObject({code:"UNIPILE_UNAVAILABLE"});
     expect(h.events.some(event=>event.startsWith("server:"))).toBe(false);
   });
   it("fails mismatching authenticated primary instead of completing the hinted account",async()=>{
@@ -357,5 +363,80 @@ describe("backend beta connection policy",()=>{
   it("rejects forged policy requests before RPC",async()=>{
     const ops=createEmailConnectOperations({...settings,fetchImpl:async()=>{throw Error("unexpected");}});
     await expect(ops.start({userId:id,client:{rpc:async()=>{throw Error("unexpected RPC");}}},{workspace:"senja",email,mailbox_use:"personal",skip_placement:true} as never)).rejects.toThrow();
+  });
+});
+
+describe("hosted selection and exact-attempt verification", () => {
+  it("starts workspace-only selection and reconnection without requesting a mailbox address or contacting the provider", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const client = { rpc: async (_name: string, args: Record<string, unknown>) => {
+      calls.push(args);
+      return { data: { state: "pending", workspace_ref: workspace, email: null, mailbox_use: null, daily_limit: 10,
+        intent_ref: id, expires_at: intent.expires_at }, error: null };
+    } };
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async () => { throw new Error("Must not read provider"); } });
+    const result = await ops.start({ userId: id, client }, { workspace, reconnect: true });
+    expect(result).toMatchObject({ status: "pending", email: null, mailbox_use: null, intent_ref: id, expires_at: intent.expires_at });
+    expect(calls).toHaveLength(1); expect(calls[0]?.p_payload).toEqual({ workspace, reconnect: true });
+  });
+  it("keeps declaration in an explicit browser form POST bound to the same sealed intent", async () => {
+    let declared = false; const calls: string[] = [];
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async (_url, init) => {
+      const args = JSON.parse(String(init?.body)); calls.push(args.p_operation);
+      expect(args.p_payload.intent_ref).toBe(id);
+      if (args.p_operation === "declare") { expect(args.p_payload.mailbox_use).toBe("personal"); declared = true; return json({ ok: true }); }
+      return json({ ...intent, email: null, selection_required: !declared });
+    } });
+    const app = createApp({ authorizeEmail: ops.authorize, declareEmail: ops.declare, log: () => {} });
+    const page = await app.request(`/unipile/start?intent=${state}`);
+    expect(page.status).toBe(200); expect(page.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(page.headers.get("content-security-policy")).toContain("form-action 'self'");
+    expect(await page.text()).toContain('type="checkbox"'); expect(calls).toEqual(["intent"]);
+    const send = (body: string, origin = "http://localhost") => app.request("/unipile/start", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin }, body });
+    expect((await send(`intent=${state}`)).status).toBe(400);
+    expect((await send(`intent=${state}&mailbox_use=personal`, "https://attacker.test")).status).toBe(403);
+    expect(declared).toBe(false);
+    const response = await send(`intent=${state}&mailbox_use=personal`);
+    expect(response.status).toBe(303); expect(response.headers.get("location")).toBe(intent.hosted_url);
+    expect(calls).toEqual(["intent", "declare", "intent"]);
+  });
+  it("verifies the selected primary mailbox from provider readback without inventing an address", async () => {
+    const h = harness({ intent: { ...intent, email: null } });
+    await h.ops.callback(state, body);
+    expect(h.calls.at(-1)).toEqual({ operation: "complete", payload: { intent_ref: id, account_id: "account_1", email } });
+  });
+  it.each(["pending", "connected"])("preserves %s authorization and grant on malformed account/owner responses", async initial => {
+    for (const malformed of ["account", "owner"]) {
+      const operations: string[] = [];
+      const client = { rpc: async (_name: string, args: Record<string, unknown>) => {
+        operations.push(String(args.p_operation));
+        if (String(_name).includes("callback_hint")) return { data: { workspace_ref: workspace, intent_ref: id, account_id: "account_1" }, error: null };
+        return { data: { state: initial, workspace_ref: workspace, email, mailbox_use: "personal", daily_limit: 10, intent_ref: id, account_id: "account_1", connection_ref: workspace }, error: null };
+      } };
+      const ops = createEmailConnectOperations({ ...settings, fetchImpl: async url => {
+        if (String(url).includes("users/me")) return json(malformed === "owner" ? { ...owner, aliases: [] } : owner);
+        return json(malformed === "account" ? { incomplete: true } : account);
+      } });
+      await expect(ops.status({ userId: id, client }, workspace)).rejects.toMatchObject({ code: "UNIPILE_UNAVAILABLE" });
+      expect(operations).toEqual(initial === "pending" ? ["status", "read"] : ["status"]);
+    }
+  });
+  it("does not reconcile a newer pending intent when verifying an older exact reference", async () => {
+    const operations: string[] = [];
+    const client = { rpc: async (_name: string, args: Record<string, unknown>) => {
+      operations.push(String(args.p_operation));
+      return { data: { state: "pending", workspace_ref: workspace, email, mailbox_use: "personal", daily_limit: 10, intent_ref: workspace }, error: null };
+    } };
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async () => { throw new Error("No provider call"); } });
+    expect((await ops.status({ userId: id, client }, workspace, id)).status).toBe("pending");
+    expect(operations).toEqual(["status"]);
+  });
+});
+
+describe("unknown email source status", () => {
+  it.each(["", "FUTURE_STATUS"])("does not convert %s into a failed grant or attempt", async status => {
+    const h = harness({ identity: { ...account, sources: [{ id: "s", status }] } });
+    await expect(h.ops.callback(state, body)).rejects.toMatchObject({ code: "UNIPILE_UNAVAILABLE" });
+    expect(h.calls.map(call => call.operation)).toEqual(["intent", "record"]);
   });
 });

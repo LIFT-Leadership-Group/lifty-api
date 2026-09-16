@@ -1,4 +1,8 @@
 import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
+import { registerStageRoutes } from "./stage-routes.js";
+import { lintOnboardingDraft } from "./onboarding-draft.js";
+import { renderEmailAuthorizationPage } from "./email-authorization-page.js";
+import { getConnectionAttempt, type ConnectionAttemptStatus, type ConnectionProvider } from "./connection-attempt.js";
 import {
   type CompanyMappingOperation,
   CompanyMappingContextSchema,
@@ -131,6 +135,7 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
   apolloCredentials(session: AuthSession, workspace: string, input: ApolloCredentialInput): Promise<ApolloCredentialOutput>;
@@ -138,15 +143,16 @@ export interface AppDependencies {
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
   linkedinCampaign(session: AuthSession, input: LinkedinCampaignInput): Promise<LinkedinCampaignOutput>;
   startLinkedinConnect(session: AuthSession, input: LinkedinConnectInput): Promise<LinkedinStart>;
-  getLinkedinConnection(session: AuthSession, workspace: string): Promise<LinkedinStatus>;
+  getLinkedinConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<LinkedinStatus>;
   disconnectLinkedin(session: AuthSession, workspace: string): Promise<LinkedinStatus>;
   authorizeLinkedin(state: string): Promise<string>;
   completeLinkedinCallback(state: string, body: unknown): Promise<void>;
   emailAvailable: boolean;
   startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
-  getEmailConnection(session: AuthSession, workspace: string): Promise<EmailStatus>;
+  getEmailConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<EmailStatus>;
   disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
   authorizeEmail(state: string): Promise<string>;
+  declareEmail(state: string): Promise<string>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
@@ -204,6 +210,7 @@ export interface AppDependencies {
   completeHubspotCallback(
     input: { code: string; state: string },
   ): Promise<HubspotCallbackSuccess>;
+  denyHubspotCallback(state: string): Promise<void>;
   buildHubspotAuthorizeUrl(state: string): string | null;
   startSlackConnect(session: AuthSession): Promise<SlackConnectStart>;
   createSlackConnectLink(session: AuthSession, workspaceId: string): Promise<SlackConnectLink>;
@@ -211,6 +218,7 @@ export interface AppDependencies {
   completeSlackCallback(
     input: { code: string; state: string },
   ): Promise<SlackCallbackSuccess>;
+  denySlackCallback(state: string): Promise<void>;
   buildSlackAuthorizeUrl(state: string): string | null;
   renderCliAuthPage(
     state: string,
@@ -243,7 +251,7 @@ export interface LogEvent {
   upstream_kind?: string;
 }
 
-type AppEnvironment = {
+export type AppEnvironment = {
   Variables: {
     requestId: string;
     requestStartedAt: number;
@@ -519,7 +527,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     path: "/v1/workspace/runs",
     operationId: "startRun",
     security: [{ bearerAuth: [] }],
-    request: { headers: z.object({ "x-lifty-client-contract": z.literal(CALIBRATION_CLIENT_CONTRACT) }) },
+    request: { headers: z.object({ "x-lifty-client-contract": z.enum([CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT]) }) },
     responses: {
       200: JsonResponse(StartRunResultSchema),
       401: JsonResponse(ErrorResponseSchema),
@@ -908,6 +916,10 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 }
 
 const defaultDependencies: AppDependencies = {
+  getConnectionAttempt,
+  declareEmail: async () => { throw new PublicError({ status: 503, code: "EMAIL_NOT_CONFIGURED", message: "Email connection is not configured yet." }); },
+  denyHubspotCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
+  denySlackCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
   getApolloAllowance: async () => { throw new PublicError({status:503,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"Apollo allowance is not configured yet."}); },
   acquisitionRecovery: async () => {
     throw new PublicError({
@@ -1177,6 +1189,11 @@ export function createApp(
   });
   app.get("/hubspot/callback", async (context) => {
     if (context.req.query("error")) {
+      const state = context.req.query("state") ?? "";
+      if (isSealedHubspotState(state)) {
+        try { await dependencies.denyHubspotCallback(state); }
+        catch { return hubspotHtmlResponse(context, 503, "Authorization could not be verified", "The outcome could not be recorded. Return to Lifty to check the same attempt."); }
+      }
       return hubspotHtmlResponse(
         context,
         400,
@@ -1257,6 +1274,11 @@ export function createApp(
   });
   app.get("/slack/callback", async (context) => {
     if (context.req.query("error")) {
+      const state = context.req.query("state") ?? "";
+      if (isSealedSlackState(state)) {
+        try { await dependencies.denySlackCallback(state); }
+        catch { return hubspotHtmlResponse(context, 503, "Authorization could not be verified", "The outcome could not be recorded. Return to Lifty to check the same attempt."); }
+      }
       return hubspotHtmlResponse(
         context,
         400,
@@ -1331,10 +1353,43 @@ export function createApp(
   app.get("/unipile/start", async (context) => {
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
-    const target = await dependencies.authorizeEmail(context.req.query("intent") ?? "");
+    const state = context.req.query("intent") ?? "";
+    let target: string;
+    try { target = await dependencies.authorizeEmail(state); }
+    catch (error) {
+      if (!(error instanceof PublicError) || error.code !== "EMAIL_DECLARATION_REQUIRED") throw error;
+      return context.html(renderEmailAuthorizationPage(state), 200, {
+        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      });
+    }
     const url = new URL(target);
     if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
       throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"LIFTY could not prepare the email connection."});
+    }
+    return context.redirect(target, 303);
+  });
+  app.post("/unipile/start", async context => {
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
+    const origin = context.req.header("origin");
+    if ((origin && origin !== new URL(context.req.url).origin) || context.req.header("sec-fetch-site") === "cross-site") {
+      return errorJson(context, 403, "INVALID_REQUEST", "Continue from the email authorization page.");
+    }
+    if (!context.req.header("content-type")?.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Submit the email authorization form.");
+    }
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Invalid email account declaration.");
+    const form = new URLSearchParams(raw.text);
+    if (form.getAll("intent").length !== 1 || form.getAll("mailbox_use").length !== 1
+      || [...form.keys()].some(key => !["intent", "mailbox_use"].includes(key)) || form.get("mailbox_use") !== "personal") {
+      return errorJson(context, 400, "INVALID_REQUEST", "Confirm your regular personal mailbox before continuing.");
+    }
+    const target = await dependencies.declareEmail(form.get("intent")!);
+    const url = new URL(target);
+    if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
+      throw new PublicError({ status: 502, code: "EMAIL_INVALID_HANDOFF", message: "LIFTY could not prepare the email connection." });
     }
     return context.redirect(target, 303);
   });
@@ -1440,6 +1495,7 @@ export function createApp(
   app.use("/v1/*", async (context, next) => {
     if (context.req.method !== "POST" || ![
       "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/linkedin/connect",
+      "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
     ].includes(context.req.path)) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {
@@ -1457,6 +1513,8 @@ export function createApp(
   });
 
   // ---------------------------------------------------------------- status
+
+  registerStageRoutes(app, dependencies);
 
   // One aggregate read so `lifty status` answers "is my HubSpot OK?" without
   // ever touching OAuth: workspace, onboarding import, first run, the latest
@@ -1665,7 +1723,7 @@ export function createApp(
         "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
     }
     const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft, undefined, {
-      requireDiscoveryIntent: context.req.header("x-lifty-client-contract") === CALIBRATION_CLIENT_CONTRACT,
+      requireDiscoveryIntent: [CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT].includes(context.req.header("x-lifty-client-contract") ?? ""),
     });
     if (!lint.success) {
       return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
@@ -1677,6 +1735,11 @@ export function createApp(
       return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
         "Repair the local configuration using these issues and push it again.", contextualLint.issues);
     }
+    // Writers only protect local artifacts. The current server validates full
+    // confirmation/readiness semantics for every client before persistence.
+    const draftIssues = lintOnboardingDraft(envelope.data.draft);
+    if (draftIssues.length) return errorJson(context, 422, "ONBOARDING_DRAFT_INVALID",
+      "Repair the confirmed draft using the current API schema before submitting configuration.", draftIssues);
 
     const submission = await dependencies.submitOnboarding(
       context.get("authSession"),
@@ -1725,7 +1788,7 @@ export function createApp(
   });
 
   app.post("/v1/workspace/runs", async (context) => {
-    if (context.req.header("x-lifty-client-contract") !== CALIBRATION_CLIENT_CONTRACT) {
+    if (![CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT].includes(context.req.header("x-lifty-client-contract") ?? "")) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Upgrade the installed Lifty CLI and skills before starting or resuming calibration. Your saved candidates remain available through status.");
     }
     const result = StartRunResultSchema.parse(await dependencies.startRun(context.get("authSession")));
@@ -2233,9 +2296,9 @@ export function createApp(
     const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
     if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Email connection request is too large.");
     let payload: unknown;
-    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace, email and mailbox_use."); }
+    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace and the current email connection fields."); }
     const parsed = EmailConnectRequest.safeParse(payload);
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace, email and mailbox_use (personal or outreach).");
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace; legacy email and mailbox_use must be supplied together.");
     return context.json(EmailConnectResult.parse(await dependencies.startEmailConnect(context.get("authSession"), parsed.data)));
   });
   app.get("/v1/email", async (context) => {

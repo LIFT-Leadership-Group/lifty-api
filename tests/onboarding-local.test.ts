@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { getOnboardingContext, submitOnboarding } from "../src/workspace-operations.js";
-import { localConfiguration, onboardingContext } from "./onboarding-fixtures.js";
+import { localConfiguration, onboardingContext, confirmedDraft } from "./onboarding-fixtures.js";
 
 const session = { userId: "founder", client: {} };
 const authenticate = async () => ({ ok: true as const, session });
-const draft = { schema_version: "2.1", personas: localConfiguration.icp_config.personas };
+const draft = confirmedDraft;
 
 function push(app: ReturnType<typeof createApp>, body: unknown) {
   return app.request("/v1/onboarding", {
@@ -16,12 +16,12 @@ function push(app: ReturnType<typeof createApp>, body: unknown) {
 }
 
 describe("locally generated onboarding", () => {
-  it("requires explicit discovery intent from a current client before saving a draft", async () => {
+  it.each(["v4", "v5"])("requires explicit discovery intent from a %s client before saving a draft", async version => {
     const submit = vi.fn(); const enqueue = vi.fn();
     const app = createApp({ authenticate, submitOnboarding: submit, enqueueOnboardingImport: enqueue, getOnboardingContext: async () => onboardingContext });
     const response = await app.request("/v1/onboarding", { method: "POST",
-      headers: { "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v4" },
-      body: JSON.stringify({ draft, configuration: localConfiguration }),
+      headers: { "content-type": "application/json", "x-lifty-client-contract": `lifty-cli-context.${version}` },
+      body: JSON.stringify({ draft: { ...draft, icp: undefined }, configuration: localConfiguration }),
     });
     expect(response.status).toBe(422);
     expect((await response.json()).error.issues).toContainEqual(expect.objectContaining({ code: "discovery_intent_required", path: "/draft/icp/discovery" }));

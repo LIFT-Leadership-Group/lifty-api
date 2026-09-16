@@ -3,33 +3,21 @@
 
 ## Authorization links
 
-For login and every account connection, show the actual URL returned by the
-persisted CLI as a clickable Markdown link in the conversation. Never invent,
-reuse an expired link, or open one automatically with browser tools, `open`,
-`xdg-open` or another app. Let the founder choose their browser and profile.
-Run authorization commands with `LIFTY_NO_BROWSER=1` for older installed CLIs.
-For connection commands, use `--no-wait` to return the link immediately. If an
-older CLI rejects that flag before making a request, omit it, keep the process
-running and read its first output without waiting for authorization to finish.
-Do not start another connection attempt just to recover the URL.
+Use the installed authorization guide for login and the common browser handoff.
+For account setup, read the current `sending-accounts`, `crm`, or `notifications`
+stage context and use its published operations through `lifty stage`. The stage
+POST returns a real link immediately with an `attempt_ref` and expiry. Show that
+link, let the founder choose their browser/account, and wait for their response.
+Then read the same stage with the retained `attempt_ref` (and sending channel).
+Only the matching verified completion confirms that authorization. An older
+healthy grant does not complete a new reconnect, and a failed verification read
+must preserve the reference for retry. See the stage's connection guidance for
+pending, expiry, denial and failure. Never open the browser automatically or
+activate sending as part of connection setup.
 
-Use the founder's language. If the email is already known, the Spanish handoff
-is ``[Conectá `<email>` acá](<returned-url>).`` followed by:
-"Avisame cuando termines la autorización y verifico la conexión. No se enviará
-ningún email." Use the real address and URL, never the placeholders. If the
-address is not known, label the link "Conectá tu cuenta acá"; do not ask for an
-address solely to label the link. For login, say "Iniciá sesión acá"; name
-HubSpot, Slack or LinkedIn when connecting those accounts.
-
-End the turn after giving the link. When the founder says authorization is
-complete, verify through the CLI before reporting success: email/LinkedIn use
-`connect <provider> --workspace <workspace-ref> --status`, HubSpot uses `status`,
-and Slack uses `notifications`. If a process is still running, read its result.
-For explicit HubSpot reauthorization, retain the waiting process rather than
-`--no-wait`: its check requires a new grant, not the old connected status.
-Login also keeps its callback listener running; show its URL promptly and read
-its result after the founder replies. Never claim connection from a pending
-handoff, silently restart an expired attempt, or activate sending.
+Login keeps its existing short-lived callback listener alive until completion,
+cancellation or expiry; provider-stage authorization requires an existing Lifty
+session and does not replace that listener.
 
 After onboarding, the hosted workspace is the source of truth: read it before
 answering, change research settings through `update`, operate email through `campaign` and LinkedIn through `campaign linkedin`, and keep the onboarding voice.

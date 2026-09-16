@@ -110,15 +110,15 @@ describe("runtime stage context", () => {
   });
 
   it("publishes exact-attempt schemas and provider-specific handoff guidance", () => {
-    const pending = { status: "pending", attempt_ref: "opaque-attempt", expires_at: "2026-09-16T22:00:00Z", retry_after_seconds: 3 };
+    const pending = { status: "pending", attempt_ref: "11111111-1111-4111-8111-111111111111", expires_at: "2026-09-16T22:00:00Z", retry_after_seconds: 3 };
     expect(ConnectionAttemptStatusSchema.safeParse(pending).success).toBe(true);
     expect(ConnectionAttemptStatusSchema.safeParse({ ...pending, retry_after_seconds: 0 }).success).toBe(false);
-    expect(ConnectionAttemptStatusSchema.safeParse({ status: "connected", attempt_ref: "opaque-attempt", verified: true }).success).toBe(true);
+    expect(ConnectionAttemptStatusSchema.safeParse({ status: "connected", attempt_ref: "11111111-1111-4111-8111-111111111111", verified: true }).success).toBe(true);
     expect(ConnectionAttemptStatusSchema.safeParse({ status: "connected" }).success).toBe(false);
     for (const status of ["expired", "denied", "failed"]) {
-      expect(ConnectionAttemptStatusSchema.safeParse({ status, attempt_ref: "opaque-attempt" }).success).toBe(true);
+      expect(ConnectionAttemptStatusSchema.safeParse({ status, attempt_ref: "11111111-1111-4111-8111-111111111111" }).success).toBe(true);
     }
-    expect(AuthorizationRequiredSchema.safeParse({ status: "authorization_required", attempt_ref: "opaque-attempt",
+    expect(AuthorizationRequiredSchema.safeParse({ status: "authorization_required", attempt_ref: "11111111-1111-4111-8111-111111111111",
       connection_url: "https://provider.example/consent", expires_at: pending.expires_at }).success).toBe(true);
     expect(SendingAccountStartSchema.safeParse({ channel: "email" }).success).toBe(true);
     expect(SendingAccountStartSchema.safeParse({ channel: "email", email: "asked-before-link@example.test" }).success).toBe(false);

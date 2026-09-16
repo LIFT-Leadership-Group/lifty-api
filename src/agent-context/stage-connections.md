@@ -18,6 +18,9 @@ include `channel` for sending accounts. Only `status: connected`, `verified:
 true` and the matching `attempt_ref` confirm this authorization. Reading a
 connected account without the reference is a state read, not attempt evidence.
 This rule also applies when reconnecting an account whose old grant still works.
+The verified receipt proves completion of that authorization and its binding to
+the current stored healthy grant; it does not claim a fresh independent provider
+availability check. GET without `attempt_ref` reads current connection health.
 
 - `pending`: keep the same attempt and recheck no sooner than the returned
   `retry_after_seconds`. Do not create another attempt just to recover its URL.

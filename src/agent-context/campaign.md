@@ -3,33 +3,21 @@
 
 ## Authorization links
 
-For login and every account connection, show the actual URL returned by the
-persisted CLI as a clickable Markdown link in the conversation. Never invent,
-reuse an expired link, or open one automatically with browser tools, `open`,
-`xdg-open` or another app. Let the founder choose their browser and profile.
-Run authorization commands with `LIFTY_NO_BROWSER=1` for older installed CLIs.
-For connection commands, use `--no-wait` to return the link immediately. If an
-older CLI rejects that flag before making a request, omit it, keep the process
-running and read its first output without waiting for authorization to finish.
-Do not start another connection attempt just to recover the URL.
+Use the installed authorization guide for login and the common browser handoff.
+For account setup, read the current `sending-accounts`, `crm`, or `notifications`
+stage context and use its published operations through `lifty stage`. The stage
+POST returns a real link immediately with an `attempt_ref` and expiry. Show that
+link, let the founder choose their browser/account, and wait for their response.
+Then read the same stage with the retained `attempt_ref` (and sending channel).
+Only the matching verified completion confirms that authorization. An older
+healthy grant does not complete a new reconnect, and a failed verification read
+must preserve the reference for retry. See the stage's connection guidance for
+pending, expiry, denial and failure. Never open the browser automatically or
+activate sending as part of connection setup.
 
-Use the founder's language. If the email is already known, the Spanish handoff
-is ``[Conectá `<email>` acá](<returned-url>).`` followed by:
-"Avisame cuando termines la autorización y verifico la conexión. No se enviará
-ningún email." Use the real address and URL, never the placeholders. If the
-address is not known, label the link "Conectá tu cuenta acá"; do not ask for an
-address solely to label the link. For login, say "Iniciá sesión acá"; name
-HubSpot, Slack or LinkedIn when connecting those accounts.
-
-End the turn after giving the link. When the founder says authorization is
-complete, verify through the CLI before reporting success: email/LinkedIn use
-`connect <provider> --workspace <workspace-ref> --status`, HubSpot uses `status`,
-and Slack uses `notifications`. If a process is still running, read its result.
-For explicit HubSpot reauthorization, retain the waiting process rather than
-`--no-wait`: its check requires a new grant, not the old connected status.
-Login also keeps its callback listener running; show its URL promptly and read
-its result after the founder replies. Never claim connection from a pending
-handoff, silently restart an expired attempt, or activate sending.
+Login keeps its existing short-lived callback listener alive until completion,
+cancellation or expiry; provider-stage authorization requires an existing Lifty
+session and does not replace that listener.
 
 After onboarding, the hosted workspace is the source of truth: read it before
 answering, change research settings through `update`, operate email through `campaign` and LinkedIn through `campaign linkedin`, and keep the onboarding voice.
@@ -69,19 +57,17 @@ added to the campaign workflow.
 
 ## Email campaigns
 
-If no eligible email account is connected, offer an optional Gmail/Google
-Workspace connection. Ask for the exact address and whether the founder
-already uses it regularly for personal or business correspondence (`personal`)
-or it is new/dedicated to outreach (`outreach`); never infer this from its domain.
-For a replacement, obtain explicit disconnect authorization first and run
-`disconnect unipile --workspace <workspace-ref>`. After the founder chooses to
-connect, run `connect unipile --workspace <workspace-ref> --email <exact-address>
---mailbox-use personal`, or `--mailbox-use outreach` for the declared new mailbox.
-Use the persisted CLI defined above; credentials stay in the hosted browser.
-Read `connect unipile --workspace <workspace-ref> --status` to verify the account.
-Connection never activates sending. The habitual-use beta supports existing
-correspondence mailboxes and blocks new/dedicated outreach mailboxes; read the
-current preview policy and blockers before preparing or approving a send.
+If no eligible email account is connected, offer the hosted email connection
+from the `sending-accounts` stage. Start it with the published email input;
+provider/account selection and the habitual personal-mailbox declaration happen
+in the browser. Do not ask for an address or mailbox-use questionnaire first.
+Reconnection creates a separately verifiable attempt while the existing grant
+remains usable; it does not require a destructive disconnect. A replacement
+account still follows the provider's existing pinned-account policy. Verify the
+exact returned attempt after the founder finishes. Connection never activates
+sending. The habitual-use beta supports existing correspondence mailboxes and
+blocks new/dedicated outreach mailboxes; read current preview policy and blockers
+before preparing or approving a send.
 
 Use this path only when the founder asks to prepare or operate a campaign.
 Connecting email never approves a campaign or activates sending. Resolve the
@@ -99,8 +85,7 @@ CLI returns; never substitute another workspace or provider silently.
 3. Prepare JSON through `campaign prepare --workspace <workspace> --input -`
    or `--file <JSON-path>`. Include `lead_ref`, `connection_ref`, `name`,
    `start_at` (ISO timestamp), and one to five `steps` with `subject`, plain
-   `text`, and `delay_minutes`. Obtain `connection_ref` from `connect unipile
-   --workspace <workspace> --status`. Follow-ups wait at least one minute after the
+   `text`, and `delay_minutes`. Obtain `connection_ref` from the current `sending-accounts` email GET. Follow-ups wait at least one minute after the
    previous confirmed send. For edits, include the existing `campaign_ref`.
    A retry of the same content reuses the version; material edits invalidate
    approval and cancel outstanding steps of the old version.
@@ -149,19 +134,14 @@ without changing campaign content or references.
 ## LinkedIn campaigns
 
 Use this separate channel path when the founder asks for LinkedIn outreach.
-The beta supports one existing habitual-use account per workspace. Before
-`connect linkedin`, obtain the founder's IANA timezone and their declaration
-that they use the account regularly and have no other automation running.
-If another automation tool is active, do not connect. Run:
-
-```bash
-lifty connect linkedin --workspace <workspace-ref> --timezone <IANA-timezone> --account-use personal --no-other-automation
-lifty connect linkedin --workspace <workspace-ref> --status
-```
-
-Use the persisted CLI path defined above. The second command only reads status;
-connection does not authorize or activate sends. Credentials stay in the hosted
-browser flow. Preserve the returned workspace and connection references.
+The beta supports one existing habitual-use account per workspace. Read the
+`sending-accounts` stage and obtain the founder's IANA timezone plus explicit
+personal-use and no-other-automation declarations required by its LinkedIn POST.
+If another automation tool is active, do not connect. Hand off the returned real
+link and verify the same attempt after the founder finishes. Credentials stay
+in the hosted browser flow. A normal stage GET without `attempt_ref` reads the
+current connection reference and health for campaign preparation; it is not
+proof of a new authorization. Connection does not authorize or activate sends.
 
 1. Select an existing researched lead in this workspace, with its stored
    LinkedIn profile. Never guess a lead ID or silently replace the recipient.

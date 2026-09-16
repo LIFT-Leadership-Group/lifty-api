@@ -30,4 +30,6 @@ The daily discovery target displayed in workspace configuration is read-only;
 use the capacity stage to inspect it. Do not patch capacity, workspace ownership,
 suspension or membership. For ambiguous/suspended workspace responses, stop
 and explain the account/workspace restriction; do not choose another tenant.
-After an uncertain edit, use the documented receipt/resolve operation.
+After an uncertain edit, GET the saved business values before retrying. If a
+submission receipt was returned, check that exact receipt with update_status.
+The generated-configuration resolve operation does not apply to metadata edits.

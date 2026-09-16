@@ -86,9 +86,10 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    change, explain the blocker instead of presenting old grades as fresh.
 7. When the founder asks to continue outreach setup, fetch `lifty context
    campaign` and collect only missing account/channel declarations. Reuse the
-   stated channel choice. Use `connect unipile` for Gmail/Google Workspace
-   email and `connect linkedin` for LinkedIn browser authorization. Skip an
-   already healthy requested connection. If they choose existing B leads,
+   stated channel choice. Read the current `sending-accounts` stage for
+   Gmail/Google Workspace email or LinkedIn authorization and exact-attempt
+   verification. Skip an already healthy connection unless reconnecting was
+   explicitly requested. If they choose existing B leads,
    review their saved evidence against the current ICP and make the selected
    recipients explicit. Keep recorded grades and calibration status truthful;
    a changed ICP does not make all saved evidence unusable. Missing evidence

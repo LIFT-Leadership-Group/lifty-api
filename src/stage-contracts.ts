@@ -34,7 +34,7 @@ export const StageErrorSchema = z.object({
   request_id: z.string(),
 });
 const Empty = z.object({}).strict();
-const AttemptRef = z.string().min(1).max(8192);
+const AttemptRef = z.uuid();
 export const AuthorizationRequiredSchema = z.object({
   status: z.literal("authorization_required"),
   attempt_ref: AttemptRef,
@@ -52,7 +52,7 @@ export const ConnectionAttemptStatusSchema = z.discriminatedUnion("status", [
 export const ConnectionAttemptQuerySchema = z.object({ attempt_ref: AttemptRef.optional() }).strict();
 export const SendingAccountQuerySchema = ConnectionAttemptQuerySchema.extend({ channel: z.enum(["linkedin", "email"]) });
 export const SendingAccountStartSchema = z.discriminatedUnion("channel", [
-  LinkedinConnectRequest.omit({ workspace: true }).extend({ channel: z.literal("linkedin") }),
+  LinkedinConnectRequest.omit({ workspace: true, reconnect: true }).extend({ channel: z.literal("linkedin") }),
   // The hosted email flow owns account/provider selection. No pre-link address
   // or use questionnaire, credentials, or authorization override is accepted.
   z.object({ channel: z.literal("email") }).strict(),
@@ -120,7 +120,7 @@ function operation(method: StageOperation["method"], route: string, description:
     request: { path: json(path, "input"), query: json(query, "input"), body: body ? json(body, "input") : null },
     responses: response
       ? { "200": json(response), "400": json(StageErrorSchema), "401": json(StageErrorSchema),
-        "403": json(StageErrorSchema), "409": json(StageErrorSchema), "422": json(StageErrorSchema),
+        "403": json(StageErrorSchema), "404": json(StageErrorSchema), "413": json(StageErrorSchema), "409": json(StageErrorSchema), "422": json(StageErrorSchema),
         "429": json(StageErrorSchema), "502": json(StageErrorSchema), "503": json(StageErrorSchema) }
       : { "405": json(StageErrorSchema), "401": json(StageErrorSchema) },
   };
@@ -141,7 +141,7 @@ const configSupport = {
   onboarding_context: operation("GET", "/v1/onboarding/context", "Read private generation rules and artifact schema before first setup.", OnboardingGenerationContextSchema),
   onboarding_status: operation("GET", "/v1/onboarding", "Read initial configuration import status before confirming setup.", OnboardingStatusSchema),
   update_status: operation("GET", "/v1/config/updates/{submission_ref}", "Read this exact update receipt. A failed read does not mean the update failed.", ConfigUpdateStatusSchema, null, Empty, z.object({ submission_ref: z.string().min(1) }).strict()),
-  resolve_update: operation("POST", "/v1/config/updates/resolve", "Resolve the unchanged original payload after an uncertain write before retrying.", ConfigUpdateStatusSchema, ConfigUpdateRequestSchema),
+  resolve_update: operation("POST", "/v1/config/updates/resolve", "Resolve an unchanged original generated edit including its configuration artifact after an uncertain write; direct metadata edits use GET readback and any returned receipt instead.", ConfigUpdateStatusSchema, ConfigUpdateRequestSchema),
 };
 
 // These definitions are also the contracts for the thin authenticated adapters
@@ -153,7 +153,6 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     post: operation("POST", stageRoute("business"), "Provision the authenticated founder's workspace using the existing create operation.", CreateWorkspaceResultSchema, CreateWorkspaceRequestSchema),
     patch: configWrite("business", "workspace", BusinessStagePatchSchema),
     update_status: configSupport.update_status,
-    resolve_update: configSupport.resolve_update,
   },
   targeting: { get: configRead("targeting", "Read saved ICP/personas; versions and lane allocation are read-only."), post: initialSetup("targeting"), patch: configWrite("targeting", "icp", TargetingStagePatchSchema), ...configSupport },
   "research-criteria": { get: configRead("research-criteria", "Read the saved research prompt and provenance; protected prompts remain read-only."), post: initialSetup("research-criteria"), patch: configWrite("research-criteria", "prompt", ResearchStagePatchSchema), ...configSupport },
@@ -167,7 +166,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     get: operation("GET", stageRoute("crm"), "Without attempt_ref read HubSpot connection state. With it verify only that exact authorization attempt, including reconnection.", z.union([HubspotConnectionStatusSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),
     post: operation("POST", stageRoute("crm"), "Start a new HubSpot connection/reconnection and return the real consent link immediately.", AuthorizationRequiredSchema, Empty),
     patch: operation("PATCH", stageRoute("crm"), "Apply the bounded company mapping plan from mapping_context. No tokens, arbitrary mappings or connected flag updates.", CompanyMappingReceiptSchema, CompanyPlanSchema),
-    mapping_context: operation("GET", "/v1/integrations/hubspot/company-mapping/context", "Read the authenticated live portal schema/mapping and its current bounded input schema.", CompanyMappingContextSchema, null, z.object({ workspace_ref: z.uuid().optional() }).strict()),
+    mapping_context: operation("GET", "/v1/workspace/crm/mapping-context", "Read the current authenticated workspace's live portal schema/mapping and its current bounded input schema.", CompanyMappingContextSchema),
   },
   "sending-accounts": {
     get: operation("GET", stageRoute("sending-accounts"), "Read the selected channel's current account, or verify the exact attempt_ref. A healthy previous account is not a new attempt's success.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema),
