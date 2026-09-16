@@ -179,6 +179,8 @@ run_smoke() {
 }
 
 deploy_app() {
+  [[ $# -le 2 && ( $# -lt 2 || "${2:-}" == "--force-rebuild" ) ]] \
+    || fail "deploy accepts only <full-sha> [--force-rebuild]"
   require_command doctl
   require_command git
   require_command jq
@@ -203,8 +205,11 @@ deploy_app() {
   [[ "$remote_commit" == "$expected_commit" ]] \
     || fail "remote $repository#$branch is $remote_commit, expected $expected_commit"
 
-  doctl apps create-deployment "$app_id" --force-rebuild --wait -o json \
-    >/dev/null
+  if [[ "${2:-}" == "--force-rebuild" ]]; then
+    doctl apps create-deployment "$app_id" --force-rebuild --wait -o json >/dev/null
+  else
+    doctl apps create-deployment "$app_id" --wait -o json >/dev/null
+  fi
   app_json="$(doctl apps get "$app_id" -o json)"
   deployment_id="$(jq -er '.[0].active_deployment.id' <<<"$app_json")"
   deployment_json="$(doctl apps get-deployment \
@@ -238,7 +243,8 @@ Commands:
   doctor             Check local tooling, authentication, and app access
   status             Show the app, deployment, source commit, and ingress
   logs [options]     Read bounded logs (--tail N, --type TYPE)
-  deploy <full-sha>  Deploy and verify one exact remote commit
+  deploy <full-sha> [--force-rebuild]
+                     Deploy and verify one exact remote commit (reuse eligible builds)
   smoke              Probe health, readiness, OpenAPI, and fail-closed auth
   help                Show this help
 

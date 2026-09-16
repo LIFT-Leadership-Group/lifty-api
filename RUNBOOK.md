@@ -61,30 +61,22 @@ termination and per-IP/per-token rate limiting belong at the deployment ingress.
 
 ## Deploy and verify
 
-1. Build the included container and deploy it as an ordinary Node service.
-2. Configure the publishable Supabase values and encrypted HubSpot app values
-   above. Backend environment variables are deployment configuration; founders
-   do not set anything locally.
-3. Keep the service private from browser integrations; no CORS allowlist is
-   emitted.
-4. Verify liveness and the public contract:
+Merging runtime changes to `main` starts the `Deploy` GitHub Actions workflow.
+Follow that run: it runs `npm run verify`, deploys the exact main SHA, waits for
+it to become active, and probes health, readiness (including CRM), OpenAPI and
+fail-closed authentication. Do not run a second deploy or repeat those public
+probes after the workflow passes. Human documentation-only pushes are excluded;
+Markdown shipped under `src/agent-context/` still triggers deployment.
 
-   ```sh
-   curl --fail https://api.example.com/healthz
-   curl --fail https://api.example.com/readyz
-   curl --fail https://api.example.com/openapi.json
-   ```
+Configure the publishable Supabase and encrypted HubSpot values above when
+setting up the host; founders do not set them locally. Keep the service private
+from browser integrations (no CORS allowlist). Release prerequisite migrations
+through their owning CI before merging the dependent API.
 
-5. Verify authentication fails closed:
-
-   ```sh
-   curl --fail-with-body https://api.example.com/v1/workspace
-   # Expected HTTP 401 with error.code = UNAUTHORIZED
-   ```
-
-6. Confirm the CLI distribution embeds this DigitalOcean ingress, then run
-   `lifty status`, a provisioning smoke test, and `lifty connect hubspot` with
-   a disposable founder. No founder environment override should be present.
+If a change affects CLI ingress, provisioning or HubSpot onboarding, verify that
+specific behavior with the matching CLI and a disposable nonproduction founder,
+following the canary constraints below. Do not run the entire provisioning flow
+for documentation or deploy-tooling changes.
 
 Logs contain request ID, method, path, status, and public error code. They must
 not contain bearer tokens, request bodies, onboarding drafts, or database error
@@ -124,8 +116,8 @@ npm run do:smoke
 query it accepts only `--tail N` and `--type TYPE`; unsupported or global
 `doctl` flags fail closed.
 
-After a reviewed commit is available on the source branch configured in App
-Platform, deploy and wait for verification with:
+For an intentional manual redeploy when no CI deployment is already running,
+use the reviewed current main SHA and wait for verification with:
 
 ```sh
 npm run do:deploy -- <full-40-character-sha>
@@ -136,7 +128,9 @@ component, GitHub repository, and `main` branch before mutation. It requires
 the supplied SHA to match the remote branch head, creates a dedicated App
 Platform deployment without reapplying the live app spec, waits, verifies the
 exact active commit, and runs health, readiness, OpenAPI, and unauthenticated
-fail-closed checks. It never prints environment values or uploads local files.
+fail-closed checks. Eligible builds can be reused; append `--force-rebuild`
+only when a clean rebuild is required or to diagnose stale build/cache state.
+Unknown flags are rejected. It never prints environment values or uploads local files.
 
 Agents need `doctl`, `jq`, and `curl`, plus an authenticated DigitalOcean
 context; deploys additionally need `git`. Run `npm run do:doctor` first on a
