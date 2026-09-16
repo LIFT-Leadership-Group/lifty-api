@@ -1,6 +1,36 @@
 
 # LIFTY founder onboarding
 
+## Authorization links
+
+For login and every account connection, show the actual URL returned by the
+persisted CLI as a clickable Markdown link in the conversation. Never invent,
+reuse an expired link, or open one automatically with browser tools, `open`,
+`xdg-open` or another app. Let the founder choose their browser and profile.
+Run authorization commands with `LIFTY_NO_BROWSER=1` for older installed CLIs.
+For connection commands, use `--no-wait` to return the link immediately. If an
+older CLI rejects that flag before making a request, omit it, keep the process
+running and read its first output without waiting for authorization to finish.
+Do not start another connection attempt just to recover the URL.
+
+Use the founder's language. If the email is already known, the Spanish handoff
+is ``[Conectá `<email>` acá](<returned-url>).`` followed by:
+"Avisame cuando termines la autorización y verifico la conexión. No se enviará
+ningún email." Use the real address and URL, never the placeholders. If the
+address is not known, label the link "Conectá tu cuenta acá"; do not ask for an
+address solely to label the link. For login, say "Iniciá sesión acá"; name
+HubSpot, Slack or LinkedIn when connecting those accounts.
+
+End the turn after giving the link. When the founder says authorization is
+complete, verify through the CLI before reporting success: email/LinkedIn use
+`connect <provider> --workspace <workspace-ref> --status`, HubSpot uses `status`,
+and Slack uses `notifications`. If a process is still running, read its result.
+For explicit HubSpot reauthorization, retain the waiting process rather than
+`--no-wait`: its check requires a new grant, not the old connected status.
+Login also keeps its callback listener running; show its URL promptly and read
+its result after the founder replies. Never claim connection from a pending
+handoff, silently restart an expired attempt, or activate sending.
+
 Build one founder-confirmed ICP bootstrap, save it privately in the active
 project. `lifty login` creates the workspace; you generate its discovery and
 research configuration locally using the current onboarding context.
@@ -124,15 +154,15 @@ only output shape.
 
 9. After a successful write, tell the founder — one plain sentence — that
    everything they confirmed is saved privately on their machine and you're
-   opening the sign-in page. No file paths, formats, or writer mechanics.
+   sharing the sign-in link. No file paths, formats, or writer mechanics.
    Resolve
    the persisted CLI as `<active-project>/.lifty/bin/lifty.mjs`; refuse to use
    it if it is missing, not a real file, or resolves outside the active
    project's `.lifty` directory.
-10. Run the browser handoff and wait for its result:
+10. Start the login handoff, show its link and keep its listener running:
 
     ```text
-    node <active-project>/.lifty/bin/lifty.mjs login \
+    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs login \
       --project-dir <active-project>
     ```
 
@@ -140,8 +170,7 @@ only output shape.
     workspace in the same step. The founder may need to sign up or sign in and
     approve the local CLI. Never ask them to paste a token or callback
     payload. If they deny, close the page, or the CLI times out, preserve the
-    draft, tell them nothing was lost, and offer to open the sign-in page
-    again — but relaunch only after they confirm they're at the browser,
+    draft, tell them nothing was lost, and offer a fresh sign-in link — but relaunch only after they confirm they're at the browser,
     never in a retry loop. When it succeeds, tell the founder their workspace exists — name
     it — and keep the rest of the CLI output to yourself.
 11. After login succeeds, fetch the authenticated workspace context:
@@ -223,11 +252,11 @@ only output shape.
     OAuth flow:
 
     ```text
-    node <active-project>/.lifty/bin/lifty.mjs connect hubspot
+    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs connect hubspot --no-wait
     ```
 
-    The CLI owns the short-lived connection URL, opens it in the browser, and
-    waits for secret-free status. The founder approves the reviewed LIFTY app
+    The CLI returns the short-lived connection URL. Show it using the
+    authorization-link handoff above and verify after the founder replies. The founder approves the reviewed LIFTY app
     in HubSpot; never ask for a client ID, client secret, authorization code,
     access token, or refresh token. Report the connection in plain words with
     the portal ID and nothing else from the CLI output. If HubSpot was not
@@ -290,13 +319,13 @@ only output shape.
     guess another tenant. Run only after the founder chooses to connect:
 
     ```bash
-    node <active-project>/.lifty/bin/lifty.mjs connect unipile \
+    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs connect unipile --no-wait \
       --workspace <workspace-ref> --email <exact-address> --mailbox-use personal
     ```
 
-    Use `--mailbox-use outreach` for a new/dedicated mailbox. The CLI opens the
-    hosted authorization and waits for verified account readback. The founder
-    enters credentials only in that browser flow. If interrupted, check with
+    Use `--mailbox-use outreach` for a new/dedicated mailbox. Show the returned
+    link using the handoff above. The founder enters credentials only in the
+    hosted flow. After they confirm authorization, check with
     `connect unipile --workspace <workspace-ref> --status`. Connection does not
     activate sending. Skipping this option never blocks onboarding.
 17. During requested outreach setup, offer LinkedIn through Unipile if
@@ -311,13 +340,13 @@ only output shape.
     Use the workspace reference returned by the CLI. After those declarations:
 
     ```bash
-    node <active-project>/.lifty/bin/lifty.mjs connect linkedin \
+    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs connect linkedin --no-wait \
       --workspace <workspace-ref> --timezone <IANA-timezone> \
       --account-use personal --no-other-automation
     ```
 
-    The founder authorizes in the browser; credentials stay there. To resume
-    checking an interrupted connection, use `connect linkedin --workspace
+    Show the link and wait for the founder to confirm authorization.
+    Credentials stay in the browser. Then verify with `connect linkedin --workspace
     <workspace-ref> --status`. Connecting or reconnecting never activates
     sending. Campaign preview, exact approval and activation happen later,
     only when requested. Skipping LinkedIn never blocks onboarding.
