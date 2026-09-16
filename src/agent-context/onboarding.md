@@ -213,6 +213,31 @@ only output shape.
     access token, or refresh token. Report the connection in plain words with
     the portal ID and nothing else from the CLI output. If HubSpot was not
     requested, offer it as an available next step and do not run it.
+
+    Check `lifty status` first. Reuse a connected portal when it does not need
+    reauthorization. If the founder explicitly asks to reauthorize an existing
+    connection, use `connect hubspot --reconnect` when the installed CLI supports
+    it; older CLIs use `connect hubspot`. Do not disconnect a working integration
+    just to refresh its consent. A previous connected status is not proof that
+    a new authorization finished.
+
+    If HubSpot says the user lacks permissions or the app's scopes are not
+    approved, give them an admin handoff immediately. Explain that a HubSpot
+    super admin for the intended portal must approve Lifty's required permissions
+    under Settings > Integrations > Connected Apps > Approved apps. Previous
+    approval can cover an older permission set. Draft a short request naming
+    their workspace and portal, and include the exact fresh connection link
+    returned by the CLI for them to share. Do not send the request yourself.
+    The admin can open that link and authorize without the founder's Lifty login.
+    Links expire after ten minutes, so if the admin is not ready, preserve the
+    workspace and generate a new link when they are. Do not claim HubSpot sent an
+    approval request unless the founder actually submitted one in HubSpot.
+
+    A request for a fresh HubSpot link means rerun the HubSpot connection command.
+    Run Lifty login only if the CLI reports an expired or invalid Lifty session.
+    For a server error, report that this attempt did not complete and check
+    connection status before retrying. Never report company syncing as ready
+    until the connection and company mapping checks succeed.
 15. After the connection succeeds, when the first run has researched leads,
     push them into the founder's HubSpot:
 

@@ -981,7 +981,23 @@ describe("LIFTY API", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.text()).toContain("HubSpot authorization was cancelled");
+    expect(await response.text()).toContain("HubSpot authorization was not completed");
+    expect(completed).toBe(false);
+  });
+
+  it("gives an admin recovery path without reflecting provider error details", async () => {
+    let completed = false;
+    const state = sealHubspotConnectIntent("e".repeat(64), "test-secret");
+    const response = await createApp({ completeHubspotCallback: async () => {
+      completed = true;
+      return { portalId: "123", hubDomain: null };
+    }}).request(`/hubspot/callback?error=insufficient_scope&error_description=private-provider-detail&state=${state}`);
+    const html = await response.text();
+    expect(response.status).toBe(400);
+    expect(html).toContain("super admin");
+    expect(html).toContain("Approved apps");
+    expect(html).not.toContain("private-provider-detail");
+    expect(html).not.toContain(state);
     expect(completed).toBe(false);
   });
 

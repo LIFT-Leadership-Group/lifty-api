@@ -1162,8 +1162,11 @@ export function createApp(
       return hubspotHtmlResponse(
         context,
         400,
-        "HubSpot authorization was cancelled",
-        "No connection was saved. Ask LIFTY for a fresh link when you are ready.",
+        "HubSpot authorization was not completed",
+        "This attempt did not save a connection. If HubSpot blocked permissions, ask a HubSpot super admin "
+          + "to approve Lifty and its required permissions in Settings > Integrations > Connected Apps > Approved apps. "
+          + "Ask Lifty for a fresh HubSpot link when the admin is ready, and share that link with them. "
+          + "They can complete the connection without your Lifty login. If you cancelled, ask Lifty to retry when you are ready.",
       );
     }
 
