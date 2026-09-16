@@ -119,8 +119,10 @@ new version copied onto it. Hand-tuned prompts are protected; explain that LIFT
 manages that research focus and stop.
 
 Own recovery when a service response fails. A timeout, 502 or 504 does not tell
-you whether the change was saved. The CLI checks the exact original payload,
-attaches to an existing submission and makes at most one safe retry when needed.
+you whether the change was saved. Clients with automatic recovery check the
+exact original payload, attach to an existing submission and make at most one
+safe retry when needed. If an older CLI surfaces a raw HTTP or connection error,
+perform the status and live-configuration checks below yourself.
 Never rebuild the request from conversation wording. Preserve
 `.lifty/config-update.json` until the outcome is confirmed.
 
