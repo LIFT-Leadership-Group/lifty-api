@@ -46,6 +46,7 @@ export { LocalOnboardingConfigurationSchema } from "./generated/lifty-configurat
 
 export const OnboardingContextSchema = z.object({
   contract_version: z.literal("lifty-onboarding-config.v1"),
+  generation_policy: z.literal("evidence_search_v1").optional(),
   context_version: LocalOnboardingConfigurationSchema.shape.context_version,
   workspace: WorkspaceReferenceSchema.extend({ description: z.string().nullable() }),
   scout_global_base: z.string().nullable(),
@@ -92,6 +93,8 @@ const OnboardingIcpSummarySchema = z
     version: z.number().int().positive(),
     label: z.string().nullable(),
     person_locations: z.array(z.string()).nullable(),
+    organization_locations: z.array(z.string()).nullable().optional(),
+    q_keywords: z.string().nullable().optional(),
     organization_industries: z.array(z.string()).nullable(),
     organization_num_employees_ranges: z.array(z.string()).nullable(),
     person_seniorities: z.array(z.string()).nullable(),
@@ -142,16 +145,28 @@ export const OnboardingStatusSchema = z.discriminatedUnion("state", [
     .strict(),
 ]);
 
-export const StartRunResultSchema = z
-  .object({
-    state: z.enum(["queued", "running"]),
+const RunStartFields = {
     run_ref: z.string().min(1),
     requested_leads: z.number().int().positive(),
     workspace: WorkspaceReferenceSchema,
-    created: z.boolean(),
     attempt: z.number().int().nonnegative().optional(),
-  })
-  .strict();
+};
+
+export const StartRunResultSchema = z.discriminatedUnion("state", [
+  z.object({
+    ...RunStartFields,
+    state: z.enum(["queued", "running"]),
+    created: z.boolean(),
+    calibration_policy: z.enum(["tier_a_v1", "qualified_ab_v1"]).optional(),
+  }).strict(),
+  z.object({
+    ...RunStartFields,
+    state: z.literal("failed"),
+    created: z.literal(false),
+    calibration_policy: z.literal("qualified_ab_v1"),
+    error_code: z.literal("calibration_review_required"),
+  }).strict(),
+]);
 
 const RunLeadSchema = z
   .object({
@@ -176,6 +191,7 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
       run_ref: z.string().min(1),
       requested_leads: z.number().int().positive(),
       leads_discovered: z.number().int().nonnegative().nullable(),
+      calibration_policy: z.enum(["tier_a_v1", "qualified_ab_v1"]).optional(),
       leads_researched: z.number().int().nonnegative().nullable(),
       error_code: z.string().nullable(),
       started_at: z.string().min(1),
@@ -421,6 +437,7 @@ const ConfigIcpSchema = z
     digest: z.string().startsWith("sha256:"),
     label: z.string().nullable(),
     person_locations: z.array(z.string()).nullable(),
+    organization_locations: z.array(z.string()).nullable().optional(),
     organization_industries: z.array(z.string()).nullable(),
     organization_num_employees_ranges: z.array(z.string()).nullable(),
     person_seniorities: z.array(z.string()).nullable(),
@@ -475,6 +492,7 @@ export const WorkspaceConfigSchema = z
 
 export const ConfigUpdateContextSchema = z.object({
   contract_version: z.literal("lifty-config-update.v1"),
+  generation_policy: z.literal("evidence_search_v1").optional(),
   context_version: LocalOnboardingConfigurationSchema.shape.context_version,
   current_config: WorkspaceConfigSchema,
   onboarding_draft: z.record(z.string(), z.unknown()).nullable(),

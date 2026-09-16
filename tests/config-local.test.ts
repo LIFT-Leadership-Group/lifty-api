@@ -6,7 +6,7 @@ import { type ConfigUpdateContext, type ConfigUpdateRequest, type ConfigUpdateSu
 
 const version=`sha256:${"a".repeat(64)}`;
 const current: ConfigUpdateContext = {
-  contract_version:"lifty-config-update.v1",context_version:version,scout_global_base:"GLOBAL BASE",onboarding_draft:{personas:localConfiguration.icp_config.personas},
+  contract_version:"lifty-config-update.v1",generation_policy:"evidence_search_v1",context_version:version,scout_global_base:"GLOBAL BASE",onboarding_draft:{personas:localConfiguration.icp_config.personas},
   current_config:{workspace_ref:"workspace",config:{icp:{...localConfiguration.icp_config,version:1,digest:version,contact_email_status:"verified",q_organization_domains_list:null,q_keywords:null,max_stale_days:90,reject_extrapolated:true},tone:{version,values:{}},prompt:{version,digest:version,text:localConfiguration.scout_overlay,source:"lif656_onboarding_import"},workspace:{version,name:"Example",description:null,daily_discovery_target:10}}},
 };
 const configuration={contract_version:"lifty-config-update.v1",context_version:version,personas:null,scout_overlay:localConfiguration.scout_overlay};
@@ -52,8 +52,8 @@ it("fetches context through the authenticated RPC without an actor override",asy
  const rpc=vi.fn(async()=>({data:current,error:null}));expect(await getConfigUpdateContext({userId:"founder",client:{rpc}})).toEqual(current);expect(rpc).toHaveBeenCalledWith("get_lifty_config_update_context");
 });
 it("legacy clients receive an explicit upgrade diagnosis instead of hosted-update instructions",async()=>{
- const app=createApp();for(const version of ["v1","v2"]) {const r=await app.request(`/v1/context/workspace?client_contract=lifty-cli-context.${version}`);expect(r.status).toBe(200);expect((await r.json()).instructions).toContain("Hosted generation is no longer available");}
- const r=await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v3");expect((await r.json()).instructions).toContain("config-context");
+ const app=createApp();for(const version of ["v1","v2","v3"]) {const r=await app.request(`/v1/context/workspace?client_contract=lifty-cli-context.${version}`);expect(r.status).toBe(200);expect((await r.json()).instructions).toContain("Hosted generation is no longer available");}
+ const r=await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v4");expect((await r.json()).instructions).toContain("config-context");
 });
 
 it("persona repairs use the artifact's actual JSON pointer", async()=>{

@@ -16,6 +16,7 @@ export const localConfiguration: LocalOnboardingConfiguration = {
 
 export const onboardingContext: OnboardingContext = {
   contract_version: localConfiguration.contract_version,
+  generation_policy: "evidence_search_v1",
   context_version: localConfiguration.context_version,
   workspace: { workspace_ref: "ws_opaque", name: "Example", description: null },
   scout_global_base: "Global Scout rules.",

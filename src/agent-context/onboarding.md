@@ -4,9 +4,10 @@
 Build one founder-confirmed ICP bootstrap, save it privately in the active
 project. `lifty login` creates the workspace; you generate its discovery and
 research configuration locally using the current onboarding context.
-`lifty push` validates and applies it, `lifty run` searches for five researched
-Tier A leads, and `lifty status` shows where things stand at any point.
-Review and confirm the Tier A sample before proceeding to outreach connection.
+`lifty push` validates and applies it, and `lifty run` researches an initial
+five-candidate cohort. Five reviewable A/B leads complete the sample; C leads
+never count. `lifty status` shows progress. Review and confirm the current
+sample before proceeding to outreach connection, including a B-only sample.
 
 ## Already onboarded?
 
@@ -58,8 +59,9 @@ Completion means exactly:
 - `lifty login` has returned successfully with a named workspace;
 - `lifty push` has finished with the configuration imported and its secret-free
   ICP + research prompt summary shown to the founder; and
-- the five Tier A leads, fit rationales and LinkedIn profile URLs have been
-  shown and the founder has explicitly confirmed this sample. A quality
+- the five eligible A/B leads, their actual grades, fit rationales and LinkedIn
+  profile URLs have been shown and the founder has explicitly confirmed this
+  sample. A quality
   shortfall or unanswered feedback question keeps calibration pending.
 
 When HubSpot connection was part of the founder's request, completion also
@@ -96,7 +98,8 @@ only output shape.
 6. If the founder says `skip`, `no sé`, `avancemos`, or an equivalent, skip any
    outreach question immediately. For a missing bootstrap gate, offer one
    researched hypothesis and ask only for confirmation or correction.
-7. Write as soon as the five bootstrap gates in the interview contract pass.
+7. Write as soon as the bootstrap gates in the interview contract pass,
+   including confirmed discovery boundaries or acceptance of a broad search.
    Do not ask about negative titles, observed replies, timing signals, tooling,
    boundary cases, tone, sender voice, CTA, channels, or sequences. The draft
    records those stages as pending or deferred.
@@ -163,8 +166,10 @@ only output shape.
     ```
 
     Push submits the draft and local configuration, then polls while the server
-    validates and applies them. When it finishes, play back industries,
-    locations and personas using the CLI's secret-free summary. Keep lane
+    validates and applies them. When it finishes, play back the confirmed
+    market and personas, distinguishing buyer location from company headquarters.
+    Explain which limits discovery enforces and which research must check.
+    Do not present industry labels as verified Apollo filters. Keep lane
     labels and prompt sizes to yourself. For `LOCAL_CONFIGURATION_INVALID`,
     read `.lifty/onboarding-validation.json`: each issue gives a field path,
     explanation and suggested fix. Repair the generated fields locally while
@@ -178,16 +183,16 @@ only output shape.
     blindly retry unchanged invalid output. On timeout, check `lifty status`
     before resubmitting. A hand-tuned or already-configured workspace must be
     preserved. Never start the first lead run until import is confirmed.
-12. Tell the founder their targeting is live and LIFTY is now going to find
-    and research five Tier A leads for review — nothing sends, nothing touches
-    their CRM:
+12. Tell the founder their targeting is live and LIFTY will research an initial
+    group of five candidates, then review their actual grades and fit together.
+    Do not promise five A leads. This run sends nothing and does not touch CRM:
 
     ```text
     node <active-project>/.lifty/bin/lifty.mjs run
     ```
 
     The run stays attached and can take a while. Read and follow
-    `references.calibration` in full: it owns the Tier A sample, LinkedIn
+    `references.calibration` in full: it owns the qualified A/B sample, LinkedIn
     links, feedback loop and explicit confirmation before outreach connection.
     If the run times out, research may still be running; check `lifty status`
     and re-attach with `lifty run` to retrieve the final results.
@@ -253,7 +258,7 @@ only output shape.
     workspace policy. If sync fails or times out, `lifty sync` safely reattaches
     to active work or retries the still-qualified failed cohort. Claim complete
     delivery only when all stages are confirmed by the receipt.
-16. Only after the founder explicitly confirms the complete current Tier A
+16. Only after the founder explicitly confirms the complete current A/B
     sample, proceed to the Unipile account connection they requested. Fetch
     `lifty context campaign` for current connection instructions. Offer Gmail
     if email is their chosen channel; otherwise skip to their chosen channel. Gmail includes
@@ -329,4 +334,4 @@ only output shape.
 - Do not enable outreach or send anything. The first run researches leads
   only.
 - Do not ask campaign/outreach setup questions or begin sender connections
-  before explicit confirmation of the complete current Tier A sample.
+  before explicit confirmation of the complete current A/B sample.

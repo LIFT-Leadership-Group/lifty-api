@@ -1,7 +1,21 @@
 // Generated from lead-gen-system/contracts/lifty-configuration.ts. Do not edit.
-// Source sha256: 080b6dbe8896e05806270683469d6123ee3686eb48e3db55f8b1ddc23f4fc397
+// Source sha256: c82d792ebad926cf61d1c5bcedbf67407bc02eddf09ed23aeee4cc5f9afdf46e
 import { z } from "zod";
 
+const LocationsSchema = z.array(z.string().trim().min(1)).min(1).nullable();
+const EmployeeProxySchema = z.object({
+  floor: z.number().int().positive().safe(),
+  ceiling: z.number().int().positive().safe().nullable(),
+}).strict().refine(value => value.ceiling === null || value.ceiling >= value.floor);
+
+/** Founder-confirmed search limits; industry labels alone are not verified filters. */
+export const DiscoveryIntentSchema = z.object({
+  person_locations: LocationsSchema,
+  organization_locations: LocationsSchema,
+  employee_range_proxy: EmployeeProxySchema.nullable(),
+  q_keywords: z.string().trim().min(1).max(1000).nullable(),
+  broad_search_confirmed: z.boolean(),
+}).strict();
 
 export const LocalOnboardingConfigurationSchema = z.object({
   contract_version: z.literal("lifty-onboarding-config.v1"),
@@ -9,6 +23,8 @@ export const LocalOnboardingConfigurationSchema = z.object({
   icp_config: z.object({
     label: z.string().min(1).max(120),
     person_locations: z.array(z.string().min(1)).nullable(),
+    organization_locations: LocationsSchema.optional(),
+    q_keywords: z.string().trim().min(1).max(1000).nullable().optional(),
     organization_industries: z.array(z.string().min(1)).min(1).nullable(),
     organization_num_employees_ranges: z.array(z.string().regex(/^[0-9]+,([0-9]+)?$/)).min(1).nullable(),
     person_seniorities: z.array(z.string().min(1)).nullable(),
@@ -43,6 +59,7 @@ export function lintLocalOnboardingConfiguration(
   candidate: unknown,
   draft: Record<string, unknown>,
   scoutGlobalBase?: string | null,
+  options: { requireDiscoveryIntent?: boolean } = {},
 ): LintResult {
   const issues: OnboardingLintIssue[] = [];
   const add = (code: string, path: string, message: string, suggestion: string) => {
@@ -78,8 +95,8 @@ export function lintLocalOnboardingConfiguration(
     });
   };
   checkText(icp.label, "/configuration/icp_config/label");
-  for (const field of ["person_locations", "organization_industries", "person_seniorities", "organization_num_employees_ranges"] as const) {
-    checkList(icp[field], `/configuration/icp_config/${field}`);
+  for (const field of ["person_locations", "organization_locations", "organization_industries", "person_seniorities", "organization_num_employees_ranges"] as const) {
+    checkList(icp[field] ?? null, `/configuration/icp_config/${field}`);
   }
   icp.person_seniorities?.forEach((value, index) => {
     if (!SENIORITIES.has(value)) add("unsupported_seniority", `/configuration/icp_config/person_seniorities/${index}`,
@@ -92,6 +109,42 @@ export function lintLocalOnboardingConfiguration(
         "Employee range bounds must be safe integers with minimum at most maximum.", "Correct the numeric bounds; leave the value after the comma empty for an open upper bound.");
     }
   });
+  // Previously saved artifacts have no discovery intent. Validate new intent
+  // when present without reinterpreting legacy imports or later confirmed edits.
+  const draftIcp = z.object({ discovery: z.unknown().optional(), size: z.unknown().optional() }).passthrough().safeParse(draft.icp);
+  if (options.requireDiscoveryIntent && (!draftIcp.success || draftIcp.data.discovery === undefined)) {
+    add("discovery_intent_required", "/draft/icp/discovery", "The current onboarding flow requires explicit search limits.", "Read the current draft schema and capture the missing geography, optional employee proxy and keyword decisions, or explicit broad-search confirmation. Preserve answers already confirmed by the founder.");
+  }
+  if (draftIcp.success && draftIcp.data.discovery !== undefined) {
+    const intent = DiscoveryIntentSchema.safeParse(draftIcp.data.discovery);
+    const size = z.object({ floor: z.number().positive(), ceiling: z.number().positive().nullable(), unit: z.string().min(1) }).safeParse(draftIcp.data.size);
+    if (!intent.success || !size.success) {
+      add("discovery_intent_invalid", "/draft/icp/discovery", "The confirmed discovery limits cannot be validated.", "Use the current draft schema, including explicit person/company geography, an optional numeric employee proxy, search keywords and a broad-search decision.");
+    } else {
+      const confirmed = intent.data;
+      const sameList = (a: string[] | null | undefined, b: string[] | null) =>
+        JSON.stringify(a?.map(normalize).sort() ?? null) === JSON.stringify(b?.map(normalize).sort() ?? null);
+      for (const field of ["person_locations", "organization_locations"] as const) {
+        if (!sameList(icp[field], confirmed[field])) add("discovery_intent_mismatch", `/configuration/icp_config/${field}`,
+          "Generated geography differs from the confirmed search.", "Copy the corresponding confirmed geography exactly; person residence and company headquarters are separate constraints. Do not infer geography from operating states.");
+      }
+      if ((icp.q_keywords?.trim() ?? null) !== confirmed.q_keywords) add("discovery_intent_mismatch", "/configuration/icp_config/q_keywords",
+        "Generated search keywords differ from the confirmed search.", "Copy the founder-confirmed keyword text or null. Do not invent Boolean syntax or treat keywords as a guaranteed industry filter.");
+      const employeeUnits = new Set(["employee", "employees", "headcount", "fte", "people", "staff", "personnel", "empleados"]);
+      const actualEmployees = employeeUnits.has(normalize(size.data.unit));
+      const employeeSize = actualEmployees ? EmployeeProxySchema.safeParse({ floor: size.data.floor, ceiling: size.data.ceiling }) : null;
+      const range = actualEmployees ? (employeeSize?.success ? employeeSize.data : null) : confirmed.employee_range_proxy;
+      if ((actualEmployees && !employeeSize?.success) || (actualEmployees && confirmed.employee_range_proxy !== null)) {
+        add("size_intent_mismatch", "/draft/icp/discovery/employee_range_proxy", "Employee sizing conflicts with the confirmed actual size.", "Use whole employee bounds from icp.size and no proxy when the actual size unit is employees. Proxies apply only to a different business metric.");
+      }
+      const expectedRanges = range ? [`${range.floor},${range.ceiling ?? ""}`] : null;
+      if (!sameList(icp.organization_num_employees_ranges, expectedRanges)) add("size_intent_mismatch", "/configuration/icp_config/organization_num_employees_ranges",
+        "Generated employee bands differ from the confirmed size or proxy.", "Copy the actual employee bounds or the explicitly confirmed employee proxy. Use null for ARR, revenue or other units without a confirmed proxy; preserve the actual metric in Scout.");
+      if (!confirmed.person_locations && !confirmed.organization_locations && !range && !confirmed.q_keywords && !confirmed.broad_search_confirmed) {
+        add("broad_search_unconfirmed", "/draft/icp/discovery/broad_search_confirmed", "The search has no confirmed native geography, employee or keyword limit.", "Confirm a bounded initial search or explicitly confirm broad discovery. Industry labels alone do not establish an effective People Search filter.");
+      }
+    }
+  }
   const names = new Set<string>();
   icp.personas.forEach((persona, index) => {
     checkText(persona.name, `/configuration/icp_config/personas/${index}/name`);
@@ -131,11 +184,13 @@ export const ONBOARDING_GENERATION_RULES = [
   "Generate configuration locally from the founder-confirmed draft. Return only the fields in configuration_schema.",
   "Copy contract_version and context_version from this context unchanged. On ONBOARDING_CONTEXT_STALE, fetch new context and regenerate.",
   "icp_config: copy the exact set of draft persona names, one entry per persona; retain every confirmed title (case-insensitive). Precise title synonyms may be added. No duplicate names or duplicate values within targeting lists.",
-  "Use only these Apollo seniorities: owner, founder, c_suite, partner, vp, head, director, manager. person_seniorities and person_locations may be null when unconstrained; do not invent a constraint.",
-  "organization_industries and organization_num_employees_ranges must be null or nonempty arrays. Use null for employee ranges when the draft size is not expressed as employees; preserve that size rule in Scout.",
+  "Use only these Apollo seniorities: owner, founder, c_suite, partner, vp, head, director, manager. person_seniorities may be null when unconstrained; do not invent a constraint. For onboarding copy draft.icp.discovery person_locations (person residence), organization_locations (company HQ) and q_keywords exactly, including explicit nulls. Operating states are not geography.",
+  "organization_industries and organization_num_employees_ranges must be null or nonempty arrays. Industry names are research intent: their enforcement by People Search is unverified. Never describe them as a guaranteed native restriction. q_keywords is plain confirmed search text, not a guaranteed industry match or documented Boolean expression. If no native geography, employee or keyword limits remain, obtain explicit broad_search_confirmed in the draft before generation.",
+  "For employee/headcount/FTE/people/staff size use its exact whole floor/ceiling as the employee band. For ARR, revenue and other units, use only an explicitly founder-confirmed draft.icp.discovery.employee_range_proxy; otherwise use null. ARR is not total revenue or headcount. Keep the actual numeric business metric and its unit in Scout; a discovery proxy never becomes a hard research exclusion.",
   "Employee ranges use minimum,maximum or minimum, for an open upper bound, with safe nonnegative integers and minimum <= maximum. Targeting values must not be blank.",
   "scout_overlay: 200–52,000 characters (aim for 2,000–4,000), with these headings exactly once in this order: ## ICP gate; ## Hard disqualifiers; ## Size gate; ## Tier definitions.",
   "Include workspace-specific targeting, hard disqualifiers, size rules and A/B/C/non-ICP tiers grounded in the draft. Reference company names are calibration evidence, not an account allowlist.",
+  "Tier A means strong positive company fit and buyer-role evidence or credible proxies, with no confirmed exclusion. Tier B means meaningful fit with weaker positive evidence. Tier C/non-ICP requires a confirmed mismatch or disqualifier. Missing public ARR, sales-owner or sales-leader evidence is unknown: it neither forces B/C nor grants A. Absence of evidence is not evidence of absence. State observed facts, proxies, unknowns and confirmed exclusions separately, with sources. Do not treat a technical research failure as a company-fit verdict.",
   "The server composes the overlay with scout_global_base. Do not copy the global base or override its mandatory instructions.",
   "POST /v1/onboarding validates before publication. On LOCAL_CONFIGURATION_INVALID, repair error.issues at their JSON-pointer paths and push again; do not ask the founder to repair technical fields.",
 ].join("\n");
@@ -177,6 +232,8 @@ export function lintLocalConfigUpdateConfiguration(candidate: unknown, desiredIc
     icp_config: {
       label: desiredIcp.label ?? "Current targeting",
       person_locations: desiredIcp.person_locations ?? null,
+      organization_locations: desiredIcp.organization_locations ?? null,
+      q_keywords: desiredIcp.q_keywords ?? null,
       organization_industries: desiredIcp.organization_industries ?? null,
       organization_num_employees_ranges: desiredIcp.organization_num_employees_ranges ?? null,
       person_seniorities: desiredIcp.person_seniorities ?? null,
@@ -198,7 +255,9 @@ export const CONFIG_UPDATE_GENERATION_RULES = [
   "On CONFIG_CONTEXT_STALE fetch /v1/config/context and regenerate. On LOCAL_CONFIGURATION_INVALID repair its bounded error.issues locally (at most three attempts). Founder clarification is for business ambiguity only.",
   "Simple workspace name/description edits do not require an artifact. ICP targeting, tone and prompt edits do. Never overwrite a hand-tuned prompt.",
   "For these targeting rules, use the confirmed desired targeting after merging the new request, preserving unrelated current values. The historical onboarding draft is background only; newer founder-confirmed changes take precedence.",
-  ...ONBOARDING_GENERATION_RULES.split("\n").slice(2, 9).map(rule => rule
+  "Preserve desired person_locations (person residence), organization_locations (company HQ), employee ranges and q_keywords exactly. Do not derive a new filter from the old onboarding draft. ARR and revenue are not employees; any newly proposed employee proxy needs founder confirmation. A discovery proxy is not a hard research exclusion. If removing all native geography, employee and keyword limits, explicitly confirm broad discovery as part of this change.",
+  "Industry labels are research intent; enforcement by People Search is unverified. Never claim an industry filter is effective without provider evidence. q_keywords is generic search text, not documented Boolean syntax. Use only owner, founder, c_suite, partner, vp, head, director, manager for seniorities.",
+  ...ONBOARDING_GENERATION_RULES.split("\n").filter(rule => /^(Employee ranges|scout_overlay:|Include workspace-specific|Tier A means|The server composes)/.test(rule)).map(rule => rule
     .replaceAll("draft.personas", "the confirmed desired personas")
     .replaceAll("draft", "confirmed desired targeting")
     .replace("icp_config:", "Desired ICP:")),
