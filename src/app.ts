@@ -16,7 +16,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
+import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, EMAIL_HANDOFF_CLIENT_CONTRACT, supportsCalibration, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -146,7 +146,7 @@ export interface AppDependencies {
   startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
   getEmailConnection(session: AuthSession, workspace: string): Promise<EmailStatus>;
   disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
-  authorizeEmail(state: string): Promise<string>;
+  authorizeEmail(state: string, habitual?: boolean): Promise<string>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
@@ -519,7 +519,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     path: "/v1/workspace/runs",
     operationId: "startRun",
     security: [{ bearerAuth: [] }],
-    request: { headers: z.object({ "x-lifty-client-contract": z.literal(CALIBRATION_CLIENT_CONTRACT) }) },
+    request: { headers: z.object({ "x-lifty-client-contract": z.enum([CALIBRATION_CLIENT_CONTRACT, EMAIL_HANDOFF_CLIENT_CONTRACT]) }) },
     responses: {
       200: JsonResponse(StartRunResultSchema),
       401: JsonResponse(ErrorResponseSchema),
@@ -1328,10 +1328,23 @@ export function createApp(
     await dependencies.completeLinkedinCallback(context.req.query("intent") ?? "", payload);
     return context.json({ ok: true });
   });
-  app.get("/unipile/start", async (context) => {
+  app.on(["GET", "POST"], "/unipile/start", async (context) => {
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
-    const target = await dependencies.authorizeEmail(context.req.query("intent") ?? "");
+    context.header("content-security-policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+    context.header("x-content-type-options", "nosniff");
+    const state = context.req.query("intent") ?? "";
+    let habitual = false;
+    if (context.req.method === "POST") {
+      const raw = await readRequestTextWithinLimit(context.req.raw, 128);
+      if (!raw.ok || context.req.header("content-type")?.split(";")[0] !== "application/x-www-form-urlencoded")
+        return errorJson(context, 400, "INVALID_REQUEST", "Confirm the account you use regularly.");
+      habitual = raw.text === "habitual=yes";
+      if (!habitual) return errorJson(context, 400, "INVALID_REQUEST", "Choose an email account you already use regularly.");
+    }
+    const target = await dependencies.authorizeEmail(state, habitual);
+    if (target === "authorization_received") return context.html(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email authorization · Lifty</title><main><h1>We received your authorization</h1><p>Return to Lifty to check the connection and continue preparing your messages.</p></main></html>`);
+    if (target === "selection_required") return context.html(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect your email · Lifty</title><style>body{font:18px/1.6 system-ui;max-width:480px;margin:12vh auto;padding:24px;color:#202621;background:#fafbf8}h1{font-size:32px;line-height:1.2}button{font:inherit;padding:12px 20px;background:#214d38;color:white;border:0;border-radius:8px;margin-top:24px;cursor:pointer}label{display:block;margin-top:24px}input{width:18px;height:18px}</style><h1>Connect your email</h1><p>Choose a Gmail or Google Workspace account you already use regularly. We start with up to 10 emails a day to help protect your account’s reputation.</p><form method="post"><label><input type="checkbox" name="habitual" value="yes" required> I already use this account for everyday personal or business conversations.</label><button type="submit">Continue with Google</button></form><p>Then we’ll review your messages together before sending.</p></html>`);
     const url = new URL(target);
     if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
       throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"LIFTY could not prepare the email connection."});
@@ -1393,7 +1406,7 @@ export function createApp(
   app.get("/v1/context/:task", (context) => {
     context.header("cache-control", "no-store");
     const clientContract = context.req.query("client_contract") ?? AGENT_CLIENT_CONTRACT;
-    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT].includes(clientContract)) {
+    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, EMAIL_HANDOFF_CLIENT_CONTRACT].includes(clientContract)) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Update the installed LIFTY CLI and skill to retrieve current instructions.");
     }
     const document = getAgentContext(context.req.param("task"), clientContract);
@@ -1661,7 +1674,7 @@ export function createApp(
         "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
     }
     const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft, undefined, {
-      requireDiscoveryIntent: context.req.header("x-lifty-client-contract") === CALIBRATION_CLIENT_CONTRACT,
+      requireDiscoveryIntent: supportsCalibration(context.req.header("x-lifty-client-contract")),
     });
     if (!lint.success) {
       return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
@@ -1721,7 +1734,7 @@ export function createApp(
   });
 
   app.post("/v1/workspace/runs", async (context) => {
-    if (context.req.header("x-lifty-client-contract") !== CALIBRATION_CLIENT_CONTRACT) {
+    if (!supportsCalibration(context.req.header("x-lifty-client-contract"))) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Upgrade the installed Lifty CLI and skills before starting or resuming calibration. Your saved candidates remain available through status.");
     }
     const result = StartRunResultSchema.parse(await dependencies.startRun(context.get("authSession")));
@@ -2229,9 +2242,9 @@ export function createApp(
     const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
     if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Email connection request is too large.");
     let payload: unknown;
-    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace, email and mailbox_use."); }
+    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide a workspace. You can choose your email account when signing in."); }
     const parsed = EmailConnectRequest.safeParse(payload);
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace, email and mailbox_use (personal or outreach).");
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide a workspace; email and mailbox_use must either both be supplied or both be omitted.");
     return context.json(EmailConnectResult.parse(await dependencies.startEmailConnect(context.get("authSession"), parsed.data)));
   });
   app.get("/v1/email", async (context) => {

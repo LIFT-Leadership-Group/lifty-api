@@ -88,12 +88,15 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
     return url.toString();
   }
 
-  async function readIdentity(accountId: string, expectedEmail: string) {
+  async function readIdentity(accountId: string, expectedEmail?: string) {
     if (!AccountId.safeParse(accountId).success) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
     const parsed = Account.safeParse(await request(`accounts/${encodeURIComponent(accountId)}`));
     if (!parsed.success || parsed.data.id !== accountId) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
     const { type, connection_params: { mail }, sources } = parsed.data;
-    const matches = (value: string | undefined) => value?.toLowerCase() === expectedEmail;
+    const selected = z.email().safeParse(expectedEmail ?? mail.username);
+    if (!selected.success) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
+    const selectedEmail = selected.data.toLowerCase();
+    const matches = (value: string | undefined) => value?.toLowerCase() === selectedEmail;
     // The v1 beta accepts Gmail, including Google Workspace. Provider readback,
     // never the email domain, also gates old links, reconnections and recovery.
     if (type !== "GOOGLE_OAUTH") {
@@ -113,7 +116,7 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
       const primary = owner.data.aliases.filter(alias => alias.is_primary === true);
       if (primary.length !== 1 || !matches(primary[0]?.email)) throw failure("UNIPILE_IDENTITY_MISMATCH", 409);
     }
-    return { accountId, email: expectedEmail, type, healthy };
+    return { accountId, email: selectedEmail, type, healthy };
   }
 
   return { createLink, readIdentity };

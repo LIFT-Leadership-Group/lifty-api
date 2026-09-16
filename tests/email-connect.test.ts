@@ -245,10 +245,10 @@ describe("email disconnection",()=>{
 });
 
 describe("durable callback reconciliation",()=>{
-  function reconciliationHarness(options:{hint?:string|null;health?:string;accountType?:string;profile?:unknown;rpcError?:unknown;providerStatus?:number;hintWorkspace?:string;hintError?:unknown}={}){
+  function reconciliationHarness(options:{selected?:boolean;hint?:string|null;health?:string;accountType?:string;profile?:unknown;rpcError?:unknown;providerStatus?:number;hintWorkspace?:string;hintError?:unknown}={}){
     let current="pending",failure:string|null=null;
     const events:string[]=[];
-    const stored=()=>({state:current,workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,intent_ref:id,connection_ref:current==="connected"?workspace:null,account_id:current==="connected"?"account_1":null,failure_code:failure});
+    const stored=()=>({state:current,workspace_ref:workspace,email:options.selected && current!=="connected" ? null : email,mailbox_use:"personal",daily_limit:10,intent_ref:id,connection_ref:current==="connected"?workspace:null,account_id:current==="connected"?"account_1":null,failure_code:failure});
     const client={rpc:async(name:string,args:Record<string,unknown>)=>{
       events.push(`jwt:${name}:${args.p_operation}`);
       if(options.rpcError)return {data:null,error:options.rpcError};
@@ -285,6 +285,11 @@ describe("durable callback reconciliation",()=>{
     expect((await h.ops.status(h.session,"senja")).status).toBe("connected");
     expect(h.events.slice(0,6)).toEqual(["jwt:lifty_email_connection:status","jwt:lifty_email_callback_hint:read","/api/v1/accounts/account_1","/api/v1/users/me","server:complete","jwt:lifty_email_connection:status"]);
     expect((await h.ops.status(h.session,"senja")).status).toBe("connected");
+    expect(h.events.filter(event=>event==="server:complete")).toHaveLength(1);
+  });
+  it("recovers a browser-selected mailbox without needing its address in chat",async()=>{
+    const h=reconciliationHarness({selected:true});
+    expect(await h.ops.status(h.session,"senja")).toMatchObject({status:"connected",email});
     expect(h.events.filter(event=>event==="server:complete")).toHaveLength(1);
   });
   it("does not discover accounts by email when the authenticated callback hint is absent",async()=>{
@@ -358,4 +363,71 @@ describe("backend beta connection policy",()=>{
     const ops=createEmailConnectOperations({...settings,fetchImpl:async()=>{throw Error("unexpected");}});
     await expect(ops.start({userId:id,client:{rpc:async()=>{throw Error("unexpected RPC");}}},{workspace:"senja",email,mailbox_use:"personal",skip_placement:true} as never)).rejects.toThrow();
   });
+});
+
+
+describe("email account selection", () => {
+  it("creates a signed handoff without collecting an address or use declaration in chat", async () => {
+    const calls: unknown[] = [];
+    const client = {rpc: async (_name: string, args: Record<string, unknown>) => {
+      calls.push(args.p_payload);
+      return {data:{state:"pending",workspace_ref:workspace,email:null,mailbox_use:null,daily_limit:10,
+        intent_ref:id,expires_at:intent.expires_at},error:null};
+    }};
+    const {ops} = harness();
+    const result = await ops.start({userId:id,client},{workspace:"senja"});
+    expect(result).toMatchObject({status:"pending",email:null,mailbox_use:null,sending_enabled:false});
+    expect(calls).toEqual([{workspace:"senja"}]);
+  });
+  it("learns the selected address only from healthy authenticated primary readback", async () => {
+    const {ops,calls} = harness({intent:{...intent,email:null}});
+    await ops.callback(state,{...body,email:"spoofed@example.test"});
+    expect(calls.at(-1)).toEqual({operation:"complete",payload:{intent_ref:id,account_id:"account_1",email}});
+  });
+  it("explains a mailbox ownership conflict without recommending reauthorization", async () => {
+    const client={rpc:async()=>({data:null,error:{code:"PT409",message:"email_account_taken"}})};
+    const {ops}=harness();
+    await expect(ops.status({userId:id,client},"senja")).rejects.toMatchObject({code:"EMAIL_ACCOUNT_TAKEN",message:expect.stringContaining("another workspace")});
+  });
+});
+
+describe("browser account choice", () => {
+  it("renders a no-store browser declaration without asking for the address", async () => {
+    const calls: unknown[]=[];
+    const app=createApp({authorizeEmail:async(...args)=>{calls.push(args);return "selection_required";}});
+    const response=await app.request(`/unipile/start?intent=${encodeURIComponent(state)}`);
+    const html=await response.text();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("content-security-policy")).toContain("form-action 'self'");
+    expect(html).toContain('type="checkbox"');
+    expect(html).not.toContain('type="email"');
+    expect(calls).toEqual([[state,false]]);
+  });
+  it("requires an explicit browser declaration before continuing to Google", async () => {
+    const calls:unknown[]=[];
+    const app=createApp({authorizeEmail:async(...args)=>{calls.push(args);return "https://account.unipile.com/opaque";}});
+    const request=(body:string)=>app.request(`/unipile/start?intent=${encodeURIComponent(state)}`,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});
+    expect((await request("habitual=no")).status).toBe(400);
+    expect(calls).toEqual([]);
+    const response=await request("habitual=yes");
+    expect(response.status).toBe(303);expect(calls).toEqual([[state,true]]);
+  });
+  it("does not issue a provider link while the declaration is missing", async () => {
+    const {ops,calls}=harness({intent:{...intent,state:"pending",email:null,hosted_url:null,selection_required:true}});
+    await expect(ops.authorize(state)).resolves.toBe("selection_required");
+    expect(calls.map(call=>call.operation)).toEqual(["intent"]);
+  });
+  it("rejects an unverified selected primary rather than saving a guessed address", async () => {
+    const {ops,calls}=harness({intent:{...intent,email:null},owner:{...owner,aliases:[]}});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+    expect(calls.some(call=>call.operation==="complete")).toBe(false);
+  });
+});
+
+
+it.each([["completed",false,"authorization_received"],["ready",true,"authorization_received"]] as const)("opening a used email link shows %s without replaying hosted authorization",async(stateName,received,view)=>{
+  const {ops,calls}=harness({intent:{...intent,state:stateName,authorization_received:received}});
+  await expect(ops.authorize(state)).resolves.toBe(view);
+  expect(calls.map(call=>call.operation)).toEqual(["intent"]);
 });

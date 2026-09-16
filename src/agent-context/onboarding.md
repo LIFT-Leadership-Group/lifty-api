@@ -301,33 +301,10 @@ only output shape.
     workspace policy. If sync fails or times out, `lifty sync` safely reattaches
     to active work or retries the still-qualified failed cohort. Claim complete
     delivery only when all stages are confirmed by the receipt.
-16. When the founder chooses outreach setup, proceed to the Unipile account
-    connection they requested, even if sample review is pending. Fetch
-    `lifty context campaign` for current connection instructions. Offer Gmail
-    if email is their chosen channel; otherwise skip to their chosen channel. Gmail includes
-    Google Workspace business accounts; Outlook is not supported in this beta. Ask whether
-    the founder wants to connect an existing mailbox now or skip it. If they
-    choose to connect, ask for its exact address and whether it is already used
-    regularly for their own correspondence (`personal`) or is new/dedicated to
-    outreach (`outreach`). Do not infer this from the email domain. Say that
-    personal or business correspondence mailboxes qualify for the habitual-use beta.
-    The beta performs no placement and has no managed warmup. New/dedicated
-    outreach mailboxes cannot send; explain this and offer another habitual-use
-    account. If needed, disconnect first and reconnect with the other account.
-    Explain the limit: at most 10 automated emails per day from this mailbox.
-    Obtain the workspace reference from the CLI's workspace receipt; never
-    guess another tenant. Run only after the founder chooses to connect:
-
-    ```bash
-    LIFTY_NO_BROWSER=1 node <active-project>/.lifty/bin/lifty.mjs connect unipile --no-wait \
-      --workspace <workspace-ref> --email <exact-address> --mailbox-use personal
-    ```
-
-    Use `--mailbox-use outreach` for a new/dedicated mailbox. Show the returned
-    link using the handoff above. The founder enters credentials only in the
-    hosted flow. After they confirm authorization, check with
-    `connect unipile --workspace <workspace-ref> --status`. Connection does not
-    activate sending. Skipping this option never blocks onboarding.
+16. When the founder chooses email outreach, follow `references.email_connection`
+    and fetch `lifty context campaign` for the current campaign commands. Give
+    them the next useful step in their language. Pending sample review or an
+    exhausted discovery allowance does not prevent connecting or drafting.
 17. During requested outreach setup, offer LinkedIn through Unipile if
     LinkedIn is the chosen channel. Ask whether the founder wants to connect
     their existing habitual-use account now or skip it. Before connecting,

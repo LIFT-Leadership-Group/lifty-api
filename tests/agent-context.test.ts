@@ -74,3 +74,18 @@ describe("public agent task context", () => {
     expect(document.paths["/v1/onboarding/context"].get.security).toEqual([{ bearerAuth: [] }]);
   });
 });
+
+describe("email account-selection client capability", () => {
+  it("offers link-first guidance only to clients that support it and retains v4 calibration", async () => {
+    const app=createApp();
+    for (const task of ["onboarding","campaign","workspace"]) {
+      const modern=await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v5`)).json();
+      const previous=await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v4`)).json();
+      expect(modern.references.email_connection).toContain("without");
+      expect(modern.references.email_connection).toContain("Do not ask for");
+      expect(previous.references.email_connection).toContain("Offer the current CLI update");
+      expect(previous.references.calibration).toBe(modern.references.calibration);
+      expect(modern.revision).not.toBe(previous.revision);
+    }
+  });
+});

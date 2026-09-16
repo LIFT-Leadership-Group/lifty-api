@@ -7,9 +7,9 @@ export const EmailPolicy = z.discriminatedUnion("version", [
 
 export const EmailConnectRequest = z.object({
   workspace: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
-  email: z.email().max(254).transform(value => value.toLowerCase()),
-  mailbox_use: z.enum(["personal", "outreach"]),
-}).strict();
+  email: z.email().max(254).transform(value => value.toLowerCase()).optional(),
+  mailbox_use: z.enum(["personal", "outreach"]).optional(),
+}).strict().refine(value => (value.email === undefined) === (value.mailbox_use === undefined), "Provide both email and mailbox_use, or choose the account in the browser.");
 export type EmailConnectInput = z.infer<typeof EmailConnectRequest>;
 
 const profile = {
@@ -19,15 +19,20 @@ const profile = {
   email_policy: EmailPolicy.optional(),
   warmup_required: z.boolean(), sending_enabled: z.literal(false),
 };
+const pendingProfile = { ...profile, email: z.email().nullable(), mailbox_use: z.enum(["personal", "outreach"]).nullable() };
 export const EmailConnectionStatus = z.discriminatedUnion("status", [
   z.object({ provider: z.literal("unipile"), channel: z.literal("email"), workspace_ref: z.uuid(), status: z.literal("not_connected") }).strict(),
-  z.object({ ...profile, status: z.enum(["pending", "connected", "disconnected", "failed"]),
+  z.object({ ...pendingProfile, status: z.enum(["pending", "failed"]),
+    connection_ref: z.uuid().nullable(), intent_ref: z.uuid().nullable(),
+    failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed"]).nullable(),
+  }).strict(),
+  z.object({ ...profile, status: z.enum(["connected", "disconnected"]),
     connection_ref: z.uuid().nullable(), intent_ref: z.uuid().nullable(),
     failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed"]).nullable(),
   }).strict(),
 ]);
 export const EmailConnectResult = z.discriminatedUnion("status", [
-  z.object({ ...profile, status: z.literal("pending"), connect_url: z.url(), intent_ref: z.uuid(), expires_in_seconds: z.number().int().min(1).max(1800) }).strict(),
+  z.object({ ...pendingProfile, status: z.literal("pending"), connect_url: z.url(), intent_ref: z.uuid(), expires_in_seconds: z.number().int().min(1).max(1800) }).strict(),
   z.object({ ...profile, status: z.literal("connected"), connection_ref: z.uuid() }).strict(),
 ]);
 export type EmailStatus = z.infer<typeof EmailConnectionStatus>;

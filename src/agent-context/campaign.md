@@ -43,7 +43,7 @@ Every command below runs as `node <active-project>/.lifty/bin/lifty.mjs <verb>`.
 ## Handoff from targeting review
 
 When the founder asks to continue outreach setup, proceed with their chosen
-channel and collect only its missing account declarations. Follow
+channel. Follow
 `references.calibration` for lead-quality feedback, but a pending or stale
 sample, fewer than five leads, no Tier A leads, exhausted discovery allowance,
 or an unconnected CRM does not block account connection or message drafting.
@@ -68,19 +68,9 @@ added to the campaign workflow.
 
 ## Email campaigns
 
-If no eligible email account is connected, offer an optional Gmail/Google
-Workspace connection. Ask for the exact address and whether the founder
-already uses it regularly for personal or business correspondence (`personal`)
-or it is new/dedicated to outreach (`outreach`); never infer this from its domain.
-For a replacement, obtain explicit disconnect authorization first and run
-`disconnect unipile --workspace <workspace-ref>`. After the founder chooses to
-connect, run `connect unipile --workspace <workspace-ref> --email <exact-address>
---mailbox-use personal`, or `--mailbox-use outreach` for the declared new mailbox.
-Use the persisted CLI defined above; credentials stay in the hosted browser.
-Read `connect unipile --workspace <workspace-ref> --status` to verify the account.
-Connection never activates sending. The habitual-use beta supports existing
-correspondence mailboxes and blocks new/dedicated outreach mailboxes; read the
-current preview policy and blockers before preparing or approving a send.
+Follow `references.email_connection` to connect the chosen email account and
+verify its status. Keep the conversation warm and practical: one useful
+explanation, the real link, then continue from the verified result.
 
 Use this path only when the founder asks to prepare or operate a campaign.
 Connecting email never approves a campaign or activates sending. Resolve the
