@@ -74,7 +74,14 @@ export async function companyMapping(
   );
   if (error) {
     const response = (error as { context?: unknown }).context;
-    if (response instanceof Response) {
+    // Hono's Node adapter replaces global Response, while native fetch (and
+    // FunctionsHttpError.context) still returns the original implementation.
+    // Validate the required interface, then allow only the bounded envelope.
+    if (
+      response !== null && typeof response === "object" &&
+      "status" in response && typeof response.status === "number" &&
+      "json" in response && typeof response.json === "function"
+    ) {
       const body = ErrorBody.safeParse(await response.json().catch(() => null));
       if (body.success) {
         throw new CompanyMappingError(

@@ -1,3 +1,4 @@
+import { getRequestListener } from "@hono/node-server";
 import { expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { companyMapping, CompanyMappingError } from "../src/company-mapping.js";
@@ -110,4 +111,20 @@ it("routes require authentication, reject oversized plans and surface repair iss
   expect(
     (await createApp().request(url, { method: "POST", body: "{}" })).status,
   ).toBe(401);
+});
+
+it("preserves native fetch error responses after the production Hono adapter replaces Response", async () => {
+  const NativeResponse = globalThis.Response;
+  const NativeRequest = globalThis.Request;
+  const upstream = new NativeResponse(JSON.stringify({ error: { code: "WORKSPACE_UNSUPPORTED" } }), { status: 409 });
+  try {
+    getRequestListener(() => new Response("fixture"));
+    expect(upstream instanceof Response).toBe(false);
+    const invoke = vi.fn().mockResolvedValue({ error: { context: upstream } });
+    await expect(companyMapping({ userId: ws, client: { functions: { invoke } } }, "context"))
+      .rejects.toMatchObject({ code: "WORKSPACE_UNSUPPORTED", status: 409 });
+  } finally {
+    Object.defineProperty(globalThis, "Response", { value: NativeResponse });
+    Object.defineProperty(globalThis, "Request", { value: NativeRequest });
+  }
 });
