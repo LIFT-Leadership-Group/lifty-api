@@ -16,7 +16,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
+import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -1392,8 +1392,12 @@ export function createApp(
   // Register only this GET before authentication; every business route stays scoped.
   app.get("/v1/context/:task", (context) => {
     context.header("cache-control", "no-store");
-    const clientContract = context.req.query("client_contract") ?? AGENT_CLIENT_CONTRACT;
-    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT].includes(clientContract)) {
+    // Existing bootstrap defaults retain their upgrade gate. New stage links
+    // are directly readable without a client version query parameter.
+    const clientContract = context.req.query("client_contract")
+      ?? (["onboarding", "workspace", "campaign"].includes(context.req.param("task"))
+        ? AGENT_CLIENT_CONTRACT : STAGE_CLIENT_CONTRACT);
+    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT].includes(clientContract)) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Update the installed LIFTY CLI and skill to retrieve current instructions.");
     }
     const document = getAgentContext(context.req.param("task"), clientContract);
