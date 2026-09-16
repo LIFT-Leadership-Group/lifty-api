@@ -21,6 +21,14 @@ export const AgentContextSchema = z.object({
   operations: z.record(z.string(), StageOperationSchema).optional(),
 });
 
+// Public v4 responses preserved from deployed ee015fd50ae5b30ac743809295657b444db503cf.
+// Those installed CLIs cannot execute stage commands. Keep their complete
+// instructions, referenced guides and schemas together until v4 is retired;
+// stage-capable clients always receive the current API-owned documents below.
+const legacyV4Documents = z.record(z.enum(["onboarding", "workspace", "campaign"]),
+  AgentContextSchema.omit({ format: true, task: true, revision: true, operations: true }))
+  .parse(JSON.parse(readFileSync(new URL("./agent-context/legacy-v4.json", import.meta.url), "utf8")));
+
 // Only checked-in public guidance goes here. Tenant data and the Scout base
 // remain behind the existing authenticated /v1/onboarding/context boundary.
 const interview = readFileSync(new URL("./agent-context/interview.md", import.meta.url), "utf8");
@@ -70,6 +78,12 @@ const stageDocuments = Object.fromEntries(Object.entries(stageOperations).map(([
 const indexDocument = { instructions: readGuide("stages"), schemas: {}, references: stageReferences, operations: {} };
 
 export function getAgentContext(task: string, clientContract = AGENT_CLIENT_CONTRACT) {
+  if (clientContract === CALIBRATION_CLIENT_CONTRACT && Object.hasOwn(legacyV4Documents, task)) {
+    const content = { format: "lifty-context.v1" as const, task,
+      ...legacyV4Documents[task as keyof typeof legacyV4Documents] };
+    const revision = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
+    return AgentContextSchema.parse({ ...content, revision });
+  }
   const stageDocument = task === "stages" ? indexDocument
     : Object.hasOwn(stageDocuments, task) ? stageDocuments[task] : undefined;
   if (!Object.hasOwn(documents, task) && !stageDocument) return null;

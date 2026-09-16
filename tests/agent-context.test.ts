@@ -10,7 +10,7 @@ describe("public agent task context", () => {
         expect(legacy.instructions).toContain("Upgrade the installed LIFTY CLI");
         expect(legacy.schemas).toEqual({}); expect(legacy.references).toEqual({});
       }
-      const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v4`);
+      const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v5`);
       expect(response.status).toBe(200);
       const current = await response.json();
       expect(Object.keys(current.schemas).length).toBeGreaterThan(0);

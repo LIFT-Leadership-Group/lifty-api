@@ -78,9 +78,21 @@ describe("runtime stage context", () => {
     expect(targeting.references.configuration).toContain("onboarding_status");
   });
 
-  it("preserves legacy v4 content for the current installed v5 client", () => {
+  it("keeps v4 clients on executable legacy workflows while v5 uses stages", async () => {
+    const app = createApp();
     for (const task of ["onboarding", "workspace", "campaign"]) {
-      expect(getAgentContext(task, STAGE_CLIENT_CONTRACT)).toEqual(getAgentContext(task, "lifty-cli-context.v4"));
+      const legacy = await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v4`)).json();
+      const current = await (await app.request(`/v1/context/${task}?client_contract=${STAGE_CLIENT_CONTRACT}`)).json();
+      const legacyGuides = [legacy.instructions, ...Object.values(legacy.references)].join("\n");
+      // v4 has get/update/campaign commands but no stage command or stage input
+      // envelope. Reject a wrong-profile response anywhere in its references.
+      expect(legacyGuides).not.toMatch(/context stages|stage <stage>|stage (?:targeting|business|campaigns|crm|sample-review) (?:get|post|patch|onboarding_context|mapping_context)/);
+      expect(Object.keys(legacy.schemas).length).toBeGreaterThan(0);
+      expect(legacy.instructions).not.toContain("Upgrade the installed LIFTY CLI");
+      expect(current.instructions).toContain("context stages");
+      expect(current.revision).not.toBe(legacy.revision);
+      if (task === "workspace") expect(legacyGuides).toContain("get icp");
+      if (task === "campaign") expect(legacyGuides).toContain("campaign linkedin");
     }
   });
 

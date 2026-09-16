@@ -53,7 +53,7 @@ it("fetches context through the authenticated RPC without an actor override",asy
 });
 it("legacy clients receive an explicit upgrade diagnosis instead of hosted-update instructions",async()=>{
  const app=createApp();for(const version of ["v1","v2","v3"]) {const r=await app.request(`/v1/context/workspace?client_contract=lifty-cli-context.${version}`);expect(r.status).toBe(200);expect((await r.json()).instructions).toContain("Hosted generation is no longer available");}
- const r=await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v4");expect((await r.json()).instructions).toContain("generation_context");
+ const r=await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v5");expect((await r.json()).instructions).toContain("generation_context");
 });
 
 it("persona repairs use the artifact's actual JSON pointer", async()=>{
