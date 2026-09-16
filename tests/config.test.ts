@@ -120,3 +120,11 @@ describe("service configuration", () => {
     expect(() => loadConfig(environment)).toThrow(message);
   });
 });
+
+it("CRM capability is optional but must be bounded and dedicated", () => {
+  expect(loadConfig(validEnvironment).crm).toBeNull();
+  const key = "x".repeat(48);
+  expect(loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:key}).crm).toEqual({serverKey:key});
+  for (const value of ["short","x".repeat(257)]) expect(()=>loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:value})).toThrow(/LIFTY_CRM_SERVER_KEY/);
+  expect(()=>loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:key,TRIGGER_SECRET_KEY:key})).toThrow(/distinct/);
+});

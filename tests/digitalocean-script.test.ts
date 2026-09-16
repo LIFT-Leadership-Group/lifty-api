@@ -294,6 +294,7 @@ printf '%s\\n' "$*" >> "$FAKE_CURL_CALLS"
 url="\${!#}"
 case "$url" in
   */healthz) printf '%s' '{"status":"ok"}' ;;
+  */readyz/crm) printf '%s' '{"status":"ready","capability":"lifty-crm-company.v1"}' ;;
   */readyz) printf '%s' '{"status":"ready"}' ;;
   */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
   */v1/workspace)
@@ -326,7 +327,8 @@ esac
         "Smoke checks passed: https://api.example.test",
       );
       const curlCalls = readFileSync(calls, "utf8").trim().split("\n");
-      expect(curlCalls).toHaveLength(4);
+      expect(curlCalls).toHaveLength(5);
+      expect(curlCalls.join("\n")).toContain("https://api.example.test/readyz/crm");
       for (const call of curlCalls) {
         expect(call).toContain("--connect-timeout 5 --max-time 20");
       }
@@ -596,6 +598,7 @@ set -euo pipefail
 url="\${!#}"
 case "$url" in
   */healthz) printf '%s' '{"status":"ok"}' ;;
+  */readyz/crm) printf '%s' '{"status":"ready","capability":"lifty-crm-company.v1"}' ;;
   */readyz) printf '%s' '{"status":"ready"}' ;;
   */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
   */v1/workspace)

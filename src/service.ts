@@ -1,4 +1,5 @@
-import { companyMapping } from "./company-mapping.js";
+import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
+import { createCompanyMapping } from "./company-mapping.js";
 import { createLinkedinConnectOperations } from "./linkedin-connect.js";
 import { createLinkedinCampaignOperations } from "./linkedin-campaign.js";
 import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
@@ -120,7 +121,7 @@ export function createProductionApp(config: ServiceConfig) {
     enqueueNotificationDelivery: createNotificationDeliveryTrigger(config.trigger),
     getNotificationConfig,
     listSlackNotificationChannels,
-    companyMapping,
+    companyMapping: createCompanyMapping(config.crm ?? null),
     upsertNotificationDestination,
     setNotificationRoute,
     enqueueNotificationTest,
@@ -176,6 +177,7 @@ export function createProductionApp(config: ServiceConfig) {
       };
     },
     checkReadiness: createSupabaseReadinessCheck(config.supabase),
+    checkCompanyReadiness: createCompanyReadinessCheck(config.supabase, config.crm ?? null),
   });
 }
 

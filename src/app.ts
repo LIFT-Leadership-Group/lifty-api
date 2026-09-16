@@ -1,5 +1,5 @@
 import {
-  companyMapping,
+  type CompanyMappingOperation,
   CompanyMappingContextSchema,
   CompanyMappingReceiptSchema,
   CompanyMappingError,
@@ -178,7 +178,7 @@ export interface AppDependencies {
   disconnectIntegration(session: AuthSession, provider: Provider): Promise<DisconnectResult>;
   enqueueIntegrationRevocation: EnqueueIntegrationRevocation;
   getNotificationConfig(session: AuthSession): Promise<NotificationConfig>;
-  companyMapping: typeof companyMapping;
+  companyMapping: CompanyMappingOperation;
   listSlackNotificationChannels(session: AuthSession): Promise<SlackNotificationChannels>;
   upsertNotificationDestination(
     session: AuthSession,
@@ -218,6 +218,7 @@ export interface AppDependencies {
     html: string; scriptNonce: string; connectOrigin: string;
   } | null;
   checkReadiness(): Promise<boolean>;
+  checkCompanyReadiness(): Promise<boolean>;
   log(event: LogEvent): void;
 }
 
@@ -676,12 +677,15 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     method: "get",
     path: "/v1/integrations/hubspot/company-mapping/context",
     operationId: "getCompanyMappingContext",
+    request: { query: z.object({ workspace_ref: z.uuid().optional() }) },
     security: [{ bearerAuth: [] }],
     responses: {
       200: JsonResponse(CompanyMappingContextSchema),
       401: JsonResponse(ErrorResponseSchema),
       409: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
+      503: JsonResponse(ErrorResponseSchema),
+      504: JsonResponse(ErrorResponseSchema),
     },
   });
   app.openAPIRegistry.registerPath({
@@ -699,6 +703,8 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       409: JsonResponse(ErrorResponseSchema),
       422: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
+      503: JsonResponse(ErrorResponseSchema),
+      504: JsonResponse(ErrorResponseSchema),
     },
   });
   app.openAPIRegistry.registerPath({
@@ -1008,6 +1014,7 @@ const defaultDependencies: AppDependencies = {
   renderCliAuthPage: () => null,
   renderPasswordRecoveryPage: () => null,
   checkReadiness: async () => true,
+  checkCompanyReadiness: async () => false,
   log: (event) => process.stderr.write(`${JSON.stringify(event)}\n`),
 };
 
@@ -1032,6 +1039,11 @@ export function createApp(
   });
 
   app.get("/healthz", (context) => context.json({ status: "ok" }));
+  app.get("/readyz/crm", async (context) => {
+    let ready = false;
+    try { ready = await dependencies.checkCompanyReadiness(); } catch { /* bounded health response */ }
+    return context.json({ status: ready ? "ready" : "not_ready", capability: "lifty-crm-company.v1" }, ready ? 200 : 503);
+  });
   app.get("/readyz", async (context) => {
     let ready: boolean;
     try {
@@ -1826,7 +1838,11 @@ export function createApp(
   });
 
   app.get("/v1/integrations/hubspot/company-mapping/context", async (context) => {
-    const result = await dependencies.companyMapping(context.get("authSession"), "context");
+    const workspaceRef = context.req.query("workspace_ref");
+    if (workspaceRef !== undefined && !z.uuid().safeParse(workspaceRef).success) return errorJson(context, 400, "INVALID_WORKSPACE", "Select a valid workspace reference.");
+    const result = await dependencies.companyMapping(context.get("authSession"), "context", undefined, {
+      ...(workspaceRef === undefined ? {} : { workspaceRef }), signal: context.req.raw.signal,
+    });
     return context.json(CompanyMappingContextSchema.parse(result));
   });
   app.post("/v1/integrations/hubspot/company-mapping", async (context) => {
@@ -1838,7 +1854,7 @@ export function createApp(
     } catch {
       return errorJson(context, 400, "INVALID_JSON", "Send a JSON company configuration.");
     }
-    const result = await dependencies.companyMapping(context.get("authSession"), "apply", plan);
+    const result = await dependencies.companyMapping(context.get("authSession"), "apply", plan, { signal: context.req.raw.signal });
     return context.json(CompanyMappingReceiptSchema.parse(result));
   });
 

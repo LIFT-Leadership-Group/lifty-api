@@ -1,3 +1,5 @@
+import { MappingError } from "./company-mapping/contract.js";
+import { runCompanyMapping, type CompanyMappingSettings, type CompanyMappingOptions } from "./company-mapping/runtime.js";
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
@@ -28,7 +30,7 @@ export const CompanyMappingReceiptSchema = z.object({
   status: z.literal("ready"),
   workspace_ref: z.uuid(),
   portal_id: z.string().regex(/^\d+$/),
-  mapping_count: z.literal(5),
+  mapping_count: z.number().int().positive(),
   schema_changes: z.number().int().nonnegative(),
   verified: z.literal(true),
 });
@@ -48,62 +50,25 @@ export class CompanyMappingError extends PublicError {
     this.issues = issues;
   }
 }
-interface EdgeClient {
-  functions: {
-    invoke(
-      name: string,
-      options: { body: unknown },
-    ): Promise<{ data: unknown; error: unknown }>;
+export function createCompanyMapping(settings: CompanyMappingSettings | null) {
+  return async function companyMapping(
+    session: AuthSession, action: "context" | "apply", plan?: unknown,
+    options: CompanyMappingOptions = {},
+  ) {
+    if (!settings) throw new CompanyMappingError("COMPANY_MAPPING_NOT_CONFIGURED", 503);
+    try {
+      const raw = await runCompanyMapping(session, settings, action, plan, options);
+      const parsed = (action === "context" ? CompanyMappingContextSchema : CompanyMappingReceiptSchema).safeParse(raw);
+      if (!parsed.success) throw new CompanyMappingError("INVALID_COMPANY_MAPPING_RESPONSE", 502);
+      return parsed.data;
+    } catch (error) {
+      if (error instanceof CompanyMappingError) throw error;
+      if (error instanceof MappingError) {
+        const issues = z.array(Issue).max(20).safeParse(error.issues);
+        throw new CompanyMappingError(error.code, error.status, issues.success ? issues.data : []);
+      }
+      throw new CompanyMappingError("COMPANY_MAPPING_UNAVAILABLE", 502);
+    }
   };
 }
-const ErrorBody = z.object({
-  error: z.object({
-    code: z.string().regex(/^[A-Z_]{1,100}$/),
-    issues: z.array(Issue).max(20).optional(),
-  }),
-});
-export async function companyMapping(
-  session: AuthSession,
-  action: "context" | "apply",
-  plan?: unknown,
-) {
-  const client = session.client as EdgeClient;
-  const { data, error } = await client.functions.invoke(
-    "lifty-company-mapping",
-    { body: { action, ...(action === "apply" ? { plan } : {}) } },
-  );
-  if (error) {
-    const response = (error as { context?: unknown }).context;
-    // Hono's Node adapter replaces global Response, while native fetch (and
-    // FunctionsHttpError.context) still returns the original implementation.
-    // Validate the required interface, then allow only the bounded envelope.
-    if (
-      response !== null && typeof response === "object" &&
-      "status" in response && typeof response.status === "number" &&
-      "json" in response && typeof response.json === "function"
-    ) {
-      const body = ErrorBody.safeParse(await response.json().catch(() => null));
-      if (body.success) {
-        throw new CompanyMappingError(
-          body.data.error.code,
-          [400, 401, 403, 409, 413, 422, 429, 502, 503].includes(
-              response.status,
-            )
-            ? response.status
-            : 502,
-          body.data.error.issues,
-        );
-      }
-    }
-    throw new CompanyMappingError("COMPANY_MAPPING_UNAVAILABLE", 502);
-  }
-  const envelope = data as { data?: unknown } | null;
-  const result =
-    (action === "context"
-      ? CompanyMappingContextSchema
-      : CompanyMappingReceiptSchema).safeParse(envelope?.data);
-  if (!result.success) {
-    throw new CompanyMappingError("INVALID_COMPANY_MAPPING_RESPONSE", 502);
-  }
-  return result.data;
-}
+export type CompanyMappingOperation = ReturnType<typeof createCompanyMapping>;
