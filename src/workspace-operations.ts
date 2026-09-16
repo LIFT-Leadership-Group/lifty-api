@@ -623,8 +623,28 @@ export async function getConfig(
 
 export async function getConfigUpdateContext(session: AuthSession): Promise<ConfigUpdateContext> {
   const { data, error } = await getRpcClient(session).rpc<ConfigUpdateContext>("get_lifty_config_update_context");
-  if (error) throw mapRpcError(error);
+  if (error) throw configRpcError(error, "get_lifty_config_update_context");
   const parsed = ConfigUpdateContextSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) throw invalidResponse(parsed.error);
+  return parsed.data;
+}
+
+// Keep raw PostgREST messages/details in the cause only. They can contain user
+// data or SQL; logs get a bounded code and a static operation name instead.
+function configRpcError(error: unknown, operation: string): PublicError {
+  const mapped = mapRpcError(error);
+  const candidate = error && typeof error === "object" && "code" in error ? error.code : null;
+  const code = typeof candidate === "string" && /^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/.test(candidate) ? candidate : undefined;
+  return new PublicError({ status: mapped.status, code: mapped.code, message: mapped.message, cause: error,
+    diagnostics: { upstream_operation: operation, ...(code ? { upstream_code: code } : {}),
+      upstream_kind: code === "XX001" ? "database_storage" : code === "57014" ? "database_timeout" : code ? "database_error" : "transport" },
+  });
+}
+
+export async function resolveConfigUpdate(session: AuthSession, payload: ConfigUpdateRequest): Promise<ConfigUpdateStatus> {
+  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateStatus>("resolve_lifty_config_update", { payload });
+  if (error) throw configRpcError(error, "resolve_lifty_config_update");
+  const parsed = ConfigUpdateStatusSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) throw invalidResponse(parsed.error);
   return parsed.data;
 }
@@ -640,7 +660,7 @@ export async function submitConfigUpdate(
   );
 
   if (error) {
-    throw mapRpcError(error);
+    throw configRpcError(error, "submit_lifty_config_update");
   }
 
   const parsed = ConfigUpdateSubmissionSchema.safeParse(unwrapSingleRow(data));
@@ -661,7 +681,7 @@ export async function getConfigUpdateStatus(
   );
 
   if (error) {
-    throw mapRpcError(error);
+    throw configRpcError(error, "get_lifty_config_update_status");
   }
 
   const parsed = ConfigUpdateStatusSchema.safeParse(unwrapSingleRow(data));
