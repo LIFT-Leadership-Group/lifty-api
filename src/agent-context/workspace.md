@@ -85,9 +85,34 @@ privately. The server validates and queues deterministic import; no hosted AI
 runs. On LOCAL_CONFIGURATION_INVALID, read `.lifty/config-validation.json`
 and repair technical issues locally up to three attempts. On CONFIG_CONTEXT_STALE,
 fetch fresh context and regenerate. Do not resubmit an obsolete artifact with a
-new version copied onto it. On a timeout retry the identical payload to retrieve
-its durable receipt. Use status while an update is pending. Hand-tuned prompts
-are protected; explain that LIFT manages that research focus and stop.
+new version copied onto it. Hand-tuned prompts are protected; explain that LIFT
+manages that research focus and stop.
+
+Own recovery when a service response fails. A timeout, 502 or 504 does not tell
+you whether the change was saved. The CLI checks the exact original payload,
+attaches to an existing submission and makes at most one safe retry when needed.
+Never rebuild the request from conversation wording. Preserve
+`.lifty/config-update.json` until the outcome is confirmed.
+
+If the CLI confirms applied, read the relevant live configuration and confirm
+the requested criteria, including prompt rules. Do not retry an applied update.
+If it reports UPDATE_TIMEOUT, the update is saved and processing: monitor with
+`status` and verify the result when it finishes. A temporary status-read failure
+also does not justify a new update. For UPDATE_UNCONFIRMED, inspect `status` and
+the relevant `get` sections yourself, comparing them to the preserved request.
+If the outcome remains unknown, retain the original request and report that you
+cannot yet confirm the result. Do not claim rejection, data loss or that nothing
+changed. Do not loop submissions or generate another artifact to recover it.
+
+Keep the founder informed in their language while doing this work. Say what is
+confirmed and what you are checking, for example: “La respuesta se interrumpió.
+Estoy verificando si el cambio quedó guardado.” Once confirmed: “El cambio ya
+está aplicado; verifiqué los criterios nuevos.” For a pending update: “El cambio
+está guardado y se está aplicando. Estoy siguiendo su estado.” Only promise to
+keep monitoring while you can actually do so. Run these checks yourself; do not
+hand the founder a list of commands, internal error codes or another request for
+workspace details already available in this session. If blocked after bounded
+recovery, explain the remaining uncertainty and the next useful action calmly.
 
 Play back exactly what the CLI confirmed, in the founder's words, and nothing
 it did not. After a targeting or research-criteria change, read and follow

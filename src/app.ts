@@ -174,6 +174,7 @@ export interface AppDependencies {
     session: AuthSession,
     payload: ConfigUpdateRequest,
   ): Promise<ConfigUpdateSubmission>;
+  resolveConfigUpdate(session: AuthSession, payload: ConfigUpdateRequest): Promise<ConfigUpdateStatus>;
   getConfigUpdateStatus(
     session: AuthSession,
     submissionRef: string | null,
@@ -235,11 +236,18 @@ export interface LogEvent {
   path: string;
   error_code: string;
   status: number;
+  stage?: string;
+  elapsed_ms?: number;
+  upstream_operation?: string;
+  upstream_code?: string;
+  upstream_kind?: string;
 }
 
 type AppEnvironment = {
   Variables: {
     requestId: string;
+    requestStartedAt: number;
+    operationStage?: string;
     authSession: AuthSession;
   };
 };
@@ -581,6 +589,13 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       422: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post", path: "/v1/config/updates/resolve", operationId: "resolveConfigUpdate",
+    security: [{ bearerAuth: [] }],
+    description: "Read the status of the exact original local update without changing or enqueueing it.",
+    request: { body: { required: true, content: { "application/json": { schema: ConfigUpdateRequestSchema } } } },
+    responses: { 200: JsonResponse(ConfigUpdateStatusSchema), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 413: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
   });
   app.openAPIRegistry.registerPath({
     method: "get",
@@ -960,6 +975,7 @@ const defaultDependencies: AppDependencies = {
   submitConfigUpdate: async () => {
     throw new Error("submitConfigUpdate is not configured");
   },
+  resolveConfigUpdate: async () => { throw new Error("resolveConfigUpdate is not configured"); },
   getConfigUpdateStatus: async () => {
     throw new Error("getConfigUpdateStatus is not configured");
   },
@@ -1048,6 +1064,7 @@ export function createApp(
       ? suppliedRequestId.data
       : crypto.randomUUID();
     context.set("requestId", requestId);
+    context.set("requestStartedAt", Date.now());
     context.header("x-request-id", requestId);
     await next();
   });
@@ -1355,6 +1372,8 @@ export function createApp(
       path: context.req.path,
       error_code: publicError.code,
       status: publicError.status,
+      ...(context.get("operationStage") ? { stage: context.get("operationStage"), elapsed_ms: Date.now() - context.get("requestStartedAt") } : {}),
+      ...publicError.diagnostics,
     });
     return context.json(
       {
@@ -1729,6 +1748,7 @@ export function createApp(
   });
 
   app.get("/v1/config/context", async (context) => {
+    context.set("operationStage", "config_context");
     context.header("cache-control", "no-store");
     const result = await dependencies.getConfigUpdateContext(context.get("authSession"));
     return context.json(ConfigUpdateGenerationContextSchema.parse({
@@ -1737,8 +1757,23 @@ export function createApp(
     }));
   });
 
+  // Exact-payload lookup is a scoped read. Never enqueue, re-lint against a
+  // newer context, or return the saved private artifact from this endpoint.
+  app.post("/v1/config/updates/resolve", async (context) => {
+    context.header("cache-control", "no-store");
+    context.set("operationStage", "config_resolve");
+    const requestBody = await readRequestTextWithinLimit(context.req.raw, MAX_REQUEST_BYTES);
+    if (!requestBody.ok) return errorJson(context, 413, "PAYLOAD_TOO_LARGE", "The config update exceeds 132 KiB.");
+    let input: unknown;
+    try { input = JSON.parse(requestBody.text); } catch { input = null; }
+    const body = ConfigUpdateRequestSchema.safeParse(input);
+    if (!body.success || !body.data.configuration) return errorJson(context, 400, "INVALID_REQUEST", "Use the exact original update with its local configuration artifact.");
+    return context.json(ConfigUpdateStatusSchema.parse(await dependencies.resolveConfigUpdate(context.get("authSession"), body.data)));
+  });
+
   // Registered before `/v1/config/:section` so the literal segment wins.
   app.get("/v1/config/updates/:submission_ref", async (context) => {
+    context.set("operationStage", "config_status");
     const ref = SubmissionRefSchema.safeParse(context.req.param("submission_ref"));
     if (!ref.success) {
       return errorJson(
@@ -1772,6 +1807,7 @@ export function createApp(
   });
 
   app.patch("/v1/config", async (context) => {
+    context.set("operationStage", "config_validate");
     const declaredLength = Number(context.req.header("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
       return errorJson(
@@ -1816,6 +1852,7 @@ export function createApp(
     }
 
     if (body.data.configuration) {
+      context.set("operationStage", "config_context");
       const current = await dependencies.getConfigUpdateContext(context.get("authSession"));
       const request = body.data;
       // A mismatched version can be an exact imported retry. SQL distinguishes
@@ -1831,6 +1868,7 @@ export function createApp(
       }
     }
 
+    context.set("operationStage", "config_submit");
     const submission = await dependencies.submitConfigUpdate(
       context.get("authSession"),
       body.data,
@@ -1850,6 +1888,7 @@ export function createApp(
       if (submission.import_status === "failed") {
         // Reset the row before the job runs, so the founder's poll never
         // reads the previous failure while the retry lands behind it.
+        context.set("operationStage", "config_requeue");
         const requeued = await dependencies.requeueConfigUpdate(
           context.get("authSession"),
           submission.submission_ref,
@@ -1858,6 +1897,7 @@ export function createApp(
           ? new Date().toISOString()
           : requeued.requeued_at ?? new Date().toISOString();
       }
+      context.set("operationStage", "config_enqueue");
       await dependencies.enqueueConfigUpdate(submission.submission_ref, { requeuedAt });
       state = "queued";
       runRef = submission.submission_ref;
@@ -1871,6 +1911,7 @@ export function createApp(
       && state !== "queued"
       && submission.artifact_actions.icp === "applied"
     ) {
+      context.set("operationStage", "config_readback");
       const config = await dependencies.getConfig(context.get("authSession"), "icp");
       icpVersion = config.config.icp?.version ?? null;
     }
