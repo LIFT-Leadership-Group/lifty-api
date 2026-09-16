@@ -1,5 +1,5 @@
 import { generateKeyPair, exportJWK, SignJWT } from "jose";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createSupabaseAuthenticator,
@@ -11,15 +11,16 @@ async function jwtFixture(expiration: string | number | Date = "5m") {
   const { privateKey, publicKey } = await generateKeyPair("ES256");
   const publicJwk = await exportJWK(publicKey);
   const kid = "lifty-test-key";
-  const signToken = async (expiresAt: string | number | Date) =>
+  const signToken = async (expiresAt: string | number | Date, overrides: Record<string, unknown> = {}) =>
     new SignJWT({
       email: "founder@example.com",
       role: "authenticated",
+      ...overrides,
     })
       .setProtectedHeader({ alg: "ES256", kid })
       .setSubject("founder-123")
-      .setAudience("authenticated")
-      .setIssuer("https://project.supabase.test/auth/v1")
+      .setAudience(typeof overrides.aud === "string" ? overrides.aud : "authenticated")
+      .setIssuer(typeof overrides.iss === "string" ? overrides.iss : "https://project.supabase.test/auth/v1")
       .setIssuedAt()
       .setExpirationTime(expiresAt)
       .sign(privateKey);
@@ -56,7 +57,7 @@ describe("Supabase authentication boundary", () => {
       supabaseUrl: "https://project.supabase.test",
       publishableKey: "sb_publishable_test_abcdefghijklmnopqrstuvwxyz",
       jwks,
-    });
+    }, { fetch: async () => new Response("true", { headers: { "content-type": "application/json" } }) });
 
     const result = await authenticate(
       new Request("https://api.lifty.test/v1/workspace", {
@@ -76,7 +77,7 @@ describe("Supabase authentication boundary", () => {
     const observedSignal: { current: AbortSignal | null } = { current: null };
     const upstreamFetch: typeof fetch = async (_input, init) => {
       observedSignal.current = init?.signal ?? null;
-      return new Response(JSON.stringify({ state: "needs_workspace" }), {
+      return new Response(JSON.stringify(String(_input).endsWith("/lifty_session_active") ? true : { state: "needs_workspace" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -103,6 +104,51 @@ describe("Supabase authentication boundary", () => {
     expect(rpcResult.error).toBeNull();
     expect(observedSignal.current).toBeInstanceOf(AbortSignal);
     expect(observedSignal.current?.aborted).toBe(false);
+  });
+
+  it("rejects signed tokens with the wrong issuer, audience or role before contacting Supabase", async () => {
+    const { jwks, signToken } = await jwtFixture();
+    const upstream = vi.fn<typeof fetch>();
+    const authenticate = createSupabaseAuthenticator({
+      supabaseUrl: "https://project.supabase.test",
+      publishableKey: "sb_publishable_test", jwks,
+    }, { fetch: upstream });
+    for (const overrides of [
+      { iss: "https://foreign.supabase.test/auth/v1" },
+      { aud: "service_role" }, { role: "service_role" }, { role: "anon" },
+    ]) {
+      const token = await signToken("5m", overrides);
+      await expect(authenticate(new Request("https://api.lifty.test/v1/workspace", {
+        headers: { authorization: `Bearer ${token}` },
+      }))).resolves.toEqual({ ok: false, reason: "invalid_session" });
+    }
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("rechecks every session and fails closed for revocation, malformed results and upstream errors", async () => {
+    const { token, jwks } = await jwtFixture();
+    const responses = [true, false, null, "true", { active: true }];
+    const upstream = vi.fn<typeof fetch>(async (_input, init) => {
+      expect(new Headers(init?.headers).get("authorization")).toBe(`Bearer ${token}`);
+      return new Response(JSON.stringify(responses.shift()), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const authenticate = createSupabaseAuthenticator({
+      supabaseUrl: "https://project.supabase.test", publishableKey: "sb_publishable_test", jwks,
+    }, { fetch: upstream });
+    const request = new Request("https://api.lifty.test/v1/workspace", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((await authenticate(request)).ok).toBe(true);
+    for (let i = 0; i < 4; i++) {
+      await expect(authenticate(request)).resolves.toEqual({ ok: false, reason: "invalid_session" });
+    }
+    upstream.mockImplementationOnce(async () => new Response('{"message":"PRIVATE upstream content"}', { status: 503 }));
+    await expect(authenticate(request)).resolves.toEqual({ ok: false, reason: "invalid_session" });
+    upstream.mockImplementationOnce(async () => { throw new Error("PRIVATE network details"); });
+    await expect(authenticate(request)).resolves.toEqual({ ok: false, reason: "invalid_session" });
+    expect(upstream).toHaveBeenCalledTimes(7);
   });
 
   it("fails closed with one generic result for missing, malformed, and expired JWTs", async () => {

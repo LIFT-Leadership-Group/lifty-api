@@ -1,0 +1,52 @@
+{
+  "schema_version": "2.1",
+  "status": "ready_for_auth",
+  "stage": "icp_bootstrap",
+  "company": {
+    "name": "Sentinel Robotics",
+    "description": "Sentinel builds inspection robots for mid-market manufacturers.",
+    "example_companies": []
+  },
+  "primary_motion": {
+    "name": "founder-led robot pilots",
+    "outcome": "Book paid inspection pilots with plant operations leaders."
+  },
+  "parked_secondary_motions": [],
+  "icp": {
+    "industries_in": [
+      "Industrial manufacturing"
+    ],
+    "industries_out": [
+      "Consumer goods"
+    ],
+    "size": {
+      "floor": 5000000,
+      "ceiling": null,
+      "unit": "annual revenue USD"
+    },
+    "hard_disqualifiers": [
+      "No physical plant or inspection surface to automate."
+    ],
+    "operating_state_split": null
+  },
+  "personas": [
+    {
+      "name": "Plant operations leader",
+      "role": "decision_maker",
+      "titles": [
+        "VP Operations",
+        "Plant Manager"
+      ],
+      "tell": "Owns the inspection budget and downtime targets."
+    }
+  ],
+  "calibration": {
+    "status": "pending_sample",
+    "lead_target": 5
+  },
+  "outreach": {
+    "status": "deferred_until_sample_accepted"
+  },
+  "research_findings": [],
+  "founder_statement_history": []
+}
