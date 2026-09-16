@@ -220,12 +220,14 @@ only output shape.
     node <active-project>/.lifty/bin/lifty.mjs sync
     ```
 
-    The CLI starts the sync, waits, and prints how many leads landed and in
-    which portal. Report exactly that receipt — the count and the portal —
-    in founder language. A sync you did not see the CLI confirm is a sync
-    that did not happen: never tell the founder their leads are in HubSpot
-    without the CLI's receipt. If the sync fails or times out, say so
-    plainly; `lifty sync` re-attaches, so running it again is always safe.
+    The CLI starts the sync, waits, and reports contact, research and company
+    delivery separately with the portal. Report exactly that receipt in
+    founder language. A contact count alone does not prove research or company
+    delivery; legacy receipts are unverified. Report partial, pending or failed
+    stages explicitly, including research notes intentionally disabled by the
+    workspace policy. If sync fails or times out, `lifty sync` safely reattaches
+    to active work or retries the still-qualified failed cohort. Claim complete
+    delivery only when all stages are confirmed by the receipt.
 16. Only after the founder explicitly confirms the complete current Tier A
     sample, proceed to the Unipile account connection they requested. Fetch
     `lifty context campaign` for current connection instructions. Offer Gmail

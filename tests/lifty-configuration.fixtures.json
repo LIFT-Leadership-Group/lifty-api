@@ -1,0 +1,445 @@
+[
+  {
+    "name": "valid",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "51,200"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": null
+  },
+  {
+    "name": "duplicate locations",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada",
+          " canada "
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "51,200"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": "duplicate_value"
+  },
+  {
+    "name": "unsupported seniority",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "51,200"
+        ],
+        "person_seniorities": [
+          "intern"
+        ],
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": "unsupported_seniority"
+  },
+  {
+    "name": "reversed bounds",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "200,51"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": "invalid_employee_bounds"
+  },
+  {
+    "name": "renamed persona",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "51,200"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Other",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": "persona_set_mismatch"
+  },
+  {
+    "name": "dropped confirmed title",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "51,200"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "VP Finance"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": "confirmed_titles_missing"
+  },
+  {
+    "name": "copied base",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "51,200"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates.GLOBAL BASE"
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": "global_base_copied"
+  },
+  {
+    "name": "bad headings",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "Canada"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "51,200"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ]
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Other\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ]
+    },
+    "base": "GLOBAL BASE",
+    "code": "overlay_sections_invalid"
+  },
+  {
+    "name": "update malformed desired personas: null element",
+    "kind": "update",
+    "configuration": {
+      "contract_version": "lifty-config-update.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "personas": null,
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "desiredIcp": {
+      "label": "Industrial",
+      "person_locations": [
+        "Canada"
+      ],
+      "organization_industries": [
+        "industrial automation"
+      ],
+      "organization_num_employees_ranges": [
+        "51,200"
+      ],
+      "person_seniorities": null,
+      "personas": [
+        null
+      ]
+    },
+    "draft": {},
+    "base": "GLOBAL BASE",
+    "code": "desired_personas_invalid"
+  },
+  {
+    "name": "update malformed desired personas: scalar element",
+    "kind": "update",
+    "configuration": {
+      "contract_version": "lifty-config-update.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "personas": null,
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "desiredIcp": {
+      "label": "Industrial",
+      "person_locations": [
+        "Canada"
+      ],
+      "organization_industries": [
+        "industrial automation"
+      ],
+      "organization_num_employees_ranges": [
+        "51,200"
+      ],
+      "person_seniorities": null,
+      "personas": [
+        17
+      ]
+    },
+    "draft": {},
+    "base": "GLOBAL BASE",
+    "code": "desired_personas_invalid"
+  },
+  {
+    "name": "update malformed desired personas: null list",
+    "kind": "update",
+    "configuration": {
+      "contract_version": "lifty-config-update.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "personas": null,
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "desiredIcp": {
+      "label": "Industrial",
+      "person_locations": [
+        "Canada"
+      ],
+      "organization_industries": [
+        "industrial automation"
+      ],
+      "organization_num_employees_ranges": [
+        "51,200"
+      ],
+      "person_seniorities": null,
+      "personas": null
+    },
+    "draft": {},
+    "base": "GLOBAL BASE",
+    "code": "desired_personas_invalid"
+  },
+  {
+    "name": "update malformed desired personas: empty list",
+    "kind": "update",
+    "configuration": {
+      "contract_version": "lifty-config-update.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "personas": null,
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "desiredIcp": {
+      "label": "Industrial",
+      "person_locations": [
+        "Canada"
+      ],
+      "organization_industries": [
+        "industrial automation"
+      ],
+      "organization_num_employees_ranges": [
+        "51,200"
+      ],
+      "person_seniorities": null,
+      "personas": []
+    },
+    "draft": {},
+    "base": "GLOBAL BASE",
+    "code": "desired_personas_invalid"
+  }
+]

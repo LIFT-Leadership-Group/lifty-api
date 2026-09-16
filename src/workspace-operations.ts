@@ -1,5 +1,7 @@
 import type { AuthSession } from "./app.js";
 import {
+  ConfigUpdateContextSchema,
+  type ConfigUpdateContext,
   ConfigUpdateStatusSchema,
   type ConfigUpdateStatus,
   ConfigUpdateSubmissionSchema,
@@ -114,6 +116,10 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
+  if (message.includes("lifty_config_local_required")) return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED", message: "Upgrade LIFTY, fetch /v1/config/context and generate this update locally. Hosted configuration generation is no longer supported.", cause: error });
+  if (message.includes("lifty_config_context_stale")) return new PublicError({ status: 409, code: "CONFIG_CONTEXT_STALE", message: "The configuration or Scout base changed. Fetch fresh config context and regenerate the update locally.", cause: error });
+  if (message.includes("lifty_config_local_invalid")) return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_INVALID", message: "Repair the update using the configuration schema and generation rules from fresh config context.", cause: error });
+  if (message.includes("lifty_config_local_mismatch")) return new PublicError({ status: 409, code: "LOCAL_CONFIGURATION_MISMATCH", message: "The local update differs from its stored receipt. Fetch fresh config context and regenerate.", cause: error });
   if (code === "PT400" && message.includes("lifty_configuration_required")) {
     return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED",
       message: "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.", cause: error });
@@ -612,6 +618,14 @@ export async function getConfig(
   if (!parsed.success) {
     throw invalidResponse(parsed.error);
   }
+  return parsed.data;
+}
+
+export async function getConfigUpdateContext(session: AuthSession): Promise<ConfigUpdateContext> {
+  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateContext>("get_lifty_config_update_context");
+  if (error) throw mapRpcError(error);
+  const parsed = ConfigUpdateContextSchema.safeParse(unwrapSingleRow(data));
+  if (!parsed.success) throw invalidResponse(parsed.error);
   return parsed.data;
 }
 

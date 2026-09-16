@@ -40,7 +40,7 @@ describe("public agent task context", () => {
 
   it("keeps task guidance separate and exposes the input contracts for each task", async () => {
     const app = createApp();
-    const workspaceResponse = await app.request("/v1/context/workspace");
+    const workspaceResponse = await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v3");
     const campaignResponse = await app.request("/v1/context/campaign");
     expect(workspaceResponse.status).toBe(200);
     expect(campaignResponse.status).toBe(200);

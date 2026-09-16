@@ -1,4 +1,6 @@
+import { CrmSyncReceiptSchema } from "./crm-sync-receipt.js";
 import { z } from "zod";
+import { LocalConfigUpdateConfigurationSchema, LocalOnboardingConfigurationSchema } from "./generated/lifty-configuration.js";
 
 const WorkspaceReferenceSchema = z
   .object({
@@ -40,22 +42,7 @@ export const CreateWorkspaceResultSchema = z
   .strict();
 
 /** Shared with Jobs agent-output.ts; generated locally and validated before receipt. */
-export const LocalOnboardingConfigurationSchema = z.object({
-  contract_version: z.literal("lifty-onboarding-config.v1"),
-  context_version: z.string().regex(/^sha256:[0-9a-f]{64}$/),
-  icp_config: z.object({
-    label: z.string().min(1).max(120),
-    person_locations: z.array(z.string().min(1)).nullable(),
-    organization_industries: z.array(z.string().min(1)).min(1).nullable(),
-    organization_num_employees_ranges: z.array(z.string().regex(/^[0-9]+,([0-9]+)?$/)).min(1).nullable(),
-    person_seniorities: z.array(z.string().min(1)).nullable(),
-    personas: z.array(z.object({
-      name: z.string().min(1),
-      titles: z.array(z.string().min(1)).min(1),
-    }).strict()).min(1),
-  }).strict(),
-  scout_overlay: z.string().min(200),
-}).strict();
+export { LocalOnboardingConfigurationSchema } from "./generated/lifty-configuration.js";
 
 export const OnboardingContextSchema = z.object({
   contract_version: z.literal("lifty-onboarding-config.v1"),
@@ -406,13 +393,18 @@ export const CrmSyncStatusSchema = z.discriminatedUnion("state", [
       requested_leads: z.number().int().positive(),
       leads_synced: z.number().int().nonnegative().nullable(),
       error_code: z.string().nullable(),
+      crm_sync_receipt: CrmSyncReceiptSchema.nullable().optional(),
       portal_id: z.string().regex(/^[0-9]{1,20}$/).nullable(),
       started_at: z.string().min(1),
       completed_at: z.string().nullable(),
       workspace: WorkspaceReferenceSchema,
     })
     .strict(),
-]);
+]).superRefine((result, ctx) => {
+  if (result.state === "succeeded" && result.crm_sync_receipt && result.crm_sync_receipt.status !== "complete") {
+    ctx.addIssue({ code: "custom", message: "A successful sync requires complete delivery" });
+  }
+});
 
 // ---------------------------------------------------------------- P6 config
 
@@ -481,6 +473,19 @@ export const WorkspaceConfigSchema = z
   })
   .strict();
 
+export const ConfigUpdateContextSchema = z.object({
+  contract_version: z.literal("lifty-config-update.v1"),
+  context_version: LocalOnboardingConfigurationSchema.shape.context_version,
+  current_config: WorkspaceConfigSchema,
+  onboarding_draft: z.record(z.string(), z.unknown()).nullable(),
+  scout_global_base: z.string().nullable(),
+}).strict();
+export type ConfigUpdateContext = z.infer<typeof ConfigUpdateContextSchema>;
+export const ConfigUpdateGenerationContextSchema = ConfigUpdateContextSchema.extend({
+  generation_rules: z.string().min(1),
+  configuration_schema: z.record(z.string(), z.unknown()),
+});
+
 const ConfigValuesSchema = z.record(z.string(), z.unknown());
 
 /** PATCH /v1/config body: one section with values, the prompt instruction form, or a full-config object. */
@@ -489,15 +494,17 @@ export const ConfigUpdateRequestSchema = z.union([
     .object({
       section: z.literal("prompt"),
       instruction: z.string().trim().min(1).max(4000),
+      configuration: LocalConfigUpdateConfigurationSchema.optional(),
     })
     .strict(),
   z
     .object({
       section: z.enum(["icp", "tone", "workspace"]),
       values: ConfigValuesSchema,
+      configuration: LocalConfigUpdateConfigurationSchema.optional(),
     })
     .strict(),
-  z.object({ values: ConfigValuesSchema }).strict(),
+  z.object({ values: ConfigValuesSchema, configuration: LocalConfigUpdateConfigurationSchema.optional() }).strict(),
 ]).superRefine((request, context) => {
   const icp = "section" in request
     ? request.section === "icp" ? request.values : null

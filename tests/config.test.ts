@@ -120,3 +120,15 @@ describe("service configuration", () => {
     expect(() => loadConfig(environment)).toThrow(message);
   });
 });
+
+it("CRM capability is optional but must be bounded and dedicated", () => {
+  expect(loadConfig(validEnvironment).crm).toBeNull();
+  const key = "x".repeat(48);
+  expect(loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:key}).crm).toEqual({serverKey:key,readOnly:false});
+  for (const value of ["short","x".repeat(257)]) expect(()=>loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:value})).toThrow(/LIFTY_CRM_SERVER_KEY/);
+  expect(()=>loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:key,TRIGGER_SECRET_KEY:key})).toThrow(/distinct/);
+});
+
+it.each(["DASHBOARD_READ_ONLY_MODE","CONSUMER_READ_ONLY_MODE"])("preserves company maintenance write freeze from %s", name => {
+  for(const value of ["1","true","TRUE"]) expect(loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:"x".repeat(48),[name]:value}).crm?.readOnly).toBe(true);
+});

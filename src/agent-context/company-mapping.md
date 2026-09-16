@@ -25,3 +25,5 @@ A health-only question uses the context command read-only.
    delivery receipt separately. A connected portal or ready configuration does
    not prove that company records reached HubSpot. This setup never activates
    outreach.
+
+When the founder belongs to multiple Lifty workspaces, add `--workspace <workspace_ref>` to the context command and the matching apply command. Use the workspace reference from authenticated account context. Regenerate from fresh context after a timeout; HubSpot may have accepted an additive change.

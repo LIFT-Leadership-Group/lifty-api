@@ -10,6 +10,7 @@ import type { EmailConnectSettings } from "./email-connect.js";
 type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
+  crm?: { serverKey: string; readOnly: boolean } | null;
   dashboardOrigin?: string;
   host: string;
   port: number;
@@ -116,6 +117,8 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
 
   const providerValues = [environment.UNIPILE_DSN, environment.UNIPILE_ACCESS_TOKEN];
   const providerReady = providerValues.every(value => Boolean(value?.trim()));
+  const crmKey = environment.LIFTY_CRM_SERVER_KEY?.trim();
+  if (crmKey && (crmKey.length < 32 || crmKey.length > 256)) throw new Error("LIFTY_CRM_SERVER_KEY must contain 32 to 256 characters.");
   const emailKey = environment.LIFTY_EMAIL_SERVER_KEY?.trim();
   const linkedinKey = environment.LIFTY_LINKEDIN_SERVER_KEY?.trim();
   const emailEnabled = Boolean(emailKey);
@@ -125,7 +128,9 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (emailKey && emailKey.length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
   if (linkedinKey && linkedinKey.length < 32) throw new Error("LIFTY_LINKEDIN_SERVER_KEY must contain at least 32 characters.");
   if (linkedinKey && linkedinKey === emailKey) throw new Error("LinkedIn requires a server key distinct from email.");
+  if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
+    crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,
     dashboardOrigin: dashboardUrl.origin,
     linkedin: linkedinEnabled ? {
       dsn: required(environment, "UNIPILE_DSN"), accessToken: required(environment, "UNIPILE_ACCESS_TOKEN"),

@@ -159,6 +159,9 @@ run_smoke() {
     "$ingress/readyz" \
     | jq -e '.status == "ready"' >/dev/null
   curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
+    "$ingress/readyz/crm" \
+    | jq -e '.status == "ready" and .capability == "lifty-crm-company.v1"' >/dev/null
+  curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
     "$ingress/openapi.json" \
     | jq -e '.openapi == "3.1.0"' >/dev/null
 
