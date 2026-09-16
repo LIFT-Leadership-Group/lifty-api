@@ -17,7 +17,7 @@ input. Exact campaign approval and authorization to send remain separate.
 The A/B rule applies when the returned `calibration_policy` is
 `qualified_ab_v1`. Historical `tier_a_v1`, missing, or unknown policies retain
 their A-only eligibility. Do not reinterpret an old successful run as a new
-A/B sample or relabel its research. Follow the current CLI result and explain
+A/B sample or relabel its research. Follow the current stage result and explain
 any compatibility blocker.
 
 ## Read the evidence before changing the search
@@ -45,8 +45,11 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
 ## Review the first cohort
 
 1. Wait for configuration import or the targeting update to finish. Before
-   new discovery, read `lifty get allowance --workspace <workspace-id>`.
-   Run `lifty run` to research the initial five candidates. The service stops
+   new discovery, fetch `context capacity` and read `stage capacity get`.
+   Fetch `context sample-review`, then use `stage sample-review post --input -`
+   with `{ "body": {} }` to research the initial five candidates. Explicitly
+   read `stage sample-review get` until its result is confirmed; the generic
+   transport does not poll. The service stops
    for review if that cohort cannot fill the qualified sample. It does not
    acquire repeated waves to chase five A grades.
 2. Present the returned cohort as a table with person, company, actual grade,
@@ -63,7 +66,7 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    technical recovery. Do not remove an exclusion, widen the founder's market,
    invent missing facts, or claim success to fill the table.
 4. A `calibration_review_required` result is a review checkpoint. Repeating
-   `lifty run` retrieves that saved cohort; it does not authorize another
+   `stage sample-review get` retrieves that saved cohort; it does not authorize another
    acquisition wave. Agree on the business adjustment before applying it.
    For allowance exhaustion, report the returned reset time. A technical
    research failure may be retried once against the saved candidates,
@@ -78,14 +81,14 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    targeting. Reporting results is not sample approval. If the answer requests
    outreach setup, continue that work instead of repeating the sample question.
 6. If the founder requests changes, clarify only the affected business
-   decision, apply it through `update`, wait for completion, and repeat the
+   decision, fetch `context targeting` or `context research-criteria`, follow its
+   generated-artifact PATCH and exact receipt/readback workflow, then repeat the
    sample and review. Approval of an earlier sample never carries across
    targeting or research-criteria changes. Preserve existing connections and
-   drafts; only the sample's acceptance is stale. Do not use `push` for an existing
-   workspace. If the CLI still reports an old completed run after a material
+   drafts; only the sample's acceptance is stale. Do not repeat the initial onboarding POST for an existing
+   configured workspace. If the stage still reports an old completed run after a material
    change, explain the blocker instead of presenting old grades as fresh.
-7. When the founder asks to continue outreach setup, fetch `lifty context
-   campaign` and collect only missing account/channel declarations. Reuse the
+7. When the founder asks to continue outreach setup, fetch `context campaigns` and collect only missing account/channel declarations. Reuse the
    stated channel choice. Read the current `sending-accounts` stage for
    Gmail/Google Workspace email or LinkedIn authorization and exact-attempt
    verification. Skip an already healthy connection unless reconnecting was
@@ -96,7 +99,7 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    may require a recipient-specific check, not five new leads before setup.
 8. Connecting an account does not approve sending. Keep the exact campaign
    preview, recipient, sender, copy and schedule approval/activation steps
-   from campaign context. Calibration sends no messages or invitations.
+   from the campaigns stage and its channel reference. Calibration sends no messages or invitations.
 
 For example, after an ICP change with discovery allowance exhausted and the
 founder saying "continue with Tier B leads", respond along these lines:

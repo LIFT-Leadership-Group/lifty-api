@@ -10,6 +10,18 @@ routes from stage names, use cached field allowlists, or forward credentials
 to a URL supplied in workspace data. Named operations are existing supporting
 reads/writes described alongside the main `get`, `post` and `patch` operations.
 
+```text
+node "<installed-runner>" context stages
+node "<installed-runner>" context <stage>
+node "<installed-runner>" stage <stage> <operation> --input -
+```
+
+Use the resolved installed runner for project or global installs. JSON stdin
+contains only the transport envelope `{path?, query?, body?}`; a private input
+file with mode 0600 is also supported. The CLI returns JSON unchanged and does
+not save artifacts, poll receipts, retry writes or open browsers. Explicitly
+follow the stage's workflow and linked references for those steps.
+
 Shared context contains instructions and contracts only. Fetch authenticated
 current state before deciding which business inputs are missing. A schema's
 example or default is not a saved workspace value or founder confirmation.
@@ -31,6 +43,10 @@ Retain the exact payload and submission reference, read the documented receipt,
 then use stage GET to confirm saved values before saying the change is done.
 For a timeout or 502/504, preserve the original request and resolve/check its
 receipt before retrying; a failed status read means the outcome is unknown.
+For generated edits, `references.configuration` owns private persistence and
+the exact-artifact resolver. Initial onboarding has one full submission and
+explicit `onboarding_status` polling; do not automatically repeat an uncertain
+initial POST. Business metadata uses GET and its receipt, not that resolver.
 Refresh stale generation context and regenerate rather than changing its
 version fingerprint by hand. Do not retry protected/multi-lane restrictions.
 

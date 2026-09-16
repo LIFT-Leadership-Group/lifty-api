@@ -57,6 +57,27 @@ describe("runtime stage context", () => {
     }
   });
 
+  it("keeps active entry and linked workflows on published stage operations", () => {
+    const contexts = [...stages, "onboarding", "workspace", "campaign"].map(task => getAgentContext(task, STAGE_CLIENT_CONTRACT)!);
+    const guides = contexts.flatMap(context => [context.instructions, ...Object.values(context.references)]);
+    // Former recommendations escaped the dynamic contract despite a working
+    // generic transport. Check all reachable guide text, including references.
+    for (const guide of guides) {
+      expect(guide).not.toMatch(/(?:lifty )?(?:crm companies (?:context|apply)|context workspace|context campaign(?!s)|campaign linkedin|update --input|\bconnect (?:hubspot|slack|unipile|linkedin)|lifty (?:push|run|get allowance))/);
+      for (const match of guide.matchAll(/stage ([a-z][a-z-]+) ([a-z][a-z_]*)/g)) {
+        // Only executable instructions use stage/op pairs; ordinary prose such
+        // as "stage's" and "stage GET" does not match this pattern.
+        if (!Object.hasOwn(stageOperations, match[1]!)) continue;
+        expect(stageOperations[match[1]!]![match[2]!], match[0]).toBeDefined();
+      }
+    }
+    const targeting = getAgentContext("targeting", STAGE_CLIENT_CONTRACT)!;
+    expect(targeting.references.configuration).toContain("readMatchingConfiguration");
+    expect(targeting.references.configuration).toContain("does not save");
+    expect(targeting.references.configuration).toContain("same-saved-body");
+    expect(targeting.references.configuration).toContain("onboarding_status");
+  });
+
   it("preserves legacy v4 content for the current installed v5 client", () => {
     for (const task of ["onboarding", "workspace", "campaign"]) {
       expect(getAgentContext(task, STAGE_CLIENT_CONTRACT)).toEqual(getAgentContext(task, "lifty-cli-context.v4"));

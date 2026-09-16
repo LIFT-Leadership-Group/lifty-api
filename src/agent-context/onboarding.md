@@ -20,19 +20,28 @@ Verify the current attempt even when a previous connection remains healthy.
 Build one founder-confirmed ICP bootstrap, save it privately in the active
 project. `lifty login` creates the workspace; you generate its discovery and
 research configuration locally using the current onboarding context.
-`lifty push` validates and applies it, and `lifty run` researches an initial
-five-candidate cohort. Five reviewable A/B leads complete the sample; C leads
-never count. `lifty status` shows progress. Review the actual sample and keep
+The targeting stage POST validates and applies that first configuration once;
+the sample-review stage researches an initial five-candidate cohort. Five reviewable A/B leads complete the sample; C leads
+never count. Stage GET/status operations show progress. Review the actual sample and keep
 its acceptance state truthful. Calibration and outreach setup can progress
 independently: missing leads, a targeting change or exhausted discovery
 allowance do not block requested account connections or campaign drafting.
 
 ## Already onboarded?
 
-If the founder already has a workspace — they finished this flow before, or
-`lifty status` shows a workspace with a live configuration — stop here and
-run `lifty context workspace` and follow its instructions. This flow is the first
-import only; later changes never go through `push`.
+Read business GET to identify the existing workspace, then fetch
+`context targeting` and read `stage targeting onboarding_status` to establish
+whether its first configuration was imported. A workspace or a non-null business
+configuration alone is not evidence of completed setup: a newly provisioned
+workspace already has its name/description. Resume a pending import through its
+status, preserving its exact local artifacts and avoiding another initial POST.
+
+Once `onboarding_status` confirms imported, fetch `context stages`, then
+`context <stage>` for the requested work. Follow its guide, references and
+operations through `stage <stage> <operation>`. This flow is the first import
+only; later changes use the relevant stage PATCH. An older runner without
+`stage` requires an installation update first; a server validation error or
+changed field/route calls for fresh context and repair.
 
 ## Voice
 
@@ -66,7 +75,7 @@ the first ICP run, and poll its status. When the founder asks for HubSpot, it
 may also launch the CLI's reviewed OAuth handoff. It never asks for or prints
 tokens, manually installs provider apps, activates outreach, or sends anything.
 Configure one primary motion and record every secondary motion as parked.
-When the founder asks to continue outreach setup, fetch campaign context and
+When the founder asks to continue outreach setup, fetch `context campaigns` and
 advance the steps whose prerequisites are met. Collect missing account details,
 connect the chosen channel, and help draft messaging even while calibration
 is pending. Explain a blocker only for the operation it actually prevents.
@@ -75,12 +84,13 @@ Completion means exactly:
 
 - `<active-project>/.lifty/onboarding-draft.json` exists with status
   `ready_for_auth` and remains byte-for-byte local after submission;
-- the local writers have validated the draft, generated configuration and privacy controls;
+- the local writers have saved the draft/configuration with private-file and source-draft guards;
 - `.lifty/onboarding-config.json` contains a configuration derived from the
   current draft and authenticated onboarding context;
 - `lifty login` has returned successfully with a named workspace;
-- `lifty push` has finished with the configuration imported and its secret-free
-  ICP + research prompt summary shown to the founder; and
+- the targeting stage's `onboarding_status` confirms import, saved stage GETs
+  confirm the resulting configuration, and the secret-free ICP/research summary
+  has been shown to the founder; and
 - the five eligible A/B leads, their actual grades, fit rationales and LinkedIn
   profile URLs have been shown and the founder has explicitly confirmed this
   sample. A quality
@@ -158,78 +168,76 @@ only output shape.
     draft, tell them nothing was lost, and offer a fresh sign-in link — but relaunch only after they confirm they're at the browser,
     never in a retry loop. When it succeeds, tell the founder their workspace exists — name
     it — and keep the rest of the CLI output to yourself.
-11. After login succeeds, fetch the authenticated workspace context:
+11. After login succeeds, refresh the index and targeting contract:
 
     ```text
-    node "<installed-runner>" onboarding-context \
-      --project-dir <active-project>
+    node "<installed-runner>" context stages
+    node "<installed-runner>" context targeting
+    node "<installed-runner>" stage targeting onboarding_context
     ```
 
-    Read `references.configuration` from this task context,
-    `configuration_schema` from the authenticated generation context, the current
-    `.lifty/onboarding-context.json` and `.lifty/onboarding-draft.json`.
-    Read the context's `generation_rules` and `configuration_schema` as the
-    server's current contract; the bundled reference explains how to apply it.
-    Generate `icp_config` and `scout_overlay` yourself, using the confirmed
-    draft and current global research rules. No server agent generates them.
-    Scout executes lead research. Your overlay must give Scout the concrete
-    lookups, sufficient evidence and unknown/failure treatment for each
-    material criterion, following `references.configuration`. Check the worked
-    example before writing; a list of qualification rules alone is incomplete.
-    Keep the founder informed in one sentence: you're preparing their targeting.
-    Pass exactly those two generated fields over process stdin:
+    Read `references.configuration` in full and follow its executable private
+    storage recipe. This operation returns JSON; it does not save a local file.
+    Use the installed `onboarding-configuration.mjs` helper to save successful
+    context as `.lifty/onboarding-context.json` (directory 0700, files 0600).
+    Read the actual draft, authenticated `generation_rules`, current
+    `configuration_schema` and Scout base. Generate locally using confirmed
+    intent; Scout executes research, not configuration generation. Give each
+    material criterion concrete lookups, sufficient evidence and unknown/failure
+    treatment. Check the reference's worked example without copying its target.
+    Pass the generated business fields from the current schema on stdin:
 
     ```text
-    node <skill-root>/scripts/write-onboarding-config.mjs \
-      --project-dir <active-project> --input -
+    node "<skill-root>/scripts/write-onboarding-config.mjs" \
+      --project-dir "<active-project>" --input -
     ```
 
-    The writer reads the actual saved draft/context and binds the configuration
-    to them. Keep generated content out of shell command text and logs.
-    Generate once for the current inputs; when the writer succeeds, apply:
+    The writer binds the actual saved draft and context. Follow the reference's
+    `readMatchingConfiguration` recipe to enforce source-draft equality, metadata
+    and size before assembling `{ "body": { "draft": ..., "configuration": ... } }`.
+    Save the exact request privately, then submit once and explicitly read status:
 
     ```text
-    node "<installed-runner>" push \
-      --project-dir <active-project>
+    node "<installed-runner>" stage targeting post --input -
+    node "<installed-runner>" stage targeting onboarding_status
+    node "<installed-runner>" stage targeting get
     ```
 
-    Push submits the draft and local configuration, then polls while the server
-    validates and applies them. When it finishes, play back the confirmed
-    market and personas, distinguishing buyer location from company headquarters.
-    Explain which limits discovery enforces and which research must check.
-    Do not present industry labels as verified Apollo filters. Keep lane
-    labels and prompt sizes to yourself. For `LOCAL_CONFIGURATION_INVALID`,
-    read `.lifty/onboarding-validation.json`: each issue gives a field path,
-    explanation and suggested fix. Repair the generated fields locally while
-    preserving the founder-confirmed draft; run the writer and push again.
-    Handle up to three technical repair attempts automatically without asking
-    the founder to interpret validation errors. For `ONBOARDING_CONTEXT_STALE`,
-    fetch context again and regenerate against it; never change just the
-    fingerprint. A changed draft also requires regeneration. Ask the founder
-    only when a fix requires missing or ambiguous business intent; never invent
-    an answer. Follow the configuration contract's error handling; never
-    blindly retry unchanged invalid output. On timeout, check `lifty status`
-    before resubmitting. A hand-tuned or already-configured workspace must be
-    preserved. Never start the first lead run until import is confirmed.
-12. Tell the founder their targeting is live and LIFTY will research an initial
-    group of five candidates, then review their actual grades and fit together.
-    Do not promise five A leads. This run sends nothing and does not touch CRM:
+    These are separate operations: the generic transport does not save a receipt,
+    poll or perform readback automatically. Preserve the request and receipt with
+    the private helper. Research criteria and commercial voice share the same
+    initial import; never repeat POST per stage. Poll `onboarding_status` with
+    bounded waits while pending, then GET targeting, research-criteria and any
+    other saved section needed for the summary. Explain the confirmed market and
+    personas, buyer location versus headquarters, and discovery limits versus
+    research checks. Industry labels are not verified native Apollo filters.
+
+    Follow `references.configuration` for technical repairs and uncertain writes.
+    A definite validation rejection may be repaired locally up to three times
+    while preserving confirmed intent. Stale context or changed draft requires
+    regeneration, not a replaced fingerprint. On timeout check onboarding_status
+    and saved state without automatically resubmitting. Ask only for missing
+    business intent. Preserve hand-tuned/already-configured workspaces.
+12. Once import is confirmed, tell the founder Lifty will research five initial
+    candidates and review their actual grades together. Do not promise five A
+    leads. Read `references.calibration` in full, refresh `context capacity` and
+    `context sample-review`, then follow their operations:
 
     ```text
-    node "<installed-runner>" run
+    node "<installed-runner>" stage capacity get
+    node "<installed-runner>" stage sample-review post --input -
+    node "<installed-runner>" stage sample-review get
     ```
 
-    The run stays attached and can take a while. Read and follow
-    `references.calibration` in full: it owns the qualified A/B sample, LinkedIn
-    links, feedback loop and independent progress on outreach setup.
-    If the run times out, research may still be running; check `lifty status`
-    and re-attach with `lifty run` to retrieve the final results.
-13. At any point, `lifty status` shows the installation, workspace,
-    configuration, run, and HubSpot state in one read:
-
-    ```text
-    node "<installed-runner>" status <resolved-installation-arguments>
-    ```
+    The sample POST input is `{ "body": {} }`. It starts/retrieves the bounded
+    cohort. Explicitly poll GET for the actual result; a timeout does not prove
+    failure or authorize another acquisition wave. This sends nothing and does
+    not touch CRM. Calibration owns the A/B sample, profile links and feedback;
+    requested outreach setup can progress independently.
+13. For current workspace/configuration, run, connection or allowance questions,
+    GET the relevant stage after reading its context. Installation diagnostics
+    may still use `status <resolved-installation-arguments>`, but never start a
+    connection to answer a status question.
 
 14. If HubSpot connection was part of the founder's request, fetch
     `context crm` and follow its current guide, operation schemas and connection
@@ -273,8 +281,7 @@ only output shape.
     for missing required inputs. Keep credentials in the browser, show the
     actual returned link immediately and verify the current attempt. Do not
     infer reconnection success from an older healthy grant. Connection and
-    reconnection never authorize messages or invitations. Follow campaign
-    context for exact preview, approval and activation when requested.
+    reconnection never authorize messages or invitations. Follow `context campaigns` and its references for exact preview, approval and activation when requested.
 18. Ask for sample feedback as described in `references.calibration`.
     If the founder instead asks to continue outreach setup or use Tier B leads,
     honor that request and advance the supported setup steps. Preserve pending
@@ -294,13 +301,13 @@ only output shape.
   symlink refusal, atomic replacement, mode `0600`, and `.lifty/.gitignore`.
 - Do not ask for, paste, echo, log, or summarize access tokens, refresh tokens,
   callback payloads, Supabase keys, or provider credentials.
-- Do not run `push` before both writers succeed and hosted login returns
-  successfully, and do not run `run` before push reports the configuration
-  imported.
+- Do not submit the initial configuration before both writers succeed, the
+  exact draft matches its artifact and hosted login succeeds. Do not start
+  sample review before the server confirms configuration import.
 - Do not manually install provider apps or invent provider authorization URLs.
   Use the current CRM, notifications or sending-accounts stage operation
   after a workspace exists and the founder chooses that connection.
 - Do not enable outreach or send anything. The first run researches leads
   only.
 - Do not treat sample acceptance, account connection or campaign drafting as
-  permission to send. Follow campaign context for exact approval and activation.
+  permission to send. Follow `context campaigns` and its references for exact approval and activation.

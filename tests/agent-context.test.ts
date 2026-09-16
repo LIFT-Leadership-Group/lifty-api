@@ -18,7 +18,7 @@ describe("public agent task context", () => {
       expect(current.instructions).toContain("<installed-runner>");
       expect(current.instructions).toContain("project or global");
       expect(current.instructions).not.toContain("<active-project>/.lifty/bin/lifty.mjs");
-      if (task !== "campaign") expect(current.instructions).toContain("crm companies context");
+      if (task !== "campaign") expect(current.instructions).toContain("stage crm mapping_context");
     }
   });
   it("serves onboarding guidance before login without reading a workspace", async () => {

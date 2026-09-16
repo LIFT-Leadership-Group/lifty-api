@@ -1,5 +1,5 @@
 
-# LIFTY workspace management
+# LIFTY campaign operations
 
 ## Authorization links
 
@@ -19,15 +19,36 @@ Login keeps its existing short-lived callback listener alive until completion,
 cancellation or expiry; provider-stage authorization requires an existing Lifty
 session and does not replace that listener.
 
-After onboarding, the hosted workspace is the source of truth: read it before
-answering, change research settings through `update`, operate email through `campaign` and LinkedIn through `campaign linkedin`, and keep the onboarding voice.
-You are the founder's GTM engineer: outcomes, not mechanics; the founder's
-language; no paths, JSON, state strings, or raw CLI output in what they read.
-
 Use `<installed-runner>` verified by the installed entry skill's runner
-resolver, for either project or global scope. Every command below runs as
-`node "<installed-runner>" <verb>`. The active project still owns private
-artifacts; it does not determine the installed runner's location.
+resolver, for either project or global scope. The active project owns private
+artifacts; it does not determine the runner's location. Refresh the stage index
+and campaigns contract before working:
+
+```text
+node "<installed-runner>" context stages
+node "<installed-runner>" context campaigns
+node "<installed-runner>" stage campaigns get --input -
+node "<installed-runner>" stage campaigns post --input -
+node "<installed-runner>" stage campaigns patch --input -
+```
+
+Read current `operations` schemas and use JSON stdin (or a private mode-0600
+file). GET takes `{ "query": { "channel": "email" | "linkedin",
+"workspace": "<current-workspace>", "campaign_ref": "<saved-reference>",
+"operation": "preview" | "status" } }`. There is no campaign inventory read;
+retain the references from real receipts. POST takes `{ "body": { "channel":
+"email" | "linkedin", "request": { "operation": "<supported-operation>",
+"payload": { ... } } } }`. Payload contains the workspace and other inputs
+required by that operation's fresh channel schema. PATCH has the same envelope
+but supports only `prepare` with an existing campaign_ref. Do not invent a
+status-setting PATCH or put campaign operation names in the CLI verb position.
+
+The channel steps below select the nested request operation; all use this
+stage transport. Use GET for preview/status, POST for supported operational
+commands and initial preparation, and PATCH for an existing draft's preparation.
+An old runner without `stage` needs an installation update first; API validation
+or field/route changes require fresh context and correction, not a CLI rebuild.
+Report outcomes in the founder's language, keeping paths and raw JSON private.
 
 ## Handoff from targeting review
 
@@ -74,62 +95,53 @@ Connecting email never approves a campaign or activates sending. Resolve the
 workspace explicitly and preserve the recipient and campaign references the
 CLI returns; never substitute another workspace or provider silently.
 
-1. Import the intended recipient through `campaign target --workspace <workspace>
-   --input -` with `{ "email": "...", "first_name": "...", "last_name": "..." }`.
-   Names are optional. Repeating the exact email reuses its workspace lead.
-2. Select the provider for new executions with `campaign provider --workspace
-   <workspace> --input -` and `{ "channel": "email", "provider": "unipile" }`.
-   Email also supports the Smartlead default; LinkedIn supports Unipile or
-   HeyReach. Selection alone does not demonstrate transport support or enable
-   sending. Existing executions keep their pinned provider and account.
-3. Prepare JSON through `campaign prepare --workspace <workspace> --input -`
-   or `--file <JSON-path>`. Include `lead_ref`, `connection_ref`, `name`,
-   `start_at` (ISO timestamp), and one to five `steps` with `subject`, plain
-   `text`, and `delay_minutes`. Obtain `connection_ref` from the current `sending-accounts` email GET. Follow-ups wait at least one minute after the
-   previous confirmed send. For edits, include the existing `campaign_ref`.
-   A retry of the same content reuses the version; material edits invalidate
+1. Use email POST operation `target` to import the intended recipient, using
+   the current schema for their address and optional names. Repeating the exact
+   email reuses its workspace lead. Retain the returned lead reference.
+2. If provider selection is needed, email POST operation `provider` selects it
+   for new executions. Follow the current channel/provider schema. Selection
+   alone does not demonstrate transport support or enable sending. Existing
+   executions keep their pinned provider and account.
+3. Use `prepare` with the intended lead, current sender connection, name, start
+   time and supported steps from the live schema. Obtain connection_ref from
+   the sending-accounts email GET. Follow-ups wait at least one minute after
+   the previous confirmed send. Use PATCH with the saved campaign_ref for edits.
+   A retry of identical content reuses its version; material edits invalidate
    approval and cancel outstanding steps of the old version.
-4. Run `campaign preview <campaign-ref> --workspace <workspace>`. Show the
-   founder the exact sender, recipient, copy, schedule, daily ceiling and
-   blockers in their language. Do not fabricate warmup or placement evidence.
-   The beta supports accounts already used habitually for personal or business
-   correspondence. Corporate domains can qualify. New/dedicated outreach accounts
-   are blocked; explain that managed warmup is unavailable, and offer a different
-   account through disconnect then connect. Connection is optional and does not
-   activate sending. The backend determines the applicable policy.
-   For `lifty.personal-beta.v1`, placement is not required and is not performed:
-   do not request placement, create provider tests, confirm seeds, or fabricate a
-   passed result. Review the preview’s policy, blockers, copy, recipient and digest.
-   If policy changes, prepare again and get explicit approval of the new digest.
-   Workspaces reporting strict policy retain their placement and warmup gates.
-5. When the founder explicitly approves this exact preview, run `campaign
-   approve <campaign-ref> --workspace <workspace> --digest <preview-digest>`.
-   Run `campaign activate` with the same reference, workspace and digest only
-   when sending is authorized. A stale digest requires another preview and
-   approval; never silently approve a changed version. Safety blockers must be
-   resolved by the product; never write database evidence manually.
-6. `campaign status <campaign-ref> --workspace <workspace>` shows step states
-   and ingested reply timestamps. A confirmed reply cancels pending follow-ups.
-   Read back status to prove cancellation; never infer a reply from a send 2xx.
-   When status reports an unconfirmed send or an accepted email without a linked
-   receipt, explain that the mailbox budget stays consumed and dependent steps
-   remain blocked. Do not retry that email or imply automatic recovery is certain.
-   If the founder chooses to stop future steps permanently, use `campaign cancel
-   <campaign-ref> --workspace <workspace> --digest <preview-digest> --confirm-cancel`.
-   Read back the canceled state. Cancellation retains prior receipts and budget;
-   it cannot recall mail already accepted by the provider.
-7. `campaign pause <campaign-ref> --workspace <workspace>` stops future steps.
-   To suppress a recipient, use `campaign suppress --workspace <workspace>
-   --input -` with `{ "lead_ref": "..." }`. To disconnect email after explicit
-   founder authorization, use `disconnect unipile --workspace <workspace>`.
-   Reconnection does not restart campaigns or clear the mailbox's daily count.
+4. GET the exact preview. Show sender, recipient, copy, schedule, daily ceiling
+   and blockers. Do not fabricate warmup or placement evidence. Habitual personal
+   or business correspondence accounts may qualify, including corporate domains;
+   new/dedicated outreach accounts are blocked. Explain that managed warmup is
+   unavailable and offer a suitable account through the approved connection
+   workflow. Never disconnect an account without explicit authorization.
+   For `lifty.personal-beta.v1`, placement is neither required nor performed:
+   do not request tests, confirm seeds or fabricate a passed result. Review the
+   actual policy, blockers and digest. A policy/content change requires a new
+   preview and explicit approval; strict-policy workspaces retain their gates.
+5. After explicit approval of the exact preview, POST `approve` with that
+   campaign reference, workspace and digest. POST `activate` only when sending
+   is separately authorized. A stale digest requires a fresh preview/approval;
+   never silently approve changed content or write database evidence manually.
+6. GET status for actual step states and ingested replies. A confirmed reply
+   cancels pending follow-ups; read back cancellation instead of inferring it
+   from a send 2xx. An unconfirmed send or accepted email lacking a linked
+   receipt keeps its mailbox budget consumed and dependent steps blocked.
+   Do not resend or promise automatic recovery. If the founder authorizes
+   stopping future steps permanently, POST `cancel` with the exact digest and
+   current schema's cancellation confirmation. GET the canceled state.
+   Cancellation retains receipts and budget and cannot recall accepted mail.
+7. POST `pause` stops future steps. POST `suppress` suppresses the intended
+   recipient. To disconnect email after explicit authorization, use the existing
+   `disconnect unipile --workspace <workspace>` command; no stage operation
+   replaces that destructive action. Reconnection neither restarts campaigns
+   nor clears the physical mailbox's daily count.
 
 LIFTY enforces at most ten automated emails per physical mailbox per UTC day,
 including supported placement and sequence sends, across workspaces, provider
 changes and reconnections. Unknown send outcomes remain counted. Do not reset
 counters or send extra real emails to test the cap. Never claim email testing
-validates LinkedIn. Preserve status after timeouts and retry the same request
-without changing campaign content or references.
+validates LinkedIn. After timeouts preserve the exact request and references, then GET status
+before deciding whether any retry is safe. Do not replay uncertain sends.
 
 ## LinkedIn campaigns
 
@@ -143,44 +155,35 @@ in the hosted browser flow. A normal stage GET without `attempt_ref` reads the
 current connection reference and health for campaign preparation; it is not
 proof of a new authorization. Connection does not authorize or activate sends.
 
-1. Select an existing researched lead in this workspace, with its stored
-   LinkedIn profile. Never guess a lead ID or silently replace the recipient.
-   Prepare one plain-text message from the founder's approved template through
-   `campaign linkedin prepare --workspace <workspace-ref> --input -` with
-   `{ "lead_id": "...", "connection_ref": "...", "text": "..." }`.
-   Text is nonempty and at most 3,000 characters. Include `campaign_ref` to
-   edit an existing draft. No invitation note or follow-up fields are supported.
-2. Read `campaign linkedin preview <campaign-ref> --workspace <workspace-ref>`.
-   Show the exact recipient, sender account, message and schedule in the
-   founder's language. The sequence is an invitation without a note and one
-   message after acceptance. No automatic follow-up is scheduled; subsequent
-   conversation is manual. The fixed account limits are five invitations per
-   day, 25 in a rolling seven days, and five messages per day. Actions run
-   Monday–Friday, 09:00–17:00 in the account's timezone, 15–45 minutes apart.
-   These limits and all blockers are part of the preview; do not edit them.
-3. After explicit approval of the exact preview, run `campaign linkedin approve
-   <campaign-ref> --workspace <workspace-ref> --digest <preview-digest>`.
-   Activate only with authorization to send: `campaign linkedin activate
-   <campaign-ref> --workspace <workspace-ref> --digest <preview-digest>`.
-   A stale digest requires another preview and approval. Changing copy
-   invalidates approval. Never infer activation permission from connection.
-4. Read `campaign linkedin status <campaign-ref> --workspace <workspace-ref>`
-   to report actual receipts, acceptance and blockers. An inbound reply before
-   the first message prevents that message. Replies stop pending outreach on
-   both LinkedIn and email. Never report a message as sent from an invitation
-   acceptance or an uncertain provider response. For an ambiguous action,
-   keep its references and inspect status; do not resend or create a duplicate
-   campaign to work around it. Provider acceptance detection can arrive later.
-5. To pause, run `campaign linkedin pause <campaign-ref> --workspace
-   <workspace-ref> --digest <preview-digest>`. To permanently cancel unsent
-   actions after authorization, run `campaign linkedin cancel <campaign-ref>
-   --workspace <workspace-ref> --digest <preview-digest> --confirm-cancel`.
-   Read back the result. Neither action recalls an already accepted send.
+1. Select an existing researched lead in this workspace with its stored
+   LinkedIn profile. Never guess an ID or replace the recipient silently.
+   Use LinkedIn POST `prepare` with the current schema's lead, connection and
+   plain-text message fields. Text is nonempty and at most 3,000 characters.
+   Use PATCH `prepare` with campaign_ref for edits. Invitation notes and
+   follow-up fields are unsupported.
+2. GET preview. Show the exact recipient, sender account, message and schedule.
+   The sequence is an invitation without a note and one message after acceptance;
+   subsequent conversation is manual. Limits remain five invitations per day,
+   25 per rolling seven days and five messages per day, Monday–Friday 09:00–17:00
+   in the account timezone, 15–45 minutes apart. Read the actual preview and
+   blockers; never edit limits to bypass them.
+3. After exact preview approval, POST `approve` with the reference, workspace,
+   digest and confirmation required by the fresh schema. POST `activate` only
+   when sending is authorized. Changed copy or a stale digest requires a new
+   preview/approval; connection never supplies activation permission.
+4. GET status to report receipts, acceptance and blockers. An inbound reply
+   before the first message prevents it. Replies stop pending outreach on both
+   channels. Invitation acceptance or an uncertain response is not a sent
+   message. Preserve references and inspect status for ambiguous actions; do
+   not resend or create duplicate campaigns. Acceptance detection may arrive later.
+5. POST `pause` or, after authorization, `cancel` with the digest and explicit
+   confirmation required by the current LinkedIn schema. GET the resulting
+   state. Neither action recalls a previously accepted send.
 6. Checkpoint, credential and restriction incidents pause sending. Resolve the
-   account issue before an explicitly requested reconnect with the same
-   declarations. Reconnection preserves history and consumed limits and does
-   not restart campaigns; reactivation is explicit. To disconnect after the
-   founder requests it, run `disconnect linkedin --workspace <workspace-ref>`.
+   account issue before an explicitly requested sending-accounts reconnect.
+   Reconnection preserves history/consumed limits and never restarts campaigns;
+   reactivation is explicit. Authorized disconnection still uses
+   `disconnect linkedin --workspace <workspace-ref>`.
 
 Canonical lead activity records continue to show invitations, acceptance,
 messages and replies through Unipile. Preserve those receipts when describing
@@ -190,21 +193,15 @@ without approval of the exact recipient, account and copy.
 
 ## Hard stops
 
-- Never activate a campaign without explicit authorization for its exact
-  recipient, sender, copy and schedule. Preview, approval and activation remain
-  separate actions; connecting a mailbox does not authorize sending.
-- Never ask for, print, or summarize tokens, keys, callback payloads, or
-  provider credentials.
-- Never run `disconnect` without the founder's explicit yes in this
-  conversation, and never run `push` here: after onboarding, `update` is the
-  only research-configuration write path; outreach writes use the corresponding
-  `campaign` or `campaign linkedin` commands.
-- If LIFTY reports `MULTI_LANE_CONFIG_UNSUPPORTED`, stop. No lane was changed.
-  Explain that this workspace has ICP lanes managed outside LIFTY and direct
-  the founder to the LIFT admin tools for lane targeting changes. Do not retry
-  with a partial lane or combine the lanes into one.
-- If LIFTY reports `ONBOARDING_ALREADY_CONFIGURED`, stop using `push`: the
-  workspace already has its first configuration. Use `lifty update` for a
-  supported change; do not try to replace it with another onboarding draft.
+- Never activate without authorization for the exact recipient, sender, copy
+  and schedule. Preparation, preview, approval and activation stay separate.
+- Never request, print or summarize tokens, keys, callback payloads or credentials.
+- Never disconnect without the founder's explicit yes in this conversation.
+- Configuration changes use the relevant stage's PATCH and generated-artifact
+  workflow. Do not repeat first onboarding for an already-configured workspace.
+- Multi-lane and protected-prompt restrictions stay in force; do not combine
+  lanes, replace hand-tuned prompts or route around a rejection.
 
-Before new Apollo discovery, use `lifty get allowance --workspace <workspace-id>` to read actual used/reserved/remaining slots and the Monday UTC reset. Platform-default Lifty workspaces have 25 new leads per week. Customer-owned keys retain their existing posture. If the allowance is exhausted, report the returned reset time; never bypass reservations with retries, dry runs or manual inserts.
+Before new discovery, GET capacity for actual used/reserved/remaining slots and
+its reset time. Exhaustion does not prevent account setup, saved-lead review or
+drafting; never bypass reservations through retries, dry runs or manual inserts.
