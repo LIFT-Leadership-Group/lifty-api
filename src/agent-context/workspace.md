@@ -96,8 +96,14 @@ current criteria, show actual grades, fit evidence and LinkedIn profile URLs,
 and review the result. Five eligible A/B leads complete the review sample;
 C leads never count. Explicitly offer acceptance or refinement for a B-only
 sample. A quality shortfall stops for diagnosis and an agreed adjustment, not
-another unchanged search. Outreach connection waits for explicit confirmation
-of the current complete sample.
+another unchanged search. This checkpoint does not block requested outreach
+setup. Account connections and messaging drafts can proceed while calibration
+is pending or discovery allowance is exhausted; follow campaign context.
+If the founder chooses existing Tier B leads, inspect their saved evidence
+against the current targeting and make the intended recipients explicit.
+Preserve historical grades and identify any recipient-specific missing check;
+do not require five newly acquired leads to prepare outreach. Exact preview
+approval and sending authorization remain separate.
 
 The daily discovery target shown by `get workspace` is the workspace operating
 target. It is read-only here. Never infer it from an ICP lane's allocation

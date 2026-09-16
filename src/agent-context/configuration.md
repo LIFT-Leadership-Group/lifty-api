@@ -110,6 +110,54 @@ supports strong company and buyer fit. The next two are C when they contradict
 confirmed criteria. A title alone proves neither company fit nor authority and
 cannot earn A. B still needs meaningful positive fit.
 
+### Translate criteria into research instructions
+
+You write Scout's research plan; Scout performs the lead lookups. For every
+material criterion, include within the four sections: **criterion → source
+and concrete lookup → sufficient evidence → fallback and tier treatment**.
+Name capabilities exposed by the current Scout base/runtime, not guessed tool
+names or unsupported parameters. "Verify leadership" alone is not a plan.
+Use this method for all setups: multiple locations needs a location-page
+lookup and count; a technology requirement needs evidence of actual usage,
+not just a vendor logo or partnership mention. Select checks relevant to the
+confirmed ICP instead of copying every example into every overlay.
+
+For a confirmed no-sales-leader criterion, instruct Scout to:
+
+1. Resolve the exact company using its domain and LinkedIn company identity.
+   Review the LinkedIn company profile and current employee/team results.
+2. Search people at that company for Head/VP/Director of Sales, Chief Revenue
+   Officer and equivalent commercial leadership roles. Verify current
+   employment and responsibility, excluding namesake companies and former
+   employees. AEs, SDRs, advisers and fractional consultants do not by title
+   alone establish a dedicated sales leader.
+3. For a small team, inspect the available current profiles across functions;
+   do not stop at the founder profile or a title query with zero matches.
+   Corroborate through the company team page. If people search is unavailable,
+   use company-scoped professional-profile web searches and the team page.
+4. Record the company identity, queries, sources, date, profiles reviewed and
+   coverage limits in the existing research rationale/source fields. Separate
+   "checked available team; no dedicated leader found" from incomplete access,
+   no search results, and a failed request. Never claim complete coverage from
+   a partial roster or equate listed LinkedIn members with total employees.
+5. A sufficiently reviewed small team with founder commercial responsibility
+   and no dedicated leader found is a defensible founder-led-sales proxy.
+   Combined with strong company/buyer fit it supports A, with the inference
+   labeled. A confirmed dedicated leader triggers the exclusion. Incomplete
+   coverage remains unknown; attempt the fallback and do not turn it into C.
+   A technical failure cannot supply positive evidence or be hidden as a
+   completed check. Do not leave a decisive, feasible lookup undone simply
+   because unknown evidence is non-disqualifying.
+
+Geography and size need equally concrete checks: identify company HQ separately
+from buyer residence, use current company/profile evidence for employees, and
+use evidence in the actual metric for ARR. Confirmed out-of-range facts remain
+exclusions. If an ARR ceiling and a separate hard employee ceiling were both
+confirmed, enforce both; a discovery-only headcount proxy remains a proxy.
+Do not require public ARR disclosure to award A to an otherwise strong fit.
+Start with core positive fit and the founder's actual exclusions; additional
+preferences can follow sample feedback instead of silently narrowing A.
+
 Use workspace name/description as context and the confirmed draft as the
 source of targeting decisions. Write instructions for the researching agent,
 not marketing copy. Do not configure outreach, sender voice, sequences, sends,
@@ -145,27 +193,58 @@ agent or rerun unchanged invalid output. Total request limit: 132 KiB with draft
 
 ## Worked example
 
-For a confirmed draft targeting founders who own sales at B2B software
-companies headquartered in the United States with 51–200 employees, one
-persona named `Founder buyer` and title `Founder`, and an exclusion of agencies,
-assume the founder leaves buyer location unrestricted and confirms the company
-text phrase `software`. Generate:
+For a confirmed draft targeting founders who own sales at B2B SaaS companies
+headquartered in the United States or Canada with 1–99 employees, one persona
+named `Founder buyer` and title `Founder`, and an exclusion of dedicated sales
+leaders, assume the founder explicitly leaves buyer location unrestricted and
+confirms the company text phrase `software`. ARR is not a hard requirement in
+this example. Generate:
 
 ```json
 {
   "icp_config": {
     "label": "ExampleCo founder sales",
     "person_locations": null,
-    "organization_locations": ["United States"],
+    "organization_locations": [
+      "United States",
+      "Canada"
+    ],
     "q_keywords": "software",
-    "organization_industries": ["computer software"],
-    "organization_num_employees_ranges": ["51,200"],
+    "organization_industries": [
+      "computer software"
+    ],
+    "organization_num_employees_ranges": [
+      "1,99"
+    ],
     "person_seniorities": null,
-    "personas": [{"name": "Founder buyer", "titles": ["Founder", "Co-Founder"]}]
+    "personas": [
+      {
+        "name": "Founder buyer",
+        "titles": [
+          "Founder",
+          "Co-Founder"
+        ]
+      }
+    ]
   },
-  "scout_overlay": "## ICP gate\nTarget B2B software companies headquartered in the United States whose founder owns sales. Research the product, customer type, headquarters and buyer responsibility. Buyer residence is unrestricted. Distinguish supported, contradicted and unknown criteria.\n## Hard disqualifiers\nExclude agencies: a client-service portfolio without an owned software product is the observable tell. Confirmed consumer-only businesses contradict the required B2B target.\n## Size gate\nThe required boundary is 51–200 employees. Use public team size or a current company profile; label estimates and unknowns. Verified out-of-range size fails the boundary; missing data does not.\n## Tier definitions\nTier A: strong positive company and buyer fit supported by evidence or credible proxies, no confirmed hard exclusion. Tier B: meaningful positive fit but company fit or buyer relevance is less convincing. Tier C: confirmed hard exclusion or clear target mismatch. Unknown evidence alone never downgrades a lead or proves A. Retrieval errors are research failures, not negative company evidence."
+  "scout_overlay": "## ICP gate\nTarget B2B SaaS companies headquartered in the United States or Canada whose founder owns sales. Buyer residence is unrestricted. Inspect product/pricing pages and customer cases for an owned business software product; check company contact/about information and its LinkedIn profile for HQ. A local customer or office is not HQ. Check founder profiles and commercial activity for responsibility such as demos or buying decisions; a title alone is insufficient. Record supported, contradicted and unknown criteria with dated sources.\n## Hard disqualifiers\nExclude a confirmed current dedicated sales leader. Resolve the exact company/domain and LinkedIn identity, then search current people at that company for Head/VP/Director of Sales, CRO and equivalent responsibility. For a small team review available current profiles across functions, and corroborate with its team page. Check current employment and ownership of sales; former employees, AEs/SDRs, advisers and fractional consultants do not by title alone prove the exclusion. If LinkedIn people results are inaccessible, try company-scoped professional-profile web search and the team page. Record searches, profiles reviewed and coverage limits. A reviewed small team with a commercially active founder and no dedicated leader found supports founder-led sales as an explicit inference. Zero search results, partial coverage and tool errors do not prove absence. Confirmed consumer-only products or HQ outside the two countries contradict the target.\n## Size gate\nRequire 1–99 employees. Check current company headcount evidence, including its LinkedIn profile and company disclosures; distinguish estimates and listed LinkedIn members from total employees. Seek another source when a range crosses 99. Confirmed 100 or more employees fails the boundary; missing or ambiguous size remains unknown. ARR is not required for this example.\n## Tier definitions\nA: strong positive company and buyer fit with no confirmed exclusion; the reviewed-team proxy can support A without public ARR or an explicit statement that no sales leader exists. B: meaningful fit with substantively weaker company or buyer evidence. C: a confirmed dedicated sales leader or clear target mismatch, including verified HQ or headcount outside the confirmed boundaries. Unknown evidence alone neither downgrades a lead nor proves A. Report retrieval failures and unfinished checks honestly; they are not negative company facts. Preserve the rationale and sources in the existing research output."
 }
 ```
 
 This is an example for those exact inputs. Derive every actual output from the
 current founder draft and global base; do not copy the example targeting.
+
+Check the generated overlay against these evidence cases before submitting:
+
+| Evidence under this example | Expected interpretation |
+| --- | --- |
+| Canadian B2B SaaS, founder runs demos, current small-team profiles reviewed with no sales leader found, six employees, ARR unknown | A supported by positive fit and a labeled team-review proxy. |
+| Same company with a confirmed current VP owning sales | C; the exclusion is established. |
+| Strong B2B SaaS fit, 1,000 verified employees | C; strong fit does not erase the 99-employee ceiling. |
+| Six employees, but verified HQ outside USA/Canada | C; headcount does not erase geography. |
+| Company-scoped people query fails or returns no usable profiles | Try fallback; retain unknown coverage. This alone justifies neither A nor C. |
+| Only a Founder title and software keyword | Insufficient evidence for A; research product and buyer responsibility. |
+
+For a different confirmed setup retaining a hard $5M ARR ceiling, verified
+$100M ARR is C; unknown ARR can still coexist with A when positive fit is
+strong. Total revenue, funding and valuation are not interchangeable with ARR.

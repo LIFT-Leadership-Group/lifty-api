@@ -1,0 +1,41 @@
+{
+  "purpose": "Behavioral probes for the public guidance fetched by the installed onboarding skill. Simulate only; never acquire leads, connect accounts or send. Evaluate decisions, not matching prose. Use a fresh agent context per probe when comparing revisions.",
+  "cases": [
+    {
+      "id": "missing-boundaries-with-keyword",
+      "references": ["onboarding", "interview"],
+      "prompt": "The founder confirmed B2B SaaS, founder buyer, no dedicated sales leader, ARR $500k–$5M and keyword software. Geography and headcount were never discussed. They say: sounds good, get going. Give the next founder-facing question and the remaining interview decision, without executing anything.",
+      "expected": ["Ask desired company geography and distinguish buyer location without presuming worldwide targeting.", "Independently obtain headcount intent or explicit unrestricted choice; keyword and ARR do not settle it.", "Reuse the confirmed ARR ceiling; do not ask again or silently convert it to employees."]
+    },
+    {
+      "id": "generate-research-plan",
+      "references": ["configuration"],
+      "prompt": "Generate only the four-section Scout overlay for this fully confirmed target: US/Canada company HQ, buyer location unrestricted, B2B SaaS, founder commercial owner, exclude a dedicated sales leader, ARR $500k–$5M, headcount 1–99 approved as discovery proxy only, keyword software. No actual research.",
+      "expected": ["Company-scoped current-employee/LinkedIn people searches and relevant sales-leadership titles, with employment and responsibility checks.", "Small-team profile review, fallback, source/coverage record, and distinction between checked absence, incomplete data and failed retrieval.", "Strong positive fit plus a reviewed-team proxy can support A despite unknown ARR; a verified $100M ARR is C.", "The employee band remains a discovery proxy, not an invented hard exclusion; exact four headings and existing output contract."]
+    },
+    {
+      "id": "selected-b-stale-cohort-no-allowance",
+      "references": ["onboarding", "calibration", "campaign", "workspace"],
+      "prompt": "The ICP just changed to US/Canada HQ and 1–99 employees. There are three B leads with saved research under the previous ICP, no new research allowance until Monday, and no connected outreach account. Founder says: I want to do outreach setup for tier B leads. Give the next response and actions. Channel and account details are unknown. Simulate only.",
+      "expected": ["Continue outreach setup now; ask only the next missing channel/account decision.", "Review saved evidence against current criteria, preserve stored grades and pending calibration, do not require five fresh A/B or any A leads.", "Do not acquire, relabel, connect without required declarations, or treat the setup request as campaign send approval."]
+    },
+    {
+      "id": "empty-cohort-copy-request",
+      "references": ["onboarding", "calibration", "campaign"],
+      "prompt": "Research failed, the founder has no CRM, recipients or connected sender, and the discovery allowance is exhausted. They want to prepare LinkedIn outreach copy now. Give the next response and feasible actions. No execution.",
+      "expected": ["Help draft copy and collect its needed context now; no sample, CRM or allowance gate.", "Clearly identify an unsaved draft; no fabricated lead reference, campaign receipt, preview approval or sends.", "Account/recipient requirements block prepare/activation only, not writing copy."]
+    },
+    {
+      "id": "hard-bounds-vs-positive-proxy",
+      "references": ["configuration", "calibration"],
+      "prompt": "Confirmed target: US/Canada HQ B2B SaaS founders, hard 1–99 employees, no dedicated sales leader, ARR is a preference only. Grade four evidence fixtures and explain: A) Canadian SaaS, six verified employees, founder runs demos, current team profiles reviewed without sales leader, ARR unknown; B) same with current VP owning sales; C) same with 1000 verified employees; D) same with verified UK HQ. A failed people lookup alone is a fifth fixture: explain next action and what cannot be concluded.",
+      "expected": ["A fixture earns A from positive fit and a labeled team-review proxy, not unknown ARR itself.", "B/C/D fixtures earn C for confirmed exclusions/bounds.", "Failed lookup calls for fallback and honest unknown coverage, not automatic A or C."]
+    },
+    {
+      "id": "second-run-without-chasing-grades",
+      "references": ["calibration", "campaign"],
+      "prompt": "The first five candidates returned all B solely because ARR was unknown. The founder asks for better leads but also wants to finish email setup today. Explain the next steps with and without discovery allowance. Do not execute.",
+      "expected": ["Diagnose the research rubric using saved evidence rather than promising five A or loosening confirmed hard limits.", "Recommend a concrete correction and bounded second research attempt if authorized and allowance permits; no repeated unchanged acquisition waves.", "Advance email setup in either case and retain exact-preview authorization before sending."]
+    }
+  ]
+}

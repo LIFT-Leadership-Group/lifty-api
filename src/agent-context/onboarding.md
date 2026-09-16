@@ -6,8 +6,10 @@ project. `lifty login` creates the workspace; you generate its discovery and
 research configuration locally using the current onboarding context.
 `lifty push` validates and applies it, and `lifty run` researches an initial
 five-candidate cohort. Five reviewable A/B leads complete the sample; C leads
-never count. `lifty status` shows progress. Review and confirm the current
-sample before proceeding to outreach connection, including a B-only sample.
+never count. `lifty status` shows progress. Review the actual sample and keep
+its acceptance state truthful. Calibration and outreach setup can progress
+independently: missing leads, a targeting change or exhausted discovery
+allowance do not block requested account connections or campaign drafting.
 
 ## Already onboarded?
 
@@ -48,6 +50,10 @@ the first ICP run, and poll its status. When the founder asks for HubSpot, it
 may also launch the CLI's reviewed OAuth handoff. It never asks for or prints
 tokens, manually installs provider apps, activates outreach, or sends anything.
 Configure one primary motion and record every secondary motion as parked.
+When the founder asks to continue outreach setup, fetch campaign context and
+advance the steps whose prerequisites are met. Collect missing account details,
+connect the chosen channel, and help draft messaging even while calibration
+is pending. Explain a blocker only for the operation it actually prevents.
 
 Completion means exactly:
 
@@ -62,7 +68,8 @@ Completion means exactly:
 - the five eligible A/B leads, their actual grades, fit rationales and LinkedIn
   profile URLs have been shown and the founder has explicitly confirmed this
   sample. A quality
-  shortfall or unanswered feedback question keeps calibration pending.
+  shortfall or unanswered feedback question keeps calibration pending, without
+  preventing requested outreach setup. Report these as separate outcomes.
 
 When HubSpot connection was part of the founder's request, completion also
 requires `lifty connect hubspot` to report the secret-free portal ID as
@@ -92,7 +99,10 @@ only output shape.
    persona's role, titles, and authority tell. Wait for that answer before the
    next block, and never bundle unrelated judgments. Reject adjective-only
    sizing and require a numeric floor plus its unit. Once a persona has a role,
-   one title, and an organizational tell, move on.
+   one title, and an organizational tell, move on. Resolve the geography and
+   employee-size decisions in `references.interview` even when ARR or a keyword
+   is already known. Ask about an unmentioned size ceiling; explicit
+   unrestricted choices are valid. Reuse answers without reconfirming them.
 5. When an answer changes, say what changed. The newest statement replaces the
    older value; never average or merge contradictions.
 6. If the founder says `skip`, `no sé`, `avancemos`, or an equivalent, skip any
@@ -148,6 +158,10 @@ only output shape.
     server's current contract; the bundled reference explains how to apply it.
     Generate `icp_config` and `scout_overlay` yourself, using the confirmed
     draft and current global research rules. No server agent generates them.
+    Scout executes lead research. Your overlay must give Scout the concrete
+    lookups, sufficient evidence and unknown/failure treatment for each
+    material criterion, following `references.configuration`. Check the worked
+    example before writing; a list of qualification rules alone is incomplete.
     Keep the founder informed in one sentence: you're preparing their targeting.
     Pass exactly those two generated fields over process stdin:
 
@@ -193,7 +207,7 @@ only output shape.
 
     The run stays attached and can take a while. Read and follow
     `references.calibration` in full: it owns the qualified A/B sample, LinkedIn
-    links, feedback loop and explicit confirmation before outreach connection.
+    links, feedback loop and independent progress on outreach setup.
     If the run times out, research may still be running; check `lifty status`
     and re-attach with `lifty run` to retrieve the final results.
 13. At any point, `lifty status` shows the installation, workspace,
@@ -258,8 +272,8 @@ only output shape.
     workspace policy. If sync fails or times out, `lifty sync` safely reattaches
     to active work or retries the still-qualified failed cohort. Claim complete
     delivery only when all stages are confirmed by the receipt.
-16. Only after the founder explicitly confirms the complete current A/B
-    sample, proceed to the Unipile account connection they requested. Fetch
+16. When the founder chooses outreach setup, proceed to the Unipile account
+    connection they requested, even if sample review is pending. Fetch
     `lifty context campaign` for current connection instructions. Offer Gmail
     if email is their chosen channel; otherwise skip to their chosen channel. Gmail includes
     Google Workspace business accounts; Outlook is not supported in this beta. Ask whether
@@ -285,7 +299,7 @@ only output shape.
     enters credentials only in that browser flow. If interrupted, check with
     `connect unipile --workspace <workspace-ref> --status`. Connection does not
     activate sending. Skipping this option never blocks onboarding.
-17. After the same sample confirmation, offer LinkedIn through Unipile if
+17. During requested outreach setup, offer LinkedIn through Unipile if
     LinkedIn is the chosen channel. Ask whether the founder wants to connect
     their existing habitual-use account now or skip it. Before connecting,
     obtain their IANA timezone and an explicit declaration that they already
@@ -307,11 +321,12 @@ only output shape.
     <workspace-ref> --status`. Connecting or reconnecting never activates
     sending. Campaign preview, exact approval and activation happen later,
     only when requested. Skipping LinkedIn never blocks onboarding.
-18. End the sample review with the explicit feedback question in
-    `references.calibration` and wait. Once they confirm, continue to the
-    requested Unipile connection; do not close with only “Outreach stays off.”
-    Report the connection receipt when it succeeds. Sending remains subject
-    to the separate exact campaign approval.
+18. Ask for sample feedback as described in `references.calibration`.
+    If the founder instead asks to continue outreach setup or use Tier B leads,
+    honor that request and advance the supported setup steps. Preserve pending
+    calibration without repeatedly asking for acceptance of five fresh leads.
+    Report actual connection and draft progress. Sending remains subject to
+    the separate exact campaign preview, approval and activation.
 
 ## Hard stops
 
@@ -333,5 +348,5 @@ only output shape.
   command after a workspace exists and the founder chooses that connection.
 - Do not enable outreach or send anything. The first run researches leads
   only.
-- Do not ask campaign/outreach setup questions or begin sender connections
-  before explicit confirmation of the complete current A/B sample.
+- Do not treat sample acceptance, account connection or campaign drafting as
+  permission to send. Follow campaign context for exact approval and activation.

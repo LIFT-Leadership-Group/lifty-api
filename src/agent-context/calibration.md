@@ -1,4 +1,4 @@
-# Review targeting before connecting outreach
+# Review targeting while progressing outreach setup
 
 Apply this workflow after the initial lead run and after every targeting or
 research-criteria change. The review sample is five researched **Tier A or B**
@@ -6,6 +6,13 @@ leads under the current confirmed ICP, each with its actual LinkedIn profile
 URL and a concrete fit rationale. Preserve each grade. C leads never count.
 A sample containing five B leads is valid, but still needs explicit founder
 acceptance.
+
+The sample measures targeting quality; it is not a prerequisite for outreach
+setup. If the founder wants to continue, help choose a channel, connect their
+account and draft outreach while calibration remains pending. This also
+applies after an ICP change, with fewer than five leads, no A leads, exhausted
+discovery allowance or no CRM. Pause only the operation that needs a missing
+input. Exact campaign approval and authorization to send remain separate.
 
 The A/B rule applies when the returned `calibration_policy` is
 `qualified_ab_v1`. Historical `tier_a_v1`, missing, or unknown policies retain
@@ -27,6 +34,13 @@ an automatic downgrade, or proof of A. Require positive fit for A and B.
 Keep estimates and unknowns visible. Research retrieval failures are technical
 failures, not evidence against a company. Do not silently change grades to
 fill the sample.
+
+Aim to surface strong Tier A candidates on the first research run. If that
+misses, identify the cause from saved evidence and recommend one specific
+targeting or research-instruction correction for a second run, subject to the
+founder's intent and available allowance. This is a quality objective, not a
+promise of A grades or permission to relax confirmed limits. Never relabel
+leads, invent fit, or acquire repeated waves to satisfy the objective.
 
 ## Review the first cohort
 
@@ -54,28 +68,39 @@ fill the sample.
    For allowance exhaustion, report the returned reset time. A technical
    research failure may be retried once against the saved candidates,
    preserving completed research and acquisition usage. Never blindly retry
-   quality shortfalls or budget exhaustion.
+   quality shortfalls or budget exhaustion. A reset date limits new discovery,
+   not account connection, reviewing saved evidence or drafting outreach.
 5. When five eligible profiles are ready, ask: **"Do these leads look right,
-   or would you like me to change the targeting? Once you confirm this sample,
-   we can connect outreach through Unipile."** Mirror the founder's language.
+   or would you like me to change the targeting? We can also prepare outreach
+   while refining the sample."** Mirror the founder's language.
    For a B-only sample, explicitly say all five are B, explain from their
    evidence why none are A, and ask whether to accept that sample or refine
-   targeting. Wait for the answer; reporting results is not sample approval.
+   targeting. Reporting results is not sample approval. If the answer requests
+   outreach setup, continue that work instead of repeating the sample question.
 6. If the founder requests changes, clarify only the affected business
    decision, apply it through `update`, wait for completion, and repeat the
    sample and review. Approval of an earlier sample never carries across
-   targeting or research-criteria changes. Do not use `push` for an existing
+   targeting or research-criteria changes. Preserve existing connections and
+   drafts; only the sample's acceptance is stale. Do not use `push` for an existing
    workspace. If the CLI still reports an old completed run after a material
    change, explain the blocker instead of presenting old grades as fresh.
-7. Only explicit confirmation of the current complete sample advances this
-   flow to outreach connection. Silence, "targeting updated", or an earlier
-   ICP confirmation is not sample approval. Fetch `lifty context campaign`,
-   explain that the next step is connecting outreach through Unipile, and
-   collect only missing account/channel declarations. Reuse the founder's
+7. When the founder asks to continue outreach setup, fetch `lifty context
+   campaign` and collect only missing account/channel declarations. Reuse the
    stated channel choice. Use `connect unipile` for Gmail/Google Workspace
    email and `connect linkedin` for LinkedIn browser authorization. Skip an
-   already healthy requested connection. Do not ask for sample approval again
-   while targeting remains unchanged.
+   already healthy requested connection. If they choose existing B leads,
+   review their saved evidence against the current ICP and make the selected
+   recipients explicit. Keep recorded grades and calibration status truthful;
+   a changed ICP does not make all saved evidence unusable. Missing evidence
+   may require a recipient-specific check, not five new leads before setup.
 8. Connecting an account does not approve sending. Keep the exact campaign
    preview, recipient, sender, copy and schedule approval/activation steps
    from campaign context. Calibration sends no messages or invitations.
+
+For example, after an ICP change with discovery allowance exhausted and the
+founder saying "continue with Tier B leads", respond along these lines:
+"We can prepare outreach with the B leads you choose. I'll check their saved
+research against the updated targeting, and we can connect your account and
+draft the messages now. New discovery can wait for the allowance reset."
+Then perform the available next step or ask for its one missing decision.
+Do not close with a multi-day wait when useful setup work can proceed now.
