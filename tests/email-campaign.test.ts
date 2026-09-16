@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createApp, type AuthSession } from "../src/app.js";
+import { createCurrentClient as createApp, type AuthSession } from "./current-client.js";
 import { createEmailCampaignOperations } from "../src/email-campaign.js";
 import { EmailCampaignRequest } from "../src/email-campaign-contracts.js";
 

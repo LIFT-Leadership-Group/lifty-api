@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from "vitest";
-import {createApp} from "../src/app.js";
+import {createCurrentClient as createApp} from "./current-client.js";
 import {getApolloAllowance} from "../src/apollo-allowance.js";
 const workspace="68000000-0000-4000-8000-000000000001",other="68000000-0000-4000-8000-000000000002";
 const status={workspace_ref:workspace,lifty:true,applies:true,key_source:"platform_default",limit:25,used:5,reserved:3,remaining:17,resets_at:"2026-09-21T00:00:00+00:00"};

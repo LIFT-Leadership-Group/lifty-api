@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { EmailConnectResult } from "../src/email-contracts.js";
 import { LinkedinConnectResult, LINKEDIN_POLICY } from "../src/linkedin-contracts.js";
 import { createHubspotConnectOperations } from "../src/hubspot-connect.js";

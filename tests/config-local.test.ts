@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { getConfigUpdateContext, resolveConfigUpdate, submitConfigUpdate } from "../src/workspace-operations.js";
 import { localConfiguration } from "./onboarding-fixtures.js";
 import { type ConfigUpdateContext, type ConfigUpdateRequest, type ConfigUpdateSubmission } from "../src/contracts.js";
@@ -52,7 +52,7 @@ it("fetches context through the authenticated RPC without an actor override",asy
  const rpc=vi.fn(async()=>({data:current,error:null}));expect(await getConfigUpdateContext({userId:"founder",client:{rpc}})).toEqual(current);expect(rpc).toHaveBeenCalledWith("get_lifty_config_update_context");
 });
 it("legacy clients receive an explicit upgrade diagnosis instead of hosted-update instructions",async()=>{
- const app=createApp();for(const version of ["v1","v2","v3"]) {const r=await app.request(`/v1/context/workspace?client_contract=lifty-cli-context.${version}`);expect(r.status).toBe(200);expect((await r.json()).instructions).toContain("Hosted generation is no longer available");}
+ const app=createApp();for(const version of ["v1","v2","v3","v4"]) {const r=await app.request(`/v1/context/workspace?client_contract=lifty-cli-context.${version}`);expect(r.status).toBe(409);expect((await r.json()).error.code).toBe("CONTEXT_CLIENT_UNSUPPORTED");}
  const r=await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v5");expect((await r.json()).instructions).toContain("generation_context");
 });
 

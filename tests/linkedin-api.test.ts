@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { loadConfig } from "../src/config.js";
 import { LINKEDIN_POLICY } from "../src/linkedin-contracts.js";
 
