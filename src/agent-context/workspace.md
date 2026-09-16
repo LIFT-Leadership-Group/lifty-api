@@ -46,14 +46,26 @@ one decision block at a time. Interview only for the block being changed.
 Send only the fields that change; the backend merges them into the current
 configuration. JSON goes on stdin, never in the command line.
 
-- `icp`: `person_locations`, `organization_industries` (Apollo taxonomy
-  names), `organization_num_employees_ranges` (`"min,max"`, open ceiling
+- `icp`: `person_locations` for buyers, `organization_locations` for company
+  headquarters, `organization_industries` as taxonomy labels,
+  `organization_num_employees_ranges` (`"min,max"`, open ceiling
   `"10001,"`), `person_seniorities`, `personas` as the complete list of
   `{"name", "titles"}` (it replaces the old one), `q_keywords`,
   `contact_email_status`, `max_stale_days`, `reject_extrapolated`.
 - `tone`: free-form fields such as `identity`, `value_prop`, `cta`.
 - `workspace`: `name`, `description`.
 - `prompt`: `{"instruction": "<one line>"}` and nothing else.
+
+When changing discovery, preserve the distinction between buyer location and
+company headquarters. Industry labels alone do not prove Apollo enforces the
+industry. Keywords are generic company text, not Boolean syntax or an exact
+industry filter. ARR and annual revenue are not employee count. Use a headcount
+proxy for another size measure only when the founder explicitly agrees, and
+keep the actual size criterion in research. If the requested update leaves
+native geography, employee range, and keywords unrestricted, explain the
+breadth and obtain that decision before applying it. Do not invent default
+boundaries. Preserve unrelated confirmed criteria and the evidence-aware
+A/B/C rubric in `references.calibration`.
 
 Workspace name/description changes apply directly with the existing section
 form. For ICP, persona, tone or prompt edits, run `config-context` first. Read
@@ -79,10 +91,13 @@ are protected; explain that LIFT manages that research focus and stop.
 
 Play back exactly what the CLI confirmed, in the founder's words, and nothing
 it did not. After a targeting or research-criteria change, read and follow
-`references.calibration` in full: run a fresh five-lead Tier A sample, show each
-LinkedIn profile URL, and ask for feedback or confirmation. Do not stop at
-“Targeting updated” or recommend the best Tier B candidate. Outreach connection
-in this flow waits for explicit confirmation of the current complete sample.
+`references.calibration` in full: research an initial cohort of five under the
+current criteria, show actual grades, fit evidence and LinkedIn profile URLs,
+and review the result. Five eligible A/B leads complete the review sample;
+C leads never count. Explicitly offer acceptance or refinement for a B-only
+sample. A quality shortfall stops for diagnosis and an agreed adjustment, not
+another unchanged search. Outreach connection waits for explicit confirmation
+of the current complete sample.
 
 The daily discovery target shown by `get workspace` is the workspace operating
 target. It is read-only here. Never infer it from an ICP lane's allocation

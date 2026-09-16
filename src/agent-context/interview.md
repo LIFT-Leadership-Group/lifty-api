@@ -9,7 +9,7 @@ later.
 Ask for one coherent decision block at a time, and only when a bootstrap gate
 is missing. A block may request up to three tightly related answers when they
 describe one judgment. Good blocks include company description plus primary
-motion, industry plus numeric size floor and unit, or persona role, titles, and
+motion, industry plus numeric size floor and unit, search boundaries, or persona role, titles, and
 organizational tell. Wait for the answer before moving to the next block. Never
 group unrelated gates.
 
@@ -57,6 +57,34 @@ exclusion. A ceiling and industries out may stay unknown. If the founder
 bundles two operating states, ask which is primary only when the distinction
 changes the initial search.
 
+### Initial search boundaries
+
+Record `icp.discovery` from confirmed founder intent. Reuse any search
+boundaries already supplied, and ask one coherent question only for the
+missing search decision. Explain what would otherwise remain broad.
+
+- `person_locations` constrains where buyers live or work.
+- `organization_locations` constrains company headquarters. Do not substitute
+  one for the other when the founder says "US companies" or "US founders".
+- `employee_range_proxy` is `{floor, ceiling}` only when the founder explicitly
+  agrees to use headcount as a discovery proxy for a different size metric.
+  The ceiling may be null. An actual employee/headcount target uses its
+  existing numeric size floor and ceiling; no proxy is needed.
+- `q_keywords` is a founder-confirmed company-description search phrase or
+  null. It is generic text search, not a Boolean expression or a guaranteed
+  industry filter.
+- `broad_search_confirmed` is true only when the founder explicitly accepts
+  discovery without native geography, employee-range, or keyword limits.
+  Industry labels alone are not verified discovery confinement.
+
+Use null for a boundary the founder leaves unrestricted. Do not invent a
+country, headcount band, or keyword to make the search look complete. ARR,
+annual revenue, margin, sites, and employee count are different measures.
+For an ARR target, preserve the ARR boundary for research and use headcount
+only if the founder approves that proxy. If all native boundaries remain
+unset, explain that search is broad and obtain their acceptance once. Do not
+convert missing geography into silent worldwide targeting.
+
 ### Initial personas
 
 Capture at least one persona with:
@@ -74,15 +102,17 @@ Do not ask which similar titles waste time, who usually replies, or for more
 titles once the initial persona gate passes. The sample will answer those
 questions with evidence.
 
-## Five bootstrap gates
+## Bootstrap gates
 
-Write the draft as soon as these five items exist:
+Write the draft as soon as these items exist:
 
 1. A standalone company description.
 2. One primary motion.
 3. A numeric size floor plus its unit.
 4. At least one hard exclusion.
 5. At least one persona with role, title, and organizational tell.
+6. Confirmed discovery boundaries, or explicit acceptance of a broad search.
+   Record them in `icp.discovery` using the current schema.
 
 Industries in are also required for the initial search. Empty example-company
 and industries-out arrays are valid. Do not keep interviewing to fill optional
@@ -90,8 +120,9 @@ fields.
 
 ## Deferred stages
 
-The workspace draft records a pending calibration on five researched Tier A
-leads (`lead_target: 5`), each with a LinkedIn profile URL. Follow
+The workspace draft records a pending calibration on five researched A/B
+leads (`lead_target: 5`), each with a LinkedIn profile URL and fit rationale.
+C leads never count, and a B-only sample needs explicit acceptance. Follow
 `references.calibration` for the feedback and confirmation gate. Sample review owns:
 
 - negative or low-value titles;
@@ -107,7 +138,7 @@ answers.
 
 ## Close
 
-Play back the five bootstrap decisions in plain founder language — who you'll
-target and why — not field names. Frame what remains deferred as what happens
-next, not as a list of skipped questions. If the founder has already confirmed
+Play back the bootstrap decisions in plain founder language: who you will
+target, why, and which boundaries discovery can enforce. Frame what remains
+deferred as what happens next, not as a list of skipped questions. If the founder has already confirmed
 the values or asked to advance, write the draft without another approval loop.

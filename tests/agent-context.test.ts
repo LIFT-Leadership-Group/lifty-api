@@ -2,19 +2,20 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 
 describe("public agent task context", () => {
-  it("serves company setup only to clients with the company command contract", async () => {
+  it("gates every task's changed workflow behind the calibration client contract", async () => {
     const app = createApp();
-    for (const task of ["onboarding", "workspace"]) {
-      const legacy = await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v1`)).json();
-      const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v2`);
+    for (const task of ["onboarding", "workspace", "campaign"]) {
+      for (const version of ["v1", "v2", "v3"]) {
+        const legacy = await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.${version}`)).json();
+        expect(legacy.instructions).toContain("Upgrade the installed LIFTY CLI");
+        expect(legacy.schemas).toEqual({}); expect(legacy.references).toEqual({});
+      }
+      const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v4`);
       expect(response.status).toBe(200);
       const current = await response.json();
-      expect(legacy.instructions).not.toContain("crm companies context");
-      expect(current.instructions).toContain("required before HubSpot sync");
-      expect(current.instructions).toContain("crm companies context");
-      expect(current.instructions).toContain("crm companies apply --input -");
-      expect(current.revision).not.toBe(legacy.revision);
-      expect(current.schemas).toEqual(legacy.schemas);
+      expect(Object.keys(current.schemas).length).toBeGreaterThan(0);
+      expect(current.references.calibration).toBeDefined();
+      if (task !== "campaign") expect(current.instructions).toContain("crm companies context");
     }
   });
   it("serves onboarding guidance before login without reading a workspace", async () => {
@@ -22,7 +23,7 @@ describe("public agent task context", () => {
       authenticate: async () => { throw new Error("public context must not authenticate"); },
       getOnboardingContext: async () => { throw new Error("public context must not read tenant context"); },
     });
-    const response = await app.request("/v1/context/onboarding?client_contract=lifty-cli-context.v1");
+    const response = await app.request("/v1/context/onboarding?client_contract=lifty-cli-context.v4");
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
@@ -35,13 +36,13 @@ describe("public agent task context", () => {
     expect(body.references.interview.length).toBeGreaterThan(100);
     expect(body.workspace).toBeUndefined();
     expect(body.scout_global_base).toBeUndefined();
-    expect(await (await app.request("/v1/context/onboarding")).json()).toEqual(body);
+    expect((await (await app.request("/v1/context/onboarding")).json()).schemas).toEqual({});
   });
 
   it("keeps task guidance separate and exposes the input contracts for each task", async () => {
     const app = createApp();
-    const workspaceResponse = await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v3");
-    const campaignResponse = await app.request("/v1/context/campaign");
+    const workspaceResponse = await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v4");
+    const campaignResponse = await app.request("/v1/context/campaign?client_contract=lifty-cli-context.v4");
     expect(workspaceResponse.status).toBe(200);
     expect(campaignResponse.status).toBe(200);
     const workspace = await workspaceResponse.json();

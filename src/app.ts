@@ -16,7 +16,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
+import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -511,6 +511,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     path: "/v1/workspace/runs",
     operationId: "startRun",
     security: [{ bearerAuth: [] }],
+    request: { headers: z.object({ "x-lifty-client-contract": z.literal(CALIBRATION_CLIENT_CONTRACT) }) },
     responses: {
       200: JsonResponse(StartRunResultSchema),
       401: JsonResponse(ErrorResponseSchema),
@@ -1373,7 +1374,7 @@ export function createApp(
   app.get("/v1/context/:task", (context) => {
     context.header("cache-control", "no-store");
     const clientContract = context.req.query("client_contract") ?? AGENT_CLIENT_CONTRACT;
-    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT].includes(clientContract)) {
+    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT].includes(clientContract)) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Update the installed LIFTY CLI and skill to retrieve current instructions.");
     }
     const document = getAgentContext(context.req.param("task"), clientContract);
@@ -1640,7 +1641,9 @@ export function createApp(
       return errorJson(context, 422, "LOCAL_CONFIGURATION_REQUIRED",
         "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
     }
-    const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft);
+    const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft, undefined, {
+      requireDiscoveryIntent: context.req.header("x-lifty-client-contract") === CALIBRATION_CLIENT_CONTRACT,
+    });
     if (!lint.success) {
       return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
         "Repair the local configuration using these issues and push it again.", lint.issues);
@@ -1699,8 +1702,14 @@ export function createApp(
   });
 
   app.post("/v1/workspace/runs", async (context) => {
+    if (context.req.header("x-lifty-client-contract") !== CALIBRATION_CLIENT_CONTRACT) {
+      return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Upgrade the installed Lifty CLI and skills before starting or resuming calibration. Your saved candidates remain available through status.");
+    }
     const result = StartRunResultSchema.parse(await dependencies.startRun(context.get("authSession")));
-    // Enqueue on every start, including a re-attach: the run-and-attempt-scoped
+    // A quality checkpoint is terminal until targeting changes. Reattaching
+    // returns its saved cohort without starting another acquisition job.
+    if (result.state === "failed") return context.json(result);
+    // Enqueue active starts, including re-attachments: the run-and-attempt-scoped
     // idempotency key makes it a no-op when the run is already enqueued and
     // self-heals an enqueue lost after the ledger insert.
     await dependencies.enqueueFirstRun(result.run_ref, result.attempt ?? 0);

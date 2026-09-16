@@ -441,5 +441,658 @@
     "draft": {},
     "base": "GLOBAL BASE",
     "code": "desired_personas_invalid"
+  },
+  {
+    "name": "confirmed HQ and employee proxy for ARR",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "3,50"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": "B2B software"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": {
+            "floor": 3,
+            "ceiling": 50
+          },
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": null
+  },
+  {
+    "name": "HQ silently replaced with person residence",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": [
+          "United States"
+        ],
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "3,50"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": null,
+        "q_keywords": "B2B software"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": {
+            "floor": 3,
+            "ceiling": 50
+          },
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "discovery_intent_mismatch"
+  },
+  {
+    "name": "employee proxy invented for ARR",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "3,50"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": "B2B software"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": null,
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "size_intent_mismatch"
+  },
+  {
+    "name": "confirmed employee proxy omitted",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": null,
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": "B2B software"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": {
+            "floor": 3,
+            "ceiling": 50
+          },
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "size_intent_mismatch"
+  },
+  {
+    "name": "search keyword broadened beyond confirmed intent",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "3,50"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": "software OR real estate"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": {
+            "floor": 3,
+            "ceiling": 50
+          },
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "discovery_intent_mismatch"
+  },
+  {
+    "name": "malformed search intent",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "3,50"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": "B2B software"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": {
+            "floor": 50,
+            "ceiling": 3
+          },
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "discovery_intent_invalid"
+  },
+  {
+    "name": "blank native keyword",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "3,50"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": " "
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": {
+            "floor": 3,
+            "ceiling": 50
+          },
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "schema_too_small"
+  },
+  {
+    "name": "explicitly confirmed broad research-only search",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": null,
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": null,
+        "q_keywords": null
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": null,
+          "employee_range_proxy": null,
+          "q_keywords": null,
+          "broad_search_confirmed": true
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": null
+  },
+  {
+    "name": "industry names alone do not confirm broad discovery",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": null,
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": null,
+        "q_keywords": null
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 500000,
+          "ceiling": 5000000,
+          "unit": "ARR USD"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": null,
+          "employee_range_proxy": null,
+          "q_keywords": null,
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "broad_search_unconfirmed"
+  },
+  {
+    "name": "actual employee size remains an exact discovery constraint",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "5,75"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": "B2B software"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 5,
+          "ceiling": 75,
+          "unit": "employees"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": null,
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": null
+  },
+  {
+    "name": "actual employee floor cannot be silently widened",
+    "configuration": {
+      "contract_version": "lifty-onboarding-config.v1",
+      "context_version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "icp_config": {
+        "label": "Industrial",
+        "person_locations": null,
+        "organization_industries": [
+          "industrial automation"
+        ],
+        "organization_num_employees_ranges": [
+          "1,75"
+        ],
+        "person_seniorities": null,
+        "personas": [
+          {
+            "name": "Finance leader",
+            "titles": [
+              "CFO"
+            ]
+          }
+        ],
+        "organization_locations": [
+          "United States"
+        ],
+        "q_keywords": "B2B software"
+      },
+      "scout_overlay": "## ICP gate\nManufacturers with inspection needs.\n## Hard disqualifiers\nPure software firms are excluded.\n## Size gate\nAt least 51 employees.\n## Tier definitions\nA requires strong evidence and a matching persona; B requires partial evidence; C lacks fit; non-ICP fails the hard gates."
+    },
+    "draft": {
+      "personas": [
+        {
+          "name": "Finance leader",
+          "titles": [
+            "CFO"
+          ]
+        }
+      ],
+      "icp": {
+        "size": {
+          "floor": 5,
+          "ceiling": 75,
+          "unit": "employees"
+        },
+        "discovery": {
+          "person_locations": null,
+          "organization_locations": [
+            "United States"
+          ],
+          "employee_range_proxy": null,
+          "q_keywords": "B2B software",
+          "broad_search_confirmed": false
+        }
+      }
+    },
+    "base": "GLOBAL BASE",
+    "code": "size_intent_mismatch"
   }
 ]
