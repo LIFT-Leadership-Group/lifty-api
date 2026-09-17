@@ -7,7 +7,7 @@ import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguratio
 import { registerStageRoutes } from "./stage-routes.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
-import { brandedHostedAuthUrl, parseHostedAuthOrigin, UNIPILE_HOSTED_AUTH_ORIGIN } from "./hosted-auth-branding.js";
+import { versionedHostedAuthUrl, parseHostedAuthOrigin, UNIPILE_HOSTED_AUTH_ORIGIN } from "./hosted-auth-branding.js";
 import { getConnectionAttempt, type ConnectionAttemptStatus, type ConnectionProvider } from "./connection-attempt.js";
 import {
   type CompanyMappingOperation,
@@ -143,6 +143,9 @@ export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
   unipileHostedAuthOrigin: string;
+  unipileV2HostedAuthOrigins: string[];
+  receiveEmailV2Return: (state:string)=>Promise<void>;
+  receiveLinkedinV2Return: (state:string)=>Promise<void>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
@@ -956,6 +959,9 @@ const defaultDependencies: AppDependencies = {
   disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   emailAvailable: false,
   unipileHostedAuthOrigin: UNIPILE_HOSTED_AUTH_ORIGIN,
+  unipileV2HostedAuthOrigins: [],
+  receiveEmailV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
+  receiveLinkedinV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
   emailAuthorizationOrigin: null,
   startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
@@ -1088,6 +1094,8 @@ export function createApp(
 ): OpenAPIHono<AppEnvironment> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const hostedAuthOrigin = parseHostedAuthOrigin(dependencies.unipileHostedAuthOrigin);
+  const v2HostedAuthOrigins=dependencies.unipileV2HostedAuthOrigins.map(origin=>parseHostedAuthOrigin(origin));
+  if(v2HostedAuthOrigins.includes(UNIPILE_HOSTED_AUTH_ORIGIN))throw new Error("V2 hosted origins cannot include V1.");
   const app = new OpenAPIHono<AppEnvironment>();
   registerOpenApi(app);
   const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
@@ -1360,11 +1368,25 @@ export function createApp(
       );
     }
   });
+  for(const channel of ["email","linkedin"] as const) {
+    app.get(`/unipile/v2/${channel}/return`,async context=>{
+      context.header("cache-control","no-store");
+      context.header("referrer-policy","no-referrer");
+      const receive=channel==="email" ? dependencies.receiveEmailV2Return : dependencies.receiveLinkedinV2Return;
+      await receive(context.req.query("intent") ?? "");
+      // Browser result fields are hints only. Signed lifecycle events and later
+      // authenticated polling determine success, including provider-error returns.
+      return context.html("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Lifty connection</title><h1>Continue in Lifty</h1><p>You can close this page and check your connection status in Lifty.</p></html>",200,{
+        "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
+        "content-security-policy":"default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      });
+    });
+  }
   app.get("/unipile/linkedin/start", async (context) => {
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
     const target = await dependencies.authorizeLinkedin(context.req.query("intent") ?? "");
-    const redirect = brandedHostedAuthUrl(target, hostedAuthOrigin);
+    const redirect = versionedHostedAuthUrl(target, hostedAuthOrigin,v2HostedAuthOrigins);
     if (!redirect) {
       throw new PublicError({ status: 502, code: "LINKEDIN_INVALID_HANDOFF", message: "LIFTY could not prepare the LinkedIn connection." });
     }
@@ -1398,7 +1420,7 @@ export function createApp(
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       });
     }
-    const redirect = brandedHostedAuthUrl(target, hostedAuthOrigin);
+    const redirect = versionedHostedAuthUrl(target, hostedAuthOrigin,v2HostedAuthOrigins);
     if (!redirect) {
       throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"LIFTY could not prepare the email connection."});
     }
@@ -1424,7 +1446,7 @@ export function createApp(
       return errorJson(context, 400, "INVALID_REQUEST", "Confirm your regular personal mailbox before continuing.");
     }
     const target = await dependencies.declareEmail(form.get("intent")!);
-    const redirect = brandedHostedAuthUrl(target, hostedAuthOrigin);
+    const redirect = versionedHostedAuthUrl(target, hostedAuthOrigin,v2HostedAuthOrigins);
     if (!redirect) {
       throw new PublicError({ status: 502, code: "EMAIL_INVALID_HANDOFF", message: "LIFTY could not prepare the email connection." });
     }

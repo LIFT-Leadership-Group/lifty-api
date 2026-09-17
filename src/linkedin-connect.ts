@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { UnipileTransport, type VerifiedTransport } from "./unipile-transport.js";
+import { createUnipileV2Provider } from "./unipile-v2-provider.js";
+import { unipileV2AuthState } from "./unipile-v2-state.js";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import { LINKEDIN_POLICY, LinkedinConnectRequest, LinkedinConnectResult, LinkedinConnectionStatus, LinkedinFailureCode, LinkedinHealthStatus, LinkedinProfileId, LinkedinProfileUrl, LinkedinTimezone, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
@@ -15,6 +18,7 @@ export interface LinkedinConnectSettings extends UnipileProviderSettings {
 }
 interface RpcClient { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }
 const Stored = z.object({
+  transport: UnipileTransport.optional(),
   state: z.enum(["not_connected", "pending", "connecting", "connected", "disconnected", "failed", "revoked"]),
   workspace_ref: z.uuid(), timezone: LinkedinTimezone.nullish(),
   account_id: LinkedinProfileId.nullish(), connection_ref: z.uuid().nullish(), intent_ref: z.uuid().nullish(),
@@ -22,6 +26,7 @@ const Stored = z.object({
   expires_at: z.string().optional(), failure_code: LinkedinFailureCode.nullish(), outbound_enabled: z.boolean().optional(), health_status: LinkedinHealthStatus.nullish(),
 });
 const Intent = z.object({
+  transport: UnipileTransport.optional(), authorization_account_id: z.string().nullish(), authorization_received: z.boolean().optional(),
   state: z.enum(["pending", "issuing", "ready", "completed", "failed"]), intent_ref: z.uuid(), workspace_ref: z.uuid(),
   expires_at: z.string(), account_id: LinkedinProfileId.nullable(), profile_id: LinkedinProfileId.nullable(),
   hosted_url: z.url().nullable(), timezone: LinkedinTimezone,
@@ -33,6 +38,16 @@ const providerPending = (error: unknown) => error instanceof PublicError && ["UN
 export function createLinkedinConnectOperations(settings: LinkedinConnectSettings) {
   if (settings.serverKey.length < 32) throw new Error("Invalid LinkedIn server key.");
   const provider = createLinkedinProvider(settings);
+  const v2=settings.v2 ? createUnipileV2Provider({...settings.v2,...(settings.fetchImpl ? {fetchImpl:settings.fetchImpl} : {}),...(settings.timeoutMs ? {timeoutMs:settings.timeoutMs} : {})}) : null;
+  function requireV2(){if(!v2)linkedinFailure("LINKEDIN_CONNECTION_UNAVAILABLE",503);return v2;}
+  async function readIdentity(accountId:string,profileId:string|null|undefined,transport?:UnipileTransport):Promise<LinkedinIdentity & {verifiedTransport?:VerifiedTransport}> {
+    if(transport?.api_version!=="v2")return provider.readIdentity(accountId,profileId);
+    try {return await requireV2().readLinkedinIdentity(transport.account_id ?? accountId,transport,profileId);}
+    catch(error){
+      if(error instanceof PublicError)throw new PublicError({status:error.status,code:error.code.replace("UNIPILE_","UNIPILE_LINKEDIN_"),message:error.message});
+      throw error;
+    }
+  }
   const fetchImpl = settings.fetchImpl ?? fetch;
   async function rpc(operation: string, payload: Record<string, unknown>, session?: AuthSession, name: "lifty_linkedin_connection" | "lifty_linkedin_callback_hint" = "lifty_linkedin_connection"): Promise<unknown> {
     const args = { p_server_key: settings.serverKey, p_operation: operation, p_payload: payload };
@@ -64,14 +79,15 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     if (z.uuid().safeParse(workspace).success && stored.workspace_ref !== workspace) linkedinFailure("LINKEDIN_CONNECTION_UNAVAILABLE");
     return stored;
   }
-  async function complete(intentRef: string, identity: LinkedinIdentity) {
+  async function complete(intentRef: string, identity: LinkedinIdentity & {verifiedTransport?:VerifiedTransport}) {
     await rpc("complete", { intent_ref: intentRef, account_id: identity.accountId, profile_id: identity.profileId,
+      ...(identity.verifiedTransport ? {verified_transport:identity.verifiedTransport} : {}),
       ...(identity.profileUrl ? { profile_url: identity.profileUrl } : {}), ...(identity.displayName ? { display_name: identity.displayName } : {}) });
   }
   async function refreshHealth(session: AuthSession, workspace: string, value: z.infer<typeof Stored>) {
     if (!value.account_id || !value.profile_id || !value.connection_ref) linkedinFailure("LINKEDIN_CONNECTION_UNAVAILABLE");
     let status: LinkedinHealth = "unknown";
-    try { status = (await provider.readIdentity(value.account_id, value.profile_id)).healthStatus; }
+    try { status = (await readIdentity(value.account_id, value.profile_id,value.transport)).healthStatus; }
     catch (error) {
       // A timeout/provider outage is not evidence of revoked credentials. Do
       // not write unknown health and disconnect a previously healthy grant.
@@ -80,18 +96,23 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
       status = error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_ACCOUNT_NOT_FOUND" ? "disconnected" :
         error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_ACCOUNT_UNHEALTHY" ? "credentials" : "unknown";
     }
-    await rpc("health", { workspace, connection_ref: value.connection_ref, account_id: value.account_id, profile_id: value.profile_id, status }, session);
+    await rpc("health", { workspace, connection_ref: value.connection_ref, account_id: value.account_id, profile_id: value.profile_id, status,
+      ...(value.transport ? {transport_generation:value.transport.generation,transport_api_version:value.transport.api_version} : {}) }, session);
     return readStored(session, workspace);
   }
   async function status(session: AuthSession, workspace: string, attemptRef?: string): Promise<LinkedinStatus> {
     let value = await readStored(session, workspace);
     let completed = false;
     if (value.state === "pending" && value.intent_ref && (!attemptRef || value.intent_ref === attemptRef)) {
-      const hint = z.object({ workspace_ref: z.literal(value.workspace_ref), intent_ref: z.literal(value.intent_ref), account_id: LinkedinProfileId.nullable() })
-        .parse(await rpc("read", { workspace_ref: value.workspace_ref, intent_ref: value.intent_ref }, session, "lifty_linkedin_callback_hint"));
+      const pendingIntent=value.transport?.api_version==="v2" ? await readIntent(value.intent_ref) : null;
+      if(pendingIntent && (pendingIntent.workspace_ref!==value.workspace_ref || pendingIntent.transport?.api_version!=="v2"))linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
+      const hint=pendingIntent ? {account_id:pendingIntent.authorization_received ? pendingIntent.authorization_account_id ?? null : null}
+        : z.object({ workspace_ref: z.literal(value.workspace_ref), intent_ref: z.literal(value.intent_ref), account_id: LinkedinProfileId.nullable() })
+          .parse(await rpc("read", { workspace_ref: value.workspace_ref, intent_ref: value.intent_ref }, session, "lifty_linkedin_callback_hint"));
       if (hint.account_id) {
         try {
-          const identity = await provider.readIdentity(hint.account_id, value.profile_id);
+          if(pendingIntent?.transport?.account_id && pendingIntent.transport.account_id!==hint.account_id)linkedinFailure("LINKEDIN_IDENTITY_MISMATCH",409);
+          const identity = await readIdentity(hint.account_id, pendingIntent ? pendingIntent.profile_id : value.profile_id,pendingIntent?.transport);
           if (identity.healthy) { await complete(value.intent_ref, identity); completed = true; }
         } catch (error) {
           if (error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_UNAVAILABLE") throw error;
@@ -143,12 +164,22 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     if (!claim.claimed) linkedinFailure("LINKEDIN_LINK_PENDING", 409, "A LinkedIn connection link is being prepared. Open it again shortly.");
     let phase: "create" | "save" = "create";
     try {
-      const url = await provider.createLink({ correlation: linkedinCallbackName(id, settings.serverKey),
+      let url:string;
+      if(intent.transport?.api_version==="v2") {
+        const authState=unipileV2AuthState("linkedin",id,settings.serverKey);
+        await rpc("auth_state",{intent_ref:id,state:authState});
+        url=await requireV2().createLink({channel:"linkedin",state:authState,transport:intent.transport,
+          redirectUri:`${settings.publicBaseUrl}/unipile/v2/linkedin/return?intent=${encodeURIComponent(state)}`,
+          expiresAt:new Date(intent.expires_at).toISOString()});
+      } else url = await provider.createLink({ correlation: linkedinCallbackName(id, settings.serverKey),
         notifyUrl: `${settings.publicBaseUrl}/unipile/linkedin/callback?intent=${encodeURIComponent(state)}`,
         expiresAt: new Date(intent.expires_at).toISOString(), reconnectId: intent.account_id });
       phase = "save"; await rpc("save_link", { intent_ref: id, url }); return url;
     } catch (error) {
       try { await rpc("fail", { intent_ref: id, failure_code: "link_failed" }); } catch { /* Preserve the original safe failure; do not create another provider link. */ }
+      if (phase === "create" && error instanceof PublicError && error.code.startsWith("UNIPILE_HOSTED_")) {
+        throw new PublicError({ status: error.status, code: error.code.replace("UNIPILE_", "UNIPILE_LINKEDIN_"), message: error.message });
+      }
       if (error instanceof PublicError && (error.status === 401 || error.status === 403 || (phase === "create" && error.code.startsWith("UNIPILE_LINKEDIN_HOSTED_")))) throw error;
       linkedinFailure(phase === "save" ? "LINKEDIN_LINK_SAVE_FAILED" : "LINKEDIN_LINK_CREATE_FAILED");
     }
@@ -157,6 +188,7 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     const id = open(state), parsed = callbackBody.safeParse(body);
     if (!parsed.success || !validLinkedinCallbackName(id, parsed.data.name, settings.serverKey)) linkedinFailure("LINKEDIN_CALLBACK_INVALID", 403);
     const intent = await readIntent(id);
+    if(intent.transport?.api_version==="v2")linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
     if (!["ready", "completed"].includes(intent.state)) linkedinFailure("LINKEDIN_INTENT_EXPIRED", 410);
     if (intent.account_id && intent.account_id !== parsed.data.account_id) linkedinFailure("LINKEDIN_IDENTITY_MISMATCH", 409);
     await rpc("record", { workspace_ref: intent.workspace_ref, intent_ref: id, account_id: parsed.data.account_id, callback_name: parsed.data.name }, undefined, "lifty_linkedin_callback_hint");
@@ -173,5 +205,9 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     await rpc("disconnect", { workspace, confirm: true }, session);
     return status(session, workspace);
   }
-  return { start, status, authorize, callback, disconnect };
+  async function v2Return(state:string):Promise<void> {
+    const intent=await readIntent(open(state));
+    if(intent.transport?.api_version!=="v2" || !["ready","completed"].includes(intent.state))linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
+  }
+  return { start, status, authorize, callback, disconnect, v2Return };
 }

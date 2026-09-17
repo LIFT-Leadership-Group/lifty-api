@@ -132,3 +132,22 @@ it("CRM capability is optional but must be bounded and dedicated", () => {
 it.each(["DASHBOARD_READ_ONLY_MODE","CONSUMER_READ_ONLY_MODE"])("preserves company maintenance write freeze from %s", name => {
   for(const value of ["1","true","TRUE"]) expect(loadConfig({...validEnvironment,LIFTY_CRM_SERVER_KEY:"x".repeat(48),[name]:value}).crm?.readOnly).toBe(true);
 });
+
+describe("staged V2 configuration",()=>{
+  const baseline={...validEnvironment,UNIPILE_DSN:"https://api1.unipile.com:13111",UNIPILE_ACCESS_TOKEN:"v1-test",
+    LIFTY_EMAIL_SERVER_KEY:"e".repeat(40),LIFTY_LINKEDIN_SERVER_KEY:"l".repeat(40)};
+  it("does not change existing V1 credentials when V2 is configured",()=>{
+    const config=loadConfig({...baseline,UNIPILE_V2_ACCESS_TOKEN:"v2-test",UNIPILE_V2_APPLICATION_ID:"app_test",
+      UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://connect-v2.lifty.test,https://previous-v2.lifty.test"});
+    expect(config.email).toMatchObject({dsn:baseline.UNIPILE_DSN,accessToken:"v1-test",v2:{accessToken:"v2-test",applicationId:"app_test"}});
+    expect(config.linkedin?.v2).toEqual(config.email?.v2);
+    expect(config.unipileV2HostedAuthOrigins).toEqual(["https://auth.unipile.com","https://connect-v2.lifty.test","https://previous-v2.lifty.test"]);
+  });
+  it.each([
+    {UNIPILE_V2_ACCESS_TOKEN:"token"},{UNIPILE_V2_APPLICATION_ID:"app_test"},
+    {UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://connect-v2.lifty.test"},
+    {UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"not-app"},
+    {UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"app_test",UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://account.unipile.com"},
+    {UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"app_test",UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://user:pass@other.test"},
+  ])("rejects incomplete or unsafe V2 config %j",extra=>{expect(()=>loadConfig({...baseline,...extra})).toThrow();});
+});

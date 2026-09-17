@@ -27,6 +27,7 @@ export interface UnipileProviderSettings {
   accessToken: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  v2?: import("./unipile-v2-provider.js").UnipileV2Settings;
 }
 
 function failure(code = "UNIPILE_UNAVAILABLE", status = 502): PublicError {
