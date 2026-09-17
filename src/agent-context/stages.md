@@ -24,3 +24,9 @@ primitive before authenticated workspace operations. The legacy onboarding,
 workspace and campaign contexts remain available for their installed flows.
 The glossary is an index, not a persisted progress checklist or prerequisite
 scheduler. Work on the stage the founder requested.
+
+Start every authenticated session with `context summary` and its `get` operation.
+Use the saved-state summary to choose the next stage; never restart setup from
+conversation memory. Summary is read-only.
+
+The [session summary](/v1/context/summary) is the first authenticated read.
