@@ -7,6 +7,7 @@ import { PublicError } from "./errors.js";
 const ONBOARDING_IMPORT_TASK_ID = "lifty-onboarding-import";
 const FIRST_RUN_TASK_ID = "lifty-first-run";
 const CRM_SYNC_TASK_ID = "lifty-crm-sync";
+const CRM_MAPPING_TASK_ID = "lifty-crm-mapping-sync";
 const CONFIG_UPDATE_TASK_ID = "lifty-config-update";
 const INTEGRATION_REVOKE_TASK_ID = "lifty-integration-revoke";
 const NOTIFICATION_DELIVERY_TASK_ID = "notification-delivery";
@@ -104,6 +105,17 @@ export function createCrmSyncTrigger(
   // `lifty sync` re-triggers idempotently and self-heals a lost enqueue.
   return async (runId) =>
     triggerTask(settings, CRM_SYNC_TASK_ID, { runId }, `${CRM_SYNC_TASK_ID}:${runId}`);
+}
+
+export type EnqueueCrmMapping = (runRef: string, workspaceRef: string) => Promise<void>;
+
+export function createCrmMappingTrigger(settings: TriggerClientSettings): EnqueueCrmMapping {
+  // The saved ledger owns the immutable cohort and proposed values. Reattaching
+  // wakes that same run; no mapping payload or provider credential reaches ingress.
+  return async runRef => {
+    await triggerTask(settings, CRM_MAPPING_TASK_ID, { runRef },
+      `${CRM_MAPPING_TASK_ID}:${runRef}`);
+  };
 }
 
 export interface EnqueueConfigUpdateOptions {

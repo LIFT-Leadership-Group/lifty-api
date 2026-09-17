@@ -1,3 +1,10 @@
+import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
+import {
+  CrmMappingCatalogSchema, CrmMappingSourcesRequestSchema, CrmMappingSourcesSchema,
+  CrmMappingPreviewRequestSchema, CrmMappingPreviewSchema, CrmMappingApplyRequestSchema,
+  CrmMappingApplySchema, CrmMappingPropertyCreateRequestSchema, CrmMappingPropertyCreateSchema,
+  CrmMappingSyncRequestSchema, CrmMappingSyncSchema, CrmMappingStatusQuerySchema, CrmMappingStatusSchema,
+} from "./crm-mapping/contracts.js";
 import { z } from "zod";
 import {
   ConfigUpdateGenerationContextSchema, ConfigUpdateRequestSchema, ConfigUpdateResultSchema,
@@ -121,7 +128,7 @@ function operation(method: StageOperation["method"], route: string, description:
     responses: response
       ? { "200": json(response), "400": json(StageErrorSchema), "401": json(StageErrorSchema),
         "403": json(StageErrorSchema), "404": json(StageErrorSchema), "413": json(StageErrorSchema), "409": json(StageErrorSchema), "422": json(StageErrorSchema),
-        "429": json(StageErrorSchema), "502": json(StageErrorSchema), "503": json(StageErrorSchema) }
+        "429": json(StageErrorSchema), "502": json(StageErrorSchema), "503": json(StageErrorSchema), "504": json(StageErrorSchema) }
       : { "405": json(StageErrorSchema), "401": json(StageErrorSchema) },
   };
 }
@@ -163,6 +170,14 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   },
   "commercial-voice": { get: configRead("commercial-voice", "Read the customer's saved commercial tone; distinct from Lifty's identity."), post: initialSetup("commercial-voice"), patch: configWrite("commercial-voice", "tone", VoiceStagePatchSchema), ...configSupport },
   crm: {
+    mapping_catalog: operation("GET", "/v1/workspace/crm/mapping/catalog", "Read the current workspace's full saved mapping, supported sources/transforms/write rules and live HubSpot contact/company schema including internal enum values. This is the general mapper; mapping_context remains bounded company setup.", CrmMappingCatalogSchema),
+    mapping_sources: operation("POST", "/v1/workspace/crm/mapping/sources", "Read saved discovery/research evidence for the explicitly selected leads. Person location and company headquarters are distinct; a missing source is unknown. Does not acquire or enrich leads.", CrmMappingSourcesSchema, CrmMappingSourcesRequestSchema),
+    mapping_preview: operation("POST", "/v1/workspace/crm/mapping/preview", "Preview the selected lead cohort with the existing mapper against live CRM schema and record values; inspect per-field values, skipped reasons and conflicts before applying or syncing. Does not save mappings or write CRM records.", CrmMappingPreviewSchema, CrmMappingPreviewRequestSchema),
+    mapping_apply: operation("POST", "/v1/workspace/crm/mapping/apply", "Save explicit validated edits to the full mapping with current portal and mapping version checks, preserving unrelated mappings. Does not sync CRM records or create properties; fetch a fresh catalog and preview afterward.", CrmMappingApplySchema, CrmMappingApplyRequestSchema),
+    property_create: operation("POST", "/v1/workspace/crm/mapping/property_create", "Explicitly create a missing HubSpot property only when workspace provisioning policy permits. First inspect the live catalog for an existing compatible property. Never create a duplicate field just to bypass a mapping conflict.", CrmMappingPropertyCreateSchema, CrmMappingPropertyCreateRequestSchema),
+    mapping_sync: operation("POST", "/v1/workspace/crm/mapping/sync", "Replay the saved mapping only for the explicit bounded lead cohort using the current preview digest and a stable request_ref. This queues a receipt, not verified success; poll mapping_status for this exact run. Does not discover leads or send outreach.", CrmMappingSyncSchema, CrmMappingSyncRequestSchema),
+    mapping_status: operation("GET", "/v1/workspace/crm/mapping/status", "Read the exact mapping replay receipt, including per-field live readback and skipped or stale values. Report only values the receipt verifies; partial or failed runs are not full success.", CrmMappingStatusSchema, null, CrmMappingStatusQuerySchema),
+    records: operation("GET", "/v1/workspace/crm/records", "Read contact and company links for the existing sync cohort. Supply the known run_ref or omit for the latest CRM sync. This never starts a sync.", CrmRecordsSchema, null, CrmRecordsQuerySchema),
     get: operation("GET", stageRoute("crm"), "Without attempt_ref read HubSpot connection state. With it verify only that exact authorization attempt, including reconnection.", z.union([HubspotConnectionStatusSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),
     post: operation("POST", stageRoute("crm"), "Start a new HubSpot connection/reconnection and return the real consent link immediately.", AuthorizationRequiredSchema, Empty),
     patch: operation("PATCH", stageRoute("crm"), "Apply the bounded company mapping plan from mapping_context. No tokens, arbitrary mappings or connected flag updates.", CompanyMappingReceiptSchema, CompanyPlanSchema),

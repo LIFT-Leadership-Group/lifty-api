@@ -267,7 +267,11 @@ exit 88
     }
   });
 
-  it("smoke-checks public routes and verifies authentication fails closed", () => {
+  it.each([
+    ["ready", "lifty-crm-mapping.v1", true],
+    ["ready", "lifty-crm-company.v1", false],
+    ["not_ready", "lifty-crm-mapping.v1", false],
+  ] as const)("smoke gates mapping capability (%s/%s) and verifies authentication fails closed", (mappingStatus, mappingVersion, shouldPass) => {
     const fakeBin = mkdtempSync(join(tmpdir(), "lifty-doctl-test-"));
     const fakeDoctl = join(fakeBin, "doctl");
     const fakeCurl = join(fakeBin, "curl");
@@ -295,6 +299,7 @@ url="\${!#}"
 case "$url" in
   */healthz) printf '%s' '{"status":"ok"}' ;;
   */readyz/crm) printf '%s' '{"status":"ready","capability":"lifty-crm-company.v1"}' ;;
+  */readyz/crm-mapping) printf '%s' '{"status":"${mappingStatus}","capability":"${mappingVersion}"}' ;;
   */readyz) printf '%s' '{"status":"ready"}' ;;
   */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
   */v1/workspace)
@@ -322,13 +327,20 @@ esac
         },
       });
 
+      if (!shouldPass) {
+        expect(result.status).not.toBe(0);
+        expect(result.stdout).not.toContain("Smoke checks passed");
+        expect(readFileSync(calls, "utf8")).not.toContain("/v1/workspace");
+        return;
+      }
       expect(result.status).toBe(0);
       expect(result.stdout).toContain(
         "Smoke checks passed: https://api.example.test",
       );
       const curlCalls = readFileSync(calls, "utf8").trim().split("\n");
-      expect(curlCalls).toHaveLength(5);
+      expect(curlCalls).toHaveLength(6);
       expect(curlCalls.join("\n")).toContain("https://api.example.test/readyz/crm");
+      expect(curlCalls.join("\n")).toContain("https://api.example.test/readyz/crm-mapping");
       for (const call of curlCalls) {
         expect(call).toContain("--connect-timeout 5 --max-time 20");
       }
@@ -612,6 +624,7 @@ url="\${!#}"
 case "$url" in
   */healthz) printf '%s' '{"status":"ok"}' ;;
   */readyz/crm) printf '%s' '{"status":"ready","capability":"lifty-crm-company.v1"}' ;;
+  */readyz/crm-mapping) printf '%s' '{"status":"ready","capability":"lifty-crm-mapping.v1"}' ;;
   */readyz) printf '%s' '{"status":"ready"}' ;;
   */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
   */v1/workspace)

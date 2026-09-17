@@ -1,3 +1,5 @@
+import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
+import { CrmMappingError } from "./crm-mapping.js";
 import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
 import { registerStageRoutes } from "./stage-routes.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
@@ -174,6 +176,7 @@ export interface AppDependencies {
   enqueueFirstRun: EnqueueFirstRun;
   startCrmSyncRun(session: AuthSession): Promise<StartCrmSyncResult>;
   getCrmSyncStatus(session: AuthSession): Promise<CrmSyncStatus>;
+  runCrmMapping: CrmMappingOperation;
   enqueueCrmSync: EnqueueCrmSync;
   getConfigUpdateContext(session: AuthSession): Promise<ConfigUpdateContext>;
   getConfig(session: AuthSession, section: ConfigSection | null): Promise<WorkspaceConfig>;
@@ -234,6 +237,7 @@ export interface AppDependencies {
   } | null;
   checkReadiness(): Promise<boolean>;
   checkCompanyReadiness(): Promise<boolean>;
+  checkCrmMappingReadiness(): Promise<boolean>;
   log(event: LogEvent): void;
 }
 
@@ -975,6 +979,7 @@ const defaultDependencies: AppDependencies = {
   startCrmSyncRun: async () => {
     throw new Error("startCrmSyncRun is not configured");
   },
+  runCrmMapping: async () => { throw new PublicError({ status: 503, code: "CRM_MAPPING_NOT_CONFIGURED", message: "CRM mapping is not configured." }); },
   getCrmSyncStatus: async () => {
     throw new Error("getCrmSyncStatus is not configured");
   },
@@ -1058,6 +1063,7 @@ const defaultDependencies: AppDependencies = {
   renderPasswordRecoveryPage: () => null,
   checkReadiness: async () => true,
   checkCompanyReadiness: async () => false,
+  checkCrmMappingReadiness: async () => false,
   log: (event) => process.stderr.write(`${JSON.stringify(event)}\n`),
 };
 
@@ -1087,6 +1093,11 @@ export function createApp(
     let ready = false;
     try { ready = await dependencies.checkCompanyReadiness(); } catch { /* bounded health response */ }
     return context.json({ status: ready ? "ready" : "not_ready", capability: "lifty-crm-company.v1" }, ready ? 200 : 503);
+  });
+  app.get("/readyz/crm-mapping", async (context) => {
+    let ready = false;
+    try { ready = await dependencies.checkCrmMappingReadiness(); } catch { /* bounded health response */ }
+    return context.json({ status: ready ? "ready" : "not_ready", capability: "lifty-crm-mapping.v1" }, ready ? 200 : 503);
   });
   app.get("/readyz", async (context) => {
     let ready: boolean;
@@ -1434,7 +1445,7 @@ export function createApp(
     return context.json(
       {
         error: { code: publicError.code, message: publicError.message,
-          ...(publicError instanceof CompanyMappingError ? { issues: publicError.issues } : {}),
+          ...(publicError instanceof CompanyMappingError || publicError instanceof CrmMappingError ? { issues: publicError.issues } : {}),
           ...(context.req.path === "/v1/onboarding" && onboardingRepairIssues(publicError.code)
             ? { issues: onboardingRepairIssues(publicError.code) } : {}),
         },
@@ -1474,6 +1485,7 @@ export function createApp(
   });
 
   app.use("/v1/*", async (context, next) => {
+    if (context.req.path.startsWith("/v1/workspace/crm/")) context.header("cache-control", "no-store");
     const authentication = await dependencies.authenticate(context.req.raw);
     if (!authentication.ok) {
       return context.json(
@@ -1497,6 +1509,7 @@ export function createApp(
     if (context.req.method !== "POST" || ![
       "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/linkedin/connect",
       "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
+      "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync",
     ].includes(context.req.path)) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {

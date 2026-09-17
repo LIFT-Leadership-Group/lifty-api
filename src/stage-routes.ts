@@ -1,3 +1,11 @@
+import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
+import {
+  CrmMappingCatalogSchema, CrmMappingSourcesRequestSchema, CrmMappingSourcesSchema,
+  CrmMappingPreviewRequestSchema, CrmMappingPreviewSchema, CrmMappingApplyRequestSchema,
+  CrmMappingApplySchema, CrmMappingPropertyCreateRequestSchema, CrmMappingPropertyCreateSchema,
+  CrmMappingSyncRequestSchema, CrmMappingSyncSchema, CrmMappingStatusQuerySchema, CrmMappingStatusSchema,
+  type CrmMappingAction,
+} from "./crm-mapping/contracts.js";
 import { z } from "zod";
 import type { Context } from "hono";
 import type { OpenAPIHono } from "@hono/zod-openapi";
@@ -91,6 +99,46 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     return AuthorizationRequiredSchema.parse({ status: "authorization_required", attempt_ref: ref,
       connection_url: value.connect_url, expires_at: value.expires_at });
   };
+
+  app.get("/v1/workspace/crm/records", async context => {
+    context.header("cache-control", "no-store");
+    const query = parse(CrmRecordsQuerySchema, context.req.query());
+    const current = await workspace(context);
+    const result = CrmRecordsSchema.parse(await dependencies.runCrmMapping(context.get("authSession"), "records", query, {
+      workspaceRef: current, signal: context.req.raw.signal,
+    }));
+    if (result.workspace_ref !== current) throw forbidden();
+    return context.json(result);
+  });
+
+  async function mapping(context: Context<AppEnvironment>, action: CrmMappingAction, input: unknown, responseSchema: z.ZodType) {
+    context.header("cache-control", "no-store");
+    const current = await workspace(context);
+    // Input schemas may carry the catalog's immutable scope for optimistic
+    // checks. It must still refer to this authenticated current workspace.
+    if (input && typeof input === "object" && "workspace_ref" in input && input.workspace_ref !== current) throw forbidden();
+    const result = responseSchema.parse(await dependencies.runCrmMapping(context.get("authSession"), action, input, {
+      workspaceRef: current, signal: context.req.raw.signal,
+    }));
+    if (!result || typeof result !== "object" || !("workspace_ref" in result) || result.workspace_ref !== current) throw forbidden();
+    return context.json(result);
+  }
+  app.get("/v1/workspace/crm/mapping/catalog", context =>
+    mapping(context, "catalog", parse(Empty, context.req.query()), CrmMappingCatalogSchema));
+  app.get("/v1/workspace/crm/mapping/status", context =>
+    mapping(context, "status", parse(CrmMappingStatusQuerySchema, context.req.query()), CrmMappingStatusSchema));
+  for (const [action, requestSchema, responseSchema] of [
+    ["sources", CrmMappingSourcesRequestSchema, CrmMappingSourcesSchema],
+    ["preview", CrmMappingPreviewRequestSchema, CrmMappingPreviewSchema],
+    ["apply", CrmMappingApplyRequestSchema, CrmMappingApplySchema],
+    ["property_create", CrmMappingPropertyCreateRequestSchema, CrmMappingPropertyCreateSchema],
+    ["sync", CrmMappingSyncRequestSchema, CrmMappingSyncSchema],
+  ] as const) {
+    app.post(`/v1/workspace/crm/mapping/${action}`, async context => {
+      parse(Empty, context.req.query());
+      return mapping(context, action, parse(requestSchema, await readBody(context)), responseSchema);
+    });
+  }
 
   // Current-workspace mapping context keeps arbitrary member-workspace selection
   // out of the generic stage flow; the legacy admin route remains separate.

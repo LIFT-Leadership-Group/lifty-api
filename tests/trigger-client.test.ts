@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createCrmSyncTrigger,
+  createCrmMappingTrigger,
   createFirstRunTrigger,
   createNotificationDeliveryTrigger,
   createOnboardingImportTrigger,
@@ -153,6 +154,27 @@ describe("crm sync trigger client", () => {
         idempotencyKeyTTL: "1h",
       },
     });
+  });
+});
+
+describe("crm mapping replay trigger client", () => {
+  it("reattaches the exact saved mapping run with a ledger-scoped idempotency key", async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    const enqueue = createCrmMappingTrigger({ ...settings, fetchImpl: async (url, init) => {
+      requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+      return jsonResponse(200, { id: "run_mapping" });
+    } });
+    const runRef = "33333333-3333-4333-8333-333333333333";
+    const workspaceRef = "22222222-2222-4222-8222-222222222222";
+    await enqueue(runRef, workspaceRef);
+    await enqueue(runRef, workspaceRef);
+    expect(requests[0]).toEqual({
+      url: "https://api.trigger.test/api/v1/tasks/lifty-crm-mapping-sync/trigger",
+      body: { payload: { runRef }, options: {
+        idempotencyKey: `lifty-crm-mapping-sync:${runRef}`, idempotencyKeyTTL: "1h",
+      } },
+    });
+    expect(requests[1]).toEqual(requests[0]);
   });
 });
 
