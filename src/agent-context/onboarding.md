@@ -259,7 +259,9 @@ only output shape.
     ```
 
     The sample POST input is `{ "body": {} }`. It starts/retrieves the bounded
-    cohort. Explicitly poll GET for the actual result; a timeout does not prove
+    cohort. Use `stage sample-review progress` with the returned `run_ref`, then
+    its cursor, to wait for saved changes and report newly researched leads.
+    Follow the sample guide's wait and reconnect rules. A timeout does not prove
     failure or authorize another acquisition wave. This sends nothing and does
     not touch CRM. Calibration owns the A/B sample, profile links and feedback;
     requested outreach setup can progress independently.

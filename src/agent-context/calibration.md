@@ -51,9 +51,10 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
 1. Wait for configuration import or the targeting update to finish. Before
    new discovery, fetch `context capacity` and read `stage capacity get`.
    Fetch `context sample-review`, then use `stage sample-review post --input -`
-   with `{ "body": {} }` to research the initial five candidates. Explicitly
-   read `stage sample-review get` until its result is confirmed; the generic
-   transport does not poll. Once five profiles have current research and
+   with `{ "body": {} }` to research the initial five candidates. Keep its
+   `run_ref` and use `stage sample-review progress` as described in the sample
+   guide. Pass the returned cursor on the next wait and report newly completed
+   research between calls; do not insert fixed two-minute sleeps. Once five profiles have current research and
    rationale, the cohort is ready regardless of its tier distribution. The
    service does not acquire repeated waves to replace low-fit candidates.
 2. Open with your read: the strongest lead and the pattern across the returned
