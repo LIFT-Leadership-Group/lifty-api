@@ -55,9 +55,28 @@ describe("authenticated workspace resumption", () => {
     expect(summary.linkedin.status).toBe("available");
     expect(JSON.stringify(summary)).not.toContain("secret");
   });
-  it.each([401,403,409])("does not hide authorization/state failure %s as a partial summary", async status => {
+  it.each([401,403])("does not hide authorization failure %s as a partial summary", async status => {
     const response = await request(createApp({ ...base, getBusinessWebsite: async () => { throw new PublicError({ status, code: "DENIED", message: "Denied" }); } }));
     expect(response.status).toBe(status);
+  });
+  it.each(["WORKSPACE_CHANGED", "WORKSPACE_UNAVAILABLE", "WORKSPACE_MISSING", "WORKSPACE_AMBIGUOUS", "WORKSPACE_SUSPENDED"])(
+    "does not hide workspace scope failure %s as a partial summary",
+    async code => {
+      const response = await request(createApp({ ...base, getBusinessWebsite: async () => {
+        throw new PublicError({ status: 409, code, message: "Refresh workspace state." });
+      } }));
+      expect(response.status).toBe(409);
+    },
+  );
+  it("keeps the remaining summary available when email ownership reconciliation conflicts", async () => {
+    const response = await request(createApp({ ...base, getEmailConnection: async () => {
+      throw new PublicError({ status: 409, code: "EMAIL_ACCOUNT_TAKEN", message: "This mailbox belongs to another workspace." });
+    } }));
+    expect(response.status).toBe(200);
+    const summary = await response.json();
+    expect(summary.email).toEqual({ status: "unavailable", next_action: "retry_read" });
+    expect(summary.business.status).toBe("available");
+    expect(summary.campaign.status).toBe("available");
   });
   it("rejects a foreign component and membership changes between reads", async () => {
     expect((await request(createApp({ ...base, getBusinessWebsite: async () => ({ ...website, workspace_ref: other }) }))).status).toBe(403);
