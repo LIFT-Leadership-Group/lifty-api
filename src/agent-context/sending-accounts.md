@@ -1,5 +1,10 @@
 # Sending accounts
 
+Before proposing setup or changes in a new authenticated session, read `summary.get`
+using `context summary`. Reuse verified saved state. Read business before asking
+for a website, sending-accounts before reconnecting, and campaigns before writing
+templates. Unavailable reads require a retry, not assumptions that setup is missing.
+
 Purpose: connect the requested sending channel through hosted Unipile flows.
 Read `references.common` and `references.connections` in full.
 

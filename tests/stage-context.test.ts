@@ -17,7 +17,7 @@ describe("runtime stage context", () => {
     expect(response.status).toBe(200);
     const index = await response.json();
     const links = [...index.instructions.matchAll(/\]\((\/v1\/context\/[^)]+)\)/g)].map(match => match[1]);
-    expect(links).toEqual(stages.map(stage => `/v1/context/${stage}`));
+    expect(links).toEqual([...stages, "summary"].map(stage => `/v1/context/${stage}`));
     for (const link of links) {
       const result = await app.request(link);
       expect(result.status).toBe(200);

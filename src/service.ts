@@ -1,3 +1,4 @@
+import { getBusinessWebsite, setBusinessWebsite } from "./business-website.js";
 import { createWorkspaceCampaignOperations } from "./workspace-campaign.js";
 import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
 import { createCrmMappingReadinessCheck } from "./crm-mapping/readiness.js";
@@ -119,6 +120,7 @@ export function createProductionApp(config: ServiceConfig) {
     startCrmSyncRun,
     getCrmSyncStatus,
     enqueueCrmSync: createCrmSyncTrigger(config.trigger),
+    getBusinessWebsite, setBusinessWebsite,
     getConfig,
     getConfigUpdateContext,
     submitConfigUpdate,

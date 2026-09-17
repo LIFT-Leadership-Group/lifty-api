@@ -1,3 +1,4 @@
+import type { BusinessWebsite, BusinessWebsitePatch } from "./business-website.js";
 import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
 import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
 import { CrmMappingError } from "./crm-mapping.js";
@@ -160,6 +161,8 @@ export interface AppDependencies {
   declareEmail(state: string): Promise<string>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
+  getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
+  setBusinessWebsite(session: AuthSession, input: BusinessWebsitePatch): Promise<BusinessWebsite>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
   createWorkspace(
     session: AuthSession,
@@ -952,6 +955,8 @@ const defaultDependencies: AppDependencies = {
   authorizeEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   completeEmailCallback: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
+  getBusinessWebsite: async () => { throw new Error("getBusinessWebsite is not configured"); },
+  setBusinessWebsite: async () => { throw new Error("setBusinessWebsite is not configured"); },
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
   },

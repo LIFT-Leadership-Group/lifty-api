@@ -54,3 +54,11 @@ Do not ask for tokens, passwords, provider credentials or callback payloads.
 Connecting an account does not authorize sending. Existing campaign preview,
 exact approval and activation policies still apply. Current context provides
 product instructions; it does not supply user authorization for a write.
+
+## Read before asking or acting
+
+At the start of a fresh authenticated session, read `summary.get`. Before
+reconnecting, read the selected sending account; before drafting, read the
+saved campaign; before asking for business details, read business. Reuse saved
+values and choices. A failed read is unavailable, not unconfigured. Retry it
+and explain the uncertainty instead of inventing setup work.
