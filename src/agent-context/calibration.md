@@ -52,7 +52,8 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    transport does not poll. The service stops
    for review if that cohort cannot fill the qualified sample. It does not
    acquire repeated waves to chase five A grades.
-2. Present the returned cohort as a table with person, company, actual grade,
+2. Open with your read: the strongest lead and the pattern across the returned
+   cohort. Then present it as a table with person, company, actual grade,
    **LinkedIn profile URL**, fit rationale, and evidence gaps. Mark C leads and
    profiles missing a valid LinkedIn URL or rationale as excluded from the
    review sample. Use only returned profile URLs. Optional research/dashboard

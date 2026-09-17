@@ -10,3 +10,10 @@ export function renderEmailAuthorizationPage(state: string): string {
 <label><input type="checkbox" name="mailbox_use" value="personal" required>I will connect my regular personal mailbox, not a new or dedicated outreach mailbox.</label>
 <button type="submit">Continue to account selection</button></form></html>`;
 }
+
+/** A used single-use link should confirm receipt instead of replaying authorization. */
+export function renderEmailAuthorizationReceivedPage(): string {
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Email authorization received · Lifty</title><style>body{font:18px/1.6 system-ui;max-width:36rem;margin:12vh auto;padding:1.5rem;color:#202124}</style>
+<h1>We received your authorization</h1><p>Return to Lifty to check the connection and continue preparing your messages.</p></html>`;
+}

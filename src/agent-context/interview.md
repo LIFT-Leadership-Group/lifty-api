@@ -7,7 +7,8 @@ later.
 ## Sequencing
 
 Ask for one coherent decision block at a time, and only when a bootstrap gate
-is missing. A block may request up to three tightly related answers when they
+is missing. Say in a few words why it matters for the search, then ask. A block
+may request up to three tightly related answers when they
 describe one judgment. Good blocks include company description plus primary
 motion, industry plus numeric size floor and unit, search boundaries, or persona role, titles, and
 organizational tell. Wait for the answer before moving to the next block. Never
@@ -30,11 +31,12 @@ value in `founder_statement_history`.
 
 ## Public research playback
 
-Research the company website, relevant public profiles, case studies, hiring
-pages, and reputable news before asking questions. Open with a short,
-confident read — what the company does, who it likely sells to, the likely
-personas, and the main unknowns — written as your take on their business, not
-a form to validate. Ask the founder to confirm or correct it in one go.
+After the one-line first reply, research the company website, relevant public
+profiles, case studies, hiring pages, and reputable news. Open with a short,
+confident read written as your take on their business, not a form to validate:
+what they sell and to whom, what stands out, who you would target first and why,
+and one request to confirm or correct the read. Close with what their answer
+unlocks: locking the targeting and moving to the first search.
 
 Every researched value stays `inferred` — an internal label, never shown to
 the founder — until the founder confirms or corrects it. Confirmed research can fill a bootstrap field. Optional research, including
@@ -171,5 +173,8 @@ A research or CRM-only workspace never needs outreach answers.
 
 Play back the bootstrap decisions in plain founder language: who you will
 target, why, and which boundaries discovery can enforce. Frame what remains
-deferred as what happens next, not as a list of skipped questions. If the founder has already confirmed
-the values or asked to advance, write the draft without another approval loop.
+deferred as what happens next, not as a list of skipped questions. Say what
+happens now: save the decisions, sign in, create the workspace, build the
+targeting, and research the first candidates. If the founder has already
+confirmed the values or asked to advance, write the draft without another
+approval loop.
