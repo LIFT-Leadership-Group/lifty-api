@@ -112,7 +112,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     if(intent.state==="completed" || (intent.state==="ready" && intent.authorization_received))return "authorization_received";
     if(intent.selection_required)throw new PublicError({status:409,code:"EMAIL_DECLARATION_REQUIRED",message:"Confirm your regular personal Gmail account use in the hosted connection flow."});
     if(intent.state==="ready" && intent.hosted_url)return intent.hosted_url;
-    if(intent.state==="failed" || intent.state==="completed")fail("EMAIL_INTENT_EXPIRED",410);
+    if(intent.state==="failed")fail("EMAIL_INTENT_EXPIRED",410);
     const claim=z.object({claimed:z.boolean()}).parse(await rpc("issue_link",{intent_ref:id}));
     if(!claim.claimed)fail("EMAIL_LINK_PENDING");
     let phase:"create"|"save"="create";
