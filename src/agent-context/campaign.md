@@ -38,8 +38,9 @@ This campaign context owns the setup policy. Read it through the campaigns
 stage before proposing or changing outreach; do not substitute a locally
 remembered campaign questionnaire. Use the current published operation schemas.
 
-The founder flow is **prepare the workspace sequence → show its complete
-preview → one informed confirmation → activate automatic outreach**. The
+The founder flow is **choose channels → explain the sequence → choose copy
+approach → prepare the workspace sequence → show its complete preview → one
+informed confirmation → activate automatic outreach**. The
 backend owns continued enrollment and execution after the conversation closes.
 Account connection, sample acceptance and a saved draft never authorize sends.
 
@@ -47,14 +48,38 @@ Account connection, sample acceptance and a saved draft never authorize sends.
    default). Reuse saved targeting, commercial voice and verified sending
    accounts. Read their current stages if that information is missing or stale.
    Do not ask the founder to repeat saved business answers.
-2. Prepare a complete recommended configuration using POST with
+2. Establish the founder's outreach choice before writing templates or calling
+   prepare. If no explicit choice exists, ask: **"Would you like to use LinkedIn,
+   email, both, or not right now?"** Wait for the answer. A connected mailbox
+   does not select email; disconnected LinkedIn remains an option to connect.
+   "Looks good" after lead review accepts that sample only. A request to
+   continue is not a channel choice. Reuse an explicit choice already made in
+   this conversation or confirmed for the campaign being edited; do not ask again.
+   If the founder skips, keep the lead-only path resumable and do not prepare
+   or activate a campaign. Deferring new setup does not pause existing campaigns;
+   a request to stop existing outreach follows the explicit pause workflow.
+3. Before drafting, explain the selected sequence in plain language using the
+   fixed journey below: steps, acceptance dependency, channel entry, follow-up
+   delays and stop-on-reply. Mention the recommended audience of current and
+   future eligible A/B leads; the five reviewed leads are a sample, not the
+   default campaign limit. Use a verified count when available. Ask whether the
+   founder wants to provide their own copy or have Lifty recommend it, and wait
+   unless they already requested one approach. Channel/copy choices are setup
+   decisions, not sending approval. Connect only selected missing accounts via
+   their stage guidance; reuse healthy accounts. Resolve requested CRM activity
+   logging through current supported operations before drafting, reporting any
+   unsupported setting honestly. Do not silently drop a selected channel when
+   its account is disconnected or blocked; explain and offer connection or an
+   explicit change of choice.
+4. Prepare a complete recommended configuration for only the selected channels using POST with
    `scope: "workspace"` and `request.operation: "prepare"`. The payload contains
-   the current workspace and `configuration`: name, the connected LinkedIn
-   account plus all three message templates, and the connected email account
-   plus all five email templates. Follow the published schema. Omit `lead_ids`
+   the current workspace and `configuration`: name, the selected LinkedIn
+   account plus all three message templates and/or the selected email account
+   plus all five email templates. Omit channels the founder did not select,
+   even when their accounts are connected. Follow the published schema. Omit `lead_ids`
    for current and future eligible A/B leads. Omit `not_before` to use the normal
    cadence from activation. Drafting is possible without a new calibration run.
-3. Show the returned full workspace preview: actual senders, audience rule
+5. Show the returned full workspace preview: actual senders, audience rule
    (including future leads), complete templates, allowed personalization,
    current recipient examples, channel entry, cadence and stop rules. Explain
    real blockers, including `blocked_leads` and the total blocked count; never
@@ -62,12 +87,12 @@ Account connection, sample acceptance and a saved draft never authorize sends.
    invented. Only `{{first_name}}`, `{{last_name}}` and `{{company_name}}` are
    permitted substitutions. Do not imply that approval covers arbitrary future
    model-generated copy.
-4. Ask once for confirmation of that complete configuration and authorization
+6. Ask once for confirmation of that complete configuration and authorization
    to start automatic outreach. On confirmation, POST `scope: "workspace"`
    with `request.operation: "activate"`, the exact `version_ref`, `digest`,
    workspace and `confirm: true`. Read status afterward. Report activation only
    from the confirmed receipt, and distinguish activation from an actual send.
-5. Later material edits use workspace prepare and a fresh preview/confirmation.
+7. Later material edits use workspace prepare and a fresh preview/confirmation.
    They pause automatic outreach. The new version applies to newly enrolled
    leads; existing journeys retain their approved copy, sender and cadence.
    Show `continuing_versions` and each recipient example’s `version_ref` in the
@@ -77,9 +102,9 @@ Account connection, sample acceptance and a saved draft never authorize sends.
 The fixed journey is an invitation without a note, then three LinkedIn messages
 only after confirmed acceptance. The second message waits four business days
 from the first confirmed send; the third waits five more business days. When
-email is connected, the five-email sequence enters after five business days
+both channels are selected, the five-email sequence enters after five business days
 without LinkedIn acceptance, or after the second LinkedIn message is confirmed
-sent. With only email connected, email enters directly. Email follow-ups wait
+sent. With email-only selected, email enters directly. Email follow-ups wait
 3, 4, 4 and 4 days from their preceding confirmed sends. Sender working windows,
 health, pacing and shared account limits still apply. Replies, suppression and
 other terminal stops cancel remaining outreach across channels: 3/5 are planned

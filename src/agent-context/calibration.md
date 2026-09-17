@@ -88,8 +88,12 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    drafts; only the sample's acceptance is stale. Do not repeat the initial onboarding POST for an existing
    configured workspace. If the stage still reports an old completed run after a material
    change, explain the blocker instead of presenting old grades as fresh.
-7. When the founder asks to continue outreach setup, fetch `context campaigns` and collect only missing account/channel declarations. Reuse the
-   stated channel choice. Read the current `sending-accounts` stage for
+7. After sample acceptance (for example, "looks good"), or when the founder
+   asks to continue outreach setup, fetch `context campaigns`. If no explicit
+   channel choice exists, offer LinkedIn, email, both, or not right now and wait.
+   A connected mailbox is not an email choice. Explain the chosen sequence
+   before writing templates, then follow the campaign context's copy choice.
+   Reuse the stated channel choice and collect only missing account declarations. Read the current `sending-accounts` stage for
    Gmail/Google Workspace email or LinkedIn authorization and exact-attempt
    verification. Skip an already healthy connection unless reconnecting was
    explicitly requested. If they choose existing B leads,
