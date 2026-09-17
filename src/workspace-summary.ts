@@ -12,10 +12,17 @@ export const readResult = <T extends z.ZodType>(schema: T) => z.discriminatedUni
   z.object({ status: z.literal("unavailable"), next_action: z.literal("retry_read") }).strict(),
 ]);
 export type ReadResult<T> = { status: "available"; value: T } | { status: "unavailable"; next_action: "retry_read" };
+const WORKSPACE_SCOPE_CONFLICTS = new Set([
+  "WORKSPACE_CHANGED",
+  "WORKSPACE_UNAVAILABLE",
+  "WORKSPACE_MISSING",
+  "WORKSPACE_AMBIGUOUS",
+  "WORKSPACE_SUSPENDED",
+]);
 // Never convert an authentication/scope failure into an incomplete success.
 export async function readComponent<T>(read: () => Promise<T>): Promise<ReadResult<T>> {
   try { return { status: "available", value: await read() }; } catch (error) {
-    if (error instanceof PublicError && [401, 403, 409].includes(error.status)) throw error;
+    if (error instanceof PublicError && ([401, 403].includes(error.status) || WORKSPACE_SCOPE_CONFLICTS.has(error.code))) throw error;
     return { status: "unavailable", next_action: "retry_read" };
   }
 }
