@@ -100,7 +100,7 @@ describe("full CRM mapping stage surface", () => {
   });
 
   it("publishes executable full mapper operations and evidence guidance in fresh v5 context", () => {
-    const context = getAgentContext("crm", STAGE_CLIENT_CONTRACT)!;
+    const context = getAgentContext("crm")!;
     for (const { action, method } of cases) {
       const key = action === "property_create" ? action : `mapping_${action}`;
       expect(context.operations?.[key]).toMatchObject({ method, route: `/v1/workspace/crm/mapping/${action}` });

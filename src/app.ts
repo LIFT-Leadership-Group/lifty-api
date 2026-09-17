@@ -22,7 +22,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
+import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -532,7 +532,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     path: "/v1/workspace/runs",
     operationId: "startRun",
     security: [{ bearerAuth: [] }],
-    request: { headers: z.object({ "x-lifty-client-contract": z.enum([CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT]) }) },
+    request: { headers: z.object({ "x-lifty-client-contract": z.literal(STAGE_CLIENT_CONTRACT) }) },
     responses: {
       200: JsonResponse(StartRunResultSchema),
       401: JsonResponse(ErrorResponseSchema),
@@ -1414,13 +1414,29 @@ export function createApp(
     await dependencies.completeEmailCallback(context.req.query("intent") ?? "", payload);
     return context.json({ok:true});
   });
-  app.doc("/openapi.json", {
-    openapi: "3.1.0",
-    info: {
-      title: "LIFTY Control Plane API",
-      version: "1.0.0",
-      description: "Authenticated REST boundary for LIFTY workspace provisioning.",
-    },
+  app.get("/openapi.json", context => {
+    const document = app.getOpenAPI31Document({
+      openapi: "3.1.0",
+      info: {
+        title: "LIFTY Control Plane API",
+        version: "1.0.0",
+        description: "Authenticated REST boundary for LIFTY workspace provisioning.",
+      },
+    });
+    // Match the shared authenticated boundary on every documented operation.
+    for (const methods of Object.values(document.paths ?? {})) {
+      for (const method of ["get", "post", "patch", "put", "delete"] as const) {
+        const operation = methods?.[method];
+        if (!operation?.security?.some(requirement => "bearerAuth" in requirement)) continue;
+        operation.parameters = (operation.parameters ?? []).filter(parameter =>
+          !("name" in parameter && parameter.in === "header" && parameter.name === "x-lifty-client-contract"));
+        operation.parameters.push({ in: "header", name: "x-lifty-client-contract", required: true,
+          schema: { type: "string", const: STAGE_CLIENT_CONTRACT } });
+        operation.responses ??= {};
+        operation.responses["409"] ??= { description: "Unsupported client contract; update the installed CLI and skill." };
+      }
+    }
+    return context.json(document);
   });
 
   app.onError((error, context) => {
@@ -1459,15 +1475,13 @@ export function createApp(
   // Register only this GET before authentication; every business route stays scoped.
   app.get("/v1/context/:task", (context) => {
     context.header("cache-control", "no-store");
-    // Existing bootstrap defaults retain their upgrade gate. New stage links
-    // are directly readable without a client version query parameter.
-    const clientContract = context.req.query("client_contract")
-      ?? (["onboarding", "workspace", "campaign"].includes(context.req.param("task"))
-        ? AGENT_CLIENT_CONTRACT : STAGE_CLIENT_CONTRACT);
-    if (![AGENT_CLIENT_CONTRACT, COMPANY_MAPPING_CLIENT_CONTRACT, LOCAL_CONFIG_CLIENT_CONTRACT, CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT].includes(clientContract)) {
-      return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Update the installed LIFTY CLI and skill to retrieve current instructions.");
+    // Unversioned public links show current documentation; authenticated calls
+    // still require the explicit current contract below.
+    const clientContract = context.req.query("client_contract") ?? STAGE_CLIENT_CONTRACT;
+    if (clientContract !== STAGE_CLIENT_CONTRACT) {
+      return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", CLIENT_UPGRADE_MESSAGE);
     }
-    const document = getAgentContext(context.req.param("task"), clientContract);
+    const document = getAgentContext(context.req.param("task"));
     if (!document) return errorJson(context, 404, "CONTEXT_NOT_FOUND", "No instructions are available for this task.");
     return context.json(document);
   });
@@ -1500,6 +1514,9 @@ export function createApp(
       );
     }
     context.set("authSession", authentication.session);
+    if (context.req.header("x-lifty-client-contract") !== STAGE_CLIENT_CONTRACT) {
+      return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", CLIENT_UPGRADE_MESSAGE);
+    }
     await next();
   });
 
@@ -1737,7 +1754,7 @@ export function createApp(
         "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
     }
     const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft, undefined, {
-      requireDiscoveryIntent: [CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT].includes(context.req.header("x-lifty-client-contract") ?? ""),
+      requireDiscoveryIntent: true,
     });
     if (!lint.success) {
       return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
@@ -1802,9 +1819,6 @@ export function createApp(
   });
 
   app.post("/v1/workspace/runs", async (context) => {
-    if (![CALIBRATION_CLIENT_CONTRACT, STAGE_CLIENT_CONTRACT].includes(context.req.header("x-lifty-client-contract") ?? "")) {
-      return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", "Upgrade the installed Lifty CLI and skills before starting or resuming calibration. Your saved candidates remain available through status.");
-    }
     const result = StartRunResultSchema.parse(await dependencies.startRun(context.get("authSession")));
     // A quality checkpoint is terminal until targeting changes. Reattaching
     // returns its saved cohort without starting another acquisition job.

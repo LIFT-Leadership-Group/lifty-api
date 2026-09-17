@@ -3,7 +3,7 @@ import { createApp } from "../src/app.js";
 import { StartRunResultSchema } from "../src/contracts.js";
 
 const authenticate = async () => ({ ok: true as const, session: { userId: "founder", client: {} } });
-const headers = { "x-lifty-client-contract": "lifty-cli-context.v4" };
+const headers = { "x-lifty-client-contract": "lifty-cli-context.v5" };
 const checkpoint = {
   state: "failed", run_ref: "22222222-2222-4222-8222-222222222222",
   requested_leads: 5, workspace: { workspace_ref: "ws_opaque", name: "Example" },
@@ -11,7 +11,7 @@ const checkpoint = {
 } as const;
 
 describe("calibration policy rollout", () => {
-  it.each([undefined, "lifty-cli-context.v3", "unknown"])("rejects an incompatible client before starting or enqueueing (%s)", async version => {
+  it.each([undefined, "lifty-cli-context.v3", "lifty-cli-context.v4", "unknown"])("rejects an incompatible client before starting or enqueueing (%s)", async version => {
     const startRun = vi.fn(); const enqueueFirstRun = vi.fn();
     const app = createApp({ authenticate, startRun, enqueueFirstRun });
     const response = await app.request("/v1/workspace/runs", { method: "POST", headers: version ? { "x-lifty-client-contract": version } : {} });
@@ -35,7 +35,7 @@ describe("calibration policy rollout", () => {
     }
   });
 
-  it("keeps status read-only for old clients and preserves the policy and actual grades", async () => {
+  it("keeps current-client status read-only and preserves the policy and actual grades", async () => {
     const status = {
       state: "succeeded" as const, run_ref: checkpoint.run_ref, requested_leads: 5,
       calibration_policy: "qualified_ab_v1" as const, leads_discovered: 5, leads_researched: 5,
@@ -43,7 +43,7 @@ describe("calibration policy rollout", () => {
       workspace: checkpoint.workspace, leads: [{ name: "Founder", title: "CEO", company: "Example",
         linkedin_url: "https://linkedin.com/in/founder", tier: "B", fit_rationale: "Relevant product, weaker buying evidence.", stage: "qualified" }],
     };
-    const response = await createApp({ authenticate, getRunStatus: async () => status }).request("/v1/workspace/runs");
+    const response = await createApp({ authenticate, getRunStatus: async () => status }).request("/v1/workspace/runs", { headers });
     expect(response.status).toBe(200); expect(await response.json()).toEqual(status);
   });
 });

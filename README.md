@@ -16,34 +16,41 @@ configured Hono app for programmatic use.
 
 ### Agent task context
 
-`GET /v1/context/onboarding`, `GET /v1/context/workspace`, and
-`GET /v1/context/campaign` return public product
-instructions, references and input schemas. They work before login and contain
-no tenant data or Scout base. The installed CLI requests
-`client_contract=lifty-cli-context.v1`; the response uses `lifty-context.v1`, a
-task identifier and a content revision. Responses are not cached by the CLI.
+`GET /v1/context/stages` indexes the ten configuration stages. Each
+`GET /v1/context/{stage}` returns current public Markdown, references, schemas
+and named operation routes. The onboarding/workspace/campaign entry contexts
+remain available. Public context works before login and contains no tenant
+values or Scout base.
 
-Edit task guidance in `src/agent-context/`. Workspace/campaign transport schemas
-are generated from the API's Zod contracts. Business validation remains in the
-API/RPCs; a JSON Schema cannot describe every rule. Private generation context
-remains at authenticated `GET /v1/onboarding/context` and supplies its current
-configuration schema, generation rules and workspace fingerprint.
+The only supported client contract is `lifty-cli-context.v5`. The CLI requests
+it through the public context query parameter `client_contract` and sends
+`x-lifty-client-contract: lifty-cli-context.v5` on every authenticated API call.
+Explicit v1–v4 or unknown context profiles return HTTP 409
+`CONTEXT_CLIENT_UNSUPPORTED` with upgrade guidance. Unversioned public links
+show current documentation. After authentication, private `/v1/*` requests
+with a missing, retired or unknown contract also return 409 before business
+handlers. Invalid sessions still return 401. Health, login and provider browser
+callbacks retain their existing bootstrap/consent behavior.
 
-For this client contract, preserve the installed command names, payload
-envelopes, local draft readiness/confirmation invariants and writer interfaces.
-Adding onboarding configuration fields or workspace values does not require
-editing the installed skill. The CLI still enforces campaign input/preview
-contracts and local confirmation rules; preserve those in this profile.
-Changes outside these supported shapes, removing required local fields or
-introducing commands the client cannot execute require a new client
-contract/release; do not publish those instructions to this profile.
-The revision identifies content and is
-not itself a signal of incompatibility or permission to mutate a workspace.
+This intentionally retires the frozen v4 guides and older compatibility
+profiles during internal testing (LIF-896). Upgrade the installed CLI/skill
+before resuming a retired client, preserving private drafts and configuration.
+The current v5 CLI already supplies the required header, so this API change
+requires no v5 npm update. The JSON envelope remains `lifty-context.v1`; that
+format is separate from the retired client profile names.
 
-Build copies the public assets into `dist/agent-context/` for the Node container.
-Deploy this endpoint before releasing the matching CLI/skill bundle; old CLI
-commands remain available. If context retrieval fails, the new skill preserves
-local work and stops dependent writes rather than using stale examples.
+Edit task guidance in `src/agent-context/`. Stage transport fetches fresh
+context on each invocation, resolves its method/route, and passes business
+inputs/responses through. Business validation remains in the API/RPCs. Private
+context at `/v1/onboarding/context` and `/v1/config/context` supplies generation
+rules, artifact schemas and workspace fingerprints. Ordinary stage guide,
+schema and route changes work with the same v5 installed artifact. Changing
+CLI transport, bootstrap or local helpers can still require a client release.
+A content revision is not authorization to mutate a workspace.
+
+Build replaces `dist/agent-context/` with the current public assets, removing
+retired guides from incremental builds. If context retrieval fails, preserve
+local work and stop dependent writes instead of using stale instructions.
 
 ### Routes
 
@@ -299,10 +306,9 @@ Rollout: apply `20260916115048_lif858_company_api_capability.sql`, provision a c
 4. Run `npm run verify`, verify the restored Edge with an authenticated nonproduction context/apply/readback canary, and merge the reviewed rollback. Deploy its **new main SHA** by following the automatically triggered `Deploy` workflow. Use `bash scripts/digitalocean.sh deploy <full-new-main-sha>` only for an intentional manual redeploy, not alongside CI. The deployment script deliberately rejects old/non-head commits; do not bypass that protection. The company-only revert restores the previous smoke script (health, readiness, OpenAPI and failed-closed authentication); use the Edge canary as the company capability proof for this rollback, since that API revision has no native `/readyz/crm` route.
 5. Remove the maintenance flag only after readback verifies the intended workspace/portal. Existing DB mappings and provider properties remain intact. Never delete additive provider fields to simulate a rollback.
 
-Company setup guidance is served to `lifty-cli-context.v2` clients. The existing
-`lifty-cli-context.v1` profile keeps its compatible task guidance; the response
-envelope remains `lifty-context.v1`. Install/release the matching CLI after the
-company mapping backend is available.
+Company setup guidance is served through the current v5 CRM stage context.
+Earlier client profiles are retired; the response envelope remains
+`lifty-context.v1`. The company mapping backend must be available before use.
 
 ### General CRM mapping and verified record links (LIF-897)
 

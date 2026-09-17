@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import type { ConfigUpdateStatus, ConfigUpdateSubmission } from "../src/contracts.js";
 
 const session = { userId: "founder-123", client: { kind: "scoped" } };

@@ -105,7 +105,7 @@ describe("authenticated workspace stage adapters", () => {
     expect(create).toHaveBeenCalledTimes(10);
   });
 
-  it.each(["v4", "v5"])("applies the existing calibration gate and enqueues one run for %s", async version => {
+  it.each(["v5"])("applies the existing calibration gate and enqueues one run for %s", async version => {
     const start = vi.fn(async () => ({ state: "queued" as const, run_ref: attemptRef, requested_leads: 5, workspace: workspace.workspace, created: true }));
     const enqueue = vi.fn(async () => ({ id: "job" }));
     const app = createApp({ ...base, startRun: start, enqueueFirstRun: enqueue });

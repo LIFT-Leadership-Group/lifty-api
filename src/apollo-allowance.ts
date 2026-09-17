@@ -14,6 +14,6 @@ export async function getApolloAllowance(session:AuthSession,workspace:string):P
  const errorShape=z.object({message:z.string().optional()}).safeParse(error);
  if(errorShape.success&&errorShape.data.message==="lifty_workspace_forbidden")throw new PublicError({status:403,code:"WORKSPACE_FORBIDDEN",message:"Choose a workspace you belong to."});
  const parsed=ApolloAllowanceSchema.safeParse(data);
- if(error||!parsed.success||parsed.data.workspace_ref!==id||(parsed.data.applies&&(parsed.data.limit!==25||parsed.data.remaining===null||parsed.data.remaining>25)))throw new PublicError({status:502,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"LIFTY could not verify the weekly Apollo allowance. Try again later."});
+ if(error||!parsed.success||parsed.data.workspace_ref!==id||(parsed.data.applies ? (parsed.data.limit===null||parsed.data.remaining!==Math.max(0,parsed.data.limit-parsed.data.used-parsed.data.reserved)) : (parsed.data.limit!==null||parsed.data.remaining!==null)))throw new PublicError({status:502,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"LIFTY could not verify the weekly Apollo allowance. Try again later."});
  return parsed.data;
 }

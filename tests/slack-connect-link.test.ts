@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 import { PublicError } from "../src/errors.js";
 import { createSlackConnectOperations } from "../src/slack-connect.js";
 import { openSlackConnectIntent } from "../src/slack-state.js";

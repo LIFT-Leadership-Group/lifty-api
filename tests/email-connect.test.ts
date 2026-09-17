@@ -2,7 +2,7 @@ import { describe,it,expect } from "vitest";
 import { createEmailConnectOperations } from "../src/email-connect.js";
 import { createUnipileProvider } from "../src/unipile-provider.js";
 import { sealEmailIntent,openEmailIntent,emailCallbackName } from "../src/email-state.js";
-import { createApp } from "../src/app.js";
+import { createCurrentClient as createApp } from "./current-client.js";
 
 const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8222-222222222222";
 const secret="server-key-"+"x".repeat(40), email="founder@example.test";
