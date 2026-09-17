@@ -1,0 +1,72 @@
+[
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/evaluator.ts",
+    "target": "src/generated/crm-shared/evaluator.ts",
+    "source_sha256": "131230ac663dc4f2b14e3338fe5761c2c3210cf48929545fd5a5d9fb01ba913e",
+    "generated_sha256": "c603419ef85f715a1340f0719a71a4da5798dde1d25f36ea322ee0261670be4b"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/executable.ts",
+    "target": "src/generated/crm-shared/executable.ts",
+    "source_sha256": "ee25ac482f981eae69bb58a4a230496d2bf02263069f67bdddf2c41a32adb02a",
+    "generated_sha256": "fe8471328909ff6bc42e05afd1c2cbc94a215a7862ce186e491ab5836de03fb9"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/types.ts",
+    "target": "src/generated/crm-shared/types.ts",
+    "source_sha256": "2852869226d7e81b1d1a09a7a3057be3d918911dc1d412d629e0a8ef9a684a01",
+    "generated_sha256": "0bf586133cc1789de1235e6684c1b2b74945e96fe1ae86196019c2c26e13fae8"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/scout-input.ts",
+    "target": "src/generated/crm-shared/scout-input.ts",
+    "source_sha256": "7a79039261af71db48ba33f3e83890c112a7119f8e39b79ea0680bfdaa60018d",
+    "generated_sha256": "73d9fb77c89040f3585384c95cca456ffb284b7336bd6d47b3cee5eda83d72ba"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/scout-contract.ts",
+    "target": "src/generated/crm-shared/scout-contract.ts",
+    "source_sha256": "32a57f1011df4e01e661e36f63276ad98f34a29563bf423ad5064be513e0bb9b",
+    "generated_sha256": "8accaa1df619d6aed7abf960967146ce8b382a6b0915baa60cb6a2c2906d9b0c"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/sha256.ts",
+    "target": "src/generated/crm-shared/sha256.ts",
+    "source_sha256": "03c4340c16059c3f1699c9e6ee9d059ae6b1fc9c5984df3e6a2870e9c4a5e25f",
+    "generated_sha256": "6d206aef9abaaf41e374e8e799973e0206abdadfb9ec223b646c19ef8434ee02"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/index.ts",
+    "target": "src/generated/crm-shared/index.ts",
+    "source_sha256": "39dcc289739fc0be4467523c617ed2596e1894c0d393bd42ced9351b0be5fbf9",
+    "generated_sha256": "a2bfbbacd8af003b3fba41ef12f7d6fbc73f78bc1b3beced1be05d2bf686a66b"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-shared/conformance-fixtures.ts",
+    "target": "src/generated/crm-shared/conformance-fixtures.ts",
+    "source_sha256": "7d46f3597b6cae1f0573e0dbf89a56e9cf58ea8ac3d2a7d7b77b71831081efa0",
+    "generated_sha256": "5967ce6953bfb26892cf45a02606e752bb786ed41cb752b56bfe2f6056d59674"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-field-mappings.ts",
+    "target": "src/generated/crm-field-mappings.ts",
+    "source_sha256": "8f8071504c1905a3ef84ab17f07e70a9d273c228cb17d7e7e428269fe612085e",
+    "generated_sha256": "3df349f176f450b9a408b7f50adb498fdc3262fd806baa2ad38aae05b53dae09"
+  },
+  {
+    "source_commit": "0033f88d735f01ae593875e12862e5a132d165d7",
+    "source": "lib/crm-source-catalog.ts",
+    "target": "src/generated/crm-source-catalog.ts",
+    "source_sha256": "76eb2852dae1b394bd6569c47156fdf5c5b0406beadd89bf02542ab8dc171173",
+    "generated_sha256": "9aad633bb4b2621b032ce76329f31e976e07ca3f9a085eaee9f96d870594f916"
+  }
+]

@@ -3,7 +3,8 @@
 Fetch fresh context for the relevant stage before preparing a request. Each
 response contains its Markdown guide and current operation routes, input
 schemas and response schemas. Private saved values come only from the
-authenticated operation named `get`, never from this index or shared context.
+authenticated read operations published by each stage, never from this index
+or shared context.
 
 | Stage | Context | Use it for |
 | --- | --- | --- |
@@ -12,7 +13,7 @@ authenticated operation named `get`, never from this index or shared context.
 | Research criteria | [research-criteria](/v1/context/research-criteria) | Evidence, exclusions and research instructions |
 | Sample review | [sample-review](/v1/context/sample-review) | Existing cohort, grades and calibration |
 | Commercial voice | [commercial-voice](/v1/context/commercial-voice) | The customer's commercial tone and proposition |
-| CRM | [crm](/v1/context/crm) | HubSpot authorization and bounded company mapping |
+| CRM | [crm](/v1/context/crm) | HubSpot authorization, full CRM mapping, verified record links and field updates |
 | Sending accounts | [sending-accounts](/v1/context/sending-accounts) | Hosted LinkedIn and email authorization |
 | Campaigns | [campaigns](/v1/context/campaigns) | Workspace sequence setup, preview and automatic outreach activation |
 | Notifications | [notifications](/v1/context/notifications) | Slack authorization, destinations and routing |

@@ -71,7 +71,13 @@ Markdown shipped under `src/agent-context/` still triggers deployment.
 Configure the publishable Supabase and encrypted HubSpot values above when
 setting up the host; founders do not set them locally. Keep the service private
 from browser integrations (no CORS allowlist). Release prerequisite migrations
-through their owning CI before merging the dependent API.
+through their owning CI before merging the dependent API. For LIF-897, deploy
+its database capability and replay ledger first, then the Jobs task
+`lifty-crm-mapping-sync`, then this API. The public smoke checks both
+`/readyz/crm` (`lifty-crm-company.v1`) and `/readyz/crm-mapping`
+(`lifty-crm-mapping.v1`); these verify static database capabilities without
+reading a tenant or contacting HubSpot. Worker deployment is a separate
+prerequisite, verified by its owning release workflow.
 
 If a change affects CLI ingress, provisioning or HubSpot onboarding, verify that
 specific behavior with the matching CLI and a disposable nonproduction founder,

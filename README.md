@@ -309,3 +309,32 @@ Rollout: apply `20260916115048_lif858_company_api_capability.sql`, provision a c
 Company setup guidance is served through the current v5 CRM stage context.
 Earlier client profiles are retired; the response envelope remains
 `lifty-context.v1`. The company mapping backend must be available before use.
+
+### General CRM mapping and verified record links (LIF-897)
+
+Current v5 clients discover the full mapper through `context crm`. Its
+`mapping_catalog`, `mapping_sources`, `mapping_preview`, `mapping_apply`,
+`property_create`, `mapping_sync` and `mapping_status` operations reuse the
+existing CRM mapping contract. The bounded company onboarding flow remains
+available. `records` returns contact/company links only after live identity
+checks in the currently connected portal. Saved person location is distinct
+from company headquarters; no enrichment purchase is part of these reads.
+
+Mapping edits do not update records. Replay requires the selected cohort of
+at most 25 leads, current scope/version, a fresh preview digest and a stable
+request reference. The `lifty-crm-mapping-sync` worker uses the saved ledger
+plan and reports per-field readback. Queue acceptance is not verified success.
+Maintenance mode blocks mapping apply, property creation and replay submission;
+read operations remain available.
+
+Release the LIF-897 database migration through its owning CI, then deploy the
+matching Jobs task before this API. The existing dedicated CRM capability key
+also gates `lifty_crm_mapping_tools`; no API service-role key is introduced.
+`/readyz/crm-mapping` must return
+`{status:"ready",capability:"lifty-crm-mapping.v1"}` alongside the existing
+`/readyz/crm` capability. Deployment smoke enforces both. This static probe
+checks the installed RPC/version/key without reading tenant data, credentials
+or HubSpot; it does not prove that the replay worker is deployed. Verify the
+Jobs task version separately and use a disposable nonproduction exact-cohort
+preview/replay/readback canary under the existing canary policy. Generic v5
+clients consume these API-owned operations without a new CLI business registry.
