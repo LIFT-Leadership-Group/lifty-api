@@ -26,11 +26,18 @@ a new product feature. A saved shortfall requires diagnosis before more work.
 
 ## User-facing behavior and errors
 
-For `qualified_ab_v1`, five eligible A/B profiles fill the review sample; C
-never counts. A B-only sample needs explicit acceptance or refinement. Show
-person, company, actual grade, LinkedIn profile URL, fit rationale and evidence
-gaps. Retain the historical A-only rule for older/unknown policies.
-Respect allowance and calibration-review stops. A status error is not a failed
+For `researched_v1`, all five researched profiles count regardless of tier,
+including C. Three A, one B and one C is a complete sample, as is an all-C
+cohort with complete evidence. Show person, company, actual grade, LinkedIn
+profile URL, fit rationale and evidence gaps. Readiness to review is distinct
+from targeting quality, founder acceptance and outreach eligibility.
+
+Preserve historical policies and actual grades. An explicit POST retry of a
+failed `tier_a_v1` or `qualified_ab_v1` run adopts the current review policy
+using its saved cohort. Do not acquire replacements to chase A/B grades.
+Missing current research, a valid profile or rationale still needs recovery;
+`calibration_sample_incomplete` reports that evidence gap. Respect allowance.
+A status error is not a failed
 run. No new discovery is required merely to connect an account or draft outreach
 with chosen saved leads; exact sending approval remains separate.
 

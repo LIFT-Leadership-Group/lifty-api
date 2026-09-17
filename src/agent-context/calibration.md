@@ -1,11 +1,13 @@
 # Review targeting while progressing outreach setup
 
 Apply this workflow after the initial lead run and after every targeting or
-research-criteria change. The review sample is five researched **Tier A or B**
-leads under the current confirmed ICP, each with its actual LinkedIn profile
-URL and a concrete fit rationale. Preserve each grade. C leads never count.
-A sample containing five B leads is valid, but still needs explicit founder
-acceptance.
+research-criteria change. The review sample is five researched candidates
+under the current confirmed ICP, each with its actual LinkedIn profile URL
+and a concrete fit rationale. **Every recorded tier, including C, counts for
+review.** A sample with three A, one B and one C is complete; even five C
+candidates are valid evidence for reviewing the targeting. Preserve grades
+and explain the distribution. Completion means the evidence is ready, not
+that every candidate fits or that the founder has accepted the targeting.
 
 The sample measures targeting quality; it is not a prerequisite for outreach
 setup. If the founder wants to continue, help choose a channel, connect their
@@ -14,11 +16,13 @@ applies after an ICP change, with fewer than five leads, no A leads, exhausted
 discovery allowance or no CRM. Pause only the operation that needs a missing
 input. Exact campaign approval and authorization to send remain separate.
 
-The A/B rule applies when the returned `calibration_policy` is
-`qualified_ab_v1`. Historical `tier_a_v1`, missing, or unknown policies retain
-their A-only eligibility. Do not reinterpret an old successful run as a new
-A/B sample or relabel its research. Follow the current stage result and explain
-any compatibility blocker.
+The tier-independent rule applies to `calibration_policy: researched_v1`.
+Historical `tier_a_v1` and `qualified_ab_v1` runs keep their recorded policies.
+An explicit retry of a failed run adopts the current policy and reuses its
+saved candidates and completed research. Do not describe that as new research.
+If an older backend still returns a quality checkpoint instead of upgrading,
+report the compatibility blocker; do not buy replacements or relabel leads.
+Unknown policies must not be treated as proof of readiness.
 
 ## Read the evidence before changing the search
 
@@ -49,36 +53,42 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    Fetch `context sample-review`, then use `stage sample-review post --input -`
    with `{ "body": {} }` to research the initial five candidates. Explicitly
    read `stage sample-review get` until its result is confirmed; the generic
-   transport does not poll. The service stops
-   for review if that cohort cannot fill the qualified sample. It does not
-   acquire repeated waves to chase five A grades.
+   transport does not poll. Once five profiles have current research and
+   rationale, the cohort is ready regardless of its tier distribution. The
+   service does not acquire repeated waves to replace low-fit candidates.
 2. Present the returned cohort as a table with person, company, actual grade,
-   **LinkedIn profile URL**, fit rationale, and evidence gaps. Mark C leads and
-   profiles missing a valid LinkedIn URL or rationale as excluded from the
-   review sample. Use only returned profile URLs. Optional research/dashboard
+   **LinkedIn profile URL**, fit rationale, and evidence gaps. Include C leads
+   with their mismatch reasons; they are part of the review. Distinguish
+   profiles missing a valid LinkedIn URL or rationale as incomplete evidence.
+   Use only returned profile URLs. Optional research/dashboard
    links never replace them. Preserve discovery and research counts and show
    how many of the required five sample places are filled.
-3. When fewer than five eligible profiles remain, explain the specific
-   shortfall and propose the smallest useful adjustment. Wrong industries,
+3. Separate sample completeness from targeting quality. Missing current
+   research, a valid profile or a rationale calls for evidence recovery. A C
+   verdict is a completed evaluation, not missing research. Wrong industries,
    geography, or company sizes suggest a discovery problem. Positive-fit
    companies downgraded only for unavailable evidence suggest a rubric
    problem. Confirmed exclusions stay excluded. Retrieval failures call for
    technical recovery. Do not remove an exclusion, widen the founder's market,
    invent missing facts, or claim success to fill the table.
-4. A `calibration_review_required` result is a review checkpoint. Repeating
-   `stage sample-review get` retrieves that saved cohort; it does not authorize another
-   acquisition wave. Agree on the business adjustment before applying it.
+4. A historical `calibration_review_required` result can be retried explicitly
+   through `stage sample-review post` to evaluate its saved cohort under the
+   current policy. This is not permission for another acquisition wave.
+   A current `calibration_sample_incomplete` result means some profile or
+   research evidence is still missing; identify the missing input before retrying.
    For allowance exhaustion, report the returned reset time. A technical
    research failure may be retried once against the saved candidates,
    preserving completed research and acquisition usage. Never blindly retry
-   quality shortfalls or budget exhaustion. A reset date limits new discovery,
+   low-fit results or budget exhaustion. A reset date limits new discovery,
    not account connection, reviewing saved evidence or drafting outreach.
-5. When five eligible profiles are ready, ask: **"Do these leads look right,
+5. When the five researched profiles are ready, ask: **"Does this sample help
+   confirm the targeting,
    or would you like me to change the targeting? We can also prepare outreach
    while refining the sample."** Mirror the founder's language.
-   For a B-only sample, explicitly say all five are B, explain from their
-   evidence why none are A, and ask whether to accept that sample or refine
-   targeting. Reporting results is not sample approval. If the answer requests
+   State the actual tier mix and explain lower-fit candidates from their
+   evidence. Offer targeting refinement when useful without requiring a
+   minimum number of A/B leads to accept the review. Reporting results is not
+   sample approval or eligibility to send to every reviewed candidate. If the answer requests
    outreach setup, continue that work instead of repeating the sample question.
 6. If the founder requests changes, clarify only the affected business
    decision, fetch `context targeting` or `context research-criteria`, follow its
