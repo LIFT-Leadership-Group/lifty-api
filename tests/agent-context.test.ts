@@ -42,6 +42,17 @@ describe("public agent task context", () => {
     expect((await (await app.request("/v1/context/onboarding")).json()).revision).toBe(body.revision);
   });
 
+  it("uses operator voice without reviving the obsolete Tier-A outreach gate", async () => {
+    const body = await (await createApp().request("/v1/context/onboarding?client_contract=lifty-cli-context.v5")).json();
+
+    expect(body.instructions).toContain("Shape of every message");
+    expect(body.instructions).toContain("Every question ties to the search it changes");
+    expect(body.references.interview).toContain("why it matters for the search");
+    expect(body.references.calibration).toMatch(/pattern across the returned\s+cohort/);
+    expect(body.references.calibration).not.toContain("five Tier A");
+    expect(body.instructions).toMatch(/Calibration and outreach setup can progress\s+independently/);
+  });
+
   it("keeps task guidance separate and exposes the input contracts for each task", async () => {
     const app = createApp();
     const workspaceResponse = await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v5");
