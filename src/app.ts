@@ -1,3 +1,4 @@
+import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
 import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
 import { CrmMappingError } from "./crm-mapping.js";
 import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
@@ -144,6 +145,7 @@ export interface AppDependencies {
   apolloCredentials(session: AuthSession, workspace: string, input: ApolloCredentialInput): Promise<ApolloCredentialOutput>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
+  workspaceCampaign(session: AuthSession, input: WorkspaceCampaignInput): Promise<WorkspaceCampaignOutput>;
   linkedinCampaign(session: AuthSession, input: LinkedinCampaignInput): Promise<LinkedinCampaignOutput>;
   startLinkedinConnect(session: AuthSession, input: LinkedinConnectInput): Promise<LinkedinStart>;
   getLinkedinConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<LinkedinStatus>;
@@ -935,6 +937,7 @@ const defaultDependencies: AppDependencies = {
   },
   apolloCredentials: async () => { throw new PublicError({status:503,code:"APOLLO_CREDENTIAL_UNAVAILABLE",message:"Apollo credential configuration is unavailable."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
+  workspaceCampaign: async () => { throw new PublicError({ status: 503, code: "WORKSPACE_CAMPAIGN_NOT_CONFIGURED", message: "Workspace sequences are not configured yet." }); },
   linkedinCampaign: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn campaigns are not configured yet." }); },
   startLinkedinConnect: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
   getLinkedinConnection: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },

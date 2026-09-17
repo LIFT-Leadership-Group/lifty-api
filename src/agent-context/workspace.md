@@ -130,8 +130,11 @@ reservations, or repeat unchanged discovery to chase a desired grade.
 
 ## Campaign operations
 
-Fetch `context campaigns` and read its linked channel guidance. Use its GET
-preview/status, POST operations and supported PATCH preparation contract.
+Fetch `context campaigns` and read its linked campaign context. Default to the
+complete workspace sequence using saved targeting and commercial voice, its
+recommended cadence, and one informed confirmation before activation. GET reads
+workspace status; POST prepares/activates and PATCH updates the configuration.
+Individual campaign references are for explicitly requested work or recovery.
 Connection, sample acceptance and a draft never authorize sending.
 
 ## Operations outside the stage surface

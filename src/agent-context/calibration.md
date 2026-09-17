@@ -97,9 +97,9 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    recipients explicit. Keep recorded grades and calibration status truthful;
    a changed ICP does not make all saved evidence unusable. Missing evidence
    may require a recipient-specific check, not five new leads before setup.
-8. Connecting an account does not approve sending. Keep the exact campaign
-   preview, recipient, sender, copy and schedule approval/activation steps
-   from the campaigns stage and its channel reference. Calibration sends no messages or invitations.
+8. Connecting an account does not approve sending. Use the full workspace sequence preview and single confirmation/activation
+   from the campaigns stage and its campaign reference. Reuse saved targeting
+   and voice; do not require choosing sample recipients or individual times. Calibration sends no messages or invitations.
 
 For example, after an ICP change with discovery allowance exhausted and the
 founder saying "continue with Tier B leads", respond along these lines:

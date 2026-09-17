@@ -77,8 +77,9 @@ tokens, manually installs provider apps, activates outreach, or sends anything.
 Configure one primary motion and record every secondary motion as parked.
 When the founder asks to continue outreach setup, fetch `context campaigns` and
 advance the steps whose prerequisites are met. Collect missing account details,
-connect the chosen channel, and help draft messaging even while calibration
-is pending. Explain a blocker only for the operation it actually prevents.
+connect the chosen channel, and prepare the complete workspace sequence from
+saved targeting and voice even while calibration is pending. The campaign
+context owns that setup; do not default to individual lead/schedule questions. Explain a blocker only for the operation it actually prevents.
 
 Completion means exactly:
 

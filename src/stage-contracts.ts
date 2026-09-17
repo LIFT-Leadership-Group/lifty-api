@@ -6,6 +6,7 @@ import {
   CrmMappingSyncRequestSchema, CrmMappingSyncSchema, CrmMappingStatusQuerySchema, CrmMappingStatusSchema,
 } from "./crm-mapping/contracts.js";
 import { z } from "zod";
+import { WorkspaceCampaignRequest, WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import {
   ConfigUpdateGenerationContextSchema, ConfigUpdateRequestSchema, ConfigUpdateResultSchema,
   ConfigUpdateStatusSchema, CreateWorkspaceRequestSchema, CreateWorkspaceResultSchema,
@@ -101,19 +102,30 @@ export const VoiceStagePatchSchema = z.object({
   values: z.record(z.string(), z.unknown()).describe("Free-form customer commercial voice values merged by the existing config RPC, for example identity, value_prop and cta. Not Lifty identity or campaign approval."),
   configuration: LocalConfigUpdateConfigurationSchema.optional(),
 }).strict();
-export const CampaignStageQuerySchema = z.object({
+const ChannelCampaignQuerySchema = z.object({
   channel: z.enum(["email", "linkedin"]), workspace: z.string().min(1), campaign_ref: z.uuid(),
   operation: z.enum(["status", "preview"]).default("status"),
 }).strict();
-export const CampaignStageRequestSchema = z.discriminatedUnion("channel", [
+const ChannelCampaignRequestSchema = z.discriminatedUnion("channel", [
   z.object({ channel: z.literal("email"), request: EmailCampaignRequest }).strict(),
   z.object({ channel: z.literal("linkedin"), request: LinkedinCampaignRequest }).strict(),
 ]);
-export const CampaignStagePatchSchema = z.discriminatedUnion("channel", [
+const ChannelCampaignPatchSchema = z.discriminatedUnion("channel", [
   z.object({ channel: z.literal("email"), request: z.intersection(EmailCampaignRequest,
     z.object({ operation: z.literal("prepare"), payload: z.object({ campaign_ref: z.uuid() }).passthrough() }).passthrough()) }).strict(),
   z.object({ channel: z.literal("linkedin"), request: z.intersection(LinkedinCampaignRequest,
     z.object({ operation: z.literal("prepare"), payload: z.object({ campaign_ref: z.uuid() }).passthrough() }).passthrough()) }).strict(),
+]);
+
+export const CampaignStageQuerySchema = z.union([
+  z.object({ scope: z.literal("workspace").default("workspace"), operation: z.enum(["status", "preview"]).default("status") }).strict(),
+  ChannelCampaignQuerySchema,
+]);
+export const CampaignStageRequestSchema = z.union([
+  z.object({ scope: z.literal("workspace"), request: WorkspaceCampaignRequest }).strict(), ChannelCampaignRequestSchema,
+]);
+export const CampaignStagePatchSchema = z.union([
+  z.object({ scope: z.literal("workspace"), request: WorkspaceCampaignRequest.options[1] }).strict(), ChannelCampaignPatchSchema,
 ]);
 
 function json(schema: z.ZodType, io: "input" | "output" = "output") {
@@ -124,7 +136,7 @@ function operation(method: StageOperation["method"], route: string, description:
   path: z.ZodType = Empty): StageOperation {
   return {
     method, route, description,
-    request: { path: json(path, "input"), query: json(query, "input"), body: body ? json(body, "input") : null },
+    request: { path: json(path, "input"), query: { type: "object", ...json(query, "input") }, body: body ? json(body, "input") : null },
     responses: response
       ? { "200": json(response), "400": json(StageErrorSchema), "401": json(StageErrorSchema),
         "403": json(StageErrorSchema), "404": json(StageErrorSchema), "413": json(StageErrorSchema), "409": json(StageErrorSchema), "422": json(StageErrorSchema),
@@ -189,9 +201,9 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
   },
   campaigns: {
-    get: operation("GET", stageRoute("campaigns"), "Read status/preview of one known campaign; no campaign inventory service.", z.union([EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),
-    post: operation("POST", stageRoute("campaigns"), "Invoke an existing explicit campaign operation using its channel contract. Preparing is not approving or activating.", z.union([EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
-    patch: operation("PATCH", stageRoute("campaigns"), "Edit via the existing prepare operation with campaign_ref. The changed preview needs fresh exact-digest approval.", z.union([EmailCampaignResult, LinkedinCampaignResult]), CampaignStagePatchSchema),
+    get: operation("GET", stageRoute("campaigns"), "Read the workspace sequence by default. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),
+    post: operation("POST", stageRoute("campaigns"), "Prepare the full workspace sequence, then activate its exact preview with one informed confirmation. Preparation does not send. Individual channel operations remain explicit.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
+    patch: operation("PATCH", stageRoute("campaigns"), "Prepare an updated workspace sequence or individual campaign. Material changes pause automatic outreach and require fresh digest-bound activation.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStagePatchSchema),
   },
   notifications: {
     get: operation("GET", stageRoute("notifications"), "Read notification routes/destinations and Slack state, or verify the exact Slack attempt_ref.", z.union([NotificationConfigSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),
