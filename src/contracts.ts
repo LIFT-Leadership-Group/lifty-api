@@ -154,12 +154,14 @@ const RunStartFields = {
     attempt: z.number().int().nonnegative().optional(),
 };
 
+const CalibrationPolicySchema = z.enum(["tier_a_v1", "qualified_ab_v1", "researched_v1"]);
+
 export const StartRunResultSchema = z.discriminatedUnion("state", [
   z.object({
     ...RunStartFields,
     state: z.enum(["queued", "running"]),
     created: z.boolean(),
-    calibration_policy: z.enum(["tier_a_v1", "qualified_ab_v1"]).optional(),
+    calibration_policy: CalibrationPolicySchema.optional(),
   }).strict(),
   z.object({
     ...RunStartFields,
@@ -193,7 +195,7 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
       run_ref: z.string().min(1),
       requested_leads: z.number().int().positive(),
       leads_discovered: z.number().int().nonnegative().nullable(),
-      calibration_policy: z.enum(["tier_a_v1", "qualified_ab_v1"]).optional(),
+      calibration_policy: CalibrationPolicySchema.optional(),
       leads_researched: z.number().int().nonnegative().nullable(),
       error_code: z.string().nullable(),
       started_at: z.string().min(1),
