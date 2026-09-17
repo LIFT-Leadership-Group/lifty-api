@@ -27,3 +27,10 @@ A health-only question uses the mapping context read-only.
    outreach.
 
 The stage operations resolve the authenticated current workspace. Preserve the workspace and portal references returned by its mapping context; do not select another tenant to bypass ambiguity or authorization errors. Regenerate from fresh context after a timeout; HubSpot may have accepted an additive change.
+
+For Industry, person location, other contact/company fields or an intentional
+edit to an existing mapping, use the general operations published by
+`context crm`: `mapping_catalog`, `mapping_sources`, `mapping_preview` and
+`mapping_apply`. This five-field onboarding setup is not the full mapper.
+Saving a mapping still requires a fresh preview and requested `mapping_sync`
+to update existing records; verify the exact `mapping_status` receipt.
