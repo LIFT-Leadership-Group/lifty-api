@@ -1,3 +1,5 @@
+import { BusinessWebsiteSchema, BusinessWebsitePatchSchema } from "./business-website.js";
+import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
 import {
   CrmMappingCatalogSchema, CrmMappingSourcesRequestSchema, CrmMappingSourcesSchema,
@@ -68,6 +70,7 @@ export const SendingAccountStartSchema = z.discriminatedUnion("channel", [
 export const BusinessStageSchema = z.object({
   workspace: WorkspaceStatusSchema,
   configuration: WorkspaceConfigSchema.nullable(),
+  website: readResult(BusinessWebsiteSchema).nullable(),
 }).strict();
 export const CapacityStageSchema = z.object({
   configuration: WorkspaceConfigSchema,
@@ -77,9 +80,9 @@ export const NotificationStagePatchSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("destination"), values: UpsertNotificationDestinationRequestSchema }).strict(),
   z.object({ operation: z.literal("route"), values: SetNotificationRouteRequestSchema }).strict(),
 ]);
-export const BusinessStagePatchSchema = z.object({
-  section: z.literal("workspace"), values: CreateWorkspaceRequestSchema.partial(),
-}).strict();
+export const BusinessStagePatchSchema = z.union([z.object({
+  section: z.literal("workspace"), values: CreateWorkspaceRequestSchema.omit({ website_url: true }).partial(),
+}).strict(), BusinessWebsitePatchSchema]);
 // Reuse generation field definitions; extra filter limits mirror the existing
 // submit_lifty_config_update RPC. Labels, weights and fingerprints stay absent.
 export const TargetingValuesSchema = LocalOnboardingConfigurationSchema.shape.icp_config
@@ -167,10 +170,15 @@ const configSupport = {
 // implemented with the generic stage transport. Existing business handlers and
 // their authorization, validation, jobs and protected-field rules remain owners.
 export const stageOperations: Record<string, Record<string, StageOperation>> = {
+  summary: {
+    get: operation("GET", stageRoute("summary"), "Read this authenticated workspace at the start of every session. Compact existing business, website, connection and saved campaign state. Unavailable means retry, not missing setup.", WorkspaceSummarySchema),
+    post: unsupported("summary", "POST", "Summary is read-only."),
+    patch: unsupported("summary", "PATCH", "Summary is read-only."),
+  },
   business: {
-    get: operation("GET", stageRoute("business"), "Read workspace existence and saved business name/description; configuration is null before provisioning.", BusinessStageSchema),
+    get: operation("GET", stageRoute("business"), "Read workspace existence and saved business name/description and confirmed website with unconfirmed research candidates; configuration is null before provisioning.", BusinessStageSchema),
     post: operation("POST", stageRoute("business"), "Provision the authenticated founder's workspace using the existing create operation.", CreateWorkspaceResultSchema, CreateWorkspaceRequestSchema),
-    patch: configWrite("business", "workspace", BusinessStagePatchSchema),
+    patch: operation("PATCH", stageRoute("business"), "Update name/description with section=workspace, or the confirmed primary website with section=website and its current expected_version. Website updates are immediate; read back after uncertain writes. No campaign changes.", z.union([ConfigUpdateResultSchema, BusinessWebsiteSchema]), BusinessStagePatchSchema),
     update_status: configSupport.update_status,
   },
   targeting: { get: configRead("targeting", "Read saved ICP/personas; versions and lane allocation are read-only."), post: initialSetup("targeting"), patch: configWrite("targeting", "icp", TargetingStagePatchSchema), ...configSupport },

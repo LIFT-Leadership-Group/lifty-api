@@ -367,6 +367,33 @@ describe("backend beta connection policy",()=>{
 });
 
 describe("hosted selection and exact-attempt verification", () => {
+  it("explains a mailbox ownership conflict without recommending another authorization", async () => {
+    const client = { rpc: async () => ({ data: null, error: { code: "PT409", message: "email_account_taken" } }) };
+    const { ops } = harness();
+
+    await expect(ops.status({ userId: id, client }, workspace)).rejects.toMatchObject({
+      code: "EMAIL_ACCOUNT_TAKEN",
+      message: expect.stringContaining("another workspace"),
+    });
+  });
+  it.each([
+    ["completed", false],
+    ["ready", true],
+  ] as const)("acknowledges a used %s authorization without replaying the hosted link", async (intentState, authorizationReceived) => {
+    const { ops, calls } = harness({ intent: { ...intent, state: intentState, authorization_received: authorizationReceived } });
+
+    await expect(ops.authorize(state)).resolves.toBe("authorization_received");
+    expect(calls.map(call => call.operation)).toEqual(["intent"]);
+  });
+  it("renders a no-store acknowledgment for a used browser authorization", async () => {
+    const app = createApp({ authorizeEmail: async () => "authorization_received", log: () => {} });
+
+    const response = await app.request(`/unipile/start?intent=${state}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.text()).toContain("We received your authorization");
+  });
   it("starts workspace-only selection and reconnection without requesting a mailbox address or contacting the provider", async () => {
     const calls: Record<string, unknown>[] = [];
     const client = { rpc: async (_name: string, args: Record<string, unknown>) => {
@@ -389,7 +416,7 @@ describe("hosted selection and exact-attempt verification", () => {
     } });
     const app = createApp({ authorizeEmail: ops.authorize, declareEmail: ops.declare, log: () => {} });
     const page = await app.request(`/unipile/start?intent=${state}`);
-    expect(page.status).toBe(200); expect(page.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(page.status).toBe(200); expect(page.headers.get("referrer-policy")).toBe("strict-origin");
     expect(page.headers.get("content-security-policy")).toContain("form-action 'self'");
     expect(await page.text()).toContain('type="checkbox"'); expect(calls).toEqual(["intent"]);
     const send = (body: string, origin = "http://localhost") => app.request("/unipile/start", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin }, body });

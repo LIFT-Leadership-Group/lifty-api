@@ -459,8 +459,8 @@ export async function createWorkspace(
   input: CreateWorkspaceRequest,
 ): Promise<CreateWorkspaceResult> {
   const { data, error } = await getRpcClient(session).rpc<CreateWorkspaceResult>(
-    "create_lifty_workspace",
-    { name: input.name, description: input.description ?? null },
+    input.website_url === undefined ? "create_lifty_workspace" : "create_lifty_business",
+    { name: input.name, description: input.description ?? null, ...(input.website_url === undefined ? {} : { website_url: input.website_url }) },
   );
 
   if (error) {

@@ -56,7 +56,8 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    transport does not poll. Once five profiles have current research and
    rationale, the cohort is ready regardless of its tier distribution. The
    service does not acquire repeated waves to replace low-fit candidates.
-2. Present the returned cohort as a table with person, company, actual grade,
+2. Open with your read: the strongest lead and the pattern across the returned
+   cohort. Then present it as a table with person, company, actual grade,
    **LinkedIn profile URL**, fit rationale, and evidence gaps. Include C leads
    with their mismatch reasons; they are part of the review. Distinguish
    profiles missing a valid LinkedIn URL or rationale as incomplete evidence.

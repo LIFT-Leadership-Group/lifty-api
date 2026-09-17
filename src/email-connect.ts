@@ -20,13 +20,14 @@ const Stored = z.object({
   account_id: z.string().nullable().optional(), connection_ref: z.uuid().nullable().optional(), intent_ref: z.uuid().nullable().optional(),
   expires_at: z.string().optional(), failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed"]).nullable().optional(),
 });
-const Intent = z.object({state:z.enum(["pending","issuing","ready","completed","failed"]),intent_ref:z.uuid(),workspace_ref:z.uuid(),email:z.email().nullable(),expires_at:z.string(),account_id:z.string().nullable(),hosted_url:z.url().nullable(),selection_required:z.boolean().optional()});
+const Intent = z.object({state:z.enum(["pending","issuing","ready","completed","failed"]),intent_ref:z.uuid(),workspace_ref:z.uuid(),email:z.email().nullable(),expires_at:z.string(),account_id:z.string().nullable(),hosted_url:z.url().nullable(),selection_required:z.boolean().optional(),authorization_received:z.boolean().optional()});
 function fail(code: string, status = 409): never {
   const messages: Record<string,string> = {
     EMAIL_WORKSPACE_FORBIDDEN: "Choose a workspace you belong to.",
     EMAIL_PROFILE_CONFLICT: "Disconnect this workspace’s email first, then run connect again with a mailbox you use regularly.",
     EMAIL_INTENT_EXPIRED: "This email connection link expired. Run the connect command again.",
     EMAIL_LINK_PENDING: "An email connection link is being prepared. Try opening it again shortly.",
+    EMAIL_ACCOUNT_TAKEN: "This email is linked to another workspace. Another authorization link will not fix that. Resolve the existing workspace connection before trying again.",
     EMAIL_IDENTITY_MISMATCH: "Authorize the exact email address you selected in LIFTY.",
   };
   throw new PublicError({status,code,message:messages[code] ?? "LIFTY could not complete the email connection. Try again from the CLI."});
@@ -108,9 +109,10 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
   async function authorize(state:string):Promise<string>{
     const id=open(state);
     const intent=Intent.parse(await rpc("intent",{intent_ref:id}));
+    if(intent.state==="completed" || (intent.state==="ready" && intent.authorization_received))return "authorization_received";
     if(intent.selection_required)throw new PublicError({status:409,code:"EMAIL_DECLARATION_REQUIRED",message:"Confirm your regular personal Gmail account use in the hosted connection flow."});
     if(intent.state==="ready" && intent.hosted_url)return intent.hosted_url;
-    if(intent.state==="failed" || intent.state==="completed")fail("EMAIL_INTENT_EXPIRED",410);
+    if(intent.state==="failed")fail("EMAIL_INTENT_EXPIRED",410);
     const claim=z.object({claimed:z.boolean()}).parse(await rpc("issue_link",{intent_ref:id}));
     if(!claim.claimed)fail("EMAIL_LINK_PENDING");
     let phase:"create"|"save"="create";

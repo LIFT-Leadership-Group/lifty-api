@@ -1,3 +1,5 @@
+import { getWorkspaceSummary, readComponent } from "./workspace-summary.js";
+import { BusinessWebsiteSchema } from "./business-website.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
 import {
   CrmMappingCatalogSchema, CrmMappingSourcesRequestSchema, CrmMappingSourcesSchema,
@@ -153,11 +155,20 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     app.get(`/v1/workspace/${stage}`, async context => {
       context.header("cache-control", "no-store");
       const session = context.get("authSession");
+      if (stage === "summary") {
+        parse(Empty, context.req.query());
+        return context.json(await getWorkspaceSummary(dependencies, session));
+      }
       if (stage === "business") {
         parse(Empty, context.req.query());
         const state = WorkspaceStatusSchema.parse(await dependencies.getWorkspace(session));
         return context.json(BusinessStageSchema.parse({ workspace: state,
-          configuration: state.state === "needs_workspace" ? null : await dependencies.getConfig(session, "workspace") }));
+          configuration: state.state === "needs_workspace" ? null : await dependencies.getConfig(session, "workspace"),
+          website: state.state === "needs_workspace" ? null : await readComponent(async () => {
+            const value = BusinessWebsiteSchema.parse(await dependencies.getBusinessWebsite(session));
+            if (value.workspace_ref !== state.workspace.workspace_ref) throw forbidden();
+            return value;
+          }) }));
       }
       const current = await workspace(context);
       if (stage === "crm" || stage === "notifications") {
@@ -193,7 +204,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
 
     app.post(`/v1/workspace/${stage}`, async context => {
       parse(Empty, context.req.query());
-      if (stage === "capacity") throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "Capacity is managed by existing platform policy and is read-only here." });
+      if (stage === "capacity" || stage === "summary") throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This stage is read-only." });
       const body = await readBody(context);
       if (stage === "business") return forward(context, "POST", "/v1/workspace", parse(CreateWorkspaceRequestSchema, body));
       const current = await workspace(context);
@@ -225,7 +236,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
 
     app.patch(`/v1/workspace/${stage}`, async context => {
       parse(Empty, context.req.query());
-      if (["capacity", "sample-review", "sending-accounts"].includes(stage)) {
+      if (["summary", "capacity", "sample-review", "sending-accounts"].includes(stage)) {
         throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This stage has no supported configuration changes through PATCH." });
       }
       const current = await workspace(context);
@@ -246,7 +257,16 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         const input = parse(NotificationStagePatchSchema, body);
         return forward(context, "PUT", input.operation === "destination" ? "/v1/notifications/destinations/slack" : "/v1/notifications/routes", input.values);
       }
-      const schema = stage === "business" ? BusinessStagePatchSchema : stage === "targeting" ? TargetingStagePatchSchema
+      if (stage === "business") {
+        const input = parse(BusinessStagePatchSchema, body);
+        if (input.section === "website") {
+          const result = BusinessWebsiteSchema.parse(await dependencies.setBusinessWebsite(context.get("authSession"), input));
+          if (result.workspace_ref !== current) throw forbidden();
+          return context.json(result);
+        }
+        return forward(context, "PATCH", "/v1/config", input);
+      }
+      const schema = stage === "targeting" ? TargetingStagePatchSchema
         : stage === "research-criteria" ? ResearchStagePatchSchema : VoiceStagePatchSchema;
       return forward(context, "PATCH", "/v1/config", parse(schema, body));
     });

@@ -1,10 +1,11 @@
+import type { BusinessWebsite, BusinessWebsitePatch } from "./business-website.js";
 import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
 import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
 import { CrmMappingError } from "./crm-mapping.js";
 import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
 import { registerStageRoutes } from "./stage-routes.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
-import { renderEmailAuthorizationPage } from "./email-authorization-page.js";
+import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { getConnectionAttempt, type ConnectionAttemptStatus, type ConnectionProvider } from "./connection-attempt.js";
 import {
   type CompanyMappingOperation,
@@ -153,6 +154,7 @@ export interface AppDependencies {
   authorizeLinkedin(state: string): Promise<string>;
   completeLinkedinCallback(state: string, body: unknown): Promise<void>;
   emailAvailable: boolean;
+  emailAuthorizationOrigin: string | null;
   startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
   getEmailConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<EmailStatus>;
   disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
@@ -160,6 +162,8 @@ export interface AppDependencies {
   declareEmail(state: string): Promise<string>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
+  getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
+  setBusinessWebsite(session: AuthSession, input: BusinessWebsitePatch): Promise<BusinessWebsite>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
   createWorkspace(
     session: AuthSession,
@@ -947,11 +951,14 @@ const defaultDependencies: AppDependencies = {
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
   disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   emailAvailable: false,
+  emailAuthorizationOrigin: null,
   startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authorizeEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   completeEmailCallback: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
+  getBusinessWebsite: async () => { throw new Error("getBusinessWebsite is not configured"); },
+  setBusinessWebsite: async () => { throw new Error("setBusinessWebsite is not configured"); },
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
   },
@@ -1374,8 +1381,14 @@ export function createApp(
     catch (error) {
       if (!(error instanceof PublicError) || error.code !== "EMAIL_DECLARATION_REQUIRED") throw error;
       return context.html(renderEmailAuthorizationPage(state), 200, {
-        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+        "cache-control": "no-store", "referrer-policy": "strict-origin", "x-content-type-options": "nosniff",
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      });
+    }
+    if (target === "authorization_received") {
+      return context.html(renderEmailAuthorizationReceivedPage(), 200, {
+        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       });
     }
     const url = new URL(target);
@@ -1388,7 +1401,9 @@ export function createApp(
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
     const origin = context.req.header("origin");
-    if ((origin && origin !== new URL(context.req.url).origin) || context.req.header("sec-fetch-site") === "cross-site") {
+    // TLS terminates at the hosting proxy; compare with the configured public origin.
+    const expectedOrigin = dependencies.emailAuthorizationOrigin ?? new URL(context.req.url).origin;
+    if ((origin && origin !== expectedOrigin) || context.req.header("sec-fetch-site") === "cross-site") {
       return errorJson(context, 403, "INVALID_REQUEST", "Continue from the email authorization page.");
     }
     if (!context.req.header("content-type")?.toLowerCase().startsWith("application/x-www-form-urlencoded")) {

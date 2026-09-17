@@ -1,3 +1,4 @@
+import { BusinessWebsiteUrl } from "./business-website.js";
 import { CrmSyncReceiptSchema } from "./crm-sync-receipt.js";
 import { z } from "@hono/zod-openapi";
 import { LocalConfigUpdateConfigurationSchema, LocalOnboardingConfigurationSchema } from "./generated/lifty-configuration.js";
@@ -28,6 +29,7 @@ export const WorkspaceStatusSchema = z.discriminatedUnion("state", [
 
 export const CreateWorkspaceRequestSchema = z
   .object({
+    website_url: BusinessWebsiteUrl.nullable().optional(),
     name: z.string().trim().min(1).max(200),
     description: z.string().max(4000).nullable().optional(),
   })
