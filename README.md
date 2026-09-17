@@ -362,3 +362,61 @@ or HubSpot; it does not prove that the replay worker is deployed. Verify the
 Jobs task version separately and use a disposable nonproduction exact-cohort
 preview/replay/readback canary under the existing canary policy. Generic v5
 clients consume these API-owned operations without a new CLI business registry.
+
+## Staged Unipile V2 connections (LIF-916)
+
+V2 is an additive, database-selected transport. Keep the V1 DSN, credentials,
+namespace and hosted domain intact. Set `UNIPILE_V2_ACCESS_TOKEN` and
+`UNIPILE_V2_APPLICATION_ID` together, with an application-scoped key. The API
+uses `https://api.unipile.com/v2` for V2 only. Credentials alone do not select a
+workspace or change an existing connection.
+
+Apply the reviewed Functions LIF-916 migration and signed V2 lifecycle endpoint
+before selecting pilot workspace/channel routing. The existing email/LinkedIn
+RPCs return an immutable `transport` snapshot per intent and the active transport
+per connection. Copied accounts preserve canonical V1 connection IDs, mailbox
+budgets and LinkedIn history; provider calls use only the verified V2 alias.
+Administrative prebinding must verify the provider's `metadata.v1_account_id`,
+application, scope and owner against the existing canonical connection. New
+V2-only accounts retain their real V2 ID and `unipile:v2:<application_id>`
+namespace. They cannot be rolled back onto a fictitious V1 account.
+
+`UNIPILE_V2_HOSTED_AUTH_ORIGINS` is a comma-separated allowlist of verified HTTPS
+origins. The default `https://auth.unipile.com` is also allowed. Rollout configuration
+snapshots the selected origin into each intent. The API passes that domain to
+Unipile, checks the exact returned origin, and stores/redirects the returned URL
+without rewriting it. Keep previous origins in the allowlist until their links
+expire. Use a separate V2 domain while V1 links remain active; V1 URLs keep the
+existing V1 browser-boundary rewrite.
+
+The API first claims the intent, persists a channel-separated HMAC state, and
+issues one hosted link. Browser return parameters never authorize attachment.
+Only a separately authenticated, state-bearing lifecycle event can supply the
+account for exact-attempt polling. Polling independently reads the account and
+owner, checks application/scope/legacy alias, and submits verified evidence to
+SQL. SQL rechecks ownership, current intent, expiry and disconnect races. V1
+callbacks are rejected for V2 intents. Reconnection never enables sending.
+LinkedIn health writes include transport version/generation to reject stale
+readbacks after cutover or rollback.
+
+Currently V2 accepts Google mailbox connections with exactly one verified primary
+email sender, and LinkedIn with an exact self-profile match. Outlook and IMAP
+continue on V1: the documented V2 account response does not expose the V1
+delegated-mailbox flag or matching IMAP/SMTP service settings needed by the current
+mailbox policy. V2 deliberately rejects those providers until equivalent vendor
+evidence is established. This limitation does not change existing V1 Outlook or
+IMAP support.
+
+Rollback disables new V2 routing and uses the retained mapping's generation CAS
+for copied accounts. Keep V2 credentials, endpoint and domains available while
+V2 attempts or retained operations need reconciliation; do not erase mappings or
+change the V1 namespace. Jobs must retain each operation's transport separately
+so a successful or ambiguous send is never retried against the other version.
+
+Local contract tests prove fail-closed API behavior, not vendor production
+readiness. Release still requires independent review, actual signed webhook
+validation, copied-account prebinding and a permitted live pilot. Sources:
+[Hosted auth](https://developer.unipile.com/v2.0/docs/authenticate-with-hosted-auth),
+[provider features](https://developer.unipile.com/v2.0/docs/list-provider-features),
+and the official [Unipile SDK](https://github.com/unipile/unipile-node) schemas at
+`f839654cf7c8856635b9dae6032d00a91489560b`.

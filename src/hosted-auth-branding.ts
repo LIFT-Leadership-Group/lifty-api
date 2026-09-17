@@ -24,3 +24,13 @@ export function brandedHostedAuthUrl(target: string, origin: string): string | n
     return url.toString();
   } catch { return null; }
 }
+
+/** V2 URLs already contain the intent-snapshotted verified domain; never rewrite them. */
+export function versionedHostedAuthUrl(target:string,v1Origin:string,v2Origins:readonly string[]):string|null {
+  try {
+    const url=new URL(target);
+    if(url.origin===UNIPILE_HOSTED_AUTH_ORIGIN)return brandedHostedAuthUrl(target,v1Origin);
+    if(url.protocol!=="https:" || url.username || url.password || url.port || url.hash || !v2Origins.includes(url.origin))return null;
+    return url.toString();
+  } catch {return null;}
+}

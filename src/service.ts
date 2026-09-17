@@ -82,6 +82,7 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    ...(config.unipileV2HostedAuthOrigins ? {unipileV2HostedAuthOrigins:config.unipileV2HostedAuthOrigins} : {}),
     ...(config.unipileHostedAuthOrigin ? { unipileHostedAuthOrigin: config.unipileHostedAuthOrigin } : {}),
     acquisitionRecovery: createAcquisitionRecoveryOperations({
       enqueueVerification: createAcquisitionVerificationTrigger(config.trigger),
@@ -97,6 +98,7 @@ export function createProductionApp(config: ServiceConfig) {
       disconnectLinkedin: linkedin.disconnect,
       authorizeLinkedin: linkedin.authorize,
       completeLinkedinCallback: linkedin.callback,
+      receiveLinkedinV2Return: linkedin.v2Return,
     } : {}),
     ...(email ? {
       emailAvailable: true,
@@ -109,6 +111,7 @@ export function createProductionApp(config: ServiceConfig) {
       authorizeEmail: email.authorize,
       declareEmail: email.declare,
       completeEmailCallback: email.callback,
+      receiveEmailV2Return: email.v2Return,
     } : {}),
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,

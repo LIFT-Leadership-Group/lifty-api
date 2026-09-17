@@ -12,6 +12,7 @@ type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
   unipileHostedAuthOrigin?: string;
+  unipileV2HostedAuthOrigins?: string[];
   crm?: { serverKey: string; readOnly: boolean } | null;
   dashboardOrigin?: string;
   host: string;
@@ -119,12 +120,20 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
 
   const providerValues = [environment.UNIPILE_DSN, environment.UNIPILE_ACCESS_TOKEN];
   const providerReady = providerValues.every(value => Boolean(value?.trim()));
+  const v2Token=environment.UNIPILE_V2_ACCESS_TOKEN?.trim(), v2Application=environment.UNIPILE_V2_APPLICATION_ID?.trim();
+  const v2Origins=environment.UNIPILE_V2_HOSTED_AUTH_ORIGINS?.trim();
+  if(Boolean(v2Token)!==Boolean(v2Application) || (v2Origins && !v2Token))throw new Error("Unipile V2 requires UNIPILE_V2_ACCESS_TOKEN and UNIPILE_V2_APPLICATION_ID.");
+  if(v2Application && !/^app_[A-Za-z0-9_-]+$/.test(v2Application))throw new Error("Invalid UNIPILE_V2_APPLICATION_ID.");
+  const v2=v2Token && v2Application ? {accessToken:v2Token,applicationId:v2Application,
+    hostedAuthOrigins:[...new Set(["https://auth.unipile.com",...(v2Origins?.split(",") ?? [])].map(value=>parseHostedAuthOrigin(value)))]} : undefined;
+  if(v2?.hostedAuthOrigins.includes("https://account.unipile.com"))throw new Error("V2 cannot use the V1 hosted authentication origin.");
   const crmKey = environment.LIFTY_CRM_SERVER_KEY?.trim();
   if (crmKey && (crmKey.length < 32 || crmKey.length > 256)) throw new Error("LIFTY_CRM_SERVER_KEY must contain 32 to 256 characters.");
   const emailKey = environment.LIFTY_EMAIL_SERVER_KEY?.trim();
   const linkedinKey = environment.LIFTY_LINKEDIN_SERVER_KEY?.trim();
   const emailEnabled = Boolean(emailKey);
   const linkedinEnabled = Boolean(linkedinKey);
+  if(v2 && !emailEnabled && !linkedinEnabled)throw new Error("Unipile V2 requires a dedicated connection service key.");
   if ((emailEnabled || linkedinEnabled) && !providerReady) throw new Error("Unipile requires both UNIPILE_DSN and UNIPILE_ACCESS_TOKEN.");
   if (providerValues.some(value => Boolean(value?.trim())) && !emailEnabled && !linkedinEnabled) throw new Error("Unipile requires a dedicated email or LinkedIn service key.");
   if (emailKey && emailKey.length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
@@ -133,15 +142,18 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
     unipileHostedAuthOrigin: parseHostedAuthOrigin(environment.UNIPILE_HOSTED_AUTH_ORIGIN),
+    ...(v2 ? {unipileV2HostedAuthOrigins:v2.hostedAuthOrigins} : {}),
     crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,
     dashboardOrigin: dashboardUrl.origin,
     linkedin: linkedinEnabled ? {
+      ...(v2 ? {v2} : {}),
       dsn: required(environment, "UNIPILE_DSN"), accessToken: required(environment, "UNIPILE_ACCESS_TOKEN"),
       serverKey: required(environment, "LIFTY_LINKEDIN_SERVER_KEY"),
       publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
     } : null,
     email: emailEnabled ? {
+      ...(v2 ? {v2} : {}),
       dsn: required(environment,"UNIPILE_DSN"), accessToken: required(environment,"UNIPILE_ACCESS_TOKEN"),
       serverKey: required(environment,"LIFTY_EMAIL_SERVER_KEY"),
       publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
