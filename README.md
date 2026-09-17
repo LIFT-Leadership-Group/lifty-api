@@ -177,6 +177,30 @@ Deployment order:
    expired/forged callbacks. Unit HTTP contracts and SQL fixture tests are not
    live OAuth acceptance evidence.
 
+### Hosted connection domain
+
+Email and LinkedIn browser handoffs support `UNIPILE_HOSTED_AUTH_ORIGIN`.
+When unset, they use `https://account.unipile.com`. To enable a Lifty domain:
+
+1. Create `connect.liftygtm.com` as a CNAME to `account.unipile.com`.
+2. Ask Unipile support to activate the V1 hosted domain and issue its TLS
+   certificate. Verify public DNS and HTTPS before changing the API setting.
+3. Set `UNIPILE_HOSTED_AUTH_ORIGIN=https://connect.liftygtm.com` on the API
+   deployment. It accepts only an HTTPS DNS origin, with no credentials,
+   non-default port, path, query or fragment.
+4. Verify new and resumed email/LinkedIn handoffs, then real account
+   authorization and reconnection in the designated test workspace.
+
+The provider and database continue using canonical Unipile URLs. Only the
+browser redirect hostname changes; the session path/query, signed callbacks,
+identity readback and account permissions remain intact. No database migration
+or CLI update is required. Roll back by removing `UNIPILE_HOSTED_AUTH_ORIGIN`
+and deploying the configuration; existing unexpired intents remain usable.
+
+Custom domains do not establish logo removal or change Google/Microsoft's OAuth
+consent branding. Confirm V1 page branding separately with Unipile. Do not
+change shared OAuth credentials or migrate to V2 to enable this setting.
+
 LIF-827 still owns Mailivery warmup/placement evidence and durable activation
 policy. LIF-828 must enforce the per-physical-mailbox 10/day budget atomically
 across all automated sends, retries and workspace resets before any sending is

@@ -6,6 +6,7 @@ import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguratio
 import { registerStageRoutes } from "./stage-routes.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
+import { brandedHostedAuthUrl, parseHostedAuthOrigin, UNIPILE_HOSTED_AUTH_ORIGIN } from "./hosted-auth-branding.js";
 import { getConnectionAttempt, type ConnectionAttemptStatus, type ConnectionProvider } from "./connection-attempt.js";
 import {
   type CompanyMappingOperation,
@@ -140,6 +141,7 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  unipileHostedAuthOrigin: string;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
@@ -951,6 +953,7 @@ const defaultDependencies: AppDependencies = {
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
   disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   emailAvailable: false,
+  unipileHostedAuthOrigin: UNIPILE_HOSTED_AUTH_ORIGIN,
   emailAuthorizationOrigin: null,
   startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
@@ -1081,6 +1084,7 @@ export function createApp(
   overrides: Partial<AppDependencies> = {},
 ): OpenAPIHono<AppEnvironment> {
   const dependencies = { ...defaultDependencies, ...overrides };
+  const hostedAuthOrigin = parseHostedAuthOrigin(dependencies.unipileHostedAuthOrigin);
   const app = new OpenAPIHono<AppEnvironment>();
   registerOpenApi(app);
   const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
@@ -1357,11 +1361,11 @@ export function createApp(
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
     const target = await dependencies.authorizeLinkedin(context.req.query("intent") ?? "");
-    const url = new URL(target);
-    if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
+    const redirect = brandedHostedAuthUrl(target, hostedAuthOrigin);
+    if (!redirect) {
       throw new PublicError({ status: 502, code: "LINKEDIN_INVALID_HANDOFF", message: "LIFTY could not prepare the LinkedIn connection." });
     }
-    return context.redirect(target, 303);
+    return context.redirect(redirect, 303);
   });
   app.post("/unipile/linkedin/callback", async (context) => {
     context.header("cache-control", "no-store");
@@ -1391,11 +1395,11 @@ export function createApp(
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       });
     }
-    const url = new URL(target);
-    if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
+    const redirect = brandedHostedAuthUrl(target, hostedAuthOrigin);
+    if (!redirect) {
       throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"LIFTY could not prepare the email connection."});
     }
-    return context.redirect(target, 303);
+    return context.redirect(redirect, 303);
   });
   app.post("/unipile/start", async context => {
     context.header("cache-control", "no-store");
@@ -1417,11 +1421,11 @@ export function createApp(
       return errorJson(context, 400, "INVALID_REQUEST", "Confirm your regular personal mailbox before continuing.");
     }
     const target = await dependencies.declareEmail(form.get("intent")!);
-    const url = new URL(target);
-    if (url.protocol !== "https:" || url.hostname !== "account.unipile.com" || url.port || url.username || url.password || url.hash) {
+    const redirect = brandedHostedAuthUrl(target, hostedAuthOrigin);
+    if (!redirect) {
       throw new PublicError({ status: 502, code: "EMAIL_INVALID_HANDOFF", message: "LIFTY could not prepare the email connection." });
     }
-    return context.redirect(target, 303);
+    return context.redirect(redirect, 303);
   });
   app.post("/unipile/callback", async (context) => {
     context.header("cache-control", "no-store");
