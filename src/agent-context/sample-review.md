@@ -14,8 +14,27 @@ Preserve historical policy and grades; old cohorts are not new research.
 After configuration is imported, read the capacity stage before new discovery.
 POST has an empty object body and reuses the existing bounded first-run
 operation. It starts/retrieves the initial cohort; it does not repeatedly buy
-new leads until a desired grade appears. Read GET until the operation reaches
-a confirmed state, then present the actual cohort.
+new leads until a desired grade appears. Use the returned `run_ref` with
+`sample-review.progress` while work is pending. The first read returns immediately;
+pass its `cursor` and `wait_seconds: 25` on the next call to wait for a change.
+Keep one request open at a time. Report newly researched people as they appear,
+then present the actual cohort when `terminal` is true. Do not sleep for two
+minutes or POST again just to check progress.
+
+Each progress response is the complete current cohort (at most 25 people).
+`changed: false` means no change during that wait; reuse the cursor. Reconnect
+with the same run reference and last cursor. Deduplicate narrated completions
+by `run_ref`, `attempt` and `lead_ref`; a new attempt resets that comparison.
+Research can become superseded, so retain the returned current snapshot rather
+than adding counts from responses. These are observations of saved state, not
+a persisted event history: intermediate changes can be coalesced, and partial
+research may already exist when an attempt resumes. Preserve every actual grade.
+
+A failed run is terminal; a read error is not. Retry a failed read with the same
+run and cursor, never start discovery or research recovery automatically. Stop
+waiting on terminal success/failure, cancellation, or a founder change of task.
+Host tools may buffer output; Lifty returns progress as changes are observed,
+but cannot guarantee the host narrates each lead in real time.
 
 ## Later edits
 

@@ -259,7 +259,9 @@ only output shape.
     ```
 
     The sample POST input is `{ "body": {} }`. It starts/retrieves the bounded
-    cohort. Explicitly poll GET for the actual result; a timeout does not prove
+    cohort. Use `stage sample-review progress` with the returned `run_ref`, then
+    its cursor, to wait for saved changes and report newly researched leads.
+    Follow the sample guide's wait and reconnect rules. A timeout does not prove
     failure or authorize another acquisition wave. This sends nothing and does
     not touch CRM. Calibration owns the A/B sample, profile links and feedback;
     requested outreach setup can progress independently.
@@ -268,7 +270,11 @@ only output shape.
     may still use `status <resolved-installation-arguments>`, but never start a
     connection to answer a status question.
 
-14. If HubSpot connection was part of the founder's request, fetch
+14. Offer to connect the founder's CRM without assuming which one they use.
+    Reuse a saved preference; otherwise ask which CRM they use or whether they
+    prefer to continue without one. External CRM setup is optional. HubSpot is
+    the current self-service connection; Attio and other choices must not be
+    silently redirected into HubSpot authorization. If they choose HubSpot, fetch
     `context crm` and follow its current guide, operation schemas and connection
     reference. Explain that connecting lets Lifty put researched leads into
     their CRM and does not send outreach. Read the current state, start the
@@ -277,8 +283,9 @@ only output shape.
     portal is insufficient evidence for a new authorization. Preserve a working
     connection during reconnection. If HubSpot reports an admin/permission
     blocker, use the stage's current repair instructions and do not claim an
-    approval request was sent unless the founder submitted it. If HubSpot was
-    not requested, offer it as a next step without starting authorization.
+    approval request was sent unless the founder submitted it. If they choose
+    no CRM or one not yet supported here, continue with their Lifty workspace
+    and the remaining requested steps.
 
 15. After the connection succeeds, when the first run has researched leads,
     push them into the founder's HubSpot:
@@ -297,7 +304,7 @@ only output shape.
     delivery only when all stages are confirmed by the receipt.
 16. When the founder chooses email setup, fetch `context sending-accounts`
     and follow its current email operation schema, even while sample review is
-    pending. Briefly recommend a Gmail/Google Workspace account they already
+    pending. Briefly recommend a Gmail, Google Workspace, Outlook, Microsoft 365, or IMAP/SMTP account they already
     use regularly when appropriate under the current policy. Hosted selection
     handles provider, account and habitual-use declarations; do not add an
     email-address or mailbox-use questionnaire. GET the current state, POST

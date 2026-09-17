@@ -1,3 +1,4 @@
+import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { BusinessWebsiteSchema, BusinessWebsitePatchSchema } from "./business-website.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
@@ -184,6 +185,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   targeting: { get: configRead("targeting", "Read saved ICP/personas; versions and lane allocation are read-only."), post: initialSetup("targeting"), patch: configWrite("targeting", "icp", TargetingStagePatchSchema), ...configSupport },
   "research-criteria": { get: configRead("research-criteria", "Read the saved research prompt and provenance; protected prompts remain read-only."), post: initialSetup("research-criteria"), patch: configWrite("research-criteria", "prompt", ResearchStagePatchSchema), ...configSupport },
   "sample-review": {
+    progress: operation("GET", "/v1/workspace/runs/progress", "Wait up to 25 seconds for a change to this exact run. Pass the last cursor to resume. Returns the complete current bounded cohort, live research count and terminal state; not a persisted event history. Read-only and reauthorized on each poll.", RunProgressSchema, null, RunProgressQuerySchema),
     get: operation("GET", stageRoute("sample-review"), "Read the existing cohort, grades and run state; no persisted approval ledger.", RunStatusSchema),
     post: operation("POST", stageRoute("sample-review"), "Start/retrieve the existing bounded initial run; no repeated discovery waves or new approval store.", StartRunResultSchema, Empty),
     patch: unsupported("sample-review", "PATCH", "Grades, historical evidence and sample approval are not writable configuration."),

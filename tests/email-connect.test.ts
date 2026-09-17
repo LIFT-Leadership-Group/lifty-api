@@ -10,6 +10,14 @@ const state=sealEmailIntent(id,secret);
 const settings={dsn:"https://api1.unipile.com:13111",accessToken:"provider-SECRET",serverKey:secret,publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://project.supabase.co",publishableKey:"sb_public"};
 const account={id:"account_1",type:"GOOGLE_OAUTH",connection_params:{mail:{id:"mail_1",username:email}},sources:[{id:"source_a",status:"OK"},{id:"source_b",status:"OK"}]};
 const owner={object:"AccountOwnerProfile",provider:"GMAIL",email,aliases:[{email,is_primary:true}]};
+const imapAccount={...account,type:"MAIL",connection_params:{mail:{
+  imap_user:email,imap_host:"imap.example.test",imap_port:993,
+  smtp_user:email,smtp_host:"smtp.example.test",smtp_port:465,
+}}};
+const imapOwner={object:"AccountOwnerProfile",provider:"IMAP",connection_params:{
+  imap:{username:email,host:"imap.example.test",port:993},
+  smtp:{username:email,host:"smtp.example.test",port:465},
+}};
 const intent={state:"ready",intent_ref:id,workspace_ref:workspace,email,expires_at:new Date(Date.now()+120000).toISOString(),account_id:null,hosted_url:"https://account.unipile.com/example"};
 const body={status:"CREATION_SUCCESS",account_id:"account_1",name:emailCallbackName(id,secret)};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json"}});
@@ -58,15 +66,35 @@ describe("email hosted auth boundary",()=>{
   });
   it("rejects wrong IDs, SMTP/IMAP ambiguity and unhealthy sources",async()=>{
     for(const identity of [{...account,id:"different"},{...account,type:"MAIL",connection_params:{mail:{smtp_user:email,imap_user:"other@example.test"}}}]){
-      const {ops,calls}=harness({identity}); await expect(ops.callback(state,body)).rejects.toMatchObject({code:identity.type==="MAIL"?"UNIPILE_MAILBOX_UNVERIFIABLE":"UNIPILE_IDENTITY_MISMATCH"});
+      const {ops,calls}=harness({identity}); await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
       expect(calls.some(c=>c.operation==="complete")).toBe(false);
     }
     const {ops}=harness({identity:{...account,sources:[{id:"different",status:"CONNECTING"}]}});
     await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_PROVIDER_NOT_READY"});
   });
-  it("rejects matching IMAP/SMTP usernames without pretending they prove physical identity",async()=>{
+  it("rejects matching IMAP/SMTP usernames without complete service evidence",async()=>{
     const {ops,calls}=harness({identity:{...account,type:"MAIL",connection_params:{mail:{imap_user:email,smtp_user:email}}}});
-    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_MAILBOX_UNVERIFIABLE",message:expect.stringContaining("IMAP/SMTP")});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_UNAVAILABLE"});
+    expect(calls.some(c=>c.operation==="complete")).toBe(false);
+  });
+  it.each(["CREATION_SUCCESS","RECONNECTED"])("completes IMAP %s with matching authenticated service logins",async(status)=>{
+    const {ops,calls}=harness({identity:imapAccount,owner:imapOwner,
+      intent:{...intent,email:null,account_id:status==="RECONNECTED"?"account_1":null}});
+    await ops.callback(state,{...body,status});
+    expect(calls.at(-1)).toEqual({operation:"complete",payload:{intent_ref:id,account_id:"account_1",email}});
+  });
+  it.each([
+    {smtp:{...imapOwner.connection_params.smtp,username:"other@example.test"}},
+    {imap:{...imapOwner.connection_params.imap,host:"other.example.test"}},
+    {smtp:{...imapOwner.connection_params.smtp,port:587}},
+  ])("rejects changed IMAP service evidence before completion: %j",async(changes)=>{
+    const {ops,calls}=harness({identity:imapAccount,owner:{...imapOwner,connection_params:{...imapOwner.connection_params,...changes}}});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+    expect(calls.some(c=>c.operation==="complete")).toBe(false);
+  });
+  it("keeps unhealthy IMAP authorization pending",async()=>{
+    const {ops,calls}=harness({identity:{...imapAccount,sources:[{id:"imap",status:"OK"},{id:"smtp",status:"CREDENTIALS"}]},owner:imapOwner});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_PROVIDER_NOT_READY"});
     expect(calls.some(c=>c.operation==="complete")).toBe(false);
   });
   it("requires the exact authenticated primary, not a matching login or default SendAs alias",async()=>{
@@ -91,15 +119,14 @@ describe("email hosted auth boundary",()=>{
       expect(calls.some(c=>c.operation==="complete")).toBe(false);
     }
   });
-  it.each(["CREATION_SUCCESS","RECONNECTED"])("rejects Outlook %s even with a matching custom-domain owner and never completes",async(status)=>{
+  it.each(["CREATION_SUCCESS","RECONNECTED"])("completes Outlook %s after verifying the custom-domain owner",async(status)=>{
     const {ops,calls}=harness({identity:{...account,type:"OUTLOOK"},
       owner:{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email},
       intent:{...intent,account_id:status==="RECONNECTED"?"account_1":null}});
-    await expect(ops.callback(state,{...body,status})).rejects.toMatchObject({status:409,code:"UNIPILE_MAILBOX_UNVERIFIABLE",message:expect.stringContaining("Gmail only")});
-    expect(calls.some(c=>c.operation==="complete")).toBe(false);
-    expect(calls.at(-1)).toEqual({operation:"fail",payload:{intent_ref:id,failure_code:"identity_mismatch"}});
+    await ops.callback(state,{...body,status});
+    expect(calls.at(-1)).toEqual({operation:"complete",payload:{intent_ref:id,account_id:"account_1",email}});
   });
-  it.each(["status","start"] as const)("rejects an existing Outlook connection on %s instead of reporting it healthy",async(operation)=>{
+  it.each(["status","start"] as const)("verifies an existing Outlook connection on %s",async(operation)=>{
     const operations:string[]=[],providerPaths:string[]=[];
     const client={rpc:async(_name:string,args:Record<string,unknown>)=>{
       operations.push(String(args.p_operation));
@@ -108,24 +135,37 @@ describe("email hosted auth boundary",()=>{
     }};
     const ops=createEmailConnectOperations({...settings,fetchImpl:async(url)=>{
       providerPaths.push(new URL(String(url)).pathname);
-      return json({...account,type:"OUTLOOK"});
+      return json(String(url).includes("/users/me?")
+        ? {object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email}
+        : {...account,type:"OUTLOOK"});
     }});
     const result=operation==="status"?ops.status({userId:id,client},"senja")
       :ops.start({userId:id,client},{workspace:"senja",email,mailbox_use:"personal"});
-    await expect(result).rejects.toMatchObject({status:409,code:"UNIPILE_MAILBOX_UNVERIFIABLE",message:expect.stringContaining("Gmail only")});
+    await expect(result).resolves.toMatchObject({status:"connected",email,connection_ref:id});
     expect(operations).toEqual([operation]);
-    expect(providerPaths).toEqual(["/api/v1/accounts/account_1"]);
+    expect(providerPaths).toEqual(["/api/v1/accounts/account_1","/api/v1/users/me"]);
+  });
+  it.each([
+    {profile:{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email:"other@example.test"}},
+    {profile:{object:"AccountOwnerProfile",provider:"OUTLOOK",email}},
+    {profile:owner},
+    {mailboxId:"delegated-mailbox"},
+  ])("rejects unverifiable or delegated Outlook identity before completion: %j",async({profile,mailboxId})=>{
+    const {ops,calls}=harness({identity:{...account,type:"OUTLOOK",connection_params:{mail:{...account.connection_params.mail,...(mailboxId?{mailbox_id:mailboxId}:{})}}},
+      owner:profile??{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email}});
+    await expect(ops.callback(state,body)).rejects.toMatchObject({status:expect.any(Number)});
+    expect(calls.some(c=>c.operation==="complete")).toBe(false);
   });
   it("rejects stale or failed intents without provider side effects",async()=>{
     const {ops,calls}=harness({intent:{...intent,state:"failed"}});
     await expect(ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_INTENT_EXPIRED"});
     expect(calls).toHaveLength(1);
   });
-  it.each(["HostedAuthUrl","HostedAuthURL"])("accepts documented %s and creates one single-use Gmail-only link without mailbox-history sync",async(object)=>{
+  it.each(["HostedAuthUrl","HostedAuthURL"])("accepts documented %s and creates one single-use Google/Microsoft/IMAP link without mailbox-history sync",async(object)=>{
     const calls:Record<string,unknown>[]=[];
     const provider=createUnipileProvider({...settings,fetchImpl:async(_url,init)=>{calls.push(JSON.parse(String(init?.body)));return json({object,url:"https://account.unipile.com/opaque"});}});
     await provider.createLink({correlation:"opaque",notifyUrl:"https://api.lifty.test/callback",expiresAt:intent.expires_at,reconnectId:null});
-    expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({single_use:true,providers:["GOOGLE"],sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+    expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({single_use:true,providers:["GOOGLE","OUTLOOK","MAIL"],sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
     expect(calls[0]).not.toHaveProperty("email");
   });
   it("keeps Gmail reconnection pinned to the existing account without offering another provider",async()=>{
@@ -160,7 +200,7 @@ describe("hosted authorization lifecycle",()=>{
         providerCalls++;
         expect(new URL(String(url)).pathname).toBe("/api/v1/hosted/accounts/link");
         const body=JSON.parse(String(init?.body));
-        expect(body).toMatchObject({providers:["GOOGLE"],single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+        expect(body).toMatchObject({providers:["GOOGLE","OUTLOOK","MAIL"],single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
         if(failure==="provider")return json({message:"provider-SECRET https://account.unipile.com/private-token"},401);
         return json({object:failure==="schema"?"HostedAuthLink":"HostedAuthUrl",url:"https://account.unipile.com/opaque"});
       }
@@ -269,7 +309,7 @@ describe("durable callback reconciliation",()=>{
           return json(options.profile??owner);
         }
         expect(path).toBe("/api/v1/accounts/account_1");
-        return json({...account,type:options.accountType??account.type,sources:account.sources.map(source=>({...source,status:options.health??"OK"}))},options.providerStatus??200);
+        return json({...(options.accountType==="MAIL"?imapAccount:account),type:options.accountType??account.type,sources:account.sources.map(source=>({...source,status:options.health??"OK"}))},options.providerStatus??200);
       }
       expect(path).toBe("/rest/v1/rpc/lifty_email_connection");
       const args=JSON.parse(String(init?.body));events.push(`server:${args.p_operation}`);
@@ -308,14 +348,20 @@ describe("durable callback reconciliation",()=>{
     expect(await h.ops.status(h.session,"senja")).toMatchObject({status:"failed",failure_code:"identity_mismatch"});
     expect(h.events).not.toContain("server:complete");
   });
-  it.each(["OK","CONNECTING"])("fails a durable Outlook hint with %s health instead of recovering an unsupported connection",async(health)=>{
+  it.each(["OK","CONNECTING"])("recovers a durable Outlook hint only when health is OK: %s",async(health)=>{
     const h=reconciliationHarness({accountType:"OUTLOOK",health,
       profile:{object:"AccountOwnerProfile",provider:"OUTLOOK",id:"owner-id",email}});
-    expect(await h.ops.status(h.session,"senja")).toMatchObject({status:"failed",failure_code:"identity_mismatch"});
-    expect(h.events).not.toContain("server:complete");
-    expect(h.events).not.toContain("/api/v1/users/me");
-    expect((await h.ops.status(h.session,"senja")).status).toBe("failed");
-    expect(h.events.filter(event=>event==="server:fail")).toHaveLength(1);
+    expect(await h.ops.status(h.session,"senja")).toMatchObject({status:health==="OK"?"connected":"pending"});
+    expect((await h.ops.status(h.session,"senja")).status).toBe(health==="OK"?"connected":"pending");
+    expect(h.events.filter(event=>event==="server:complete")).toHaveLength(health==="OK"?1:0);
+    expect(h.events).not.toContain("server:fail");
+    if(health!=="OK")expect(h.events).not.toContain("/api/v1/users/me");
+  });
+  it.each(["OK","CONNECTING"])("recovers a durable IMAP hint only when health is OK: %s",async(health)=>{
+    const h=reconciliationHarness({accountType:"MAIL",health,profile:imapOwner});
+    expect((await h.ops.status(h.session,"senja")).status).toBe(health==="OK"?"connected":"pending");
+    expect(h.events.filter(event=>event==="server:complete")).toHaveLength(health==="OK"?1:0);
+    expect(h.events).not.toContain("server:fail");
   });
   it("rejects membership revocation before provider reads",async()=>{
     const h=reconciliationHarness({rpcError:{code:"PT403",message:"email_workspace_forbidden"}});

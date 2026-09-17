@@ -49,6 +49,27 @@ informed confirmation → activate automatic outreach**. The
 backend owns continued enrollment and execution after the conversation closes.
 Account connection, sample acceptance and a saved draft never authorize sends.
 
+## Who writes the copy
+
+Read `references.writing`, the versioned LIFT outreach writing guide, before
+drafting. The local agent writes recommendations using that guide and the
+workspace's saved business, commercial voice and lead evidence. Explain this
+plainly: "I'll draft the sequence here using your saved business context and
+LIFT's writing guidance. We'll review the angle and wording together. Lifty
+stores the templates and handles scheduling and sending after you approve the
+complete preview."
+
+First read the saved campaign. If templates already exist, show and reuse them;
+do not overwrite approved copy just because the guide offers different defaults.
+For a new recommendation, explain the proposed angle, which saved facts support
+it, and the purpose of each message. Give the founder room to revise it before
+prepare saves the templates. Reuse a direction they already gave. Do not claim
+that a proposed draft has proven results or passed a copy-quality validator.
+Server validation checks the published contract and sending prerequisites;
+founder review and exact preview approval remain required.
+
+## Prepare and activate
+
 1. Read the campaigns stage with empty query `{}` (workspace status is the
    default). Reuse saved targeting, commercial voice and verified sending
    accounts. Read their current stages if that information is missing or stale.

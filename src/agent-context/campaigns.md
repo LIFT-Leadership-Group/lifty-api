@@ -3,7 +3,9 @@
 Purpose: configure the workspace journey once and activate automatic outreach
 after one informed confirmation. `references.campaign` is the authoritative
 setup context: read it for sequence, audience, personalization, cadence and
-conversation behavior. Read `references.common` for transport rules.
+conversation behavior. Read `references.writing` before recommending or editing
+copy. It supplies LIFT's writing defaults and the founder review process.
+Read `references.common` for transport rules.
 
 ## Read current state
 

@@ -1,7 +1,24 @@
 # CRM
 
-Purpose: connect HubSpot, maintain the existing full CRM mapping, and verify
-record delivery. Read `references.common` and `references.connections` in full.
+Purpose: help the founder use their CRM, maintain the existing full mapping,
+and verify record delivery. Read `references.common` and
+`references.connections` in full.
+
+## Choose the path
+
+Start with the founder's saved setup or stated preference. If it is unknown,
+ask which CRM they use, or whether they want to continue without one. Do not
+assume HubSpot or make a separate CRM subscription a prerequisite for Lifty.
+Leads and research remain in the Lifty workspace, and outreach setup can proceed
+without an external CRM connection.
+
+HubSpot is the self-service integration available through this stage today.
+Offer its connection only when the founder chooses HubSpot. If they use Attio
+or another CRM, explain that this Lifty connection flow does not support it yet;
+continue the other requested setup instead of opening a HubSpot consent link.
+Existing operator-managed Attio integrations elsewhere do not prove this
+workspace has a self-service Attio connection. Do not describe planned dashboard
+CRM features as available or promise a delivery date.
 
 ## Read current state
 

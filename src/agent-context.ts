@@ -23,6 +23,7 @@ export const AgentContextSchema = z.object({
 const interview = readFileSync(new URL("./agent-context/interview.md", import.meta.url), "utf8");
 const companyMapping = readFileSync(new URL("./agent-context/company-mapping.md", import.meta.url), "utf8");
 const calibration = readFileSync(new URL("./agent-context/calibration.md", import.meta.url), "utf8");
+const writing = readFileSync(new URL("./agent-context/writing.md", import.meta.url), "utf8");
 const documents = {
   onboarding: {
     instructions: readFileSync(new URL("./agent-context/onboarding.md", import.meta.url), "utf8"),
@@ -40,7 +41,7 @@ const documents = {
       email_campaign: z.toJSONSchema(EmailCampaignRequest, { io: "input" }),
       linkedin_campaign: z.toJSONSchema(LinkedinCampaignRequest, { io: "input" }),
     },
-    references: { calibration },
+    references: { calibration, writing },
   },
 };
 
@@ -60,7 +61,7 @@ const stageDocuments = Object.fromEntries(Object.entries(stageOperations).map(([
     ...(["targeting", "research-criteria", "commercial-voice"].includes(stage)
       ? { interview, configuration: readGuide("configuration") } : {}),
     ...(["targeting", "research-criteria", "sample-review"].includes(stage) ? { calibration } : {}),
-    ...(stage === "campaigns" ? { campaign: readGuide("campaign") } : {}),
+    ...(stage === "campaigns" ? { campaign: readGuide("campaign"), writing } : {}),
     ...(stage === "crm" ? { company_mapping: companyMapping } : {}),
   },
 }]));

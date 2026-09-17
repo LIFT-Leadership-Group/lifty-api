@@ -51,9 +51,10 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
 1. Wait for configuration import or the targeting update to finish. Before
    new discovery, fetch `context capacity` and read `stage capacity get`.
    Fetch `context sample-review`, then use `stage sample-review post --input -`
-   with `{ "body": {} }` to research the initial five candidates. Explicitly
-   read `stage sample-review get` until its result is confirmed; the generic
-   transport does not poll. Once five profiles have current research and
+   with `{ "body": {} }` to research the initial five candidates. Keep its
+   `run_ref` and use `stage sample-review progress` as described in the sample
+   guide. Pass the returned cursor on the next wait and report newly completed
+   research between calls; do not insert fixed two-minute sleeps. Once five profiles have current research and
    rationale, the cohort is ready regardless of its tier distribution. The
    service does not acquire repeated waves to replace low-fit candidates.
 2. Open with your read: the strongest lead and the pattern across the returned
@@ -105,7 +106,7 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    A connected mailbox is not an email choice. Explain the chosen sequence
    before writing templates, then follow the campaign context's copy choice.
    Reuse the stated channel choice and collect only missing account declarations. Read the current `sending-accounts` stage for
-   Gmail/Google Workspace email or LinkedIn authorization and exact-attempt
+   Gmail, Google Workspace, Outlook, Microsoft 365, or IMAP/SMTP email or LinkedIn authorization and exact-attempt
    verification. Skip an already healthy connection unless reconnecting was
    explicitly requested. If they choose existing B leads,
    review their saved evidence against the current ICP and make the selected

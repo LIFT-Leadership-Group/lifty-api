@@ -105,7 +105,7 @@ describe("hosted connection branding", () => {
       expect(saved).toEqual([canonical]);
       expect(providerBodies).toHaveLength(1);
       expect(providerBodies[0]).toMatchObject(reconnect ? { type: "reconnect", reconnect_account: "account_1" }
-        : { type: "create", providers: [channel === "email" ? "GOOGLE" : "LINKEDIN"] });
+        : { type: "create", providers: channel === "email" ? ["GOOGLE", "OUTLOOK", "MAIL"] : ["LINKEDIN"] });
       // Turning branding off also works for intents that were issued while it was on.
       const rollback = createProductionApp(loadConfig(env));
       expect((await rollback.request(`${path}?intent=${encodeURIComponent(state)}`)).headers.get("location")).toBe(canonical);
