@@ -81,6 +81,7 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    ...(config.unipileHostedAuthOrigin ? { unipileHostedAuthOrigin: config.unipileHostedAuthOrigin } : {}),
     acquisitionRecovery: createAcquisitionRecoveryOperations({
       enqueueVerification: createAcquisitionVerificationTrigger(config.trigger),
       enqueueFirstRun: createFirstRunTrigger(config.trigger),
