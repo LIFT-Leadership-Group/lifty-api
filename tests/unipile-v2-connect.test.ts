@@ -10,7 +10,7 @@ const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8
 const secret="connection-test-server-key-"+"x".repeat(40),email="founder@example.test";
 const expires=new Date(Date.now()+600000).toISOString();
 const transport={api_version:"v2",connection_ref:connection,canonical_account_id:"legacy",provider_namespace:"unipile:old",account_id:"acc_test",application_id:"app_test",account_scope_id:null,generation:1,user_id:"owner",v1_account_id:"legacy",hosted_auth_origin:"https://auth.unipile.com"};
-function harness(channel:"email"|"linkedin",options:{authorized?:boolean;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean}={}) {
+function harness(channel:"email"|"linkedin",options:{authorized?:boolean;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean}={}) {
   let phase=options.intentState??"ready",status=options.statusState??"pending",reads=0;
   const calls:{operation:string;payload:Record<string,unknown>;caller:boolean}[]=[];
   const http:{url:string;body:Record<string,unknown>|null}[]=[];
@@ -41,6 +41,8 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;authori
     }
     http.push({url:target,body:init?.body?JSON.parse(String(init.body)):null});
     expect(target).toContain("https://api.unipile.com/v2/");
+    if(target.endsWith("/auth/link") && options.hostedStatus)return new Response("private provider details",{status:options.hostedStatus});
+    if(target.endsWith("/auth/link") && options.hostedMalformed)return new Response("{}");
     if(options.providerFailsOnce && reads++===0)return new Response("{}",{status:503});
     const data=target.endsWith("/auth/link")?{object:"HostedAuthLink",link:"https://auth.unipile.com/?token=created"}
       :target.endsWith("/email-senders")?{data:[{object:"EmailSender",email,is_primary:true,verification_status:"verified"}]}
@@ -54,6 +56,19 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;authori
   const session={userId:id,client:{rpc:(name:string,args:Record<string,unknown>)=>rpc(name,args,true)}};
   return {ops,session,calls,http,state:authState};
 }
+describe("V2 LinkedIn hosted diagnostics",()=>{
+  for(const status of [429,503])it(`retains safe HTTP ${status} and does not retry`,async()=>{
+    const h=harness("linkedin",{intentState:"pending",hostedStatus:status});
+    await expect(h.ops.authorize(h.state)).rejects.toMatchObject({code:`UNIPILE_LINKEDIN_HOSTED_HTTP_${status}`});
+    expect(h.http).toHaveLength(1);
+    expect(h.calls.some(c=>c.operation==="fail")).toBe(true);
+  });
+  it("retains malformed hosted response diagnostic",async()=>{
+    const h=harness("linkedin",{intentState:"pending",hostedMalformed:true});
+    await expect(h.ops.authorize(h.state)).rejects.toMatchObject({code:"UNIPILE_LINKEDIN_HOSTED_RESPONSE_INVALID"});
+    expect(h.http).toHaveLength(1);
+  });
+});
 for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifecycle`,()=>{
   it("waits for signed lifecycle evidence and never consumes browser hints",async()=>{
     const h=harness(channel);

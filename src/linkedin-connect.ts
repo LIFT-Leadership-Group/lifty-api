@@ -177,6 +177,9 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
       phase = "save"; await rpc("save_link", { intent_ref: id, url }); return url;
     } catch (error) {
       try { await rpc("fail", { intent_ref: id, failure_code: "link_failed" }); } catch { /* Preserve the original safe failure; do not create another provider link. */ }
+      if (phase === "create" && error instanceof PublicError && error.code.startsWith("UNIPILE_HOSTED_")) {
+        throw new PublicError({ status: error.status, code: error.code.replace("UNIPILE_", "UNIPILE_LINKEDIN_"), message: error.message });
+      }
       if (error instanceof PublicError && (error.status === 401 || error.status === 403 || (phase === "create" && error.code.startsWith("UNIPILE_LINKEDIN_HOSTED_")))) throw error;
       linkedinFailure(phase === "save" ? "LINKEDIN_LINK_SAVE_FAILED" : "LINKEDIN_LINK_CREATE_FAILED");
     }
