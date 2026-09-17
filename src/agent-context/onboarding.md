@@ -268,7 +268,11 @@ only output shape.
     may still use `status <resolved-installation-arguments>`, but never start a
     connection to answer a status question.
 
-14. If HubSpot connection was part of the founder's request, fetch
+14. Offer to connect the founder's CRM without assuming which one they use.
+    Reuse a saved preference; otherwise ask which CRM they use or whether they
+    prefer to continue without one. External CRM setup is optional. HubSpot is
+    the current self-service connection; Attio and other choices must not be
+    silently redirected into HubSpot authorization. If they choose HubSpot, fetch
     `context crm` and follow its current guide, operation schemas and connection
     reference. Explain that connecting lets Lifty put researched leads into
     their CRM and does not send outreach. Read the current state, start the
@@ -277,8 +281,9 @@ only output shape.
     portal is insufficient evidence for a new authorization. Preserve a working
     connection during reconnection. If HubSpot reports an admin/permission
     blocker, use the stage's current repair instructions and do not claim an
-    approval request was sent unless the founder submitted it. If HubSpot was
-    not requested, offer it as a next step without starting authorization.
+    approval request was sent unless the founder submitted it. If they choose
+    no CRM or one not yet supported here, continue with their Lifty workspace
+    and the remaining requested steps.
 
 15. After the connection succeeds, when the first run has researched leads,
     push them into the founder's HubSpot:
