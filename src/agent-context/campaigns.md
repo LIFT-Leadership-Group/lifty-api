@@ -11,9 +11,18 @@ GET with empty query reads the current workspace sequence and its blockers.
 
 ## First setup
 
+Before writing templates or calling prepare, follow the channel-choice and
+sequence-explanation steps in `references.campaign`. Ask **LinkedIn, email,
+both, or not right now** when the founder has not explicitly chosen, and wait.
+Account availability is not channel intent; accepting leads is not a channel
+choice. Keep disconnected channels available as connection options. Reuse a
+choice already made. Explain the selected sequence and current/future audience
+before asking for founder-written copy or permission to recommend templates.
+Skipping keeps the lead-only path resumable without preparing or activating.
+
 POST with `scope: "workspace"` and a prepare request saves the full recommended
-configuration: invitation plus three LinkedIn messages and, when connected,
-five emails. Reuse saved targeting, commercial voice, sender and normal cadence.
+configuration for the selected channels only: invitation plus three LinkedIn
+messages and/or five emails. Never include a channel just because it is connected. Reuse saved targeting, commercial voice, sender and normal cadence.
 Do not default to individual campaigns, choosing two Tier A sample leads or
 asking for a date/time per recipient. Honor explicit audience/start overrides.
 

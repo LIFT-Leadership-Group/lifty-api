@@ -33,3 +33,12 @@ gaps. Retain the historical A-only rule for older/unknown policies.
 Respect allowance and calibration-review stops. A status error is not a failed
 run. No new discovery is required merely to connect an account or draft outreach
 with chosen saved leads; exact sending approval remains separate.
+
+## After sample acceptance
+
+"Looks good" after the lead table accepts the sample only. When the founder
+continues toward outreach, fetch `context campaigns`. If channel intent is
+missing, offer LinkedIn, email, both, or not right now and wait. Do not recommend
+email simply because a mailbox is connected. Follow the campaign context to
+explain the chosen sequence before writing templates. Reuse explicit choices;
+never turn sample acceptance into campaign activation consent.
