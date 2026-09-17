@@ -1,5 +1,5 @@
 
-# LIFTY campaign operations
+# LIFTY workspace outreach configuration
 
 ## Authorization links
 
@@ -32,49 +32,93 @@ node "<installed-runner>" stage campaigns post --input -
 node "<installed-runner>" stage campaigns patch --input -
 ```
 
-Read current `operations` schemas and use JSON stdin (or a private mode-0600
-file). GET takes `{ "query": { "channel": "email" | "linkedin",
-"workspace": "<current-workspace>", "campaign_ref": "<saved-reference>",
-"operation": "preview" | "status" } }`. There is no campaign inventory read;
-retain the references from real receipts. POST takes `{ "body": { "channel":
-"email" | "linkedin", "request": { "operation": "<supported-operation>",
-"payload": { ... } } } }`. Payload contains the workspace and other inputs
-required by that operation's fresh channel schema. PATCH has the same envelope
-but supports only `prepare` with an existing campaign_ref. Do not invent a
-status-setting PATCH or put campaign operation names in the CLI verb position.
+## Default setup: one workspace sequence
 
-The channel steps below select the nested request operation; all use this
-stage transport. Use GET for preview/status, POST for supported operational
-commands and initial preparation, and PATCH for an existing draft's preparation.
-An old runner without `stage` needs an installation update first; API validation
-or field/route changes require fresh context and correction, not a CLI rebuild.
-Report outcomes in the founder's language, keeping paths and raw JSON private.
+This campaign context owns the setup policy. Read it through the campaigns
+stage before proposing or changing outreach; do not substitute a locally
+remembered campaign questionnaire. Use the current published operation schemas.
 
-## Handoff from targeting review
+The founder flow is **prepare the workspace sequence → show its complete
+preview → one informed confirmation → activate automatic outreach**. The
+backend owns continued enrollment and execution after the conversation closes.
+Account connection, sample acceptance and a saved draft never authorize sends.
 
-When the founder asks to continue outreach setup, proceed with their chosen
-channel and collect only its missing account declarations. Follow
-`references.calibration` for lead-quality feedback, but a pending or stale
-sample, fewer than five leads, no Tier A leads, exhausted discovery allowance,
-or an unconnected CRM does not block account connection or message drafting.
-Setup and calibration have separate progress; report both honestly.
+1. Read the campaigns stage with empty query `{}` (workspace status is the
+   default). Reuse saved targeting, commercial voice and verified sending
+   accounts. Read their current stages if that information is missing or stale.
+   Do not ask the founder to repeat saved business answers.
+2. Prepare a complete recommended configuration using POST with
+   `scope: "workspace"` and `request.operation: "prepare"`. The payload contains
+   the current workspace and `configuration`: name, the connected LinkedIn
+   account plus all three message templates, and the connected email account
+   plus all five email templates. Follow the published schema. Omit `lead_ids`
+   for current and future eligible A/B leads. Omit `not_before` to use the normal
+   cadence from activation. Drafting is possible without a new calibration run.
+3. Show the returned full workspace preview: actual senders, audience rule
+   (including future leads), complete templates, allowed personalization,
+   current recipient examples, channel entry, cadence and stop rules. Explain
+   real blockers, including `blocked_leads` and the total blocked count; never
+   report those leads as scheduled. Missing placeholder data skips that recipient; it is never
+   invented. Only `{{first_name}}`, `{{last_name}}` and `{{company_name}}` are
+   permitted substitutions. Do not imply that approval covers arbitrary future
+   model-generated copy.
+4. Ask once for confirmation of that complete configuration and authorization
+   to start automatic outreach. On confirmation, POST `scope: "workspace"`
+   with `request.operation: "activate"`, the exact `version_ref`, `digest`,
+   workspace and `confirm: true`. Read status afterward. Report activation only
+   from the confirmed receipt, and distinguish activation from an actual send.
+5. Later material edits use workspace prepare and a fresh preview/confirmation.
+   They pause automatic outreach. The new version applies to newly enrolled
+   leads; existing journeys retain their approved copy, sender and cadence.
+   Show `continuing_versions` and each recipient example’s `version_ref` in the
+   preview so this is explicit. A narrowed audience also fences excluded leads.
+   Explicit pause uses the current version and digest. Retain receipts and read status after uncertain writes before retrying.
 
-The founder may explicitly choose Tier B recipients. Inspect saved evidence
-against the current targeting, preserve recorded grades, and identify the exact
-intended recipients. An ICP update invalidates the old sample's acceptance,
-not every account connection or usable fact about every existing lead. Reuse
-evidence when it supports current fit; do not acquire a new cohort merely to
-continue setup or claim an old grade was freshly produced by Scout.
+The fixed journey is an invitation without a note, then three LinkedIn messages
+only after confirmed acceptance. The second message waits four business days
+from the first confirmed send; the third waits five more business days. When
+email is connected, the five-email sequence enters after five business days
+without LinkedIn acceptance, or after the second LinkedIn message is confirmed
+sent. With only email connected, email enters directly. Email follow-ups wait
+3, 4, 4 and 4 days from their preceding confirmed sends. Sender working windows,
+health, pacing and shared account limits still apply. Replies, suppression and
+other terminal stops cancel remaining outreach across channels: 3/5 are planned
+lengths, not promises to send despite a response.
 
-Without a recipient or a healthy account, help choose channel, sender, copy
-and timing and retain a clearly labeled draft. Call campaign prepare/preview
-only when their real required inputs exist; do not invent lead references or
-claim a local draft is a saved campaign. Missing prerequisites block their
-dependent operation, not all setup. Before activation, resolve actual
-recipient/account/preview blockers and obtain explicit approval of the exact
-preview and authorization to send. Choosing B leads or connecting an account
-does not by itself grant that approval. No five-lead or Tier-A-only gate is
-added to the campaign workflow.
+Do not default to choosing “the two Tier A leads or all five accepted leads”,
+preparing one opening email per person, or asking for a Thursday date/time.
+Prepare the workspace recommendation from the saved settings. A founder who
+explicitly asks for two named leads gets a narrowed `lead_ids` audience; an
+explicit custom start uses `not_before`. Those are optional overrides, not
+required setup questions. Ask only for a genuinely missing business input or
+required account declaration. A pending/stale sample, fewer than five leads,
+no Tier A leads, exhausted discovery allowance or an unconnected CRM does not
+block connection or drafting. Preserve grades and reuse saved fit evidence;
+never claim it was freshly researched. Activation still respects real account,
+audience and approval blockers.
+
+If the current API does not publish workspace operations or cannot verify their
+result, retain a clearly labeled draft and explain that automatic workspace
+activation is unavailable. Do not fall back to silently creating individual
+campaigns or claim a graph/flag change enables execution.
+
+## Explicit individual campaign operations
+
+The channel operations below support explicitly requested individual work and
+recovery of existing campaign references. They are not the default onboarding
+setup. GET with `channel`, `workspace`, `campaign_ref` and optional
+`operation: "preview" | "status"` reads one known campaign, not an inventory.
+POST uses `{ "channel": "email" | "linkedin", "request": { "operation":
+"<supported-operation>", "payload": { ... } } }`. PATCH supports preparation
+with an existing campaign reference. Use JSON stdin (or a private mode-0600
+file). Operation names belong in the request, never in the CLI verb position.
+
+Individual consent covers only its exact preview; it does not grant workspace
+consent or permission to enroll future leads. Changed sender, recipients, copy
+or timing requires fresh approval. Keep provider and recipient pins, account
+limits and stop-on-reply. Report outcomes in the founder's language and keep
+paths and raw JSON private. An old runner without `stage` needs an installation
+update; current v5 operation/schema changes come from refreshed API context.
 
 ## Email campaigns
 
@@ -162,7 +206,8 @@ proof of a new authorization. Connection does not authorize or activate sends.
    Use PATCH `prepare` with campaign_ref for edits. Invitation notes and
    follow-up fields are unsupported.
 2. GET preview. Show the exact recipient, sender account, message and schedule.
-   The sequence is an invitation without a note and one message after acceptance;
+   Historical `text` campaigns contain one post-acceptance message. New
+   `messages` campaigns contain all three, with the returned fixed cadence;
    subsequent conversation is manual. Limits remain five invitations per day,
    25 per rolling seven days and five messages per day, Monday–Friday 09:00–17:00
    in the account timezone, 15–45 minutes apart. Read the actual preview and

@@ -11,6 +11,20 @@ const preview = { workspace_ref: workspace, campaign_ref: campaign, connection_r
   content: { invitation: { note: null }, message: { text: prepare.payload.text }, target_identifier: "https://www.linkedin.com/in/recipient", timezone: "America/Argentina/Buenos_Aires", policy: LINKEDIN_POLICY }, actions: [], blockers: [] };
 
 describe("LinkedIn campaigns", () => {
+  it("prepares exactly three pinned messages and rejects changed follow-up copy", async () => {
+    const messages = [{ text: "First" }, { text: "Second" }, { text: "Third" }];
+    const input = { operation: "prepare" as const, payload: { workspace, lead_id: lead, connection_ref: connection, messages } };
+    const { message: _message, ...content } = preview.content;
+    const data = { ...preview, content: { ...content, messages, message_delays_business_days: [0, 4, 5] } };
+    const parsed = LinkedinCampaignRequest.parse(input);
+    expect(linkedinCampaignResultFor(parsed, data)).toEqual(data);
+    expect(() => linkedinCampaignResultFor(parsed, { ...data, content: { ...data.content, messages: [messages[0], { text: "Changed" }, messages[2]] } })).toThrow();
+    for (const invalid of [[], messages.slice(0, 2), [...messages, messages[0]], [{ text: " " }, ...messages.slice(1)]]) {
+      expect(LinkedinCampaignRequest.safeParse({ ...input, payload: { ...input.payload, messages: invalid } }).success).toBe(false);
+    }
+    expect(LinkedinCampaignRequest.safeParse({ ...input, payload: { ...input.payload, text: "Unbound legacy copy" } }).success).toBe(false);
+  });
+
   it("uses only the authenticated caller RPC and dedicated capability; preserves exact content", async () => {
     const calls: unknown[] = [];
     const operations = createLinkedinCampaignOperations(key);

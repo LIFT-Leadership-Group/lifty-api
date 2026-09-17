@@ -1,38 +1,49 @@
 # Campaigns
 
-Purpose: configure and operate existing email/LinkedIn campaigns without
-changing their execution or approval semantics. Read `references.common` and
-the existing channel guidance in `references.campaign`.
+Purpose: configure the workspace journey once and activate automatic outreach
+after one informed confirmation. `references.campaign` is the authoritative
+setup context: read it for sequence, audience, personalization, cadence and
+conversation behavior. Read `references.common` for transport rules.
 
 ## Read current state
 
-GET requires `channel`, `workspace`, and a known `campaign_ref`. Use query
-`operation: status` or `preview`. It reads one campaign; there is no new
-campaign inventory endpoint. Use saved operation receipts for known references.
+GET with empty query reads the current workspace sequence and its blockers.
 
-## First setup and required inputs
+## First setup
 
-POST accepts `channel` plus the existing channel `request` (`operation` and
-`payload`). Use the current schema for sender connection, intended recipient,
-copy, timing and policy declarations. Begin with the supported prepare flow.
-Other existing operations remain explicit: target, preview, approve, activate,
-pause, cancellation and provider-specific placement steps where documented.
-Preparation, connection and sample approval never imply sending approval.
+POST with `scope: "workspace"` and a prepare request saves the full recommended
+configuration: invitation plus three LinkedIn messages and, when connected,
+five emails. Reuse saved targeting, commercial voice, sender and normal cadence.
+Do not default to individual campaigns, choosing two Tier A sample leads or
+asking for a date/time per recipient. Honor explicit audience/start overrides.
+
+Show the complete returned preview, including sender, current and future
+audience, templates, personalization and timing. The email branch follows the
+existing journey: five business days without acceptance or the second confirmed
+LinkedIn message; email-only configuration starts directly. Preparation never
+sends. One explicit confirmation authorizes activation of the exact version and
+digest. Read status afterward; activation is distinct from confirmed sending.
+Material edits pause automatic outreach and require fresh confirmation.
 
 ## Later edits
 
-PATCH accepts only a prepare request with the existing `campaign_ref` and the
-desired supported content. Read the new preview afterward. Changed recipients,
-sender, copy or schedule invalidate the previous approval; show the exact
-preview and obtain fresh digest-bound approval before explicit activation.
-Use POST for documented operational commands rather than inventing writable
-execution states, campaign counters or a universal status-setting PATCH.
+Use workspace prepare to save a complete updated configuration, then show the
+new preview before fresh confirmation. Use pause to stop automatic outreach.
+
+### Existing individual campaigns
+
+Only when explicitly requested, use the channel contracts for an individual
+campaign or recovery. GET requires channel, workspace and campaign_ref; it is
+not a campaign inventory. POST supports explicit lifecycle operations. Channel
+PATCH only prepares an existing campaign. Follow `references.campaign` for the
+channel-specific requirements and approval rules. Individual approval never
+authorizes workspace-wide enrollment or future leads.
 
 ## User-facing behavior and errors
 
-Show the exact preview in clear business language, including actual sender,
-recipient, copy and schedule. Explain actual policy/blocker results rather than
-promising delivery. Respect identity, placement, suppression and unresolved-send
-restrictions. After an uncertain operation, read its current status before
-resubmitting. Preserve historical grades and use saved evidence for selected
-leads; a pending sample or exhausted discovery budget does not block drafting.
+Explain actual returned blockers, preserve receipts after an uncertain write,
+and read status before retrying. Sample acceptance and account connection never
+authorize sending. Pending calibration or exhausted discovery allowance does
+not prevent drafting from suitable saved leads. If workspace operations are
+unavailable, retain the draft and state the limitation; do not silently fall
+back to the old per-lead setup.

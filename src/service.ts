@@ -1,3 +1,4 @@
+import { createWorkspaceCampaignOperations } from "./workspace-campaign.js";
 import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
 import { createCompanyMapping } from "./company-mapping.js";
 import { createLinkedinConnectOperations } from "./linkedin-connect.js";
@@ -82,6 +83,7 @@ export function createProductionApp(config: ServiceConfig) {
     }),
     getApolloAllowance,
     apolloCredentials,
+    ...((config.email?.serverKey ?? config.linkedin?.serverKey) ? { workspaceCampaign: createWorkspaceCampaignOperations((config.email?.serverKey ?? config.linkedin?.serverKey)!) } : {}),
     ...(linkedin ? {
       linkedinCampaign: createLinkedinCampaignOperations(config.linkedin!.serverKey),
       startLinkedinConnect: linkedin.start,

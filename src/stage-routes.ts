@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { workspaceCampaignResultFor } from "./workspace-campaign-contracts.js";
 import type { Context } from "hono";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppDependencies, AppEnvironment } from "./app.js";
@@ -125,6 +126,10 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       }
       if (stage === "campaigns") {
         const query = parse(CampaignStageQuerySchema, context.req.query());
+        if ("scope" in query) {
+          const input = { operation: query.operation, payload: { workspace: current } };
+          return context.json(workspaceCampaignResultFor(input, await dependencies.workspaceCampaign(session, input)));
+        }
         if (query.workspace !== current) throw forbidden();
         return forward(context, "POST", query.channel === "email" ? "/v1/email/campaign" : "/v1/linkedin/campaign",
           { operation: query.operation, payload: { workspace: current, campaign_ref: query.campaign_ref } });
@@ -151,6 +156,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       if (stage === "campaigns") {
         const input = parse(CampaignStageRequestSchema, body);
         if (input.request.payload.workspace !== current) throw forbidden();
+        if ("scope" in input) return context.json(workspaceCampaignResultFor(input.request,
+          await dependencies.workspaceCampaign(context.get("authSession"), input.request)));
         return forward(context, "POST", input.channel === "email" ? "/v1/email/campaign" : "/v1/linkedin/campaign", input.request);
       }
       if (stage === "sending-accounts") {
@@ -183,6 +190,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       if (stage === "campaigns") {
         const input = parse(CampaignStagePatchSchema, body);
         if (input.request.payload.workspace !== current) throw forbidden();
+        if ("scope" in input) return context.json(workspaceCampaignResultFor(input.request,
+          await dependencies.workspaceCampaign(context.get("authSession"), input.request)));
         return forward(context, "POST", input.channel === "email" ? "/v1/email/campaign" : "/v1/linkedin/campaign", input.request);
       }
       if (stage === "notifications") {
