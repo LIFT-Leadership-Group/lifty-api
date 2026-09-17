@@ -17,7 +17,7 @@ it("requires authentication for current config generation context",async()=>{exp
 it("returns private no-store generation context and canonical schema",async()=>{
  const response=await createApp({authenticate,getConfigUpdateContext:async()=>current}).request("/v1/config/context");
  expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
- const body=await response.json();expect(body.configuration_schema.properties.contract_version.const).toBe("lifty-config-update.v1");expect(body.generation_rules).toContain("never calls a hosted model");expect(body.current_config).toEqual(current.current_config);
+ const body=await response.json();expect(body.configuration_schema.properties.contract_version.const).toBe("lifty-config-update.v1");expect(body.generation_rules).toContain("never calls a hosted model");expect(body.current_config).toEqual(current.current_config);expect(body.scout_global_base).toBeNull();expect(JSON.stringify(body)).not.toContain("GLOBAL BASE");
 });
 it("submits the exact local update and enqueues deterministic import",async()=>{
  const submit=vi.fn(async(_session: unknown, _body: ConfigUpdateRequest)=>receipt);const enqueue=vi.fn(async()=>({id:"run"}));

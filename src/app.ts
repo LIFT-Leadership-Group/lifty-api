@@ -1831,6 +1831,8 @@ export function createApp(
     const result = await dependencies.getOnboardingContext(context.get("authSession"));
     return context.json(OnboardingGenerationContextSchema.parse({
       ...OnboardingContextSchema.parse(result),
+      // Defense in depth while older databases still return the execution base.
+      scout_global_base: null,
       generation_rules: ONBOARDING_GENERATION_RULES,
       configuration_schema: z.toJSONSchema(LocalOnboardingConfigurationSchema),
     }));
@@ -1888,7 +1890,8 @@ export function createApp(
     context.header("cache-control", "no-store");
     const result = await dependencies.getConfigUpdateContext(context.get("authSession"));
     return context.json(ConfigUpdateGenerationContextSchema.parse({
-      ...ConfigUpdateContextSchema.parse(result), generation_rules: CONFIG_UPDATE_GENERATION_RULES,
+      ...ConfigUpdateContextSchema.parse(result), scout_global_base: null,
+      generation_rules: CONFIG_UPDATE_GENERATION_RULES,
       configuration_schema: z.toJSONSchema(LocalConfigUpdateConfigurationSchema),
     }));
   });

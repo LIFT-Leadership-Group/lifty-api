@@ -71,7 +71,7 @@ describe("locally generated onboarding", () => {
     const response = await createApp({ authenticate, getOnboardingContext: getContext }).request("/v1/onboarding/context?workspace_ref=foreign-workspace");
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toMatchObject({ ...onboardingContext, generation_rules: expect.stringContaining("52,000"), configuration_schema: expect.objectContaining({ type: "object" }) });
+    expect(await response.json()).toMatchObject({ ...onboardingContext, scout_global_base: null, generation_rules: expect.stringContaining("52,000"), configuration_schema: expect.objectContaining({ type: "object" }) });
     expect(getContext).toHaveBeenCalledExactlyOnceWith(session);
   });
 
