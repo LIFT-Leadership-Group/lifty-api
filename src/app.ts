@@ -1,3 +1,4 @@
+import { RunProgressQuerySchema, RunProgressSchema, type RunProgressQuery, type RunProgress } from "./run-progress.js";
 import type { BusinessWebsite, BusinessWebsitePatch } from "./business-website.js";
 import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
 import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
@@ -179,6 +180,7 @@ export interface AppDependencies {
   enqueueOnboardingImport: EnqueueOnboardingImport;
   startRun(session: AuthSession): Promise<StartRunResult>;
   getRunStatus(session: AuthSession): Promise<RunStatus>;
+  getRunProgress(session: AuthSession, query: RunProgressQuery, signal: AbortSignal): Promise<RunProgress>;
   enqueueFirstRun: EnqueueFirstRun;
   startCrmSyncRun(session: AuthSession): Promise<StartCrmSyncResult>;
   getCrmSyncStatus(session: AuthSession): Promise<CrmSyncStatus>;
@@ -980,6 +982,7 @@ const defaultDependencies: AppDependencies = {
   startRun: async () => {
     throw new Error("startRun is not configured");
   },
+  getRunProgress: async () => { throw new Error("getRunProgress is not configured"); },
   getRunStatus: async () => {
     throw new Error("getRunStatus is not configured");
   },
@@ -1846,6 +1849,22 @@ export function createApp(
     // self-heals an enqueue lost after the ledger insert.
     await dependencies.enqueueFirstRun(result.run_ref, result.attempt ?? 0);
     return context.json(StartRunResultSchema.parse(result));
+  });
+
+  app.openAPIRegistry.registerPath({
+    method: "get", path: "/v1/workspace/runs/progress", operationId: "getRunProgress", security: [{ bearerAuth: [] }],
+    request: { query: RunProgressQuerySchema },
+    responses: { 200: JsonResponse(RunProgressSchema), 400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema), 404: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema), 429: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema), 504: JsonResponse(ErrorResponseSchema) },
+  });
+  app.get("/v1/workspace/runs/progress", async (context) => {
+    context.header("cache-control", "no-store");
+    const query = RunProgressQuerySchema.safeParse(context.req.query());
+    if (!query.success) return errorJson(context, 400, "INVALID_REQUEST", "Supply a run_ref, optional cursor and wait_seconds from 0 to 25.");
+    const result = await dependencies.getRunProgress(context.get("authSession"), query.data, context.req.raw.signal);
+    return context.json(RunProgressSchema.parse(result));
   });
 
   app.get("/v1/workspace/runs", async (context) => {
