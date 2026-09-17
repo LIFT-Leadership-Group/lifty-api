@@ -105,7 +105,7 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    A connected mailbox is not an email choice. Explain the chosen sequence
    before writing templates, then follow the campaign context's copy choice.
    Reuse the stated channel choice and collect only missing account declarations. Read the current `sending-accounts` stage for
-   Gmail/Google Workspace email or LinkedIn authorization and exact-attempt
+   Gmail, Google Workspace, Outlook, Microsoft 365, or IMAP/SMTP email or LinkedIn authorization and exact-attempt
    verification. Skip an already healthy connection unless reconnecting was
    explicitly requested. If they choose existing B leads,
    review their saved evidence against the current ICP and make the selected

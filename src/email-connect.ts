@@ -110,7 +110,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     const id=open(state);
     const intent=Intent.parse(await rpc("intent",{intent_ref:id}));
     if(intent.state==="completed" || (intent.state==="ready" && intent.authorization_received))return "authorization_received";
-    if(intent.selection_required)throw new PublicError({status:409,code:"EMAIL_DECLARATION_REQUIRED",message:"Confirm your regular personal Gmail account use in the hosted connection flow."});
+    if(intent.selection_required)throw new PublicError({status:409,code:"EMAIL_DECLARATION_REQUIRED",message:"Confirm that you regularly use this mailbox for personal or business conversations in the hosted connection flow."});
     if(intent.state==="ready" && intent.hosted_url)return intent.hosted_url;
     if(intent.state==="failed")fail("EMAIL_INTENT_EXPIRED",410);
     const claim=z.object({claimed:z.boolean()}).parse(await rpc("issue_link",{intent_ref:id}));

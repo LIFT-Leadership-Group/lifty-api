@@ -297,7 +297,7 @@ only output shape.
     delivery only when all stages are confirmed by the receipt.
 16. When the founder chooses email setup, fetch `context sending-accounts`
     and follow its current email operation schema, even while sample review is
-    pending. Briefly recommend a Gmail/Google Workspace account they already
+    pending. Briefly recommend a Gmail, Google Workspace, Outlook, Microsoft 365, or IMAP/SMTP account they already
     use regularly when appropriate under the current policy. Hosted selection
     handles provider, account and habitual-use declarations; do not add an
     email-address or mailbox-use questionnaire. GET the current state, POST
