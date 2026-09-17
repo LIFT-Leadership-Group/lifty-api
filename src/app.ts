@@ -154,6 +154,7 @@ export interface AppDependencies {
   authorizeLinkedin(state: string): Promise<string>;
   completeLinkedinCallback(state: string, body: unknown): Promise<void>;
   emailAvailable: boolean;
+  emailAuthorizationOrigin: string | null;
   startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
   getEmailConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<EmailStatus>;
   disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
@@ -950,6 +951,7 @@ const defaultDependencies: AppDependencies = {
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
   disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   emailAvailable: false,
+  emailAuthorizationOrigin: null,
   startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authorizeEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
@@ -1379,7 +1381,7 @@ export function createApp(
     catch (error) {
       if (!(error instanceof PublicError) || error.code !== "EMAIL_DECLARATION_REQUIRED") throw error;
       return context.html(renderEmailAuthorizationPage(state), 200, {
-        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+        "cache-control": "no-store", "referrer-policy": "strict-origin", "x-content-type-options": "nosniff",
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       });
     }
@@ -1399,7 +1401,9 @@ export function createApp(
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
     const origin = context.req.header("origin");
-    if ((origin && origin !== new URL(context.req.url).origin) || context.req.header("sec-fetch-site") === "cross-site") {
+    // TLS terminates at the hosting proxy; compare with the configured public origin.
+    const expectedOrigin = dependencies.emailAuthorizationOrigin ?? new URL(context.req.url).origin;
+    if ((origin && origin !== expectedOrigin) || context.req.header("sec-fetch-site") === "cross-site") {
       return errorJson(context, 403, "INVALID_REQUEST", "Continue from the email authorization page.");
     }
     if (!context.req.header("content-type")?.toLowerCase().startsWith("application/x-www-form-urlencoded")) {

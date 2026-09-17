@@ -416,7 +416,7 @@ describe("hosted selection and exact-attempt verification", () => {
     } });
     const app = createApp({ authorizeEmail: ops.authorize, declareEmail: ops.declare, log: () => {} });
     const page = await app.request(`/unipile/start?intent=${state}`);
-    expect(page.status).toBe(200); expect(page.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(page.status).toBe(200); expect(page.headers.get("referrer-policy")).toBe("strict-origin");
     expect(page.headers.get("content-security-policy")).toContain("form-action 'self'");
     expect(await page.text()).toContain('type="checkbox"'); expect(calls).toEqual(["intent"]);
     const send = (body: string, origin = "http://localhost") => app.request("/unipile/start", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin }, body });

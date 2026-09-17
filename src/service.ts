@@ -98,6 +98,7 @@ export function createProductionApp(config: ServiceConfig) {
     } : {}),
     ...(email ? {
       emailAvailable: true,
+      emailAuthorizationOrigin: new URL(config.email!.publicBaseUrl).origin,
       emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
       retireWorkspace: createWorkspaceRetirement(config.email!.serverKey),
       startEmailConnect: email.start,
