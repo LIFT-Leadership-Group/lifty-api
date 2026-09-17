@@ -168,7 +168,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
         approveCard.hidden = true;
         doneCard.hidden = false;
         byId("done-title").textContent = "You're authenticated";
-        byId("done-message").textContent = "Return to your terminal. You can close this tab.";
+        byId("done-message").textContent = "Return to your agent to continue. You can close this tab.";
       } catch {
         status.textContent = "We couldn't reach the CLI. Keep lifty login running and try again in a Chromium browser.";
         status.className = "error";
