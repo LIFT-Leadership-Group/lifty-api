@@ -1,8 +1,8 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v10) and
-`src/agent-context/anti-slop.md` (lifty-anti-slop.v5).
+`src/agent-context/writing.md` (lifty-writing.v11) and
+`src/agent-context/anti-slop.md` (lifty-anti-slop.v6).
 
 ## Author
 

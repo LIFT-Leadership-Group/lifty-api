@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v10
+Version: lifty-writing.v11
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -177,19 +177,23 @@ Jobs by step:
   "Want a short conversation." Do not invent a demo. Do not diagnose a
   new problem. If a founder-confirmed website is saved, include that
   exact URL in 3 or 4.
-  If the saved offer is only a short line, say that line in spoken first
-  person as the main focus. Do not put the offer in the hook. The hook
-  ties that offer to the meeting ask. Do not caption it ("Our work is help
-  with operations", "This company is me helping with operations"). Do not
-  invent a method, walkthrough length, or site to make a thin offer sound
-  complete. Email 4 must add a new detail, not restate email 3.
-- Email 5 is the final note. Do not pitch again. Do not call a miss "useful."
-  Assume the timing may not be right, or this sits with someone else at
-  {{company_name}}. Two short asks only: would they point you to whoever
-  owns that work, and can you reconnect later if it becomes a priority.
-  Do not add process about a handoff, that a name is enough, or that you
-  will pick it up with them. No guilt and no meeting demand. Write that
-  in the author's voice. Do not paste a canned close.
+  If the saved offer is only a short line, say that line out loud as the
+  main focus, the way you would tell someone at a table. Do not comment
+  on the sequence. Ban "I haven't said what I actually do yet", "It is
+  my job at", "I'm the founder" as an opener, "This comes from me", and
+  "I can only see the fit when we are speaking." Do not put the offer in
+  the hook. Do not invent a method, walkthrough length, or site. Email 4
+  adds one new spoken detail, then asks for time like a person ("Got 15
+  minutes this week?"). It must not restate email 3 or announce that a
+  meeting is how you start.
+- Email 5 is a last note to a person, not a status report. Do not pitch
+  again. Do not call a miss "useful." Assume the timing isn't right, or
+  this sits with someone else at {{company_name}}. Two short asks only:
+  would they point you to whoever owns that work, and can you reconnect
+  later. Do not
+  narrate options ("I won't rehash the offer", "I can wait, or I can go
+  to the other person", "I have two questions"). No guilt and no meeting
+  demand. Write that in the author's voice. Do not paste a canned close.
 
 ## Illustrative examples
 

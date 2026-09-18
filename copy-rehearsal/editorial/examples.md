@@ -30,4 +30,7 @@ a meeting." / "I can work with either next step." / "I have two questions."
 
 Robot offer lines: "You would be talking with me." / "I would be there for
 that stretch." / "If you want that help, a meeting is how I would start
-with you." / "Want a short conversation."
+with you." / "Want a short conversation." / "I haven't said what I actually
+do yet." / "I'm the founder." / "This comes from me." / "I can only see
+the fit when we are speaking." / "I won't rehash the offer." / "I can
+wait, or I can go to the other person."

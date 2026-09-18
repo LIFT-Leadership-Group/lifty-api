@@ -13,7 +13,7 @@ describe("outreach writing context", () => {
       expect(response.status).toBe(200);
       const context = await response.json();
       expect(context.references.writing).toEqual(expect.any(String));
-      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v10\n/);
+      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v11\n/);
       expect(context.references.writing).toContain("Email shape");
       expect(context.references.writing).toContain("Subject line");
       expect(context.references.writing).toContain("same subject line on all five steps");
@@ -34,8 +34,9 @@ describe("outreach writing context", () => {
       expect(context.references.writing).toContain("I followed up because");
       expect(context.references.writing).toContain("Want a short conversation");
       expect(context.references.writing).toContain("hypothetical");
+      expect(context.references.writing).toContain("Do not comment");
       expect(context.references.anti_slop).toEqual(expect.any(String));
-      expect(context.references.anti_slop).toMatch(/^# LIFT outreach anti-slop list\n\nVersion: lifty-anti-slop\.v5\n/);
+      expect(context.references.anti_slop).toMatch(/^# LIFT outreach anti-slop list\n\nVersion: lifty-anti-slop\.v6\n/);
       expect(context.references.anti_slop).toContain("quick question");
       expect(context.references.anti_slop).toContain("I don't want to keep asking you");
       expect(context.references.anti_slop).toContain("I'm in this");

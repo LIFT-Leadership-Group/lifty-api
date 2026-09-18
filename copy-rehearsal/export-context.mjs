@@ -81,7 +81,7 @@ Hard limits:
 - Name the author from the saved founder or sender. Use first person as that person in every LinkedIn and email step. The lead has to know who wrote a cold message.
 - Write the five emails as one conversation. Each email builds on the last with new wording. Do not repeat the same key phrase in back-to-back sentences or back-to-back emails. Do not use a stiff opener that labels the proof.
 - Print each email as it would appear in an inbox, with a blank line after the greeting, opener, main focus, and hook. Do not collapse fields onto one paragraph.
-- Do not use phrases from references.anti_slop, including "quick question", "I'm in this", "I stay on this", "I followed up because", and "Want a short conversation".
+- Do not use phrases from references.anti_slop, including "quick question", "I'm in this", "I stay on this", "I followed up because", "Want a short conversation", and "I haven't said what I actually do yet".
 - Only {{first_name}}, {{last_name}}, and {{company_name}} are allowed substitutions.
 - Templates must work for the approved audience, including future eligible leads. Do not invent recipient-specific research or unsupported placeholders.
 - Preserve channel choice, cadence, stop-on-reply, and campaign approval requirements. Do not propose a different sequence length or send path.

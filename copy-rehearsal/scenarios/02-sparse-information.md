@@ -83,12 +83,11 @@ builds:
    not restart with "I help with that..."
 
 Do not stack "view", "holds it", or "that work" as a substitute for a job.
-The v1 flow was scattered and too direct. LinkedIn 1-2 are locked.
-LinkedIn 3 is open.
+The v1 flow was scattered and too direct. LinkedIn 1-3 are locked.
 
 ## Helixpath v2 email feedback
 
-LinkedIn 1-2 stay locked. Rewrite LinkedIn 3 and all five emails.
+LinkedIn 1-3 and emails 1-2 stay locked. Only rewrite emails 3-5.
 
 The hook is one sentence that ties the main focus to the CTA. It is a
 bridge, not a reason for writing. Follow-up is assumed. Do not explain why
@@ -136,4 +135,20 @@ Do not write in a hypothetical register. Ban:
 - `If you want that help, a meeting is how I would start with you.`
 - `The timing may not be right. I'm assuming one of those is true.`
 - `I have two questions.`
+
+## Helixpath v4 emails 3-5
+
+Emails 1-2 are locked. Only rewrite 3-5. Write them the way Sam would
+email a person, not the way a template fills a slot.
+
+Email 3: say the saved offer out loud, then ask. Ban `I haven't said what
+I actually do yet` and `It is my job at Helixpath.`
+
+Email 4: one new spoken line, then ask for time like a person. Ban `I'm
+the founder.` / `This comes from me.` / `I can only see the fit when we
+are speaking.` / `people in your seat`.
+
+Email 5: last note. Timing may be off, or it sits with someone else.
+Point me to the person, or I can reconnect later. Ban `I won't rehash the
+offer` and `I can wait, or I can go to the other person.`
 
