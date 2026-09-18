@@ -15,9 +15,11 @@ function lockBlock(scenarioName) {
   try {
     const lock = readFileSync(lockPath, "utf8").trim();
     return `
-## Locked copy
+## Locked copy — do this first
 
-Read \`copy-rehearsal/locks/${scenarioName}.md\`. Reproduce any locked channel exactly. Do not rewrite a locked channel to match a new email pass. Only draft unlocked channels.
+A lock file exists. Do not say there is no lock file. Print every locked
+channel exactly. Do not rewrite a locked channel to match a new email pass.
+Only draft unlocked channels.
 
 ${lock}
 `;
@@ -71,14 +73,15 @@ const commercialVoice = exportTask("commercial-voice", ["common", "interview", "
 const rehearsalRules = `You are running a local Lifty copy rehearsal, not a live onboarding session.
 
 Hard limits:
+- If this prompt has a Locked copy section, that copy wins. Reproduce locked channels exactly. Only draft unlocked channels. Never write "there is no lock file" when that section is present.
 - Use only the fictional saved company information in the scenario.
 - Generate drafts locally. Do not log in, read a hosted workspace, save a campaign, activate outreach, or send messages.
 - Keep current product behavior: LinkedIn is an invitation with no note, then three messages after acceptance. Email is five messages. Each email needs a subject and body.
-- Follow references.writing and references.anti_slop for copy shape. LinkedIn is one three-message conversation that builds on a single job. Never write "so I need to know". Emails use that guide's six fields, the same subject on all five steps, Hi/Hey plus {{first_name}} on every greeting, pain on 1-2, spoken offer as the main focus on 3-4 with the confirmed website in 3 or 4 if one is saved, and email 5 as two short asks: point me to the better person, or reconnect later. The email hook is one sentence that ties the main focus to the CTA. Do not use the hook to explain why you followed up.
+- Follow references.writing and references.anti_slop for copy shape. LinkedIn is one three-message conversation that builds on a single job. Never write "so I need to know". Emails use that guide's six fields, the same subject on all five steps, Hi/Hey plus {{first_name}} on every greeting, pain on 1-2, spoken offer as the main focus on 3-4 with the confirmed website in 3 or 4 if one is saved, and email 5 as two short asks: point me to the better person, or reconnect later. The email hook is one sentence that ties the main focus to the CTA. Do not use the hook to explain why you followed up. These hooks fail: "I started with that wait because", "I followed up because", "I am offering that help because", "I am asking so you can hear", "You can judge the fit there, not from another email."
 - Name the author from the saved founder or sender. Use first person as that person in every LinkedIn and email step. The lead has to know who wrote a cold message.
 - Write the five emails as one conversation. Each email builds on the last with new wording. Do not repeat the same key phrase in back-to-back sentences or back-to-back emails. Do not use a stiff opener that labels the proof.
 - Print each email as it would appear in an inbox, with a blank line after the greeting, opener, main focus, and hook. Do not collapse fields onto one paragraph.
-- Do not use phrases from references.anti_slop, including "quick question", "I'm in this", and "I stay on this".
+- Do not use phrases from references.anti_slop, including "quick question", "I'm in this", "I stay on this", and "I followed up because".
 - Only {{first_name}}, {{last_name}}, and {{company_name}} are allowed substitutions.
 - Templates must work for the approved audience, including future eligible leads. Do not invent recipient-specific research or unsupported placeholders.
 - Preserve channel choice, cadence, stop-on-reply, and campaign approval requirements. Do not propose a different sequence length or send path.
@@ -98,7 +101,7 @@ for (const fileName of scenarioFiles) {
   const scenarioName = fileName.replace(/\.md$/, "");
   const scenario = readFileSync(join(scenariosDir, fileName), "utf8").trim();
   const prompt = `# Lifty copy rehearsal
-
+${lockBlock(scenarioName)}
 ${rehearsalRules}
 
 ## Scenario (fixed input)
@@ -106,7 +109,7 @@ ${rehearsalRules}
 Read \`copy-rehearsal/scenarios/${fileName}\` and use it as the saved company context:
 
 ${scenario}
-${lockBlock(scenarioName)}
+
 ## Current assembled guidance
 
 Read these local export files. They were generated from getAgentContext in a fresh process. Use them as the product guidance. Include every reference, especially \`references.campaign\`.
