@@ -1,6 +1,6 @@
 # LIFT outreach anti-slop list
 
-Version: lifty-anti-slop.v4
+Version: lifty-anti-slop.v5
 
 Do not use these words or phrases in recommended LinkedIn or email copy.
 Match case-insensitively. Do not use close variants that keep the same tell
@@ -37,6 +37,13 @@ writing ban, not a claim about response rates.
 - unlock
 - unlocking
 - seamless
+- Want a short conversation
+- a short conversation
+- you would be talking with me
+- I would be there for that stretch
+- a meeting is how I would start
+- I would stay on
+- I have two questions
 - —
 
 ## LinkedIn

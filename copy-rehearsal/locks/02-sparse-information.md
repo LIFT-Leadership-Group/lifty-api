@@ -1,7 +1,7 @@
 # Locked copy for 02-sparse-information
 
-David accepted the LinkedIn on 2026-09-18. Do not rewrite that channel.
-Email is still open.
+David accepted LinkedIn 1-2 on 2026-09-18. Do not rewrite those messages.
+LinkedIn 3 is open. Email is open.
 
 ## LinkedIn
 
@@ -15,6 +15,5 @@ Message 2
 
 I asked because the rest of the team feels it when those operations slip. Does it stay steady as you add people, or does it change every time {{company_name}} grows?
 
-Message 3
-
-I help companies with operations, and keeping them steady is what I wanted to talk through. Want a short conversation on that at {{company_name}}?
+Message 3 is unlocked. Draft a new ask in Sam's own words. Never write
+"Want a short conversation."

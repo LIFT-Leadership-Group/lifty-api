@@ -8,7 +8,8 @@ Message 2: "I help with that view, so I need to know where it actually lives."
 
 "so I need to know" is never something you say to a prospect. It is too
 direct. The v1 LinkedIn flow was scattered and did not build across the
-three messages. LinkedIn v2 is locked.
+three messages. LinkedIn 1-2 are locked. Message 3 cannot say "Want a
+short conversation."
 
 ## Email — do not write this
 
@@ -25,4 +26,8 @@ Follow-up is assumed.
 
 Email 5 process: "I don't need a long handoff. A name is enough." / "I'll
 pick this up with them if you send me over." / "I am not asking you to take
-a meeting." / "I can work with either next step."
+a meeting." / "I can work with either next step." / "I have two questions."
+
+Robot offer lines: "You would be talking with me." / "I would be there for
+that stretch." / "If you want that help, a meeting is how I would start
+with you." / "Want a short conversation."

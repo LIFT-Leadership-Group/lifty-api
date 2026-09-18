@@ -57,8 +57,8 @@ fixed and sparse.
   or customer to sound like Palletwing.
 - Emails 3-4 can only offer what is saved: help with operations. No website.
   No walkthrough length. No named result. Do not treat $1M ARR as a result.
-  If there is no saved meeting CTA, ask for a short conversation without
-  inventing a demo.
+  If there is no saved meeting CTA, ask the way Sam would ask. Never write
+  "Want a short conversation." Do not invent a demo.
 - Email 5 assumes the timing isn't right, or this sits with someone else.
   Ask them to point you to the better person. Leave the door open to
   reconnect. Do not call a miss "useful."
@@ -78,16 +78,17 @@ builds:
 2. Stay on that job. Add who feels it or where it shows up. Ask an either/or
    they can answer. First person. Never write "so I need to know" or "I need
    to know". Do not ask who owns the work. That is email 5.
-3. Offer help with operations in spoken first person. Ask for a short
-   conversation on that same job. Do not restart with "I help with that..."
+3. Offer help with operations in spoken first person. Ask in Sam's own
+   words on that same job. Never write "Want a short conversation." Do
+   not restart with "I help with that..."
 
 Do not stack "view", "holds it", or "that work" as a substitute for a job.
-The v1 flow was scattered and too direct. LinkedIn v2 is locked. Do not
-rewrite it.
+The v1 flow was scattered and too direct. LinkedIn 1-2 are locked.
+LinkedIn 3 is open.
 
 ## Helixpath v2 email feedback
 
-LinkedIn is locked. Only rewrite email.
+LinkedIn 1-2 stay locked. Rewrite LinkedIn 3 and all five emails.
 
 The hook is one sentence that ties the main focus to the CTA. It is a
 bridge, not a reason for writing. Follow-up is assumed. Do not explain why
@@ -117,4 +118,22 @@ Email:
 - Email 5: two short asks only. Point me to the person who owns this, or
   reconnect later. No extra process about a handoff, a name being enough,
   or picking it up with them.
+
+## Helixpath v3 voice
+
+These emails have to sound like Sam wrote them, in order, over a couple of
+weeks. The six fields stay. They must disappear in the inbox.
+
+Stay general on facts. Vary the words. Do not stack "operations" or
+"keep up" in back-to-back sentences or emails.
+
+Do not write in a hypothetical register. Ban:
+
+- `Want a short conversation`
+- `You would be talking with me.`
+- `I would stay on how those operations keep up at {{company_name}} as it grows.`
+- `I would be there for that stretch.`
+- `If you want that help, a meeting is how I would start with you.`
+- `The timing may not be right. I'm assuming one of those is true.`
+- `I have two questions.`
 

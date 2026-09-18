@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v9
+Version: lifty-writing.v10
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -66,16 +66,19 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
   recipient to confirm it. Never promise unsupported ROI or quote guessed
   financial metrics.
 - Make one clear ask. Do not open with a meeting or demo request. Later
-  messages may offer a brief conversation when it fits the founder's preferred
-  call to action.
+  messages may ask in the founder's own words when it fits their preferred
+  call to action. Never write "Want a short conversation."
 - Continue the same topic with a new detail or question. Do not repeat the
   opener, pitch or ask in different words.
-- Write the five emails as one conversation the founder would actually have,
-  not five restatements of the same paragraph. Each email should build on the
-  last by reframing the point in new sentences. Do not stack the same noun or
-  phrase in back-to-back sentences, and do not reuse the same key phrase in
-  back-to-back emails. Variety still has to flow. If two lines could swap
-  places without anyone noticing, rewrite one of them.
+- Write the five emails as five notes the named founder sent over two weeks.
+  The six fields are a store format. They must disappear in the inbox. If a
+  line only exists to fill the hook or main-focus slot, rewrite it. Stay
+  general when facts are thin. Vary the words. Do not stack the same noun
+  across back-to-back sentences or emails. Do not write in a hypothetical
+  register about a meeting that has not happened. Ban "you would be talking
+  with me", "I would stay on", "I would be there for that stretch", and
+  "a meeting is how I would start with you." If two lines could swap places
+  without anyone noticing, rewrite one of them.
 - Openers are spoken, not labels. Do not announce the evidence you are about
   to cite, and do not comment on the act of naming it. Ban lines such as
   "North Park Market is the store I can name", "That is the only result I will
@@ -99,10 +102,11 @@ The campaign context owns the actual journey and cadence. For the three
 LinkedIn messages, write one conversation that builds across all three.
 Message 1 names the author and one job, then asks how they handle it.
 Message 2 stays on that same job and adds a new specific detail or either/or
-they can answer. Message 3 offers only what is saved, then asks for a short
-conversation on that same job. Do not scatter: do not jump to who owns the
-work (that is email 5), and do not restart with "I help with that..." as a
-new pitch. Never write "so I need to know", "I need to know", or tell a
+they can answer. Message 3 offers only what is saved, then asks in that
+founder's own words. Never write "Want a short conversation." Do not
+scatter: do not jump to who owns the work (that is email 5), and do not
+restart with "I help with that..." as a new pitch. Never write "so I
+need to know", "I need to know", or tell a
 prospect you require information from them. That is too direct. Ask like a
 person, not like you are collecting facts.
 
@@ -150,7 +154,8 @@ Every recommended email uses these six fields, in this order.
    "I followed up because", "I started with that wait because", "I am
    offering that help because", and "I am asking so you can hear". First
    person from the author is required. Do not start hooks with "I'm asking
-   because..."
+   because..." Do not announce the CTA ("what I want to ask you about",
+   "I have two questions").
 6. CTA. One ask.
 
 When showing copy, print each email as it would appear in an inbox. Put a
@@ -167,10 +172,11 @@ Jobs by step:
   pains named in 1-2. Email 4 continues that thread. Do not open with a
   named customer's metric as if {{company_name}} already has that number.
   Attribute proof to the named customer in the same thought. The offer is
-  the main focus. The hook ties that offer to the meeting ask. Ask for a
-  short meeting, or the founder's saved walkthrough, so they can see the
-  solution. Do not diagnose a new problem. If a founder-confirmed website
-  is saved, include that exact URL in 3 or 4.
+  the main focus. The hook ties that offer to the meeting ask. Ask the way
+  the founder would ask, or use their saved walkthrough. Never write
+  "Want a short conversation." Do not invent a demo. Do not diagnose a
+  new problem. If a founder-confirmed website is saved, include that
+  exact URL in 3 or 4.
   If the saved offer is only a short line, say that line in spoken first
   person as the main focus. Do not put the offer in the hook. The hook
   ties that offer to the meeting ask. Do not caption it ("Our work is help
@@ -207,8 +213,8 @@ Those three lines do not build.
 LinkedIn follow-up: "I'm asking because that missing context is what customers
 feel. Does it live with the ticket, or does someone usually pass it along?"
 
-LinkedIn ask: "I help support teams keep that context with the ticket. Want a
-short conversation on how {{company_name}} handles the next handoff?"
+LinkedIn ask: "I help support teams keep that context with the ticket. Got
+15 minutes this week to walk one of those handoffs?"
 
 Email subject for all five steps: "When an issue changes owners"
 
@@ -223,7 +229,7 @@ I'm Alex at Harborline.
 When a customer issue changes owners, the next person often has to rebuild
 the story. That delay is what customers feel.
 
-That missing context is what I want to ask you about.
+That's the delay I keep seeing on those handoffs.
 
 How does the next person at {{company_name}} pick up the context today?
 
