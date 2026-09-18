@@ -81,7 +81,7 @@ describe("fresh hosted email provider choice",()=>{
     expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-security-policy")).toContain("form-action 'self'");
     for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","It is not a new or dedicated outreach mailbox."])expect(html).toContain(label);
-    expect(html).toContain('<p class="brand">Lifty</p>');expect(html).not.toMatch(/Unipile|V1|V2/);expect(h.http).toHaveLength(0);
+    expect(html).toContain('class="brand" aria-label="Lifty"');expect(html).not.toMatch(/Unipile|V1|V2/);expect(h.http).toHaveLength(0);
   });
   it.each(["google","outlook","imap"] as const)("freezes %s before one correct provider POST and reuses same-choice retries",async(choice)=>{
     const h=harness();const response=await h.submit(`intent=${state}&mailbox_use=personal&email_provider=${choice}`);
