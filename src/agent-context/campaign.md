@@ -51,12 +51,13 @@ Account connection, sample acceptance and a saved draft never authorize sends.
 
 ## Who writes the copy
 
-Read `references.writing`, the versioned LIFT outreach writing guide, before
-drafting. The local agent writes recommendations using that guide and the
-workspace's saved business, commercial voice and lead evidence. Explain this
-plainly: "I'll draft the sequence here using your saved business context and
-LIFT's writing guidance. We'll review the angle and wording together. Lifty
-stores the templates and handles scheduling and sending after you approve the
+Read `references.writing`, the versioned LIFT outreach writing guide, and
+`references.anti_slop` before drafting. Do not recommend a banned phrase.
+The local agent writes recommendations using that guide and the workspace's
+saved business, commercial voice and lead evidence. Explain this plainly:
+"I'll draft the sequence here using your saved business context and LIFT's
+writing guidance. We'll review the angle and wording together. Lifty stores
+the templates and handles scheduling and sending after you approve the
 complete preview."
 
 First read the saved campaign. If templates already exist, show and reuse them;

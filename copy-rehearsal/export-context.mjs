@@ -48,7 +48,7 @@ function exportTask(task, requiredReferences = []) {
   return context;
 }
 
-const campaigns = exportTask("campaigns", ["campaign", "writing", "common"]);
+const campaigns = exportTask("campaigns", ["campaign", "writing", "anti_slop", "common"]);
 const commercialVoice = exportTask("commercial-voice", ["common", "interview", "configuration"]);
 
 const rehearsalRules = `You are running a local Lifty copy rehearsal, not a live onboarding session.
@@ -57,7 +57,10 @@ Hard limits:
 - Use only the fictional saved company information in the scenario.
 - Generate drafts locally. Do not log in, read a hosted workspace, save a campaign, activate outreach, or send messages.
 - Keep current product behavior: LinkedIn is an invitation with no note, then three messages after acceptance. Email is five messages. Each email needs a subject and body.
-- Follow references.writing for copy shape. LinkedIn sentences in a message must be one connected thought. Emails use that guide's six fields, the same subject on all five steps, Hi/Hey alternation, pain on 1-2, offer on 3-4, and a thank-you plus different-person ask on 5.
+- Follow references.writing and references.anti_slop for copy shape. LinkedIn sentences in a message must be one connected thought. Emails use that guide's six fields, the same subject on all five steps, Hi/Hey plus {{first_name}} on every greeting, pain on 1-2, offer on 3-4, and a soft thank-you plus different-person ask on 5.
+- Name the author from the saved founder or sender. Use first person as that person. The lead has to know who wrote a cold message.
+- Print each email as it would appear in an inbox, with a blank line after the greeting, opener, main focus, and hook. Do not collapse fields onto one paragraph.
+- Do not use phrases from references.anti_slop, including "quick question".
 - Only {{first_name}}, {{last_name}}, and {{company_name}} are allowed substitutions.
 - Templates must work for the approved audience, including future eligible leads. Do not invent recipient-specific research or unsupported placeholders.
 - Preserve channel choice, cadence, stop-on-reply, and campaign approval requirements. Do not propose a different sequence length or send path.
@@ -65,8 +68,8 @@ Hard limits:
 
 Show the copy so it can be judged. For each channel, include:
 1. The recommended angle in a few sentences, including which saved facts you used.
-2. The full templates. For email, label all six fields on each step, then show the composed subject and body.
-3. A short checklist against specificity, credibility, voice, CTA, connected flow, and whether each follow-up adds a useful reason to reply.
+2. The full templates. For email, show the composed inbox view first (subject, greeting with {{first_name}}, then opener, main focus, hook, and CTA separated by blank lines). Label the six fields only after that.
+3. A short checklist against specificity, credibility, named author, voice, CTA, connected flow, anti-slop, and whether each follow-up adds a useful reason to reply.
 
 If a fact is missing, stay general. Do not invent customers, results, websites, pain, or prior conversations.`;
 

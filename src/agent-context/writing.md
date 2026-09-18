@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v2
+Version: lifty-writing.v3
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -29,6 +29,22 @@ several angles, recommend one and explain the tradeoff. Use the founder's
 direction when they have already chosen. Show the draft and incorporate their
 feedback before saving it with workspace `prepare`.
 
+## Name the author
+
+Identify the author from saved founder or sender name plus the saved company
+name. That person is speaking. Cold copy must make this obvious in a natural
+way. Do not invent a sender, title, or biography.
+
+Use first person as that author throughout LinkedIn and email: I, I'm, I sent,
+I'm asking. Do not hide behind "we" or "the company thinks" with no person
+behind it. Name yourself in the first LinkedIn message after acceptance and in
+email 1. Later messages keep that same I. A lead who never accepted LinkedIn
+still has to know who wrote the email.
+
+Prefer lines like "I'm asking because..." and naming yourself with the saved
+founder first name and company. If the founder name is missing, ask for it
+before drafting. Do not send unnamed copy.
+
 ## Write like a person
 
 - Use plain first-person and second-person language. Keep each sentence to one
@@ -37,9 +53,12 @@ feedback before saving it with workspace `prepare`.
   question must name the same job. Do not bolt a time-pressure clause onto an
   unrelated ask. If the ask makes sense alone and the first sentence does not
   earn it, rewrite until a reader can hear why the second line follows the first.
-- Use one relevant hook per message. Do not list everything researched about
-  the recipient. Explain why the offer may help without claiming they have a
-  problem you cannot verify.
+- Use one relevant hook per message. The hook has to continue the same thought
+  as the main focus. Do not add a slogan, a flattery line, or a generic "people
+  like you feel this" closer. If the hook could sit on any company's email,
+  rewrite it.
+- Do not list everything researched about the recipient. Explain why the offer
+  may help without claiming they have a problem you cannot verify.
 - Frame company-specific research as an observation in the same sentence, for
   example "It looks like...". If an inference carries the message, ask the
   recipient to confirm it. Never promise unsupported ROI or quote guessed
@@ -48,11 +67,12 @@ feedback before saving it with workspace `prepare`.
   messages may offer a brief conversation when it fits the founder's preferred
   call to action.
 - Continue the same topic with a new detail or question. Do not repeat the
-  opener, pitch or ask in different words. Skip empty nudges such as "just
-  checking in" and "circling back". Do not guilt someone into replying.
-- Remove flattery, buzzwords, em dashes and filler such as "I wanted to reach
-  out", "hope this finds you well", "unlock" and "seamless". Read the copy aloud.
-  If the founder would not say it, rewrite it.
+  opener, pitch or ask in different words.
+- Read `references.anti_slop` and do not use those phrases. Empty nudges and
+  guilt closes are banned, including "just checking in", "circling back",
+  "I don't want to keep asking you", "last note from me", and "I'll leave it
+  here". Do not guilt someone into replying.
+- Read the copy aloud. If the founder would not say it, rewrite it.
 - Use the confirmed business URL exactly when it supports the ask. Never invent
   a website or resource. Do not claim an earlier LinkedIn message or email was
   sent unless that history is confirmed for every recipient receiving the text.
@@ -63,7 +83,8 @@ The campaign context owns the actual journey and cadence. For the three
 LinkedIn messages, recommend a reply-friendly opening after acceptance, a
 specific follow-up question, then a short relevance statement and clear ask.
 Each LinkedIn message is one connected thought in short plain text, without
-headings, bullet lists or signatures. The invitation has no note.
+headings, bullet lists or signatures. The invitation has no note. The author
+still has to be present in the first message.
 
 For the five emails, use the email shape below. Do not replace it with a
 one-sentence fragment per step. Every email step still requires its own
@@ -82,17 +103,22 @@ founder requests it.
 
 ## Email shape
 
-Every recommended email uses these six fields, in this order. Show them labeled
-to the founder. Compose the stored `text` in the same order so the sent body is
-complete, not a fragment.
+Every recommended email uses these six fields, in this order.
 
 1. Subject line. The same wording on emails 1-5.
-2. Address. Use `Hi {{first_name}},` or `Hey {{first_name}},` and alternate:
-   email 1 Hi, email 2 Hey, email 3 Hi, email 4 Hey, email 5 Hi.
-3. Opener. One line specific to that email. It sets up this step only.
+2. Address. Always `Hi {{first_name}},` or `Hey {{first_name}},`. Alternate
+   Hi, Hey, Hi, Hey, Hi. Never write `Hi.` or `Hey.` without `{{first_name}}`.
+   The recipient's first name belongs in this greeting on every email.
+3. Opener. One line specific to that email, on the next line after the greeting.
 4. Main focus. Two or three sentences. This is the biggest variable.
-5. Hook. One sentence that gives a reason to keep reading or reply.
+5. Hook. One sentence that continues the same thought. First person from the
+   author is welcome here ("I'm asking because...").
 6. CTA. One ask.
+
+When showing copy, print each email as it would appear in an inbox. Put a
+blank line after the greeting, after the opener, after the main focus, and
+after the hook. Do not collapse the fields onto one paragraph or a labeled
+stack with no spacing. The stored `text` uses that same spacing.
 
 Jobs by step:
 
@@ -100,48 +126,57 @@ Jobs by step:
   saved offer. Ask; do not diagnose {{company_name}}. If saved context has no
   concrete pain, stay general. Do not invent one.
 - Emails 3-4 focus on the founder's product, offering, or solution for the
-  pains named in 1-2. Do not introduce a new problem.
-- Email 5 is the final note. Thank them for their time. Ask if someone else
-  at {{company_name}} is the better person. Do not add a new pitch, a "final
-  attempt," or a meeting demand.
+  pains named in 1-2. Do not introduce a new problem. Email 4 needs a new
+  reason to reply, not the same CTA as email 3 in different clothes.
+- Email 5 is the final note. Thank them briefly. Ask, softly, whether someone
+  else at {{company_name}} is the better person. Do not add a new pitch, a
+  meeting demand, or a guilt line about keeping after them.
 
 ## Illustrative examples
 
 These examples assume a fictional business that helps support teams hand off
 customer issues. Use them to understand the writing choices, not as facts or
-approved copy for the current workspace.
+approved copy for the current workspace. The sender is "Alex".
 
 LinkedIn, fragmented (do not write this): "Hi {{first_name}}, before the ticket
 is overdue at {{company_name}}, how does the next person pick up the context?"
 The overdue-ticket clause and the handoff question are two jobs.
 
-LinkedIn, connected: "Hi {{first_name}}, when a customer issue changes owners
-at {{company_name}}, how does the next person pick up the context?"
+LinkedIn, connected: "Hi {{first_name}}, I'm Alex at Harborline. When a
+customer issue changes owners at {{company_name}}, how does the next person
+pick up the context?"
 
-LinkedIn follow-up: "Does that context live with the ticket, or does someone
-usually pass it along?"
+LinkedIn follow-up: "I'm asking because that missing context is what customers
+feel. Does it live with the ticket, or does someone usually pass it along?"
 
 Email subject for all five steps: "When an issue changes owners"
 
-Email 1 example fields:
+Composed email 1, as it should appear:
 
-- Address: Hi {{first_name}},
-- Opener: Quick question about handoffs at {{company_name}}.
-- Main focus: When a customer issue changes owners, the next person often has
-  to rebuild the story. That delay is what customers feel.
-- Hook: I'm asking because this is the gap we help support teams close.
-- CTA: How does the next person at {{company_name}} pick up the context today?
+Subject: When an issue changes owners
 
-The first question names a concrete job without asserting that the process is
-broken. Later emails stay on that job: 2 deepens the pain, 3-4 introduce the
-offer, 5 thanks them and asks for a better contact if this is not their area.
+Hi {{first_name}},
+
+I'm Alex at Harborline.
+
+When a customer issue changes owners, the next person often has to rebuild
+the story. That delay is what customers feel.
+
+I'm asking because this is the gap we help support teams close.
+
+How does the next person at {{company_name}} pick up the context today?
+
+Do not open with "Quick question". Later emails stay on that job: 2 deepens
+the pain, 3-4 introduce the offer, 5 thanks them and asks for a better contact
+if this is not their area.
 
 ## Review, save and approve
 
-Before showing copy, check factual support, the founder's voice, connected
-sentences, the email six-field shape, one ask per message, useful progression
-and permitted placeholders. This review is writing guidance, not a claim that
-the draft is proven to perform. Preserve the founder's chosen wording while
+Before showing copy, check the named author, first-name greeting, factual
+support, the founder's voice, connected sentences, the email six-field shape
+with inbox spacing, anti-slop, one ask per message, useful progression and
+permitted placeholders. This review is writing guidance, not a claim that the
+draft is proven to perform. Preserve the founder's chosen wording while
 flagging unsupported claims or contract conflicts.
 
 After discussing the draft, the local agent submits the templates through the
