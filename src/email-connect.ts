@@ -95,8 +95,19 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     let value=Stored.parse(await rpc("status",{workspace},session));
     if(value.state==="pending" && value.intent_ref && (!attemptRef || value.intent_ref===attemptRef)){
       const pendingIntent=value.transport?.api_version==="v2" || value.email_provider || value.provider_selection_required ? await readIntent(value.intent_ref) : null;
-      if(pendingIntent && (pendingIntent.workspace_ref!==value.workspace_ref
-        || (value.transport && pendingIntent.transport?.api_version!==value.transport.api_version)))fail("EMAIL_CALLBACK_INVALID",403);
+      if (pendingIntent) {
+        // A chooser can freeze Google between status and this exact intent read.
+        // Accept only the unbound, unselected V1 placeholder becoming V2; all
+        // authorization/account evidence below comes from the committed intent.
+        const selectedDuringPoll = value.provider_selection_required === true && value.email_provider == null
+          && !value.account_id && !value.connection_ref && value.transport?.api_version === "v1"
+          && !value.transport.account_id && !value.transport.canonical_account_id && !value.transport.connection_ref
+          && pendingIntent.provider_selection_required === false && pendingIntent.email_provider === "google"
+          && !pendingIntent.account_id && pendingIntent.transport?.api_version === "v2"
+          && !pendingIntent.transport.account_id && !pendingIntent.transport.canonical_account_id && !pendingIntent.transport.connection_ref;
+        if (pendingIntent.workspace_ref !== value.workspace_ref
+          || (value.transport && pendingIntent.transport?.api_version !== value.transport.api_version && !selectedDuringPoll)) fail("EMAIL_CALLBACK_INVALID",403);
+      }
       const hint=pendingIntent?.transport?.api_version==="v2" ? {account_id:pendingIntent.authorization_received ? pendingIntent.authorization_account_id ?? null : null}
         : z.object({workspace_ref:z.literal(value.workspace_ref),intent_ref:z.literal(value.intent_ref),account_id:z.string().regex(/^[A-Za-z0-9_-]{1,255}$/).nullable()})
           .parse(await rpc("read",{workspace_ref:value.workspace_ref,intent_ref:value.intent_ref},session,"lifty_email_callback_hint"));

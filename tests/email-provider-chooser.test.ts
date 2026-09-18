@@ -11,7 +11,7 @@ const v1={api_version:"v1",connection_ref:null,canonical_account_id:null,provide
   application_id:null,account_scope_id:null,user_id:null,v1_account_id:null,owner_profile_id:null,generation:0,hosted_auth_origin:"https://account.unipile.com"};
 const v2={...v1,api_version:"v2",provider_namespace:"unipile:v2:app_test",application_id:"app_test",hosted_auth_origin:"https://auth.lifty.test"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status});
-function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:boolean;expired?:boolean;hint?:boolean;authorized?:boolean;ownerChanged?:boolean;delegated?:boolean}={}) {
+function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:boolean;expired?:boolean;hint?:boolean;authorized?:boolean;ownerChanged?:boolean;delegated?:boolean;staleStatus?:"pre_choice"|"fixed"}={}) {
   let selected:HostedEmailProvider|null=null,phase="pending",declared=false,hosted:string|null=null,connected=false;
   const calls:{op:string;payload:Record<string,unknown>}[]=[],http:{url:string;body:Record<string,unknown>|null}[]=[];
   const transport=()=>selected==="google"?v2:v1;
@@ -25,7 +25,8 @@ function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:
     const deny=(message:string)=>({data:null,error:{code:message==="email_intent_expired"?"PT410":"PT409",message}});
     if(options.expired)return deny("email_intent_expired");
     if(op==="intent")return {data:intent(),error:null};
-    if(op==="status")return {data:stored(),error:null};
+    if(op==="status")return {data:options.staleStatus&&!connected?{...stored(),transport:v1,
+      provider_selection_required:options.staleStatus==="pre_choice",email_provider:options.staleStatus==="pre_choice"?null:selected}:stored(),error:null};
     if(op==="read")return {data:{workspace_ref:workspace,intent_ref:id,account_id:options.hint?"account_1":null},error:null};
     if(op==="declare"){
       const choice=payload.email_provider as HostedEmailProvider|undefined;
@@ -77,7 +78,7 @@ describe("fresh hosted email provider choice",()=>{
     expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-security-policy")).toContain("form-action 'self'");
     for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","It is not a new or dedicated outreach mailbox."])expect(html).toContain(label);
-    expect(html).not.toMatch(/Unipile|V1|V2/);expect(h.http).toHaveLength(0);
+    expect(html).toContain('<p class="brand">Lifty</p>');expect(html).not.toMatch(/Unipile|V1|V2/);expect(h.http).toHaveLength(0);
   });
   it.each(["google","outlook","imap"] as const)("freezes %s before one correct provider POST and reuses same-choice retries",async(choice)=>{
     const h=harness();const response=await h.submit(`intent=${state}&mailbox_use=personal&email_provider=${choice}`);
@@ -165,4 +166,16 @@ it("a completed same-provider form retry acknowledges receipt without issuing an
   const response=await h.submit(`intent=${state}&mailbox_use=personal&email_provider=imap`);
   expect(response.status).toBe(200);expect(await response.text()).toContain("We received your authorization");
   expect(h.http).toHaveLength(before);expect(h.intent().expires_at).toBe(expiry);
+});
+
+it("accepts only the exact unbound chooser transition committed during a status poll",async()=>{
+  const h=harness({authorized:true,staleStatus:"pre_choice"});await h.select("google");
+  expect((await h.ops.status(h.session,workspace,id)).status).toBe("connected");
+  expect(h.calls.find(c=>c.op==="complete")?.payload).toMatchObject({email_provider:"google",verified_transport:{api_version:"v2",account_id:"account_1"}});
+  expect(h.http.slice(1).every(call=>call.url.startsWith("https://api.unipile.com/v2/"))).toBe(true);
+});
+it("still rejects transport changes for a previously fixed intent",async()=>{
+  const h=harness({authorized:true,staleStatus:"fixed"});await h.select("google");const before=h.http.length;
+  await expect(h.ops.status(h.session,workspace,id)).rejects.toMatchObject({code:"EMAIL_CALLBACK_INVALID"});
+  expect(h.http).toHaveLength(before);expect(h.calls.some(c=>c.op==="complete")).toBe(false);
 });
