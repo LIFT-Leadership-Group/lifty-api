@@ -105,8 +105,9 @@ fixed. Improve Reese's copy. Do not replace it with a generic sequence.
   say "close" twice in message 3. New wording each step.
 - Email uses the six fields, in order, with inbox spacing: subject,
   address, opener, main focus, hook, CTA. Same subject on all five.
-  Hi/Hey plus `{{first_name}}`. Email 1 opener is
-  `I'm Reese Lang at Nettle & Co.`
+  Hi/Hey plus `{{first_name}}`. Opener is one spoken line that
+  humanizes the outreach. Main focus is who Reese is and what Nettle
+  solves, in 2-3 sentences. Name Reese in email 1.
 - Hook is one spoken sentence that ties main focus to the CTA. It cannot
   narrate the email. Ban `that is the person I am writing`, `that is the
   job I do`, `That is all of it`, `I am treating this as a timing miss`,

@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v14
+Version: lifty-writing.v15
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -151,13 +151,15 @@ Every recommended email uses these six fields, in this order.
 2. Address. Always `Hi {{first_name}},` or `Hey {{first_name}},`. Alternate
    Hi, Hey, Hi, Hey, Hi. Never write `Hi.` or `Hey.` without `{{first_name}}`.
    The recipient's first name belongs in this greeting on every email.
-3. Opener. One line specific to that email, on the next line after the greeting.
-   It must be a new spoken line, not a recycled phrase from the previous email
-   and not a stiff caption for the proof that follows. The opener has to make
-   sense on its own. If a reader has to ask what "landing late" refers to,
-   rewrite it as a spoken sentence that names the thing.
-4. Main focus. Two or three sentences. This is the biggest variable. Do not
-   repeat a sentence from the previous email with one word swapped.
+3. Opener. One spoken line that humanizes the outreach. It sits on the
+   next line after the greeting. It is a person starting a note, not a
+   caption for the proof that follows. It must be new, and it has to make
+   sense on its own.
+4. Main focus. The core of the email. Two or three sentences. By the end
+   of this section the reader knows who is writing and what they solve.
+   Emails 1-2 do that through the pain. Emails 3-4 do that through the
+   offer. Do not repeat a sentence from the previous email with one word
+   swapped.
 5. Hook. One spoken sentence that ties the main focus to the CTA. It is
    a bridge, not a caption for the email's job. Do not explain why you
    followed up. Never write "I followed up because." Do not announce who

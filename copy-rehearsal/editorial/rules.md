@@ -1,7 +1,7 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v14) and
+`src/agent-context/writing.md` (lifty-writing.v15) and
 `src/agent-context/anti-slop.md` (lifty-anti-slop.v8).
 
 ## Author
@@ -29,8 +29,8 @@ with a blank line after each field:
 
 1. Subject line
 2. Address (`Hi` or `Hey` plus `{{first_name}}` on every email)
-3. Opener (one line, specific to that email)
-4. Main focus (core body, 2-3 sentences)
+3. Opener (one spoken line that humanizes the outreach)
+4. Main focus (who we are and what we solve, 2-3 sentences)
 5. Hook (one sentence that ties the main focus to the CTA)
 6. CTA
 
@@ -40,12 +40,9 @@ Field behavior:
 - Address alternates: Hi, Hey, Hi, Hey, Hi. Never drop the first name.
 - Each email builds on the previous one. Reframe the point in new sentences.
   Do not recycle the same key phrases back to back.
-- Openers are spoken, not stiff captions for the proof that follows. An
-  opener has to make sense on its own. Ban cryptic lines like "Landing late
-  is what costs you."
-- If the saved offer is only a short line, say it in spoken first person.
-  Do not caption it ("Helixpath's work is help with operations").
-- Main focus is the biggest variable.
+- Opener is one spoken line that humanizes the outreach. Not a caption.
+- Main focus is the core of the email. By the end the reader knows who is
+  writing and what they solve. Two or three sentences.
 - Hook is one spoken sentence that ties the main focus to the CTA. It is a
   bridge, not a caption for the email's job. Follow-up is assumed. Ban
   "that is the person I am writing", "that is the job I do", and "I am
