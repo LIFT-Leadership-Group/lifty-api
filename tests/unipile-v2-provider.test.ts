@@ -1,10 +1,10 @@
 import { describe,it,expect } from "vitest";
 import { createUnipileV2Provider } from "../src/unipile-v2-provider.js";
-import type { UnipileTransport } from "../src/unipile-transport.js";
+import { UnipileTransport } from "../src/unipile-transport.js";
 import { versionedHostedAuthUrl } from "../src/hosted-auth-branding.js";
 
 const transport:UnipileTransport={api_version:"v2",connection_ref:null,canonical_account_id:"legacy_account",provider_namespace:"unipile:legacy",
-  account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",generation:1,user_id:"owner",v1_account_id:"legacy_account",hosted_auth_origin:"https://connect-v2.lifty.test"};
+  account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",generation:1,owner_profile_id:null,user_id:"owner",v1_account_id:"legacy_account",hosted_auth_origin:"https://connect-v2.lifty.test"};
 const email="founder@example.test";
 const account={object:"Account",id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",
   provider:"google",status:"running",is_locked:false,metadata:{v1_account_id:"legacy_account",products_connection_status:{gmail:"running"}}};
@@ -28,7 +28,7 @@ describe("Unipile V2 authenticated contract",()=>{
   it("retains canonical legacy identity after exact application/scope/owner/alias readback",async()=>{
     const h=harness();
     expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toEqual({accountId:"legacy_account",email,type:"GOOGLE_OAUTH",healthy:true,
-      verifiedTransport:{api_version:"v2",account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",v1_account_id:"legacy_account"}});
+      verifiedTransport:{api_version:"v2",account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",owner_profile_id:null,v1_account_id:"legacy_account"}});
     expect(h.calls.map(c=>c.url)).toEqual(["https://api.unipile.com/v2/accounts/acc_test","https://api.unipile.com/v2/acc_test/email-senders"]);
   });
   it.each([
@@ -64,12 +64,12 @@ describe("Unipile V2 authenticated contract",()=>{
   });
   it("uses an independent self profile for LinkedIn identity",async()=>{
     const h=harness({account:{...account,provider:"linkedin"}});
-    const identity=await h.provider.readLinkedinIdentity("acc_test",transport,"owner");
+    const identity=await h.provider.readLinkedinIdentity("acc_test",{...transport,owner_profile_id:"owner"},"owner");
     expect(identity).toMatchObject({accountId:"legacy_account",profileId:"owner",profileUrl:"https://www.linkedin.com/in/founder/",healthy:true});
-    expect(h.calls[1]?.url).toBe("https://api.unipile.com/v2/acc_test/users/owner");
+    expect(h.calls[1]?.url).toBe("https://api.unipile.com/v2/acc_test/users/me");
   });
   it.each([{id:"foreign"},{provider:"mock"},{type:"organization"},{specifics:{network_distance:"FIRST_DEGREE"}},{specifics:{}}])("rejects wrong LinkedIn owner profile %j",async(change)=>{
-    await expect(harness({account:{...account,provider:"linkedin"},profile:{...profile,...change}}).provider.readLinkedinIdentity("acc_test",transport,"owner")).rejects.toBeDefined();
+    await expect(harness({account:{...account,provider:"linkedin"},profile:{...profile,...change}}).provider.readLinkedinIdentity("acc_test",{...transport,owner_profile_id:"owner"},"owner")).rejects.toBeDefined();
   });
   it("produces distinct create and reconnect bodies with the snapshotted domain",async()=>{
     for(const reconnect of [false,true]){
@@ -113,5 +113,51 @@ describe("V2 bounded HTTP",()=>{
     const h=harness({body:new Response("secret provider diagnostic")});
     await expect(h.provider.readEmailIdentity("acc_test",transport,email)).rejects.toMatchObject({code:"UNIPILE_UNAVAILABLE"});
     await expect(harness({account:{...account,status:"new_future_state"}}).provider.readEmailIdentity("acc_test",transport,email)).rejects.toMatchObject({code:"UNIPILE_UNAVAILABLE"});
+  });
+});
+
+
+describe("V2 LinkedIn copied owner evidence",()=>{
+  const copied={...transport,user_id:"Display Name",owner_profile_id:"owner"};
+  const raw={...account,user_id:"Display Name",provider:"linkedin"};
+  it("keeps raw account metadata separate from the retained authenticated SELF owner",async()=>{
+    const h=harness({account:raw});
+    const result=await h.provider.readLinkedinIdentity("acc_test",copied,"owner");
+    expect(result).toMatchObject({accountId:"legacy_account",profileId:"owner",healthy:true,
+      verifiedTransport:{user_id:"Display Name",owner_profile_id:"owner",v1_account_id:"legacy_account"}});
+    expect(h.calls.map(call=>call.url)).toEqual(["https://api.unipile.com/v2/accounts/acc_test","https://api.unipile.com/v2/acc_test/users/me"]);
+  });
+  it.each([
+    {binding:{user_id:"changed"},expected:"owner",response:profile},
+    {binding:{owner_profile_id:"foreign"},expected:"owner",response:profile},
+    {binding:{},expected:"foreign",response:profile},
+    {binding:{owner_profile_id:null},expected:"owner",response:profile},
+    {binding:{},expected:"owner",response:{...profile,id:"foreign"}},
+    {binding:{},expected:"owner",response:{...profile,specifics:{network_distance:"FIRST_DEGREE"}}},
+  ])("rejects mismatched or absent owner evidence %j",async({binding,expected,response})=>{
+    await expect(harness({account:raw,profile:response}).provider.readLinkedinIdentity("acc_test",{...copied,...binding},expected)).rejects.toBeDefined();
+  });
+  it("establishes a new V2-only owner solely from authenticated SELF",async()=>{
+    const h=harness({account:{...raw,metadata:{}}});
+    const result=await h.provider.readLinkedinIdentity("acc_test",{...copied,canonical_account_id:null,connection_ref:null,
+      account_id:null,provider_namespace:"unipile:v2:app_test",v1_account_id:null,user_id:null,owner_profile_id:null});
+    expect(result).toMatchObject({accountId:"acc_test",profileId:"owner",verifiedTransport:{user_id:"Display Name",owner_profile_id:"owner",v1_account_id:null}});
+  });
+  it("reports an established disconnected owner without pretending a fresh SELF proof",async()=>{
+    const h=harness({account:{...raw,status:"disconnected"}});
+    expect(await h.provider.readLinkedinIdentity("acc_test",copied,"owner")).toMatchObject({profileId:"owner",healthy:false,
+      healthStatus:"disconnected",verifiedTransport:{user_id:"Display Name",owner_profile_id:null}});
+    expect(h.calls).toHaveLength(1);
+  });
+  it("does not invent an owner for a disconnected new connection",async()=>{
+    const h=harness({account:{...raw,status:"disconnected",metadata:{}}});
+    await expect(h.provider.readLinkedinIdentity("acc_test",{...copied,canonical_account_id:null,account_id:null,
+      provider_namespace:"unipile:v2:app_test",v1_account_id:null,user_id:null,owner_profile_id:null})).rejects.toBeDefined();
+    expect(h.calls).toHaveLength(1);
+  });
+  it("accepts historical V1 and Google transport snapshots without the additive owner field",()=>{
+    const {owner_profile_id:_,...old}=transport;
+    expect(UnipileTransport.parse(old).owner_profile_id).toBeNull();
+    expect(UnipileTransport.parse({...old,api_version:"v1"}).owner_profile_id).toBeNull();
   });
 });

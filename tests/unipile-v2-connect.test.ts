@@ -10,14 +10,14 @@ const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8
 const secret="connection-test-server-key-"+"x".repeat(40),email="founder@example.test";
 const expires=new Date(Date.now()+600000).toISOString();
 const transport={api_version:"v2",connection_ref:connection,canonical_account_id:"legacy",provider_namespace:"unipile:old",account_id:"acc_test",application_id:"app_test",account_scope_id:null,generation:1,user_id:"owner",v1_account_id:"legacy",hosted_auth_origin:"https://auth.unipile.com"};
-function harness(channel:"email"|"linkedin",options:{authorized?:boolean;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean}={}) {
+function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUserId?:string;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean}={}) {
   let phase=options.intentState??"ready",status=options.statusState??"pending",reads=0;
   const calls:{operation:string;payload:Record<string,unknown>;caller:boolean}[]=[];
   const http:{url:string;body:Record<string,unknown>|null}[]=[];
   const authState=channel==="email"?sealEmailIntent(id,secret):sealLinkedinIntent(id,secret);
   const stored=()=>({state:status,workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,account_id:"legacy",connection_ref:connection,intent_ref:id,
     profile_id:"owner",profile_url:null,display_name:null,timezone:"UTC",health_status:status==="connected"?"running":"unknown",outbound_enabled:false,
-    transport,expires_at:expires});
+    transport:{...transport,user_id:options.rawUserId??transport.user_id,owner_profile_id:channel==="linkedin"?"owner":null},expires_at:expires});
   async function rpc(_name:string,args:Record<string,unknown>,caller:boolean) {
     const operation=String(args.p_operation),payload=args.p_payload as Record<string,unknown>;
     calls.push({operation,payload,caller});
@@ -47,7 +47,7 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;authori
     const data=target.endsWith("/auth/link")?{object:"HostedAuthLink",link:"https://auth.unipile.com/?token=created"}
       :target.endsWith("/email-senders")?{data:[{object:"EmailSender",email,is_primary:true,verification_status:"verified"}]}
       :target.includes("/users/")?{object:"UserProfile",provider:"linkedin",id:"owner",type:"individual",display_name:"Founder",specifics:{network_distance:"SELF"}}
-      :{object:"Account",id:"acc_test",application_id:"app_test",account_scope_id:null,user_id:"owner",provider:channel==="email"?"google":"linkedin",status:"running",is_locked:false,metadata:{v1_account_id:"legacy"},...options.accountChanges};
+      :{object:"Account",id:"acc_test",application_id:"app_test",account_scope_id:null,user_id:options.rawUserId??"owner",provider:channel==="email"?"google":"linkedin",status:"running",is_locked:false,metadata:{v1_account_id:"legacy"},...options.accountChanges};
     return new Response(JSON.stringify(data));
   };
   const settings={dsn:"https://api1.unipile.com:13111",accessToken:"v1-test",serverKey:secret,publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://project.supabase.co",publishableKey:"sb_publishable",fetchImpl,
@@ -152,4 +152,13 @@ it("pins LinkedIn health writes to the exact transport generation read",async()=
   const h=harness("linkedin",{statusState:"connected"});
   await h.ops.status(h.session,workspace);
   expect(h.calls.find(c=>c.operation==="health")?.payload).toMatchObject({account_id:"legacy",transport_generation:1,transport_api_version:"v2"});
+});
+
+
+it("completes a copied LinkedIn reconnect with separate account and canonical SELF identifiers",async()=>{
+  const h=harness("linkedin",{authorized:true,rawUserId:"Copied Display Name"});
+  expect((await h.ops.status(h.session,workspace,id)).status).toBe("connected");
+  expect(h.calls.find(call=>call.operation==="complete")?.payload).toMatchObject({intent_ref:id,account_id:"legacy",profile_id:"owner",
+    verified_transport:{account_id:"acc_test",user_id:"Copied Display Name",owner_profile_id:"owner",v1_account_id:"legacy"}});
+  expect(h.http.some(call=>call.url==="https://api.unipile.com/v2/acc_test/users/me")).toBe(true);
 });
