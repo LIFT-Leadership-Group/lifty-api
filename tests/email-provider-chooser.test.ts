@@ -11,7 +11,7 @@ const v1={api_version:"v1",connection_ref:null,canonical_account_id:null,provide
   application_id:null,account_scope_id:null,user_id:null,v1_account_id:null,owner_profile_id:null,generation:0,hosted_auth_origin:"https://account.unipile.com"};
 const v2={...v1,api_version:"v2",provider_namespace:"unipile:v2:app_test",application_id:"app_test",hosted_auth_origin:"https://auth.lifty.test"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status});
-function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:boolean;expired?:boolean;hint?:boolean;authorized?:boolean;ownerChanged?:boolean;delegated?:boolean;staleStatus?:"pre_choice"|"fixed";completeDuringPoll?:boolean}={}) {
+function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:boolean;expired?:boolean;hint?:boolean;authorized?:boolean;ownerChanged?:boolean;delegated?:boolean;copiedAccount?:boolean;staleStatus?:"pre_choice"|"fixed";completeDuringPoll?:boolean}={}) {
   let selected:HostedEmailProvider|null=null,phase="pending",declared=false,hosted:string|null=null,connected=false;
   const calls:{op:string;payload:Record<string,unknown>}[]=[],http:{url:string;body:Record<string,unknown>|null}[]=[];
   const transport=()=>selected==="google"?v2:v1;
@@ -24,6 +24,7 @@ function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:
     calls.push({op,payload});
     const deny=(message:string)=>({data:null,error:{code:message==="email_intent_expired"?"PT410":"PT409",message}});
     if(options.expired)return deny("email_intent_expired");
+    if(op==="start")return {data:stored(),error:null};
     if(op==="intent") {
       if(options.completeDuringPoll && calls.some(call=>call.op==="status")){phase="completed";connected=true;}
       return {data:intent(),error:null};
@@ -59,7 +60,7 @@ function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:
     if(url.endsWith("/hosted/accounts/link"))return json({object:"HostedAuthUrl",url:"https://account.unipile.com/?token=fake"});
     const actual=options.actual??selected??"google";
     if(url.includes("/v2/accounts/"))return json({object:"Account",id:"account_1",application_id:"app_test",account_scope_id:null,user_id:"owner",
-      provider:actual,status:"running",is_locked:false,metadata:{}});
+      provider:actual,status:"running",is_locked:false,metadata:options.copiedAccount?{v1_account_id:"retained_v1_account"}:{}});
     if(url.includes("/email-senders"))return json({data:[{object:"EmailSender",email,is_primary:true,verification_status:"verified"}]});
     if(url.includes("/accounts/"))return json({id:"account_1",type:actual==="google"?"GOOGLE_OAUTH":actual==="outlook"?"OUTLOOK":"MAIL",
       connection_params:{mail:actual==="imap"?{imap_user:email,imap_host:"imap.test",imap_port:993,smtp_user:email,smtp_host:"smtp.test",smtp_port:465}:{id:"mail_id",username:email,...(options.delegated?{mailbox_id:"shared-mailbox"}:{})}},sources:[{id:"source",status:"OK"}]});
@@ -76,12 +77,35 @@ function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:
   return {ops,app,calls,http,session,submit,intent,select:(choice:HostedEmailProvider)=>ops.declare(state,choice)};
 }
 describe("fresh hosted email provider choice",()=>{
+  it("opens the new selector after explicit reselection, then forwards copied Google proof for canonical reuse",async()=>{
+    const h=harness({authorized:true,copiedAccount:true});
+    const started=await h.ops.start(h.session,{workspace,reconnect:true,select_account:true});
+    expect(started.status).toBe("pending");
+    if(started.status!=="pending")throw Error("expected pending selection");
+    const url=new URL(started.connect_url);
+    const response=await h.app.request(url.pathname+url.search),html=await response.text();
+    expect(response.status).toBe(200);
+    for(const provider of ["google","outlook","imap"])expect(html).toContain(`value="${provider}"`);
+    expect(h.http).toHaveLength(0);
+    expect(h.calls[0]).toEqual({op:"start",payload:{workspace,reconnect:true,select_account:true}});
+    await h.select("google");
+    expect(h.http[0]?.body).toMatchObject({providers:["google"]});
+    expect(h.http[0]?.body).not.toHaveProperty("account_id");
+    expect((await h.ops.status(h.session,workspace,id)).status).toBe("connected");
+    // The API forwards authenticated V2 metadata, never invents a canonical ID
+    // from the alias. The DB must resolve exact retained binding ownership.
+    expect(h.calls.find(c=>c.op==="complete")?.payload).toMatchObject({intent_ref:id,account_id:"account_1",email,
+      email_provider:"google",verified_transport:{api_version:"v2",account_id:"account_1",application_id:"app_test",
+        account_scope_id:null,user_id:"owner",v1_account_id:"retained_v1_account"}});
+  });
   it("renders all providers on Lifty without issuing a vendor link and preserves the declaration",async()=>{
     const h=harness(),response=await h.app.request(`/unipile/start?intent=${state}`),html=await response.text();
     expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-security-policy")).toContain("form-action 'self'");
     for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","It is not a new or dedicated outreach mailbox."])expect(html).toContain(label);
-    expect(html).toContain('class="brand" aria-label="Lifty"');expect(html).not.toMatch(/Unipile|V1|V2/);expect(h.http).toHaveLength(0);
+    expect(html).toContain('class="brand" aria-label="Lifty"');
+    // Opaque intent values can randomly contain V1/V2; branding is visible copy.
+    expect(html.replace(/<[^>]+>/g," ")).not.toMatch(/\b(?:Unipile|V1|V2)\b/);expect(h.http).toHaveLength(0);
   });
   it.each(["google","outlook","imap"] as const)("freezes %s before one correct provider POST and reuses same-choice retries",async(choice)=>{
     const h=harness();const response=await h.submit(`intent=${state}&mailbox_use=personal&email_provider=${choice}`);

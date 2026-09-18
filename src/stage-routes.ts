@@ -222,7 +222,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       if (stage === "sending-accounts") {
         const input = parse(SendingAccountStartSchema, body);
         const result = input.channel === "email"
-          ? await dependencies.startEmailConnect(session, { workspace: current, reconnect: true })
+          ? await dependencies.startEmailConnect(session, { workspace: current, reconnect: true,
+            ...(input.select_account === undefined ? {} : { select_account: input.select_account }) })
           : await dependencies.startLinkedinConnect(session, { workspace: current, timezone: input.timezone,
             account_use: input.account_use, other_automation: input.other_automation, reconnect: true });
         if (result.status !== "pending") throw new PublicError({ status: 502, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The new authorization attempt could not be started." });

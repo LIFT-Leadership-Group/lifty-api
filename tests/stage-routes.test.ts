@@ -196,6 +196,30 @@ describe("provider authorization stages", () => {
       expect(await (await request(app, flow.stage, "GET", undefined, query)).json()).toMatchObject({ status: "denied", attempt_ref: attemptRef });
     });
   }
+  it("passes explicit email reselection to the current workspace and returns its new attempt", async () => {
+    const startEmail = vi.fn(async () => ({ ...emailStatus, status: "pending" as const, email: null, mailbox_use: null,
+      intent_ref: nextAttempt, connect_url: "https://api.lifty.test/unipile/start?intent=new-selection", expires_in_seconds: 600, expires_at: expires }));
+    const app = createApp({ ...base, startEmailConnect: startEmail });
+    const response = await request(app, "sending-accounts", "POST", { channel: "email", select_account: true });
+    expect(response.status).toBe(200);
+    expect(startEmail).toHaveBeenCalledWith(session, { workspace: current, reconnect: true, select_account: true });
+    expect(await response.json()).toEqual({ status: "authorization_required", attempt_ref: nextAttempt,
+      connection_url: "https://api.lifty.test/unipile/start?intent=new-selection", expires_at: expires });
+  });
+  it.each([
+    { channel: "email", select_account: "true" },
+    { channel: "email", select_account: true, email: "injected@example.test" },
+    { channel: "email", select_account: true, email_provider: "outlook" },
+    { channel: "email", select_account: true, account_id: "foreign" },
+    { channel: "email", select_account: true, workspace: foreign },
+    { channel: "email", select_account: true, transport: { api_version: "v1" } },
+    { channel: "linkedin", timezone: "America/Argentina/Buenos_Aires", account_use: "personal", other_automation: false, select_account: true },
+  ])("rejects unsafe reselection input before starting authorization: %j", async input => {
+    const startEmail = vi.fn(), startLinkedin = vi.fn();
+    const app = createApp({ ...base, startEmailConnect: startEmail, startLinkedinConnect: startLinkedin });
+    expect((await request(app, "sending-accounts", "POST", input)).status).toBe(400);
+    expect(startEmail).not.toHaveBeenCalled(); expect(startLinkedin).not.toHaveBeenCalled();
+  });
   it("keeps a completed attempt authoritative while a newer reconnect is pending", async () => {
     const currentRead = vi.fn(async () => ({ ...emailStatus, status: "pending" as const, intent_ref: nextAttempt }));
     const app = createApp({ ...base, getEmailConnection: currentRead,

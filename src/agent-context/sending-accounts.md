@@ -20,7 +20,8 @@ POST selects the channel. For LinkedIn, obtain only missing current-contract
 declarations (`timezone`, personal `account_use`, and no `other_automation`)
 before the hosted LinkedIn account connection. Preserve existing policy limits.
 For email, the request is simply `channel: email`: provider/account selection
-happens on the hosted email connection screen. Do not add an email-address or
+happens on the hosted email connection screen for a new account. A saved account
+reconnects with its existing provider. Do not add an email-address or
 mailbox-use questionnaire, ask for a password, or create an artificial address.
 Hosted selection must satisfy the existing provider/policy checks afterward.
 
@@ -34,6 +35,16 @@ Reconnection uses POST again and must verify the new attempt, even while the
 old account is healthy. PATCH is unsupported (405): account identity, limits,
 provider policy and sending enablement are not freely writable settings.
 Use the supported authorization flow to replace consent; do not patch around it.
+
+When the founder explicitly wants to choose another email account or provider,
+use the supported email disconnect command first if the saved account is still
+connected. After the requested disconnect succeeds, POST
+`{"channel":"email","select_account":true}`. This opens a new hosted provider
+selector with Google, Microsoft and IMAP/SMTP and leaves sending disabled.
+An ordinary POST without `select_account: true` reconnects the saved mailbox;
+it does not reopen provider selection. Do not disconnect a working account just
+to preview the selector. Selection does not erase earlier account history or
+restart campaigns, and still requires verified authorization for the new attempt.
 
 ## User-facing behavior and errors
 
