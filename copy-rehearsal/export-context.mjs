@@ -57,6 +57,7 @@ Hard limits:
 - Use only the fictional saved company information in the scenario.
 - Generate drafts locally. Do not log in, read a hosted workspace, save a campaign, activate outreach, or send messages.
 - Keep current product behavior: LinkedIn is an invitation with no note, then three messages after acceptance. Email is five messages. Each email needs a subject and body.
+- Follow references.writing for copy shape. LinkedIn sentences in a message must be one connected thought. Emails use that guide's six fields, the same subject on all five steps, Hi/Hey alternation, pain on 1-2, offer on 3-4, and a thank-you plus different-person ask on 5.
 - Only {{first_name}}, {{last_name}}, and {{company_name}} are allowed substitutions.
 - Templates must work for the approved audience, including future eligible leads. Do not invent recipient-specific research or unsupported placeholders.
 - Preserve channel choice, cadence, stop-on-reply, and campaign approval requirements. Do not propose a different sequence length or send path.
@@ -64,8 +65,8 @@ Hard limits:
 
 Show the copy so it can be judged. For each channel, include:
 1. The recommended angle in a few sentences, including which saved facts you used.
-2. The full templates.
-3. A short checklist against specificity, credibility, voice, CTA, and whether each follow-up adds a useful reason to reply.
+2. The full templates. For email, label all six fields on each step, then show the composed subject and body.
+3. A short checklist against specificity, credibility, voice, CTA, connected flow, and whether each follow-up adds a useful reason to reply.
 
 If a fact is missing, stay general. Do not invent customers, results, websites, pain, or prior conversations.`;
 

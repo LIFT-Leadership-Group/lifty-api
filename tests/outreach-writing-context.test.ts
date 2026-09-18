@@ -12,7 +12,15 @@ describe("outreach writing context", () => {
       expect(response.status).toBe(200);
       const context = await response.json();
       expect(context.references.writing).toEqual(expect.any(String));
-      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v1\n/);
+      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v2\n/);
+      expect(context.references.writing).toContain("Email shape");
+      expect(context.references.writing).toContain("Subject line");
+      expect(context.references.writing).toContain("same subject line on all five steps");
+      expect(context.references.writing).toContain("Emails 1-2 focus on a pain");
+      expect(context.references.writing).toContain("Emails 3-4 focus on the founder's product");
+      expect(context.references.writing).toContain("Ask if someone else");
+      expect(context.references.writing).toContain("must name the same job");
+      expect(context.references.writing).toContain("one connected thought");
       playbooks.push(context.references.writing);
 
     }
