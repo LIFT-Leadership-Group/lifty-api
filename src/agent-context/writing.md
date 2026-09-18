@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v7
+Version: lifty-writing.v8
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -96,11 +96,22 @@ before drafting. Do not send unnamed copy.
 ## Fit the workspace sequence
 
 The campaign context owns the actual journey and cadence. For the three
-LinkedIn messages, recommend a reply-friendly opening after acceptance, a
-specific follow-up question, then a short relevance statement and clear ask.
+LinkedIn messages, write one conversation that builds across all three.
+Message 1 names the author and one job, then asks how they handle it.
+Message 2 stays on that same job and adds a new specific detail or either/or
+they can answer. Message 3 offers only what is saved, then asks for a short
+conversation on that same job. Do not scatter: do not jump to who owns the
+work (that is email 5), and do not restart with "I help with that..." as a
+new pitch. Never write "so I need to know", "I need to know", or tell a
+prospect you require information from them. That is too direct. Ask like a
+person, not like you are collecting facts.
+
 Each LinkedIn message is one connected thought in short plain text, without
 headings, bullet lists or signatures. The invitation has no note. The author
-has to be present in every LinkedIn message, including message 2.
+has to be present in every LinkedIn message, including message 2. If the
+saved offer is thin, stay on one clear job and still add a new detail each
+step. Do not invent a product to create specificity, and do not substitute
+stacked words like "the view", "holds it", or "that work" for a job.
 
 For the five emails, use the email shape below. Do not replace it with a
 one-sentence fragment per step. Every email step still requires its own
@@ -127,7 +138,9 @@ Every recommended email uses these six fields, in this order.
    The recipient's first name belongs in this greeting on every email.
 3. Opener. One line specific to that email, on the next line after the greeting.
    It must be a new spoken line, not a recycled phrase from the previous email
-   and not a stiff caption for the proof that follows.
+   and not a stiff caption for the proof that follows. The opener has to make
+   sense on its own. If a reader has to ask what "landing late" refers to,
+   rewrite it as a spoken sentence that names the thing.
 4. Main focus. Two or three sentences. This is the biggest variable. Do not
    repeat a sentence from the previous email with one word swapped.
 5. Hook. One sentence that continues the same thought. First person from the
@@ -152,12 +165,17 @@ Jobs by step:
   the hook. Ask for a short meeting, or the founder's saved walkthrough, so
   they can see the solution. Do not diagnose a new problem. If a
   founder-confirmed website is saved, include that exact URL in 3 or 4.
+  If the saved offer is only a short line, say that line in spoken first
+  person. Do not caption it ("Our work is help with operations", "This
+  company is me helping with operations"). Do not invent a method,
+  walkthrough length, or site to make a thin offer sound complete.
 - Email 5 is the final note. Do not pitch again. Do not call a miss "useful."
   Assume the timing may not be right, or this sits with someone else at
-  {{company_name}}. Ask them to point you to whoever owns ordering or the
-  operating view. If it becomes a priority later, leave the door open to
-  reconnect. No guilt and no meeting demand. Write that in the author's
-  voice. Do not paste a canned close.
+  {{company_name}}. Two short asks only: would they point you to whoever
+  owns that work, and can you reconnect later if it becomes a priority.
+  Do not add process about a handoff, that a name is enough, or that you
+  will pick it up with them. No guilt and no meeting demand. Write that
+  in the author's voice. Do not paste a canned close.
 
 ## Illustrative examples
 
@@ -173,8 +191,16 @@ LinkedIn, connected: "Hi {{first_name}}, I'm Alex at Harborline. When a
 customer issue changes owners at {{company_name}}, how does the next person
 pick up the context?"
 
+LinkedIn, scattered (do not write this): message 1 asks how they keep the
+handoff in view; message 2 says "I help with that view, so I need to know
+where it lives"; message 3 restarts with "I help with that handoff work."
+Those three lines do not build.
+
 LinkedIn follow-up: "I'm asking because that missing context is what customers
 feel. Does it live with the ticket, or does someone usually pass it along?"
+
+LinkedIn ask: "I help support teams keep that context with the ticket. Want a
+short conversation on how {{company_name}} handles the next handoff?"
 
 Email subject for all five steps: "When an issue changes owners"
 
@@ -195,9 +221,9 @@ How does the next person at {{company_name}} pick up the context today?
 
 Do not open with "Quick question". Later emails stay on that job, but each one
 uses new wording: 2 deepens the pain, 3-4 introduce the offer and the saved
-site, 5 assumes timing may be off or it sits with someone else, asks for a
-better person, and leaves the door open. LinkedIn message 2 keeps Alex in first
-person instead of dropping to "the floor" with no I.
+site, 5 uses two short asks only: point me to the better person, or reconnect
+later. LinkedIn message 2 keeps Alex in first person instead of dropping to
+"the floor" with no I.
 
 ## Review, save and approve
 

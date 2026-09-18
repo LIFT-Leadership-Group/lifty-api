@@ -1,6 +1,6 @@
 # LIFT outreach anti-slop list
 
-Version: lifty-anti-slop.v2
+Version: lifty-anti-slop.v3
 
 Do not use these words or phrases in recommended LinkedIn or email copy.
 Match case-insensitively. Do not use close variants that keep the same tell
@@ -41,6 +41,9 @@ writing ban, not a claim about response rates.
 
 ## LinkedIn
 
+- so I need to know
+- I need to know
+- I need to know where
 - one thing I was wondering
 - one thing I didn't
 - one angle I didn't mention

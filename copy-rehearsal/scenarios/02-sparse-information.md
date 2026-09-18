@@ -64,3 +64,34 @@ fixed and sparse.
 - No stiff captions. No banned anti-slop phrases. No Priya or Northwind
   Logistics in the templates.
 
+## Helixpath v1 feedback
+
+Use these as writing rules. Do not treat them as new company facts.
+
+LinkedIn must be one three-message conversation on a single operations job
+from the saved audience line. Stay general. Do not invent a Palletwing-style
+product to create specificity. Specificity here means a clear job that
+builds:
+
+1. Name Sam. Name the one operations job. Ask how they handle it.
+2. Stay on that job. Add who feels it or where it shows up. Ask an either/or
+   they can answer. First person. Never write "so I need to know" or "I need
+   to know". Do not ask who owns the work. That is email 5.
+3. Offer help with operations in spoken first person. Ask for a short
+   conversation on that same job. Do not restart with "I help with that..."
+
+Do not stack "view", "holds it", or "that work" as a substitute for a job.
+The v1 flow was scattered and too direct. The next draft has to read as
+three connected messages, not three separate pitches.
+
+Email:
+
+- Openers must name the thing in spoken English. Ban "Landing late is what
+  costs you."
+- Emails 3-4: spoken first person for the saved offer. Ban "Helixpath's work
+  is help with operations" and "Helixpath is me helping with operations."
+  Do not invent how Sam delivers the work.
+- Email 5: two short asks only. Point me to the person who owns this, or
+  reconnect later. No extra process about a handoff, a name being enough,
+  or picking it up with them.
+

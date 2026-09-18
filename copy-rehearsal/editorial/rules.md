@@ -1,8 +1,8 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v7) and
-`src/agent-context/anti-slop.md` (lifty-anti-slop.v2).
+`src/agent-context/writing.md` (lifty-writing.v8) and
+`src/agent-context/anti-slop.md` (lifty-anti-slop.v3).
 
 ## Author
 
@@ -12,8 +12,14 @@ message 2 still needs an I.
 
 ## LinkedIn
 
-Each message is one connected thought. The first sentence and the ask must
-name the same job. The author is present in every message, including 2.
+The three messages are one conversation that builds. Message 1 names the
+author and one job. Message 2 stays on that job and adds a new detail or
+either/or. Message 3 offers only what is saved, then asks for a short
+conversation on that same job. Each message is one connected thought. The
+first sentence and the ask must name the same job. The author is present in
+every message, including 2. Never write "so I need to know" or tell a
+prospect you require information from them. Do not jump to who owns the
+work. That is email 5.
 
 ## Email
 
@@ -33,7 +39,11 @@ Field behavior:
 - Address alternates: Hi, Hey, Hi, Hey, Hi. Never drop the first name.
 - Each email builds on the previous one. Reframe the point in new sentences.
   Do not recycle the same key phrases back to back.
-- Openers are spoken, not stiff captions for the proof that follows.
+- Openers are spoken, not stiff captions for the proof that follows. An
+  opener has to make sense on its own. Ban cryptic lines like "Landing late
+  is what costs you."
+- If the saved offer is only a short line, say it in spoken first person.
+  Do not caption it ("Helixpath's work is help with operations").
 - Main focus is the biggest variable.
 - Hook and CTA vary. No cheesy audience slogan. Do not use the same
   "I'm asking because" stem on every hook.
@@ -45,11 +55,13 @@ Jobs by step:
 - Emails 3-4: the client's products, offerings, or solutions for those pains.
   Email 4 continues 1-3. Do not treat a named customer's metric as the lead's
   number. Offer is the hook. CTA is a short meeting or the saved walkthrough.
-- Email 5: timing may be off, or it sits with someone else. Ask them to point
-  you to whoever owns ordering or the floor. Leave the door open to reconnect
-  if it becomes a priority. Never call a miss "useful."
+- Email 5: timing may be off, or it sits with someone else. Two short asks
+  only: point me to the better person, or reconnect later. No extra process
+  about a handoff, a name being enough, or picking it up with them. Never
+  call a miss "useful."
 
 ## Anti-slop
 
 Use the existing LIFT list in `src/agent-context/anti-slop.md`. "Quick question",
-"I'm in this", and "I stay on this" are banned. Do not suggest listed phrases.
+"I'm in this", "I stay on this", and "so I need to know" are banned. Do not
+suggest listed phrases.
