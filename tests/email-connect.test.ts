@@ -1,6 +1,7 @@
 import { describe,it,expect } from "vitest";
 import { createEmailConnectOperations } from "../src/email-connect.js";
 import { createUnipileProvider } from "../src/unipile-provider.js";
+import { EmailConnectRequest } from "../src/email-contracts.js";
 import { sealEmailIntent,openEmailIntent,emailCallbackName } from "../src/email-state.js";
 import { createCurrentClient as createApp } from "./current-client.js";
 
@@ -451,6 +452,52 @@ describe("hosted selection and exact-attempt verification", () => {
     const result = await ops.start({ userId: id, client }, { workspace, reconnect: true });
     expect(result).toMatchObject({ status: "pending", email: null, mailbox_use: null, intent_ref: id, expires_at: intent.expires_at });
     expect(calls).toHaveLength(1); expect(calls[0]?.p_payload).toEqual({ workspace, reconnect: true });
+  });
+  it("requests an unbound selector explicitly after disconnect without authorizing the retained account", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const client = { rpc: async (_name: string, args: Record<string, unknown>) => {
+      calls.push(args);
+      return { data: { state: "pending", workspace_ref: workspace, email: null, mailbox_use: null, daily_limit: 10,
+        account_id: null, connection_ref: null, provider_selection_required: true,
+        intent_ref: id, expires_at: intent.expires_at }, error: null };
+    } };
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async () => { throw new Error("No provider request before selection"); } });
+    const result = await ops.start({ userId: id, client }, { workspace, reconnect: true, select_account: true });
+    expect(result).toMatchObject({ status: "pending", email: null, sending_enabled: false, intent_ref: id });
+    expect(openEmailIntent(new URL(result.status === "pending" ? result.connect_url : "").searchParams.get("intent")!, secret)).toBe(id);
+    expect(calls).toHaveLength(1); expect(calls[0]?.p_payload).toEqual({ workspace, reconnect: true, select_account: true });
+  });
+  it.each([
+    { state: "connected", account_id: "account_1", connection_ref: workspace },
+    { state: "pending", email, account_id: "account_1" },
+    { state: "pending", provider_selection_required: false },
+    { state: "pending", transport: { api_version: "v1", account_id: "account_1", canonical_account_id: null,
+      connection_ref: null, provider_namespace: "legacy", application_id: null, account_scope_id: null, user_id: null,
+      v1_account_id: null, owner_profile_id: null, generation: 0, hosted_auth_origin: "https://account.unipile.com" } },
+  ])("fails closed if explicit reselection receives a retained or incompatible backend response: %j", async response => {
+    const operations: unknown[] = [];
+    const client = { rpc: async (_name: string, args: Record<string, unknown>) => {
+      operations.push(args.p_operation);
+      return { data: { workspace_ref: workspace, email: null, mailbox_use: null, daily_limit: 10,
+        provider_selection_required: true, intent_ref: id, expires_at: intent.expires_at, ...response }, error: null };
+    } };
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async () => { throw new Error("Must not authorize retained account"); } });
+    await expect(ops.start({ userId: id, client }, { workspace, select_account: true })).rejects.toMatchObject({ code: "EMAIL_PROVIDER_SELECTION_UNAVAILABLE" });
+    expect(operations).toEqual(["start"]);
+  });
+  it.each(["email_reselection_requires_disconnect", "email_reselection_pending_work", "email_provider_selection_unavailable"])("returns actionable %s without retrying or disconnecting automatically", async message => {
+    const operations: unknown[] = [];
+    const client = { rpc: async (_name: string, args: Record<string, unknown>) => {
+      operations.push(args.p_operation); return { data: null, error: { code: "PT409", message } };
+    } };
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async () => { throw new Error("No provider request"); } });
+    await expect(ops.start({ userId: id, client }, { workspace, select_account: true })).rejects.toMatchObject({ status: 409, code: message.toUpperCase() });
+    expect(operations).toEqual(["start"]);
+  });
+  it("keeps explicit reselection free of client-supplied mailbox identity", () => {
+    expect(EmailConnectRequest.safeParse({ workspace, select_account: true }).success).toBe(true);
+    expect(EmailConnectRequest.safeParse({ workspace, select_account: true, email, mailbox_use: "personal" }).success).toBe(false);
+    expect(EmailConnectRequest.safeParse({ workspace, select_account: false, email, mailbox_use: "personal" }).success).toBe(true);
   });
   it("keeps declaration in an explicit browser form POST bound to the same sealed intent", async () => {
     let declared = false; const calls: string[] = [];

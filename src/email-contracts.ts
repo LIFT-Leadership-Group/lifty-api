@@ -13,7 +13,9 @@ export const EmailConnectRequest = z.object({
   email: z.email().max(254).transform(value => value.toLowerCase()).optional(),
   mailbox_use: z.enum(["personal", "outreach"]).optional(),
   reconnect: z.boolean().optional(),
-}).strict().refine(value => (value.email === undefined) === (value.mailbox_use === undefined), "Supply both legacy mailbox fields or let the hosted flow select the account.");
+  select_account: z.boolean().optional(),
+}).strict().refine(value => (value.email === undefined) === (value.mailbox_use === undefined), "Supply both legacy mailbox fields or let the hosted flow select the account.")
+  .refine(value => !value.select_account || value.email === undefined, "Choose the account in the hosted flow when select_account is true.");
 export type EmailConnectInput = z.infer<typeof EmailConnectRequest>;
 
 const profile = {

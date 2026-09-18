@@ -36,6 +36,9 @@ function fail(code: string, status = 409): never {
     EMAIL_PROVIDER_REQUIRED: "Choose your email provider before continuing.",
     EMAIL_PROVIDER_CONFLICT: "This link already has an email provider selected. Continue with the original selection or start again in Lifty.",
     EMAIL_PROVIDER_INVALID: "Choose one of the email providers shown in Lifty.",
+    EMAIL_RESELECTION_REQUIRES_DISCONNECT: "Disconnect this workspace’s saved email before choosing another account or provider.",
+    EMAIL_RESELECTION_PENDING_WORK: "This workspace still has email work in progress. Let it finish before choosing another email account.",
+    EMAIL_PROVIDER_SELECTION_UNAVAILABLE: "Lifty could not open a new email provider selector. Try again later; the saved account has not been reconnected.",
     EMAIL_IDENTITY_MISMATCH: "Authorize the exact email address you selected in LIFTY.",
   };
   throw new PublicError({status,code,message:messages[code] ?? "LIFTY could not complete the email connection. Try again from the CLI."});
@@ -43,7 +46,7 @@ function fail(code: string, status = 409): never {
 function mapRpcError(error: unknown): never {
   const parsed = z.object({code:z.string().optional(),message:z.string().optional()}).safeParse(error);
   const message = parsed.success ? parsed.data.message ?? "" : "";
-  const safe = ["email_workspace_forbidden","email_workspace_suspended","email_profile_conflict","email_intent_expired","email_identity_mismatch","email_account_taken","email_namespace_mismatch","email_callback_invalid","email_callback_conflict","email_provider_required","email_provider_conflict","email_provider_invalid"];
+  const safe = ["email_workspace_forbidden","email_workspace_suspended","email_profile_conflict","email_intent_expired","email_identity_mismatch","email_account_taken","email_namespace_mismatch","email_callback_invalid","email_callback_conflict","email_provider_required","email_provider_conflict","email_provider_invalid","email_reselection_requires_disconnect","email_reselection_pending_work","email_provider_selection_unavailable"];
   const code = safe.find(value=>message===value);
   fail(code?.toUpperCase() ?? "EMAIL_CONNECTION_UNAVAILABLE", parsed.success && parsed.data.code==="PT403" ? 403 : parsed.success && parsed.data.code==="PT410" ? 410 : code ? 409 : 502);
 }
@@ -149,6 +152,11 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
   async function start(session:AuthSession,input:EmailConnectInput):Promise<EmailStart>{
     const parsed=EmailConnectRequest.parse(input);
     let value=Stored.parse(await rpc("start",parsed,session));
+    // An explicit choose-again request must never silently become the retained
+    // account's reconnect, including when an older database ignores the flag.
+    if(parsed.select_account && (value.state!=="pending" || value.provider_selection_required!==true
+      || value.email || value.account_id || value.connection_ref || value.transport?.account_id
+      || value.transport?.canonical_account_id || value.transport?.connection_ref)) fail("EMAIL_PROVIDER_SELECTION_UNAVAILABLE");
     if(value.state==="connected" && value.account_id){
       const identity=await readIdentity(value.account_id,parsed.email,value.transport);
       if(identity.healthy)return EmailConnectResult.parse({...publicProfile(value),status:"connected",connection_ref:value.connection_ref});

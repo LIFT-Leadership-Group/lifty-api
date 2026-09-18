@@ -136,6 +136,8 @@ describe("runtime stage context", () => {
     expect(AuthorizationRequiredSchema.safeParse({ status: "authorization_required", attempt_ref: "11111111-1111-4111-8111-111111111111",
       connection_url: "https://provider.example/consent", expires_at: pending.expires_at }).success).toBe(true);
     expect(SendingAccountStartSchema.safeParse({ channel: "email" }).success).toBe(true);
+    expect(SendingAccountStartSchema.safeParse({ channel: "email", select_account: true }).success).toBe(true);
+    expect(SendingAccountStartSchema.safeParse({ channel: "email", select_account: "true" }).success).toBe(false);
     expect(SendingAccountStartSchema.safeParse({ channel: "email", email: "asked-before-link@example.test" }).success).toBe(false);
     for (const stage of ["crm", "sending-accounts", "notifications"]) {
       const context = getAgentContext(stage)!;
@@ -150,5 +152,11 @@ describe("runtime stage context", () => {
     expect(getAgentContext("notifications")!.instructions).toContain("Slack workspace consent");
     expect(getAgentContext("sending-accounts")!.instructions).toContain("hosted LinkedIn");
     expect(getAgentContext("sending-accounts")!.instructions).toContain("hosted email");
+    expect(getAgentContext("sending-accounts")!.instructions).toContain('"select_account":true');
+    expect(getAgentContext("sending-accounts")!.operations?.post?.request.body).toMatchObject({
+      oneOf: expect.arrayContaining([expect.objectContaining({ properties: expect.objectContaining({
+        select_account: { type: "boolean" },
+      }) })]),
+    });
   });
 });

@@ -66,7 +66,7 @@ export const SendingAccountStartSchema = z.discriminatedUnion("channel", [
   LinkedinConnectRequest.omit({ workspace: true, reconnect: true }).extend({ channel: z.literal("linkedin") }),
   // The hosted email flow owns account/provider selection. No pre-link address
   // or use questionnaire, credentials, or authorization override is accepted.
-  z.object({ channel: z.literal("email") }).strict(),
+  z.object({ channel: z.literal("email"), select_account: z.boolean().optional() }).strict(),
 ]);
 export const BusinessStageSchema = z.object({
   workspace: WorkspaceStatusSchema,
@@ -207,7 +207,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   },
   "sending-accounts": {
     get: operation("GET", stageRoute("sending-accounts"), "Read the selected channel's current account, or verify the exact attempt_ref. A healthy previous account is not a new attempt's success.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema),
-    post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. Email provider/account selection happens in the hosted flow.", AuthorizationRequiredSchema, SendingAccountStartSchema),
+    post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. For email, select_account: true opens provider/account selection after an explicit disconnect; omit it to reconnect the saved account.", AuthorizationRequiredSchema, SendingAccountStartSchema),
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
   },
   campaigns: {
