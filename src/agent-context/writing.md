@@ -1,10 +1,11 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v5
+Version: lifty-writing.v6
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
-wording unless they ask to change it. Keep the current campaign contract's
+wording unless they ask to change it. If they already accepted one channel,
+keep that channel exactly and only rewrite the channel they asked to change. Keep the current campaign contract's
 message count, fields, personalization and approval rules.
 
 ## Use the saved context
@@ -76,8 +77,11 @@ before drafting. Do not send unnamed copy.
   back-to-back emails. Variety still has to flow. If two lines could swap
   places without anyone noticing, rewrite one of them.
 - Openers are spoken, not labels. Do not announce the evidence you are about
-  to cite ("North Park Market is the store I can name", "Here's the case
-  study"). Start in the thought, then add the fact.
+  to cite, and do not comment on the act of naming it. Ban lines such as
+  "North Park Market is the store I can name", "That is the only result I will
+  name", "I named them because...", and "If this landed with the wrong person,
+  that is useful." Say the fact. Do not narrate why you are allowed to say it.
+  If a line would make a founder ask "how is that useful?", rewrite it.
 - Read `references.anti_slop` and do not use those phrases. Empty nudges and
   guilt closes are banned, including "just checking in", "circling back",
   "I don't want to keep asking you", "last note from me", and "I'll leave it
@@ -145,12 +149,12 @@ Jobs by step:
   pains named in 1-2. Do not introduce a new problem. Email 4 needs a new
   reason to reply, not the same CTA as email 3 in different clothes. If a
   founder-confirmed website is saved, include that exact URL in 3 or 4.
-- Email 5 is the final note. Do not pitch again. Cover two honest exits: the
-  timing may not be right, or this sits with someone else at {{company_name}}.
-  Ask them to point you to the person who owns that operating view. If the
-  timing is simply off, leave the door open for later, without guilt and
-  without a meeting demand. Write that in the author's voice. Do not paste a
-  canned close.
+- Email 5 is the final note. Do not pitch again. Do not call a miss "useful."
+  Cover two honest exits: the timing may not be right, or this sits with
+  someone else at {{company_name}}. Ask them to point you to the person who
+  owns that operating view. If the timing is simply off, say that is fine and
+  they can come back if this becomes a priority. No guilt and no meeting
+  demand. Write that in the author's voice. Do not paste a canned close.
 
 ## Illustrative examples
 

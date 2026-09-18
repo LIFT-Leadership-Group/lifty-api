@@ -8,6 +8,23 @@ const scratch = join(root, "scratch");
 const promptsDir = join(scratch, "prompts");
 const draftsDir = join(scratch, "drafts");
 const scenariosDir = join(root, "scenarios");
+const locksDir = join(root, "locks");
+
+function lockBlock(scenarioName) {
+  const lockPath = join(locksDir, `${scenarioName}.md`);
+  try {
+    const lock = readFileSync(lockPath, "utf8").trim();
+    return `
+## Locked copy
+
+Read \`copy-rehearsal/locks/${scenarioName}.md\`. Reproduce any locked channel exactly. Do not rewrite a locked channel to match a new email pass. Only draft unlocked channels.
+
+${lock}
+`;
+  } catch {
+    return "";
+  }
+}
 
 mkdirSync(promptsDir, { recursive: true });
 mkdirSync(draftsDir, { recursive: true });
@@ -65,7 +82,7 @@ Hard limits:
 - Only {{first_name}}, {{last_name}}, and {{company_name}} are allowed substitutions.
 - Templates must work for the approved audience, including future eligible leads. Do not invent recipient-specific research or unsupported placeholders.
 - Preserve channel choice, cadence, stop-on-reply, and campaign approval requirements. Do not propose a different sequence length or send path.
-- Do not use previous drafts or any editing discussion. Use only this scenario and the assembled guidance files named below.
+- Do not use previous drafts or any editing discussion, except locked copy in the lock file. Use only this scenario, any lock file, and the assembled guidance files named below.
 
 Show the copy so it can be judged. For each channel, include:
 1. The recommended angle in a few sentences, including which saved facts you used.
@@ -89,7 +106,7 @@ ${rehearsalRules}
 Read \`copy-rehearsal/scenarios/${fileName}\` and use it as the saved company context:
 
 ${scenario}
-
+${lockBlock(scenarioName)}
 ## Current assembled guidance
 
 Read these local export files. They were generated from getAgentContext in a fresh process. Use them as the product guidance. Include every reference, especially \`references.campaign\`.
@@ -105,7 +122,7 @@ Read these local export files. They were generated from getAgentContext in a fre
 
 The campaigns export must include \`references.campaign\`. If that section is missing, stop and say so.
 
-After reading those files, recommend the LinkedIn and email drafts for this scenario.
+After reading those files, recommend the drafts for this scenario. Reproduce any locked channel exactly.
 `;
   writeFileSync(join(promptsDir, fileName), prompt);
 }
