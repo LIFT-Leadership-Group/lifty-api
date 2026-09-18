@@ -74,7 +74,7 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     const account = result.data;
     if (account.id !== accountId || account.application_id !== transport.application_id
       || (account.account_scope_id ?? null) !== transport.account_scope_id
-      || (transport.user_id && account.user_id !== transport.user_id)
+      || (channel !== "linkedin" && transport.user_id && account.user_id !== transport.user_id)
       || (transport.v1_account_id && account.metadata.v1_account_id !== transport.v1_account_id)
       || (transport.canonical_account_id && transport.provider_namespace !== `unipile:v2:${transport.application_id}`
         && account.metadata.v1_account_id !== transport.canonical_account_id)
@@ -122,7 +122,7 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     return {accountId: transport.canonical_account_id ?? accountId, email, type: "GOOGLE_OAUTH" as const, healthy, verifiedTransport};
   }
   async function readLinkedinIdentity(accountId: string, transport: UnipileTransport, expectedProfileId?: string | null) {
-    const {verifiedTransport, healthy, healthStatus} = await readAccount(accountId, transport, "linkedin");
+    const {account, verifiedTransport, healthy, healthStatus} = await readAccount(accountId, transport, "linkedin");
     const retainedOwner = transport.owner_profile_id;
     if ((transport.canonical_account_id && !retainedOwner)
       || (retainedOwner && expectedProfileId && retainedOwner !== expectedProfileId)) fail("UNIPILE_IDENTITY_MISMATCH", 409);
@@ -131,10 +131,11 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     // unverified new connection must never infer ownership from Account.user_id.
     if (!healthy) {
       if (!retainedOwner) fail();
-      return {accountId: canonical, profileId: retainedOwner, profileUrl: null, displayName: null, healthy, healthStatus, verifiedTransport};
+      if (account.user_id === transport.user_id) return {accountId: canonical, profileId: retainedOwner, profileUrl: null, displayName: null, healthy, healthStatus, verifiedTransport};
     }
-    // Copied accounts may expose a different Account.user_id. It remains pinned
-    // above; only this authenticated SELF profile proves the LinkedIn owner.
+    // Copied Account.user_id may contain mutable display metadata. Report its
+    // current value, but only authenticated SELF proves the LinkedIn owner.
+    // Even unhealthy accounts must provide SELF if that metadata has changed.
     const parsed = Profile.safeParse(await request(`${encodeURIComponent(accountId)}/users/me`));
     if (!parsed.success) fail();
     if ((retainedOwner && parsed.data.id !== retainedOwner)

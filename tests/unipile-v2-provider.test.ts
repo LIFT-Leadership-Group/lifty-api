@@ -128,7 +128,6 @@ describe("V2 LinkedIn copied owner evidence",()=>{
     expect(h.calls.map(call=>call.url)).toEqual(["https://api.unipile.com/v2/accounts/acc_test","https://api.unipile.com/v2/acc_test/users/me"]);
   });
   it.each([
-    {binding:{user_id:"changed"},expected:"owner",response:profile},
     {binding:{owner_profile_id:"foreign"},expected:"owner",response:profile},
     {binding:{},expected:"foreign",response:profile},
     {binding:{owner_profile_id:null},expected:"owner",response:profile},
@@ -159,5 +158,26 @@ describe("V2 LinkedIn copied owner evidence",()=>{
     const {owner_profile_id:_,...old}=transport;
     expect(UnipileTransport.parse(old).owner_profile_id).toBeNull();
     expect(UnipileTransport.parse({...old,api_version:"v1"}).owner_profile_id).toBeNull();
+  });
+});
+
+
+describe("LinkedIn raw account metadata drift",()=>{
+  const retained={...transport,user_id:"Old Display Name",owner_profile_id:"owner"};
+  const changed={...account,provider:"linkedin",user_id:"Updated Display Name"};
+  it.each(["running","disconnected"])("accepts changed raw metadata with exact SELF owner while %s",async(status)=>{
+    const h=harness({account:{...changed,status}});
+    const result=await h.provider.readLinkedinIdentity("acc_test",retained,"owner");
+    expect(result).toMatchObject({profileId:"owner",healthy:status==="running",verifiedTransport:{user_id:"Updated Display Name",owner_profile_id:"owner"}});
+    expect(h.calls[1]?.url).toBe("https://api.unipile.com/v2/acc_test/users/me");
+    expect(retained.user_id).toBe("Old Display Name");
+  });
+  for(const status of ["running","disconnected"])it.each([{...profile,id:"foreign"},{}, {...profile,specifics:{}}])(`denies changed raw metadata without exact SELF while ${status}: %j`,async(response)=>{
+    await expect(harness({account:{...changed,status},profile:response}).provider.readLinkedinIdentity("acc_test",retained,"owner")).rejects.toBeDefined();
+  });
+  it.each([{application_id:"other"},{account_scope_id:"other"},{metadata:{v1_account_id:"other"}}])("keeps immutable account bindings strict %j",async(change)=>{
+    const h=harness({account:{...changed,...change}});
+    await expect(h.provider.readLinkedinIdentity("acc_test",retained,"owner")).rejects.toBeDefined();
+    expect(h.calls).toHaveLength(1);
   });
 });

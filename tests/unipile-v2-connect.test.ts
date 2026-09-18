@@ -156,7 +156,7 @@ it("pins LinkedIn health writes to the exact transport generation read",async()=
 
 
 it("completes a copied LinkedIn reconnect with separate account and canonical SELF identifiers",async()=>{
-  const h=harness("linkedin",{authorized:true,rawUserId:"Copied Display Name"});
+  const h=harness("linkedin",{authorized:true,rawUserId:"Old Display Name",accountChanges:{user_id:"Copied Display Name"}});
   expect((await h.ops.status(h.session,workspace,id)).status).toBe("connected");
   expect(h.calls.find(call=>call.operation==="complete")?.payload).toMatchObject({intent_ref:id,account_id:"legacy",profile_id:"owner",
     verified_transport:{account_id:"acc_test",user_id:"Copied Display Name",owner_profile_id:"owner",v1_account_id:"legacy"}});
