@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v16
+Version: lifty-writing.v17
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -73,8 +73,8 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
   recipient to confirm it. Never promise unsupported ROI or quote guessed
   financial metrics.
 - Make one clear ask. Do not open with a meeting or demo request. Later
-  messages may ask in the founder's own words. Never write "Want a short
-  conversation." Never write "reply yes" or a yes/no closer. Do not paste
+  messages may ask in the founder's own words. Never write "Want a short conversation."
+  Never write "reply yes" or a yes/no closer. Do not paste
   the same ask on every step.
 - Continue the same topic with a new detail or question. Do not repeat the
   opener, pitch, closer, or ask. Do not reuse the same key phrase later in
@@ -97,8 +97,10 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
   If a line would make a founder ask "how is that useful?", rewrite it.
 - Read `references.anti_slop` and do not use those phrases. Empty nudges and
   guilt closes are banned, including "just checking in", "circling back",
-  "I don't want to keep asking you", "last note from me", and "I'll leave it
-  here". Do not guilt someone into replying.
+  "I don't want to keep asking you", and "I'll leave it here". Do not guilt
+  someone into replying. "I'll keep this short" and "Last note from me" are
+  fine as spoken openers. Never write "sit with", "sits with", or "sit
+  with you".
 - Read the copy aloud. If the founder would not say it, rewrite it.
 - Use the confirmed business URL exactly when it supports the ask. Put that
   exact URL in email 3 or 4 with the offer. Do not drop it to avoid sounding
@@ -113,11 +115,13 @@ LinkedIn messages, write one conversation that builds across all three.
 Message 1 names the author and one job, then asks how they handle it.
 Message 2 stays on that same job and adds a new specific detail or either/or
 they can answer. Message 3 offers only what is saved, then asks in that
-founder's own words. Ask for a brief intro call, or the saved
-walkthrough. Never write "Want a short conversation" or "Should I take
-that." Do not say the same product word twice in one message. Do not
-scatter: do not
-jump to who owns the work (that is email 5), and do not restart with
+founder's own words. The default ask is: "Would you be open to a 15min
+intro call later this week or next?" If a walkthrough is already saved,
+ask for that instead, in the same spoken register. Never write "Want a short conversation",
+"Should I take that", or "Want 15 minutes this week
+for a brief intro call?" Never write "sit with". Do not say the same
+product word twice in one message. Do not scatter: do not jump to who
+owns the work (that is email 5), and do not restart with
 "I help with that..." as a new pitch. Never write "so I
 need to know", "I need to know", or tell a
 prospect you require information from them. That is too direct. Ask like a
@@ -156,7 +160,12 @@ Every recommended email uses these six fields, in this order.
 3. Opener. One spoken line that humanizes the outreach. It sits on the
    next line after the greeting. It is a person starting a note, not a
    caption for the proof that follows. It must be new, and it has to make
-   sense on its own.
+   sense on its own. Good openers sound like: "Figured an email might be
+   the easier place to start.", "Checking back in case this got buried.",
+   "I'll keep this short.", "Coming back one more time.", "Last note from
+   me." Do not claim an earlier LinkedIn send unless that history is
+   confirmed for every recipient. Do not open with a label for the pain
+   ("The after-hours stretch is the one that still lands on a founder.").
 4. Main focus. The core of the email. Two or three sentences. By the end
    of this section the reader knows who is writing and what they solve.
    Emails 1-2 do that through the pain. Emails 3-4 do that through the
@@ -189,8 +198,12 @@ Jobs by step:
   named customer's metric as if {{company_name}} already has that number.
   Attribute proof to the named customer in the same thought. If a
   founder-confirmed website is saved, include that exact URL in 3 or 4.
-  Do not invent a demo, method, or site. Ask for a brief intro call, or
-  the saved walkthrough. Never write "Should I take that."
+  Do not invent a demo, method, or site. Email 3 may use: "Would you be
+  open to a 15min intro call later this week or next?" Email 4 needs a
+  new sentence in that family, and the ask must name the saved offer
+  (the list, the note, the walkthrough). Never write "Should I take
+  that." Never write "Want 15 minutes this week for a brief intro
+  call?" Never write "go over one" with no object.
 - Email 5 asks if there is a better point of contact, then closes the
   conversation naturally. Do not pitch again. Two short asks only: would
   they point you to whoever owns that work, and can you reconnect later.
@@ -198,66 +211,70 @@ Jobs by step:
 ## Email quality bar
 
 When the saved offer is real, write emails to this standard. This is
-accepted copy for a different fictional company. Use it for shape, field
-jobs, and spoken register. Do not copy its customers, product, or proof.
+direction for a different fictional company. Use it for cadence, opener
+register, paragraph length, and how the ask is phrased. Do not copy its
+customers, product, or proof. Do not find-replace another company's
+emails with this company's nouns.
 
-Subject on all five: When a SKU runs out this week
+Subject on all five: When an issue changes owners
 
 Email 1
 
 Hi {{first_name}},
 
-I'm Maya Chen at Palletwing.
+Figured an email might be the easier place to start.
 
-Independent grocers often learn a case is gone after shoppers already saw the empty bay. That's the missing milk.
+When a customer issue changes owners, the next person often has to rebuild the story. I started Harborline to help support teams keep that context with the ticket, so the new owner is not guessing.
 
-I'm asking because I try to catch that before shoppers see it.
+That is the window where they either inherit something usable or start over.
 
-How do you see a short SKU at {{company_name}} before it hits the floor?
+Is getting that handoff written down part of what you're setting up at {{company_name}}?
 
 Email 2
 
 Hey {{first_name}},
 
-The midweek distributor call is the expensive one.
+Checking back in case this got buried.
 
-When a store has to buy extra cases after the load already left, that purchase was not on the original order. Shoppers never see that call, but the store does.
+When a new owner takes a ticket, they usually get the thread and still miss the judgment that lived with the last person.
 
-I want to know who sees that while the next order can still change.
+That is usually what I help unblock: they were asked to own the reply, but nobody handed them the context.
 
-At {{company_name}}, is that visible early in the week, or only after that extra call is already placed?
+Do you have a written handoff for the next person at {{company_name}}, or does it still live in someone's head?
 
 Email 3
 
 Hi {{first_name}},
 
-I don't ask you to rewrite inventory.
+I'll keep this short.
 
-I send a Monday SKU-risk list for each store and walk the first store with you for 20 minutes. It shows which SKUs are likely to stock out this week. https://www.palletwing.example is the page that describes that list.
+I help support teams turn the handoff in someone's head into a repeatable pass. https://www.harborline.example is the page that describes that work.
 
-I put it in your hands before the delivery is already booked.
+That is what I help with: getting the context onto the ticket before the next person has to invent it.
 
-Want me to walk through one store's first weekly list?
+Would you be open to a 15min intro call later this week or next?
 
 Email 4
 
 Hey {{first_name}},
 
-That extra distributor call is the one I try to get in front of.
+Coming back one more time.
 
-Palletwing is the Monday list plus a 20-minute walkthrough of one store. North Park Market cut emergency distributor orders from 18 a month to 4 after 90 days with me.
+Harborline is that written handoff plus a short weekly pass of the tickets that lost context. One team I work with stopped rebuilding the same story on every owner change.
 
-Want 20 minutes this week to walk one {{company_name}} store's list with me?
+Would a short intro call next week make sense, so I can walk one {{company_name}} handoff with you?
 
 Email 5
 
 Hi {{first_name}},
 
-I'm assuming the timing isn't right, or this sits with someone else at {{company_name}}.
+Last note from me.
 
-If someone there owns ordering or the floor, would you mind pointing me in their direction?
+I'm assuming the timing is off, or this belongs to someone else at {{company_name}}.
 
-Or if this becomes a priority down the road I'd love to reconnect!
+If someone there owns the queue or the handoffs, would you mind pointing me in their direction?
+
+If things change, or you think of someone else who needs this, I am easy to find.
 
 ## Illustrative examples
 
@@ -281,8 +298,8 @@ Those three lines do not build.
 LinkedIn follow-up: "I'm asking because that missing context is what customers
 feel. Does it live with the ticket, or does someone usually pass it along?"
 
-LinkedIn ask: "I help support teams keep that context with the ticket. Got
-15 minutes this week to walk one of those handoffs?"
+LinkedIn ask: "I help support teams keep that context with the ticket.
+Would you be open to a 15min intro call later this week or next?"
 
 Email subject for all five steps: "When an issue changes owners"
 

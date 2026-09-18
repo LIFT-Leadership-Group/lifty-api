@@ -8,8 +8,9 @@ Message 2: "I help with that view, so I need to know where it actually lives."
 
 "so I need to know" is never something you say to a prospect. It is too
 direct. The v1 LinkedIn flow was scattered and did not build across the
-three messages. LinkedIn 1-2 are locked. Message 3 cannot say "Want a
-short conversation."
+three messages. LinkedIn 1 is locked. Message 2 cannot say "sit with."
+Message 3 cannot say "Want a short conversation." The default ask is
+"Would you be open to a 15min intro call later this week or next?"
 
 ## Email — do not write this
 

@@ -1,8 +1,8 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v16) and
-`src/agent-context/anti-slop.md` (lifty-anti-slop.v9).
+`src/agent-context/writing.md` (lifty-writing.v17) and
+`src/agent-context/anti-slop.md` (lifty-anti-slop.v10).
 
 ## Author
 
@@ -15,7 +15,9 @@ still need an I. We can sit next to I. We cannot replace the author.
 The three messages are one conversation that builds. Message 1 names the
 author and one job. Message 2 stays on that job and adds a new detail or
 either/or. Message 3 offers only what is saved, then asks in the founder's
-own words. Never write "Want a short conversation." Each message is one
+own words. Message 3's default ask is "Would you be open to a 15min
+intro call later this week or next?" Never write "Want a short
+conversation" or "sit with." Each message is one
 connected thought. The first sentence and the ask must name the same job.
 The author is present in
 every message, including 2. Never write "so I need to know" or tell a
@@ -63,8 +65,8 @@ Jobs by step:
 
 Use the existing LIFT list in `src/agent-context/anti-slop.md`. "Quick question",
 "I'm in this", "I stay on this", "so I need to know", "I followed up
-because", "Want a short conversation", and "reply yes" are banned. Do not
-suggest listed phrases.
+because", "Want a short conversation", "reply yes", and "sit with" are banned. Do
+not suggest listed phrases.
 
 ## Thin workspace
 

@@ -97,24 +97,29 @@ numbers, extra services, or a meeting-first ask unless Reese already used one.
 These are writing rules, not new Nettle facts. Company inputs above stay
 fixed. Improve Reese's copy. Do not replace it with a generic sequence.
 
-Write the five emails to the same standard as
-`copy-rehearsal/locks/01-clear-offer.md`. Same six fields. Same spoken
-register. Same jobs: pain on 1-2, offer on 3-4, better contact on 5.
-Use Nettle facts only. Do not copy Palletwing's product, customers, or
-proof.
+Write the five emails to the Email quality bar in references.writing.
+Same six fields. Same spoken register as that Harborline sequence:
+human opener, a real paragraph, a short stakes line, then a normal
+ask. Same jobs: pain on 1-2, offer on 3-4, better contact on 5. Use
+Nettle facts only. Do not find-replace Palletwing or Harborline
+sentences with Nettle nouns.
 
 - Author is Reese Lang. Name Reese in LinkedIn 1 and email 1. Every later
   LinkedIn message and email still needs an I from Reese. Dry voice can
   keep we next to I. We cannot replace Reese.
 - LinkedIn: invitation with no note, then three connected messages that
-  build on one job. Messages 1-2 are locked. Message 3 is open. Do not
-  say "close" twice in message 3. Never write "Should I take that." Ask
-  for a brief intro call, or the equivalent. New wording each step.
+  build on one job. Message 1 is locked. Message 2 is open because the
+  old line used "sit with". Rewrite it. Message 3 is open. Do not say
+  "close" twice in message 3. Never write "Should I take that" or
+  "sit with". Message 3 CTA must be exactly: Would you be open to a
+  15min intro call later this week or next?
 - Email uses the six fields, in order, with inbox spacing: subject,
   address, opener, main focus, hook, CTA. Same subject on all five.
   Hi/Hey plus `{{first_name}}`. Opener is one spoken line that
-  humanizes the outreach. Main focus is who Reese is and what Nettle
-  solves, in 2-3 sentences. Name Reese in email 1.
+  humanizes the outreach: easier-place-to-start, buried, keep this
+  short, coming back, last note. Do not open by labeling the pain.
+  Main focus is who Reese is and what Nettle solves, in 2-3 sentences.
+  Name Reese in email 1. Never write "files" for the books.
 - Hook is one spoken sentence that ties main focus to the CTA. It cannot
   narrate the email. Ban `that is the person I am writing`, `that is the
   job I do`, `That is all of it`, `I am treating this as a timing miss`,
@@ -124,8 +129,14 @@ proof.
   fact and the quote only if they stay honest. No invented ROI.
 - Each CTA is a new sentence. Never write "reply yes", "If the books still
   live in a founder's Sunday night, reply yes", or "Want a short
-  conversation", or "Should I take that." Emails 3-4 may ask for a brief
-  intro call. Do not swap in a demo.
+  conversation", or "Should I take that." Email 3 may use the same
+  15min intro-call sentence as LinkedIn 3. Email 4 needs a new sentence
+  in that family, and must name the Monday note or the monthly close.
+  Never write "go over one" with no object. Do not swap in a demo.
+  Do not reuse Palletwing leftovers: "I want to know who sees that
+  while the week can still change", "I put it in your hands before the
+  next week is already moving", "That after-hours stretch is the one I
+  try to get in front of", or "I don't ask you to stay late for this."
 - Email 5 asks if there is a better point of contact, then closes
   naturally. No pitch. No "A later yes still works."
 - Do not replicate words or phrases across the sequence. Ban the v1

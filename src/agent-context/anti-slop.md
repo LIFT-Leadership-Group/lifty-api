@@ -1,6 +1,6 @@
 # LIFT outreach anti-slop list
 
-Version: lifty-anti-slop.v9
+Version: lifty-anti-slop.v10
 
 Do not use these words or phrases in recommended LinkedIn or email copy.
 Match case-insensitively. Do not use close variants that keep the same tell
@@ -17,7 +17,10 @@ writing ban, not a claim about response rates.
 - curious
 - quick question
 - mind if i
-- last note from me
+- sit with
+- sits with
+- sit with you
+- Does it sit with
 - totally off
 - from day one
 - from scratch
@@ -68,14 +71,12 @@ writing ban, not a claim about response rates.
 - one thing I didn't
 - one angle I didn't mention
 - I'll leave it here
-- I'll keep this short
 - I don't want to keep asking you
 
 ## Email
 
 - Quick word
 - I'll leave it here
-- I'll keep this short
 - I don't want to keep asking you
 - i noticed
 - i was impressed by
