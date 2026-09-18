@@ -13,6 +13,9 @@ activate or send anything.
 ## Saved company (fictional)
 
 - Company: Nettle & Co.
+- Company type: early-stage professional services, about $1.2M ARR, 6 people
+- Why it might use Lifty: Reese is the founder-seller and already does
+  outbound to studio founders. They want Lifty to clean up existing copy.
 - Website: `https://www.nettleandco.example` (founder-confirmed)
 - Founder / sender: Reese Lang, founder
 - One-line description: Nettle & Co. does fractional bookkeeping for design

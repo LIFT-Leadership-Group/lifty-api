@@ -5,7 +5,9 @@ outreach drafts. It is not a live Lifty session.
 
 Nothing here logs in, saves a hosted campaign, activates outreach, or sends a
 message. The company information is fictional and saved in this folder on
-purpose, so we can compare drafts without reading a real workspace.
+purpose, so we can compare drafts without reading a real workspace. The
+three companies are still Lifty-shaped: early-stage tech or services
+businesses around $1-2M ARR, with a founder who would use outbound.
 
 ## What this is for
 

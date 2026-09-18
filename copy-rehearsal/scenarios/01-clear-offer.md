@@ -13,6 +13,9 @@ templates.
 ## Saved company (fictional)
 
 - Company: Palletwing
+- Company type: early-stage B2B SaaS / tech, about $1.6M ARR, 9 people
+- Why it might use Lifty: Maya is the founder-seller. She needs outbound to
+  grocery owners, not inbound from a big brand team.
 - Website: `https://www.palletwing.example` (founder-confirmed)
 - Founder / sender: Maya Chen, founder
 - One-line description: Palletwing shows independent grocers which SKUs are

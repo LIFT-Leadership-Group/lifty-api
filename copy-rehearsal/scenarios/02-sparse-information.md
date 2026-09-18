@@ -13,6 +13,9 @@ preferred call to action.
 ## Saved company (fictional)
 
 - Company: Helixpath
+- Company type: early-stage B2B services, about $1M ARR, small team
+- Why it might use Lifty: Sam is the founder-seller and asked Lifty to help
+  with outbound. Almost no commercial detail is saved yet.
 - Website: not confirmed
 - Founder / sender: Sam Ortiz, founder
 - One-line description: "We help companies with operations."
@@ -34,5 +37,6 @@ sense for Priya or Northwind Logistics.
 ## What is not known
 
 Almost everything commercially useful. Do not invent a tighter offer, a
-website, a metric, a customer, a pain, or a meeting history to make the draft
-sound complete. If the copy has to stay general, keep it general and say so.
+website, a customer, a pain, or a meeting history to make the draft sound
+complete. The ~$1M ARR figure is a company-size fact, not proof of results.
+If the copy has to stay general, keep it general and say so.
