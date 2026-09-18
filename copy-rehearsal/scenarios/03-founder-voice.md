@@ -97,12 +97,19 @@ numbers, extra services, or a meeting-first ask unless Reese already used one.
 These are writing rules, not new Nettle facts. Company inputs above stay
 fixed. Improve Reese's copy. Do not replace it with a generic sequence.
 
+Write the five emails to the same standard as
+`copy-rehearsal/locks/01-clear-offer.md`. Same six fields. Same spoken
+register. Same jobs: pain on 1-2, offer on 3-4, better contact on 5.
+Use Nettle facts only. Do not copy Palletwing's product, customers, or
+proof.
+
 - Author is Reese Lang. Name Reese in LinkedIn 1 and email 1. Every later
   LinkedIn message and email still needs an I from Reese. Dry voice can
   keep we next to I. We cannot replace Reese.
 - LinkedIn: invitation with no note, then three connected messages that
   build on one job. Messages 1-2 are locked. Message 3 is open. Do not
-  say "close" twice in message 3. New wording each step.
+  say "close" twice in message 3. Never write "Should I take that." Ask
+  for a brief intro call, or the equivalent. New wording each step.
 - Email uses the six fields, in order, with inbox spacing: subject,
   address, opener, main focus, hook, CTA. Same subject on all five.
   Hi/Hey plus `{{first_name}}`. Opener is one spoken line that
@@ -117,7 +124,8 @@ fixed. Improve Reese's copy. Do not replace it with a generic sequence.
   fact and the quote only if they stay honest. No invented ROI.
 - Each CTA is a new sentence. Never write "reply yes", "If the books still
   live in a founder's Sunday night, reply yes", or "Want a short
-  conversation." Do not swap in a demo.
+  conversation", or "Should I take that." Emails 3-4 may ask for a brief
+  intro call. Do not swap in a demo.
 - Email 5 asks if there is a better point of contact, then closes
   naturally. No pitch. No "A later yes still works."
 - Do not replicate words or phrases across the sequence. Ban the v1

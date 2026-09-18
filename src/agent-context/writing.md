@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v15
+Version: lifty-writing.v16
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -113,8 +113,10 @@ LinkedIn messages, write one conversation that builds across all three.
 Message 1 names the author and one job, then asks how they handle it.
 Message 2 stays on that same job and adds a new specific detail or either/or
 they can answer. Message 3 offers only what is saved, then asks in that
-founder's own words. Never write "Want a short conversation." Do not
-say the same product word twice in one message. Do not scatter: do not
+founder's own words. Ask for a brief intro call, or the saved
+walkthrough. Never write "Want a short conversation" or "Should I take
+that." Do not say the same product word twice in one message. Do not
+scatter: do not
 jump to who owns the work (that is email 5), and do not restart with
 "I help with that..." as a new pitch. Never write "so I
 need to know", "I need to know", or tell a
@@ -187,10 +189,75 @@ Jobs by step:
   named customer's metric as if {{company_name}} already has that number.
   Attribute proof to the named customer in the same thought. If a
   founder-confirmed website is saved, include that exact URL in 3 or 4.
-  Do not invent a demo, method, or site.
+  Do not invent a demo, method, or site. Ask for a brief intro call, or
+  the saved walkthrough. Never write "Should I take that."
 - Email 5 asks if there is a better point of contact, then closes the
   conversation naturally. Do not pitch again. Two short asks only: would
   they point you to whoever owns that work, and can you reconnect later.
+
+## Email quality bar
+
+When the saved offer is real, write emails to this standard. This is
+accepted copy for a different fictional company. Use it for shape, field
+jobs, and spoken register. Do not copy its customers, product, or proof.
+
+Subject on all five: When a SKU runs out this week
+
+Email 1
+
+Hi {{first_name}},
+
+I'm Maya Chen at Palletwing.
+
+Independent grocers often learn a case is gone after shoppers already saw the empty bay. That's the missing milk.
+
+I'm asking because I try to catch that before shoppers see it.
+
+How do you see a short SKU at {{company_name}} before it hits the floor?
+
+Email 2
+
+Hey {{first_name}},
+
+The midweek distributor call is the expensive one.
+
+When a store has to buy extra cases after the load already left, that purchase was not on the original order. Shoppers never see that call, but the store does.
+
+I want to know who sees that while the next order can still change.
+
+At {{company_name}}, is that visible early in the week, or only after that extra call is already placed?
+
+Email 3
+
+Hi {{first_name}},
+
+I don't ask you to rewrite inventory.
+
+I send a Monday SKU-risk list for each store and walk the first store with you for 20 minutes. It shows which SKUs are likely to stock out this week. https://www.palletwing.example is the page that describes that list.
+
+I put it in your hands before the delivery is already booked.
+
+Want me to walk through one store's first weekly list?
+
+Email 4
+
+Hey {{first_name}},
+
+That extra distributor call is the one I try to get in front of.
+
+Palletwing is the Monday list plus a 20-minute walkthrough of one store. North Park Market cut emergency distributor orders from 18 a month to 4 after 90 days with me.
+
+Want 20 minutes this week to walk one {{company_name}} store's list with me?
+
+Email 5
+
+Hi {{first_name}},
+
+I'm assuming the timing isn't right, or this sits with someone else at {{company_name}}.
+
+If someone there owns ordering or the floor, would you mind pointing me in their direction?
+
+Or if this becomes a priority down the road I'd love to reconnect!
 
 ## Illustrative examples
 
