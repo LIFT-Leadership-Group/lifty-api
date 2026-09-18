@@ -20,7 +20,8 @@ three company scenarios again, and you judge whether the copy got better.
 | File | What it is |
 |---|---|
 | `scenarios/` | The three frozen company stories. Review these once, then leave them alone so comparisons are fair. |
-| `editorial/rules.md` | Outreach rules we agree on. Empty until you supply them. |
+| `locks/` | Accepted copy. Later runs must keep a locked channel exactly. |
+| `editorial/rules.md` | Outreach rules from the Palletwing pass. |
 | `editorial/examples.md` | Good and bad examples you give me. Empty until you supply them. |
 | `scratch/` | Local dumps. Not committed. Includes the current assembled guidance, paste-ready prompts, and saved drafts. |
 
@@ -44,7 +45,8 @@ anything.
    runs. Do not paste old drafts or our editing discussion.
 
 4. Paste the contents of one file from `copy-rehearsal/scratch/prompts/`.
-   Start with `01-clear-offer.md` unless we agree to run a different scenario.
+   Palletwing is locked. Next run is `02-sparse-information.md` unless we
+   agree to a different scenario.
 
 5. Judge the copy. Then paste the drafts back into the setup chat, or save them
    yourself as:

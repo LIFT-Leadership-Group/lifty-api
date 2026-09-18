@@ -40,3 +40,27 @@ Almost everything commercially useful. Do not invent a tighter offer, a
 website, a customer, a pain, or a meeting history to make the draft sound
 complete. The ~$1M ARR figure is a company-size fact, not proof of results.
 If the copy has to stay general, keep it general and say so.
+
+## Palletwing writing rules that still apply
+
+These are writing rules, not new Helixpath facts. Company inputs above stay
+fixed and sparse.
+
+- Author is Sam Ortiz. Name Sam in LinkedIn 1 and email 1. Keep first person
+  in every later message, including LinkedIn 2.
+- LinkedIn: invitation with no note, then three connected messages.
+- Email: six fields, inbox spacing, same subject on all five, Hi/Hey plus
+  `{{first_name}}` on every greeting.
+- Emails 1-2 stay on a possible operations problem the audience may recognize.
+  Do not diagnose {{company_name}} and do not invent a specific pain, product,
+  or customer to sound like Palletwing.
+- Emails 3-4 can only offer what is saved: help with operations. No website.
+  No walkthrough length. No named result. Do not treat $1M ARR as a result.
+  If there is no saved meeting CTA, ask for a short conversation without
+  inventing a demo.
+- Email 5 assumes the timing isn't right, or this sits with someone else.
+  Ask them to point you to the better person. Leave the door open to
+  reconnect. Do not call a miss "useful."
+- No stiff captions. No banned anti-slop phrases. No Priya or Northwind
+  Logistics in the templates.
+
