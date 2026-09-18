@@ -1,14 +1,15 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v11) and
+`src/agent-context/writing.md` (lifty-writing.v12) and
 `src/agent-context/anti-slop.md` (lifty-anti-slop.v6).
 
 ## Author
 
 Identify the author from the saved founder or sender name. Cold copy uses
-first person as that person. The lead has to know who wrote it. LinkedIn
-message 2 still needs an I.
+first person as that person, unless the saved voice is first-person
+plural. The lead has to know who wrote it. LinkedIn message 2 still needs
+an I, unless that saved voice is we.
 
 ## LinkedIn
 
@@ -73,3 +74,8 @@ Use the existing LIFT list in `src/agent-context/anti-slop.md`. "Quick question"
 "I'm in this", "I stay on this", "so I need to know", "I followed up
 because", and "Want a short conversation" are banned. Do not suggest listed
 phrases.
+
+## Thin workspace
+
+If the offer is only a vague line and there is no website, proof, voice,
+or preferred CTA, do not draft. Tell the founder you need more first.

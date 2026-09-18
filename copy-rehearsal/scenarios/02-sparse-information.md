@@ -41,6 +41,10 @@ website, a customer, a pain, or a meeting history to make the draft sound
 complete. The ~$1M ARR figure is a company-size fact, not proof of results.
 If the copy has to stay general, keep it general and say so.
 
+Product path for a workspace this thin: do not draft the full sequence.
+Tell the founder you need more before you can draft. The locked copy is
+the forced-draft baseline only.
+
 ## Palletwing writing rules that still apply
 
 These are writing rules, not new Helixpath facts. Company inputs above stay

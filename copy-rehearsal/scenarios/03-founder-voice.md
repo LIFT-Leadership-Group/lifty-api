@@ -91,3 +91,32 @@ Reese's dry tone, the Sunday-night books observation, the 11-studio fact if it
 stays honest as a company fact, the customer quote if it is clearly a quote,
 and the yes/no CTA. Do not add ROI numbers, extra services, or a meeting-first
 ask unless Reese already used one.
+
+## Palletwing and Helixpath writing rules that still apply
+
+These are writing rules, not new Nettle facts. Company inputs above stay
+fixed. Improve Reese's copy. Do not replace it with a generic sequence.
+
+- Author is Reese Lang. Name Reese in LinkedIn 1 and email 1. Saved voice
+  is first-person plural, dry, slightly wry. Keep we. Do not switch Reese
+  to a Palletwing-style I.
+- LinkedIn: invitation with no note, then three connected messages that
+  build on one job.
+- Email: six fields, inbox spacing, same subject on all five, Hi/Hey plus
+  `{{first_name}}` on every greeting.
+- Hook is one sentence that ties the main focus to the CTA. Do not explain
+  why you followed up. Follow-up is assumed.
+- Emails 1-2 stay on Sunday-night books. Emails 3-4 use the saved offer:
+  monthly close plus a Monday numbers note. Put
+  `https://www.nettleandco.example` in 3 or 4. Use the 11-studio fact and
+  the quote only if they stay honest. No invented ROI.
+- Keep the saved CTA: reply yes if the books still live in a founder's
+  Sunday night. Do not swap in a demo or "Want a short conversation."
+- Email 5: timing may be off, or it sits with someone else. Ask for the
+  better person or leave the door open. Keep the yes/no shape. No
+  exclamation points.
+- Strip the founder draft's banned lines: hope this finds you well,
+  unlock, seamless, scale, just checking in, circling back, final
+  attempt, and demo asks.
+- No stiff captions. No Priya-style sample-lead facts. Templates must
+  work for other eligible studios, not only Harbor Type Studio.

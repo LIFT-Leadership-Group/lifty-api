@@ -1,7 +1,10 @@
 # Locked copy for 02-sparse-information
 
-David accepted LinkedIn 1-3 and emails 1-2 on 2026-09-18. Do not rewrite
-those. Emails 3-5 are still open.
+David accepted this forced-draft sequence on 2026-09-18 as the thin
+baseline. Do not rewrite either channel.
+
+Product path for a workspace this thin: do not draft. Tell the founder
+you need more before you can draft.
 
 ## LinkedIn
 
@@ -19,9 +22,9 @@ Message 3
 
 I help companies hold the day-to-day as they add people. Can we talk through how that looks at {{company_name}}?
 
-## Email 1-2 (locked)
+## Email
 
-Subject on all five, including the unlocked later emails: Day-to-day as you grow
+Subject on all five: Day-to-day as you grow
 
 Email 1
 
@@ -46,3 +49,39 @@ It's whether the same rhythm still works the next time headcount jumps. Some tea
 Either answer tells me where the strain actually is.
 
 Which one is {{company_name}} living with?
+
+Email 3
+
+Hi {{first_name}},
+
+I help companies with operations.
+
+I work with the people who already run the place. That's the job I take on.
+
+I want that time at {{company_name}}.
+
+Can we find a time this week?
+
+Email 4
+
+Hey {{first_name}},
+
+When the next group of people comes in, the day-to-day is still what I do.
+
+I mean the current team and the one after that. That second group still counts.
+
+Adding people at {{company_name}} is what I want the time for.
+
+Got 15 minutes this week?
+
+Email 5
+
+Hi {{first_name}},
+
+I may have the timing wrong.
+
+Or this sits with someone else at {{company_name}}. That is the other read I have.
+
+That is how this looks from here.
+
+Would you point me to whoever owns this, or can I reconnect later?
