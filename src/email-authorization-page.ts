@@ -1,5 +1,5 @@
 /** The existing personal-mailbox declaration is completed in the browser. */
-export function renderEmailAuthorizationPage(state: string): string {
+export function renderEmailAuthorizationPage(state: string, chooseProvider = false): string {
   const escape = (value: string) => value.replace(/[&<>"']/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character]!);
@@ -8,6 +8,10 @@ export function renderEmailAuthorizationPage(state: string): string {
 <h1>Connect your email account</h1><p>Connect the mailbox you already use for everyday conversations. Choose Gmail, Google Workspace, Outlook, Microsoft 365, or IMAP/SMTP. You will review and approve your outreach before any email is sent.</p>
 <form method="post" action="/unipile/start"><input type="hidden" name="intent" value="${escape(state)}">
 <label><input type="checkbox" name="mailbox_use" value="personal" required>I use this mailbox regularly for personal or business conversations. It is not a new or dedicated outreach mailbox.</label>
+${chooseProvider ? `<fieldset><legend>Choose your email provider</legend>
+<label><input type="radio" name="email_provider" value="google" required>Google (Gmail or Google Workspace)</label>
+<label><input type="radio" name="email_provider" value="outlook" required>Microsoft (Outlook or Microsoft 365)</label>
+<label><input type="radio" name="email_provider" value="imap" required>Other email (IMAP/SMTP)</label></fieldset>` : ""}
 <button type="submit">Continue to account selection</button></form></html>`;
 }
 

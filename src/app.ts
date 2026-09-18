@@ -121,7 +121,7 @@ import { isSealedSlackState } from "./slack-state.js";
 import { LinkedinCampaignRequest, LinkedinCampaignResult, linkedinCampaignResultFor, type LinkedinCampaignInput, type LinkedinCampaignOutput } from "./linkedin-campaign-contracts.js";
 import { LinkedinConnectRequest, LinkedinConnectResult, LegacyLinkedinConnectResult, LinkedinConnectionStatus, LinkedinWorkspaceRequest, LinkedinDisconnectRequest, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
-import { EmailConnectRequest, EmailConnectResult, LegacyEmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
+import { HostedEmailProvider, EmailConnectRequest, EmailConnectResult, LegacyEmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
 // The create-workspace body carries only a bounded name and description.
@@ -165,7 +165,7 @@ export interface AppDependencies {
   getEmailConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<EmailStatus>;
   disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
   authorizeEmail(state: string): Promise<string>;
-  declareEmail(state: string): Promise<string>;
+  declareEmail(state: string, provider?: HostedEmailProvider): Promise<string>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
   getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
@@ -1408,8 +1408,8 @@ export function createApp(
     let target: string;
     try { target = await dependencies.authorizeEmail(state); }
     catch (error) {
-      if (!(error instanceof PublicError) || error.code !== "EMAIL_DECLARATION_REQUIRED") throw error;
-      return context.html(renderEmailAuthorizationPage(state), 200, {
+      if (!(error instanceof PublicError) || !["EMAIL_DECLARATION_REQUIRED", "EMAIL_PROVIDER_REQUIRED"].includes(error.code)) throw error;
+      return context.html(renderEmailAuthorizationPage(state, error.code === "EMAIL_PROVIDER_REQUIRED"), 200, {
         "cache-control": "no-store", "referrer-policy": "strict-origin", "x-content-type-options": "nosniff",
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       });
@@ -1442,10 +1442,18 @@ export function createApp(
     if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Invalid email account declaration.");
     const form = new URLSearchParams(raw.text);
     if (form.getAll("intent").length !== 1 || form.getAll("mailbox_use").length !== 1
-      || [...form.keys()].some(key => !["intent", "mailbox_use"].includes(key)) || form.get("mailbox_use") !== "personal") {
+      || form.getAll("email_provider").length > 1
+      || (form.has("email_provider") && !HostedEmailProvider.safeParse(form.get("email_provider")).success)
+      || [...form.keys()].some(key => !["intent", "mailbox_use", "email_provider"].includes(key)) || form.get("mailbox_use") !== "personal") {
       return errorJson(context, 400, "INVALID_REQUEST", "Confirm your regular personal mailbox before continuing.");
     }
-    const target = await dependencies.declareEmail(form.get("intent")!);
+    const target = await dependencies.declareEmail(form.get("intent")!, form.has("email_provider") ? HostedEmailProvider.parse(form.get("email_provider")) : undefined);
+    if (target === "authorization_received") {
+      return context.html(renderEmailAuthorizationReceivedPage(), 200, {
+        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+      });
+    }
     const redirect = versionedHostedAuthUrl(target, hostedAuthOrigin,v2HostedAuthOrigins);
     if (!redirect) {
       throw new PublicError({ status: 502, code: "EMAIL_INVALID_HANDOFF", message: "LIFTY could not prepare the email connection." });

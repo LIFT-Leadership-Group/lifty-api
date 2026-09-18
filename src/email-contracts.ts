@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const HostedEmailProvider = z.enum(["google", "outlook", "imap"]);
+export type HostedEmailProvider = z.infer<typeof HostedEmailProvider>;
+
 export const EmailPolicy = z.discriminatedUnion("version", [
   z.object({ version: z.literal("strict.v1"), revision: z.uuid().nullable(), placement_required: z.literal(true), habitual_only: z.literal(false) }).strict(),
   z.object({ version: z.literal("lifty.personal-beta.v1"), revision: z.uuid(), placement_required: z.literal(false), habitual_only: z.literal(true) }).strict(),

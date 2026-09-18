@@ -79,10 +79,10 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
     } finally { clearTimeout(timer); }
   }
 
-  async function createLink(input: { correlation: string; notifyUrl: string; expiresAt: string; reconnectId: string | null }): Promise<string> {
+  async function createLink(input: { correlation: string; notifyUrl: string; expiresAt: string; reconnectId: string | null; provider?: "GOOGLE" | "OUTLOOK" | "MAIL" }): Promise<string> {
     const raw = await request("hosted/accounts/link", {
       type: input.reconnectId ? "reconnect" : "create",
-      ...(input.reconnectId ? { reconnect_account: AccountId.parse(input.reconnectId) } : { providers: ["GOOGLE", "OUTLOOK", "MAIL"] }),
+      ...(input.reconnectId ? { reconnect_account: AccountId.parse(input.reconnectId) } : { providers: input.provider ? [input.provider] : ["GOOGLE", "OUTLOOK", "MAIL"] }),
       api_url: base.origin, expiresOn: input.expiresAt, name: input.correlation,
       notify_url: input.notifyUrl, single_use: true,
       sync_limit: { MAILING: "NO_HISTORY_SYNC" }, disabled_options: ["sync_limit"],
