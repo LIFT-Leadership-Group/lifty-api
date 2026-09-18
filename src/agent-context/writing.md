@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v17
+Version: lifty-writing.v18
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -159,13 +159,15 @@ Every recommended email uses these six fields, in this order.
    The recipient's first name belongs in this greeting on every email.
 3. Opener. One spoken line that humanizes the outreach. It sits on the
    next line after the greeting. It is a person starting a note, not a
-   caption for the proof that follows. It must be new, and it has to make
-   sense on its own. Good openers sound like: "Figured an email might be
-   the easier place to start.", "Checking back in case this got buried.",
-   "I'll keep this short.", "Coming back one more time.", "Last note from
-   me." Do not claim an earlier LinkedIn send unless that history is
-   confirmed for every recipient. Do not open with a label for the pain
-   ("The after-hours stretch is the one that still lands on a founder.").
+   caption for the proof that follows. Email 1 may omit the opener.
+   Start with the greeting, then main focus. Never write "Figured an
+   email might be the easier place to start." That sounds off when
+   email is the first or only channel. Later emails still use a spoken
+   opener: "Checking back in case this got buried.", "I'll keep this
+   short.", "Coming back one more time.", "Last note from me." Do not
+   claim an earlier LinkedIn send unless that history is confirmed for
+   every recipient. Do not open with a label for the pain ("The
+   after-hours stretch is the one that still lands on a founder.").
 4. Main focus. The core of the email. Two or three sentences. By the end
    of this section the reader knows who is writing and what they solve.
    Emails 1-2 do that through the pain. Emails 3-4 do that through the
@@ -184,9 +186,10 @@ Every recommended email uses these six fields, in this order.
    reuse the previous email's CTA.
 
 When showing copy, print each email as it would appear in an inbox. Put a
-blank line after the greeting, after the opener, after the main focus, and
-after the hook. Do not collapse the fields onto one paragraph or a labeled
-stack with no spacing. The stored `text` uses that same spacing.
+blank line after the greeting, after the opener when there is one, after
+the main focus, and after the hook. Email 1 with no opener goes greeting,
+blank line, main focus. Do not collapse the fields onto one paragraph or
+a labeled stack with no spacing. The stored `text` uses that same spacing.
 
 Jobs by step:
 
@@ -218,13 +221,13 @@ emails with this company's nouns.
 
 Subject on all five: When an issue changes owners
 
+Email 1 has no opener.
+
 Email 1
 
 Hi {{first_name}},
 
-Figured an email might be the easier place to start.
-
-When a customer issue changes owners, the next person often has to rebuild the story. I started Harborline to help support teams keep that context with the ticket, so the new owner is not guessing.
+I'm Alex at Harborline. When a customer issue changes owners, the next person often has to rebuild the story. I started the company to help support teams keep that context with the ticket, so the new owner is not guessing.
 
 That is the window where they either inherit something usable or start over.
 

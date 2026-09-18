@@ -97,29 +97,31 @@ numbers, extra services, or a meeting-first ask unless Reese already used one.
 These are writing rules, not new Nettle facts. Company inputs above stay
 fixed. Improve Reese's copy. Do not replace it with a generic sequence.
 
-Write the five emails to the Email quality bar in references.writing.
-Same six fields. Same spoken register as that Harborline sequence:
-human opener, a real paragraph, a short stakes line, then a normal
-ask. Same jobs: pain on 1-2, offer on 3-4, better contact on 5. Use
-Nettle facts only. Do not find-replace Palletwing or Harborline
-sentences with Nettle nouns.
+LinkedIn and email are locked in `copy-rehearsal/locks/03-founder-voice.md`.
+Do not rewrite either channel.
+
+Write later rehearsals to the Email quality bar in references.writing.
+Same six fields. Email 1 may omit the opener. Later emails use a spoken
+opener, a real paragraph, a short stakes line, then a normal ask. Same
+jobs: pain on 1-2, offer on 3-4, better contact on 5. Use Nettle facts
+only. Do not find-replace Palletwing or Harborline sentences with Nettle
+nouns.
 
 - Author is Reese Lang. Name Reese in LinkedIn 1 and email 1. Every later
   LinkedIn message and email still needs an I from Reese. Dry voice can
   keep we next to I. We cannot replace Reese.
 - LinkedIn: invitation with no note, then three connected messages that
-  build on one job. Message 1 is locked. Message 2 is open because the
-  old line used "sit with". Rewrite it. Message 3 is open. Do not say
-  "close" twice in message 3. Never write "Should I take that" or
-  "sit with". Message 3 CTA must be exactly: Would you be open to a
-  15min intro call later this week or next?
+  build on one job. All three messages are locked. Never write
+  "Should I take that" or "sit with". Message 3 CTA is: Would you be
+  open to a 15min intro call later this week or next?
 - Email uses the six fields, in order, with inbox spacing: subject,
   address, opener, main focus, hook, CTA. Same subject on all five.
-  Hi/Hey plus `{{first_name}}`. Opener is one spoken line that
-  humanizes the outreach: easier-place-to-start, buried, keep this
-  short, coming back, last note. Do not open by labeling the pain.
-  Main focus is who Reese is and what Nettle solves, in 2-3 sentences.
-  Name Reese in email 1. Never write "files" for the books.
+  Hi/Hey plus `{{first_name}}`. Email 1 has no opener. Never write
+  "Figured an email might be the easier place to start." Later openers
+  can be buried, keep this short, coming back, last note. Do not open
+  by labeling the pain. Main focus is who Reese is and what Nettle
+  solves, in 2-3 sentences. Name Reese in email 1. Never write "files"
+  for the books.
 - Hook is one spoken sentence that ties main focus to the CTA. It cannot
   narrate the email. Ban `that is the person I am writing`, `that is the
   job I do`, `That is all of it`, `I am treating this as a timing miss`,
