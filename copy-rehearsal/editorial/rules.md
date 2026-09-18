@@ -1,8 +1,8 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v4) and
-`src/agent-context/anti-slop.md` (lifty-anti-slop.v1).
+`src/agent-context/writing.md` (lifty-writing.v5) and
+`src/agent-context/anti-slop.md` (lifty-anti-slop.v2).
 
 ## Author
 
@@ -43,11 +43,12 @@ Jobs by step:
 
 - Emails 1-2: pain points or problems the lead may be experiencing.
 - Emails 3-4: the client's products, offerings, or solutions for those pains.
-  Email 4 needs a new reason to reply.
-- Email 5: final note, thank them, softly ask for a different point of contact.
-  No guilt nudge.
+  Email 4 needs a new reason to reply. Put the confirmed website in 3 or 4.
+- Email 5: timing may be off, or it sits with someone else. Ask for the person
+  who owns the operating view. Leave the door open if timing is simply off.
+  No guilt nudge. Do not copy a canned close.
 
 ## Anti-slop
 
-Use the existing LIFT list in `src/agent-context/anti-slop.md`. "Quick question"
-is banned. Do not suggest listed phrases.
+Use the existing LIFT list in `src/agent-context/anti-slop.md`. "Quick question",
+"I'm in this", and "I stay on this" are banned. Do not suggest listed phrases.

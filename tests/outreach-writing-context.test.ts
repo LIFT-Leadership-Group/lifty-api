@@ -13,13 +13,13 @@ describe("outreach writing context", () => {
       expect(response.status).toBe(200);
       const context = await response.json();
       expect(context.references.writing).toEqual(expect.any(String));
-      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v4\n/);
+      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v5\n/);
       expect(context.references.writing).toContain("Email shape");
       expect(context.references.writing).toContain("Subject line");
       expect(context.references.writing).toContain("same subject line on all five steps");
       expect(context.references.writing).toContain("Emails 1-2 focus on a pain");
       expect(context.references.writing).toContain("Emails 3-4 focus on the founder's product");
-      expect(context.references.writing).toContain("the better person");
+      expect(context.references.writing).toContain("operating view");
       expect(context.references.writing).toContain("must name the same job");
       expect(context.references.writing).toContain("one connected thought");
       expect(context.references.writing).toContain("Name the author");
@@ -28,9 +28,11 @@ describe("outreach writing context", () => {
       expect(context.references.writing).toContain("LinkedIn message 2 still needs an I");
       expect(context.references.writing).toContain("reframes the last note");
       expect(context.references.anti_slop).toEqual(expect.any(String));
-      expect(context.references.anti_slop).toMatch(/^# LIFT outreach anti-slop list\n\nVersion: lifty-anti-slop\.v1\n/);
+      expect(context.references.anti_slop).toMatch(/^# LIFT outreach anti-slop list\n\nVersion: lifty-anti-slop\.v2\n/);
       expect(context.references.anti_slop).toContain("quick question");
       expect(context.references.anti_slop).toContain("I don't want to keep asking you");
+      expect(context.references.anti_slop).toContain("I'm in this");
+      expect(context.references.anti_slop).toContain("I stay on this");
       playbooks.push(context.references.writing);
       antiSlopLists.push(context.references.anti_slop);
     }

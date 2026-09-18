@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v4
+Version: lifty-writing.v5
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -83,7 +83,9 @@ before drafting. Do not send unnamed copy.
   "I don't want to keep asking you", "last note from me", and "I'll leave it
   here". Do not guilt someone into replying.
 - Read the copy aloud. If the founder would not say it, rewrite it.
-- Use the confirmed business URL exactly when it supports the ask. Never invent
+- Use the confirmed business URL exactly when it supports the ask. Put that
+  exact URL in email 3 or 4 with the offer. Do not drop it to avoid sounding
+  like "check us out." Naming the saved page is not that phrase. Never invent
   a website or resource. Do not claim an earlier LinkedIn message or email was
   sent unless that history is confirmed for every recipient receiving the text.
 
@@ -141,10 +143,14 @@ Jobs by step:
   concrete pain, stay general. Do not invent one.
 - Emails 3-4 focus on the founder's product, offering, or solution for the
   pains named in 1-2. Do not introduce a new problem. Email 4 needs a new
-  reason to reply, not the same CTA as email 3 in different clothes.
-- Email 5 is the final note. Thank them briefly. Ask, softly, whether someone
-  else at {{company_name}} is the better person. Do not add a new pitch, a
-  meeting demand, or a guilt line about keeping after them.
+  reason to reply, not the same CTA as email 3 in different clothes. If a
+  founder-confirmed website is saved, include that exact URL in 3 or 4.
+- Email 5 is the final note. Do not pitch again. Cover two honest exits: the
+  timing may not be right, or this sits with someone else at {{company_name}}.
+  Ask them to point you to the person who owns that operating view. If the
+  timing is simply off, leave the door open for later, without guilt and
+  without a meeting demand. Write that in the author's voice. Do not paste a
+  canned close.
 
 ## Illustrative examples
 
@@ -181,9 +187,10 @@ I'm asking because this is the gap we help support teams close.
 How does the next person at {{company_name}} pick up the context today?
 
 Do not open with "Quick question". Later emails stay on that job, but each one
-uses new wording: 2 deepens the pain, 3-4 introduce the offer, 5 thanks them
-and asks for a better contact if this is not their area. LinkedIn message 2
-keeps Alex in first person instead of dropping to "the floor" with no I.
+uses new wording: 2 deepens the pain, 3-4 introduce the offer and the saved
+site, 5 assumes timing may be off or it sits with someone else, asks for a
+better person, and leaves the door open. LinkedIn message 2 keeps Alex in first
+person instead of dropping to "the floor" with no I.
 
 ## Review, save and approve
 
