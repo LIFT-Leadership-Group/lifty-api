@@ -1,15 +1,14 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v12) and
-`src/agent-context/anti-slop.md` (lifty-anti-slop.v6).
+`src/agent-context/writing.md` (lifty-writing.v13) and
+`src/agent-context/anti-slop.md` (lifty-anti-slop.v7).
 
 ## Author
 
-Identify the author from the saved founder or sender name. Cold copy uses
-first person as that person, unless the saved voice is first-person
-plural. The lead has to know who wrote it. LinkedIn message 2 still needs
-an I, unless that saved voice is we.
+Identify the author from the saved founder or sender name. Every LinkedIn
+message and every email must make that person obvious. Later messages
+still need an I. We can sit next to I. We cannot replace the author.
 
 ## LinkedIn
 
@@ -50,8 +49,8 @@ Field behavior:
 - Hook is one sentence that ties the main focus to the CTA. It is a bridge,
   not a reason for writing. Follow-up is assumed. Do not explain why you
   followed up, why you started, or why they should hear it from you.
-- CTA is one ask in the founder's own words. Never write "Want a short
-  conversation."
+- CTA is one new ask in the founder's own words. Never write "Want a
+  short conversation" or "reply yes." Do not reuse the previous CTA.
 - First person throughout. The six fields must disappear in the inbox.
   Do not write hypothetical meeting lines (`you would`, `I would stay on`,
   `a meeting is how I would start`).
@@ -61,19 +60,16 @@ Jobs by step:
 - Emails 1-2: pain points or problems the lead may be experiencing.
 - Emails 3-4: the client's products, offerings, or solutions for those pains.
   Email 4 continues 1-3. Do not treat a named customer's metric as the lead's
-  number. Offer is the main focus. The hook ties that offer to the meeting
-  ask. CTA is the way the founder would ask, or the saved walkthrough.
-- Email 5: timing may be off, or it sits with someone else. Two short asks
-  only: point me to the better person, or reconnect later. No extra process
-  about a handoff, a name being enough, or picking it up with them. Never
-  call a miss "useful."
+  number. Offer is the main focus. The hook ties that offer to a new ask.
+- Email 5: better point of contact, then close naturally. No pitch. No
+  "reply yes." Never call a miss "useful."
 
 ## Anti-slop
 
 Use the existing LIFT list in `src/agent-context/anti-slop.md`. "Quick question",
 "I'm in this", "I stay on this", "so I need to know", "I followed up
-because", and "Want a short conversation" are banned. Do not suggest listed
-phrases.
+because", "Want a short conversation", and "reply yes" are banned. Do not
+suggest listed phrases.
 
 ## Thin workspace
 

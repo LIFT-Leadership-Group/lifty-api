@@ -6,9 +6,9 @@ be compared with the baseline.
 
 ## Rehearsal request
 
-The founder wants Lifty to improve the copy below. Keep their voice, facts, and
-call to action. Do not replace it with a generic LIFT-sounding sequence. Do not
-activate or send anything.
+The founder wants Lifty to improve the copy below. Keep their voice and
+facts. Do not keep the yes/no closer. Do not replace it with a generic
+LIFT-sounding sequence. Do not activate or send anything.
 
 ## Saved company (fictional)
 
@@ -87,34 +87,38 @@ Message 3:
 
 ## What to preserve
 
-Reese's dry tone, the Sunday-night books observation, the 11-studio fact if it
-stays honest as a company fact, the customer quote if it is clearly a quote,
-and the yes/no CTA. Do not add ROI numbers, extra services, or a meeting-first
-ask unless Reese already used one.
+Reese's dry tone, the Sunday-night books observation as a pain, the 11-studio
+fact if it stays honest as a company fact, and the customer quote if it is
+clearly a quote. Do not keep "reply yes" or a yes/no closer. Do not add ROI
+numbers, extra services, or a meeting-first ask unless Reese already used one.
 
 ## Palletwing and Helixpath writing rules that still apply
 
 These are writing rules, not new Nettle facts. Company inputs above stay
 fixed. Improve Reese's copy. Do not replace it with a generic sequence.
 
-- Author is Reese Lang. Name Reese in LinkedIn 1 and email 1. Saved voice
-  is first-person plural, dry, slightly wry. Keep we. Do not switch Reese
-  to a Palletwing-style I.
+- Author is Reese Lang. Name Reese in LinkedIn 1 and email 1. Every later
+  LinkedIn message and email still needs an I from Reese. Dry voice can
+  keep we next to I. We cannot replace Reese.
 - LinkedIn: invitation with no note, then three connected messages that
-  build on one job.
+  build on one job. New wording each step. Do not repeat Sunday night or
+  the same ask.
 - Email: six fields, inbox spacing, same subject on all five, Hi/Hey plus
   `{{first_name}}` on every greeting.
 - Hook is one sentence that ties the main focus to the CTA. Do not explain
   why you followed up. Follow-up is assumed.
-- Emails 1-2 stay on Sunday-night books. Emails 3-4 use the saved offer:
-  monthly close plus a Monday numbers note. Put
+- Emails 1-2 stay on the Sunday-night pain. Emails 3-4 use the saved
+  offer: monthly close plus a Monday numbers note. Put
   `https://www.nettleandco.example` in 3 or 4. Use the 11-studio fact and
   the quote only if they stay honest. No invented ROI.
-- Keep the saved CTA: reply yes if the books still live in a founder's
-  Sunday night. Do not swap in a demo or "Want a short conversation."
-- Email 5: timing may be off, or it sits with someone else. Ask for the
-  better person or leave the door open. Keep the yes/no shape. No
-  exclamation points.
+- Each CTA is a new sentence. Never write "reply yes", "If the books still
+  live in a founder's Sunday night, reply yes", or "Want a short
+  conversation." Do not swap in a demo.
+- Email 5 asks if there is a better point of contact, then closes
+  naturally. No pitch. No "A later yes still works."
+- Do not replicate words or phrases across the sequence. Ban the v1
+  captions: "We handle month-end, and the founder goes home." / "That
+  weekend is the one we are trying to end."
 - Strip the founder draft's banned lines: hope this finds you well,
   unlock, seamless, scale, just checking in, circling back, final
   attempt, and demo asks.

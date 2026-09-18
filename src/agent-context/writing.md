@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v12
+Version: lifty-writing.v13
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -43,13 +43,12 @@ name. That person is speaking. Cold copy must make this obvious in a natural
 way. Do not invent a sender, title, or biography.
 
 Use first person as that author throughout LinkedIn and email: I, I'm, I sent,
-I'm asking. Do not hide behind "we" or "the company thinks" with no person
-behind it. If the saved commercial voice is first-person plural, keep we and
-still name the founder in LinkedIn 1 and email 1. Name yourself in the first
-LinkedIn message after acceptance and in email 1. LinkedIn message 2 still needs an I,
-unless that saved voice is we. Later messages keep that same
-person. A lead who never accepted LinkedIn still has to know who wrote the
-email.
+I'm asking. Every LinkedIn message and every email must make it obvious who
+wrote it. Name yourself in LinkedIn 1 and email 1. Later messages still need
+an I. Do not hide behind "we" or "the company thinks" with no person behind
+it. If the saved voice likes we, we can sit next to I. We cannot replace
+the author. LinkedIn message 2 still needs an I. A lead who never accepted
+LinkedIn still has to know who wrote the email.
 
 Name yourself with the saved founder first name and company. If the founder
 name is missing, ask for it before drafting. Do not send unnamed copy.
@@ -74,10 +73,13 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
   recipient to confirm it. Never promise unsupported ROI or quote guessed
   financial metrics.
 - Make one clear ask. Do not open with a meeting or demo request. Later
-  messages may ask in the founder's own words when it fits their preferred
-  call to action. Never write "Want a short conversation."
+  messages may ask in the founder's own words. Never write "Want a short
+  conversation." Never write "reply yes" or a yes/no closer. Do not paste
+  the same ask on every step.
 - Continue the same topic with a new detail or question. Do not repeat the
-  opener, pitch or ask in different words.
+  opener, pitch, closer, or ask. Do not reuse the same key phrase later in
+  the sequence. If Sunday night or the offer already did its job, say the
+  next thing in new words.
 - Write the five emails as five notes the named founder sent over two weeks.
   The six fields are a store format. They must disappear in the inbox. If a
   line only exists to fill the hook or main-focus slot, rewrite it. Stay
@@ -164,7 +166,8 @@ Every recommended email uses these six fields, in this order.
    person from the author is required. Do not start hooks with "I'm asking
    because..." Do not announce the CTA ("what I want to ask you about",
    "I have two questions").
-6. CTA. One ask.
+6. CTA. One new ask. Never write "reply yes" or a yes/no closer. Do not
+   reuse the previous email's CTA.
 
 When showing copy, print each email as it would appear in an inbox. Put a
 blank line after the greeting, after the opener, after the main focus, and
@@ -175,16 +178,17 @@ Jobs by step:
 
 - Emails 1-2 focus on a pain or problem this audience may recognize from the
   saved offer. Ask; do not diagnose {{company_name}}. If saved context has no
-  concrete pain, stay general. Do not invent one.
+  concrete pain, stay general. Do not invent one. Do not pitch the offer
+  yet, and do not close with "reply yes."
 - Emails 3-4 focus on the founder's product, offering, or solution for the
   pains named in 1-2. Email 4 continues that thread. Do not open with a
   named customer's metric as if {{company_name}} already has that number.
   Attribute proof to the named customer in the same thought. The offer is
-  the main focus. The hook ties that offer to the meeting ask. Ask the way
-  the founder would ask, or use their saved walkthrough. Never write
-  "Want a short conversation." Do not invent a demo. Do not diagnose a
-  new problem. If a founder-confirmed website is saved, include that
-  exact URL in 3 or 4.
+  the main focus. The hook ties that offer to a new ask. Ask the way the
+  founder would ask, or use their saved walkthrough. Never write "Want a
+  short conversation" or "reply yes." Do not invent a demo. Do not
+  diagnose a new problem. If a founder-confirmed website is saved, include
+  that exact URL in 3 or 4.
   If the saved offer is only a short line, say that line out loud as the
   main focus, the way you would tell someone at a table. Do not comment
   on the sequence. Ban "I haven't said what I actually do yet", "It is
@@ -194,15 +198,15 @@ Jobs by step:
   adds one new spoken detail, then asks for time like a person ("Got 15
   minutes this week?"). It must not restate email 3 or announce that a
   meeting is how you start.
-- Email 5 is a last note to a person, not a status report. Do not pitch
-  again. Do not call a miss "useful." Assume the timing isn't right, or
-  this sits with someone else at {{company_name}}. Two short asks only:
-  would they point you to whoever owns that work, and can you reconnect
-  later. If the founder saved a yes/no CTA, keep that shape. Do not swap
-  in a meeting ask. Do not narrate options ("I won't rehash the offer",
-  "I can wait, or I can go to the other person", "I have two questions").
-  No guilt and no meeting demand. Write that in the author's voice. Do
-  not paste a canned close.
+- Email 5 asks if there is a better point of contact, then closes the
+  conversation naturally. Do not pitch again. Do not call a miss
+  "useful." Do not repeat the Sunday-night line or write "reply yes."
+  Assume the timing isn't right, or this sits with someone else at
+  {{company_name}}. Two short asks only: would they point you to whoever
+  owns that work, and can you reconnect later. Do not narrate options
+  ("I won't rehash the offer", "A later yes still works", "I have two
+  questions"). No guilt. Write that in the author's voice. Do not paste
+  a canned close.
 
 ## Illustrative examples
 
@@ -248,16 +252,17 @@ How does the next person at {{company_name}} pick up the context today?
 
 Do not open with "Quick question". Later emails stay on that job, but each one
 uses new wording: 2 deepens the pain, 3-4 introduce the offer and the saved
-site, 5 uses two short asks only: point me to the better person, or reconnect
-later. The hook in every email is one sentence that ties the main focus to
-the CTA. Do not use the hook to explain why you followed up. LinkedIn
+site, 5 asks for a better point of contact and closes naturally. Never write
+"reply yes." The hook in every email is one sentence that ties the main focus
+to the CTA. Do not use the hook to explain why you followed up. LinkedIn
 message 2 keeps Alex in first person instead of dropping to "the floor"
-with no I.
+with no I. Every later email still has an I from Alex.
 
 ## Review, save and approve
 
-Before showing copy, check the named author in every LinkedIn message, the
-first-name greeting, factual support, the founder's voice, connected sentences,
+Before showing copy, check the named author in every LinkedIn message and
+every email, the first-name greeting, factual support, the founder's voice,
+connected sentences,
 inbox spacing, anti-slop, one ask per message, and whether each follow-up
 reframes the last note instead of repeating it. Also check permitted
 placeholders. This review is writing guidance, not a claim that the

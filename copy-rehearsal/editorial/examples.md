@@ -34,3 +34,7 @@ with you." / "Want a short conversation." / "I haven't said what I actually
 do yet." / "I'm the founder." / "This comes from me." / "I can only see
 the fit when we are speaking." / "I won't rehash the offer." / "I can
 wait, or I can go to the other person."
+
+Yes/no closer: "If the books still live in a founder's Sunday night, reply
+yes." Do not paste that on every email. Email 5 cannot add "A later yes
+still works."
