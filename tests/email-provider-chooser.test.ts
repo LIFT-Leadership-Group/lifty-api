@@ -11,20 +11,23 @@ const v1={api_version:"v1",connection_ref:null,canonical_account_id:null,provide
   application_id:null,account_scope_id:null,user_id:null,v1_account_id:null,owner_profile_id:null,generation:0,hosted_auth_origin:"https://account.unipile.com"};
 const v2={...v1,api_version:"v2",provider_namespace:"unipile:v2:app_test",application_id:"app_test",hosted_auth_origin:"https://auth.lifty.test"};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status});
-function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:boolean;expired?:boolean;hint?:boolean;authorized?:boolean;ownerChanged?:boolean;delegated?:boolean;staleStatus?:"pre_choice"|"fixed"}={}) {
+function harness(options:{actual?:HostedEmailProvider;legacy?:boolean;retained?:boolean;expired?:boolean;hint?:boolean;authorized?:boolean;ownerChanged?:boolean;delegated?:boolean;staleStatus?:"pre_choice"|"fixed";completeDuringPoll?:boolean}={}) {
   let selected:HostedEmailProvider|null=null,phase="pending",declared=false,hosted:string|null=null,connected=false;
   const calls:{op:string;payload:Record<string,unknown>}[]=[],http:{url:string;body:Record<string,unknown>|null}[]=[];
   const transport=()=>selected==="google"?v2:v1;
   const stored=()=>({state:connected?"connected":phase==="failed"?"failed":"pending",workspace_ref:workspace,email:connected?email:null,
     mailbox_use:"personal",daily_limit:10,account_id:connected?"account_1":null,connection_ref:connected?workspace:null,intent_ref:id,
     expires_at:expiry,transport:transport(),provider_selection_required:!options.legacy&&!selected,email_provider:selected});
-  const intent=()=>({...stored(),state:phase,account_id:options.retained?"account_old":null,hosted_url:hosted,selection_required:!declared,
+  const intent=()=>({...stored(),state:phase,account_id:options.retained?"account_old":connected?"account_1":null,hosted_url:hosted,selection_required:!declared,
     authorization_received:options.authorized??false,authorization_account_id:options.authorized?"account_1":null});
   function rpc(op:string,payload:Record<string,unknown>) {
     calls.push({op,payload});
     const deny=(message:string)=>({data:null,error:{code:message==="email_intent_expired"?"PT410":"PT409",message}});
     if(options.expired)return deny("email_intent_expired");
-    if(op==="intent")return {data:intent(),error:null};
+    if(op==="intent") {
+      if(options.completeDuringPoll && calls.some(call=>call.op==="status")){phase="completed";connected=true;}
+      return {data:intent(),error:null};
+    }
     if(op==="status")return {data:options.staleStatus&&!connected?{...stored(),transport:v1,
       provider_selection_required:options.staleStatus==="pre_choice",email_provider:options.staleStatus==="pre_choice"?null:selected}:stored(),error:null};
     if(op==="read")return {data:{workspace_ref:workspace,intent_ref:id,account_id:options.hint?"account_1":null},error:null};
@@ -178,4 +181,12 @@ it("still rejects transport changes for a previously fixed intent",async()=>{
   const h=harness({authorized:true,staleStatus:"fixed"});await h.select("google");const before=h.http.length;
   await expect(h.ops.status(h.session,workspace,id)).rejects.toMatchObject({code:"EMAIL_CALLBACK_INVALID"});
   expect(h.http).toHaveLength(before);expect(h.calls.some(c=>c.op==="complete")).toBe(false);
+});
+
+it("refreshes caller-authorized state once when the chosen intent completes during a pre-choice poll",async()=>{
+  const h=harness({staleStatus:"pre_choice",completeDuringPoll:true});await h.select("google");
+  expect((await h.ops.status(h.session,workspace,id)).status).toBe("connected");
+  expect(h.calls.filter(c=>c.op==="status")).toHaveLength(2);
+  expect(h.calls.some(c=>c.op==="complete"||c.op==="fail")).toBe(false);
+  expect(h.http.slice(1).map(call=>call.url)).toEqual(["https://api.unipile.com/v2/accounts/account_1","https://api.unipile.com/v2/account_1/email-senders"]);
 });

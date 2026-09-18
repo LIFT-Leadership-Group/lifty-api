@@ -92,6 +92,9 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     ...(value.email_policy ? {email_policy:value.email_policy} : {}),
     warmup_required:value.email_policy?.habitual_only ? false : value.mailbox_use==="outreach",sending_enabled:false as const});
   async function status(session:AuthSession,workspace:string,attemptRef?:string):Promise<EmailStatus>{
+    return readStatus(session,workspace,attemptRef,true);
+  }
+  async function readStatus(session:AuthSession,workspace:string,attemptRef:string|undefined,allowChoiceRefresh:boolean):Promise<EmailStatus>{
     let value=Stored.parse(await rpc("status",{workspace},session));
     if(value.state==="pending" && value.intent_ref && (!attemptRef || value.intent_ref===attemptRef)){
       const pendingIntent=value.transport?.api_version==="v2" || value.email_provider || value.provider_selection_required ? await readIntent(value.intent_ref) : null;
@@ -99,12 +102,20 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
         // A chooser can freeze Google between status and this exact intent read.
         // Accept only the unbound, unselected V1 placeholder becoming V2; all
         // authorization/account evidence below comes from the committed intent.
-        const selectedDuringPoll = value.provider_selection_required === true && value.email_provider == null
+        const unboundChoiceSnapshot = value.provider_selection_required === true && value.email_provider == null
           && !value.account_id && !value.connection_ref && value.transport?.api_version === "v1"
-          && !value.transport.account_id && !value.transport.canonical_account_id && !value.transport.connection_ref
-          && pendingIntent.provider_selection_required === false && pendingIntent.email_provider === "google"
-          && !pendingIntent.account_id && pendingIntent.transport?.api_version === "v2"
-          && !pendingIntent.transport.account_id && !pendingIntent.transport.canonical_account_id && !pendingIntent.transport.connection_ref;
+          && !value.transport.account_id && !value.transport.canonical_account_id && !value.transport.connection_ref;
+        const committedGoogleChoice = pendingIntent.provider_selection_required === false && pendingIntent.email_provider === "google"
+          && pendingIntent.transport?.api_version === "v2" && !pendingIntent.transport.account_id
+          && !pendingIntent.transport.canonical_account_id && !pendingIntent.transport.connection_ref;
+        if (unboundChoiceSnapshot && committedGoogleChoice && pendingIntent.workspace_ref === value.workspace_ref
+          && pendingIntent.state === "completed" && allowChoiceRefresh) {
+          // Another poll may have attached the selected account meanwhile. Read
+          // caller-authorized current state once, then verify the connected owner
+          // normally; never complete from this stale pre-choice snapshot.
+          return readStatus(session,workspace,attemptRef,false);
+        }
+        const selectedDuringPoll = unboundChoiceSnapshot && committedGoogleChoice && !pendingIntent.account_id;
         if (pendingIntent.workspace_ref !== value.workspace_ref
           || (value.transport && pendingIntent.transport?.api_version !== value.transport.api_version && !selectedDuringPoll)) fail("EMAIL_CALLBACK_INVALID",403);
       }
