@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v6
+Version: lifty-writing.v7
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -146,15 +146,18 @@ Jobs by step:
   saved offer. Ask; do not diagnose {{company_name}}. If saved context has no
   concrete pain, stay general. Do not invent one.
 - Emails 3-4 focus on the founder's product, offering, or solution for the
-  pains named in 1-2. Do not introduce a new problem. Email 4 needs a new
-  reason to reply, not the same CTA as email 3 in different clothes. If a
+  pains named in 1-2. Email 4 continues that thread. Do not open with a
+  named customer's metric as if {{company_name}} already has that number.
+  Attribute proof to the named customer in the same thought. The offer is
+  the hook. Ask for a short meeting, or the founder's saved walkthrough, so
+  they can see the solution. Do not diagnose a new problem. If a
   founder-confirmed website is saved, include that exact URL in 3 or 4.
 - Email 5 is the final note. Do not pitch again. Do not call a miss "useful."
-  Cover two honest exits: the timing may not be right, or this sits with
-  someone else at {{company_name}}. Ask them to point you to the person who
-  owns that operating view. If the timing is simply off, say that is fine and
-  they can come back if this becomes a priority. No guilt and no meeting
-  demand. Write that in the author's voice. Do not paste a canned close.
+  Assume the timing may not be right, or this sits with someone else at
+  {{company_name}}. Ask them to point you to whoever owns ordering or the
+  operating view. If it becomes a priority later, leave the door open to
+  reconnect. No guilt and no meeting demand. Write that in the author's
+  voice. Do not paste a canned close.
 
 ## Illustrative examples
 

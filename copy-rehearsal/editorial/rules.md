@@ -1,7 +1,7 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v6) and
+`src/agent-context/writing.md` (lifty-writing.v7) and
 `src/agent-context/anti-slop.md` (lifty-anti-slop.v2).
 
 ## Author
@@ -43,10 +43,11 @@ Jobs by step:
 
 - Emails 1-2: pain points or problems the lead may be experiencing.
 - Emails 3-4: the client's products, offerings, or solutions for those pains.
-  Email 4 needs a new reason to reply. Put the confirmed website in 3 or 4.
-- Email 5: timing may be off, or it sits with someone else. Ask for the person
-  who owns the operating view. Leave the door open if timing is simply off.
-  No guilt nudge. Do not copy a canned close.
+  Email 4 continues 1-3. Do not treat a named customer's metric as the lead's
+  number. Offer is the hook. CTA is a short meeting or the saved walkthrough.
+- Email 5: timing may be off, or it sits with someone else. Ask them to point
+  you to whoever owns ordering or the floor. Leave the door open to reconnect
+  if it becomes a priority. Never call a miss "useful."
 
 ## Anti-slop
 
