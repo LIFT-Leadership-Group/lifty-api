@@ -13,7 +13,7 @@ describe("outreach writing context", () => {
       expect(response.status).toBe(200);
       const context = await response.json();
       expect(context.references.writing).toEqual(expect.any(String));
-      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v3\n/);
+      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v4\n/);
       expect(context.references.writing).toContain("Email shape");
       expect(context.references.writing).toContain("Subject line");
       expect(context.references.writing).toContain("same subject line on all five steps");
@@ -25,6 +25,8 @@ describe("outreach writing context", () => {
       expect(context.references.writing).toContain("Name the author");
       expect(context.references.writing).toContain("{{first_name}}");
       expect(context.references.writing).toContain("I'm asking");
+      expect(context.references.writing).toContain("LinkedIn message 2 still needs an I");
+      expect(context.references.writing).toContain("reframes the last note");
       expect(context.references.anti_slop).toEqual(expect.any(String));
       expect(context.references.anti_slop).toMatch(/^# LIFT outreach anti-slop list\n\nVersion: lifty-anti-slop\.v1\n/);
       expect(context.references.anti_slop).toContain("quick question");

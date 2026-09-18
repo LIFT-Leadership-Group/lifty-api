@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v3
+Version: lifty-writing.v4
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -38,8 +38,9 @@ way. Do not invent a sender, title, or biography.
 Use first person as that author throughout LinkedIn and email: I, I'm, I sent,
 I'm asking. Do not hide behind "we" or "the company thinks" with no person
 behind it. Name yourself in the first LinkedIn message after acceptance and in
-email 1. Later messages keep that same I. A lead who never accepted LinkedIn
-still has to know who wrote the email.
+email 1. LinkedIn message 2 still needs an I. Later messages keep that same
+person. A lead who never accepted LinkedIn still has to know who wrote the
+email.
 
 Prefer lines like "I'm asking because..." and naming yourself with the saved
 founder first name and company. If the founder name is missing, ask for it
@@ -68,6 +69,15 @@ before drafting. Do not send unnamed copy.
   call to action.
 - Continue the same topic with a new detail or question. Do not repeat the
   opener, pitch or ask in different words.
+- Write the five emails as one conversation the founder would actually have,
+  not five restatements of the same paragraph. Each email should build on the
+  last by reframing the point in new sentences. Do not stack the same noun or
+  phrase in back-to-back sentences, and do not reuse the same key phrase in
+  back-to-back emails. Variety still has to flow. If two lines could swap
+  places without anyone noticing, rewrite one of them.
+- Openers are spoken, not labels. Do not announce the evidence you are about
+  to cite ("North Park Market is the store I can name", "Here's the case
+  study"). Start in the thought, then add the fact.
 - Read `references.anti_slop` and do not use those phrases. Empty nudges and
   guilt closes are banned, including "just checking in", "circling back",
   "I don't want to keep asking you", "last note from me", and "I'll leave it
@@ -84,7 +94,7 @@ LinkedIn messages, recommend a reply-friendly opening after acceptance, a
 specific follow-up question, then a short relevance statement and clear ask.
 Each LinkedIn message is one connected thought in short plain text, without
 headings, bullet lists or signatures. The invitation has no note. The author
-still has to be present in the first message.
+has to be present in every LinkedIn message, including message 2.
 
 For the five emails, use the email shape below. Do not replace it with a
 one-sentence fragment per step. Every email step still requires its own
@@ -110,9 +120,13 @@ Every recommended email uses these six fields, in this order.
    Hi, Hey, Hi, Hey, Hi. Never write `Hi.` or `Hey.` without `{{first_name}}`.
    The recipient's first name belongs in this greeting on every email.
 3. Opener. One line specific to that email, on the next line after the greeting.
-4. Main focus. Two or three sentences. This is the biggest variable.
+   It must be a new spoken line, not a recycled phrase from the previous email
+   and not a stiff caption for the proof that follows.
+4. Main focus. Two or three sentences. This is the biggest variable. Do not
+   repeat a sentence from the previous email with one word swapped.
 5. Hook. One sentence that continues the same thought. First person from the
-   author is welcome here ("I'm asking because...").
+   author is required. Do not start every hook with the same "I'm asking
+   because..." stem. Vary how the author shows up.
 6. CTA. One ask.
 
 When showing copy, print each email as it would appear in an inbox. Put a
@@ -166,16 +180,18 @@ I'm asking because this is the gap we help support teams close.
 
 How does the next person at {{company_name}} pick up the context today?
 
-Do not open with "Quick question". Later emails stay on that job: 2 deepens
-the pain, 3-4 introduce the offer, 5 thanks them and asks for a better contact
-if this is not their area.
+Do not open with "Quick question". Later emails stay on that job, but each one
+uses new wording: 2 deepens the pain, 3-4 introduce the offer, 5 thanks them
+and asks for a better contact if this is not their area. LinkedIn message 2
+keeps Alex in first person instead of dropping to "the floor" with no I.
 
 ## Review, save and approve
 
-Before showing copy, check the named author, first-name greeting, factual
-support, the founder's voice, connected sentences, the email six-field shape
-with inbox spacing, anti-slop, one ask per message, useful progression and
-permitted placeholders. This review is writing guidance, not a claim that the
+Before showing copy, check the named author in every LinkedIn message, the
+first-name greeting, factual support, the founder's voice, connected sentences,
+inbox spacing, anti-slop, one ask per message, and whether each follow-up
+reframes the last note instead of repeating it. Also check permitted
+placeholders. This review is writing guidance, not a claim that the
 draft is proven to perform. Preserve the founder's chosen wording while
 flagging unsupported claims or contract conflicts.
 

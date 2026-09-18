@@ -57,8 +57,9 @@ Hard limits:
 - Use only the fictional saved company information in the scenario.
 - Generate drafts locally. Do not log in, read a hosted workspace, save a campaign, activate outreach, or send messages.
 - Keep current product behavior: LinkedIn is an invitation with no note, then three messages after acceptance. Email is five messages. Each email needs a subject and body.
-- Follow references.writing and references.anti_slop for copy shape. LinkedIn sentences in a message must be one connected thought. Emails use that guide's six fields, the same subject on all five steps, Hi/Hey plus {{first_name}} on every greeting, pain on 1-2, offer on 3-4, and a soft thank-you plus different-person ask on 5.
-- Name the author from the saved founder or sender. Use first person as that person. The lead has to know who wrote a cold message.
+- Follow references.writing and references.anti_slop for copy shape. LinkedIn sentences in a message must be one connected thought, and LinkedIn message 2 still uses first person. Emails use that guide's six fields, the same subject on all five steps, Hi/Hey plus {{first_name}} on every greeting, pain on 1-2, offer on 3-4, and a soft thank-you plus different-person ask on 5.
+- Name the author from the saved founder or sender. Use first person as that person in every LinkedIn and email step. The lead has to know who wrote a cold message.
+- Write the five emails as one conversation. Each email builds on the last with new wording. Do not repeat the same key phrase in back-to-back sentences or back-to-back emails. Do not use a stiff opener that labels the proof.
 - Print each email as it would appear in an inbox, with a blank line after the greeting, opener, main focus, and hook. Do not collapse fields onto one paragraph.
 - Do not use phrases from references.anti_slop, including "quick question".
 - Only {{first_name}}, {{last_name}}, and {{company_name}} are allowed substitutions.

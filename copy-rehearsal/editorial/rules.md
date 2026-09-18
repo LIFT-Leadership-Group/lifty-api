@@ -1,18 +1,19 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v3) and
+`src/agent-context/writing.md` (lifty-writing.v4) and
 `src/agent-context/anti-slop.md` (lifty-anti-slop.v1).
 
 ## Author
 
 Identify the author from the saved founder or sender name. Cold copy uses
-first person as that person. The lead has to know who wrote it.
+first person as that person. The lead has to know who wrote it. LinkedIn
+message 2 still needs an I.
 
 ## LinkedIn
 
 Each message is one connected thought. The first sentence and the ask must
-name the same job. Name the author in the first message after acceptance.
+name the same job. The author is present in every message, including 2.
 
 ## Email
 
@@ -30,10 +31,13 @@ Field behavior:
 
 - Subject line stays the same on all five emails so they read as replies.
 - Address alternates: Hi, Hey, Hi, Hey, Hi. Never drop the first name.
-- Opener is specific to that email.
+- Each email builds on the previous one. Reframe the point in new sentences.
+  Do not recycle the same key phrases back to back.
+- Openers are spoken, not stiff captions for the proof that follows.
 - Main focus is the biggest variable.
-- Hook and CTA vary. No cheesy audience slogan as a hook.
-- First-person author lines such as "I'm asking" belong throughout.
+- Hook and CTA vary. No cheesy audience slogan. Do not use the same
+  "I'm asking because" stem on every hook.
+- First person throughout.
 
 Jobs by step:
 
