@@ -1,0 +1,150 @@
+import { mkdirSync, writeFileSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { getAgentContext } from "../src/agent-context.ts";
+
+const root = dirname(fileURLToPath(import.meta.url));
+const scratch = join(root, "scratch");
+const promptsDir = join(scratch, "prompts");
+const draftsDir = join(scratch, "drafts");
+const scenariosDir = join(root, "scenarios");
+const locksDir = join(root, "locks");
+
+function lockBlock(scenarioName) {
+  const lockPath = join(locksDir, `${scenarioName}.md`);
+  try {
+    const lock = readFileSync(lockPath, "utf8").trim();
+    return `
+## Locked copy — do this first
+
+A lock file exists. Do not say there is no lock file. Print every locked
+channel exactly. Do not rewrite a locked channel to match a new email pass.
+Only draft unlocked channels.
+
+${lock}
+`;
+  } catch {
+    return "";
+  }
+}
+
+mkdirSync(promptsDir, { recursive: true });
+mkdirSync(draftsDir, { recursive: true });
+
+function renderContext(context) {
+  if (!context) throw new Error("getAgentContext returned no document");
+  const references = context.references ?? {};
+  const lines = [
+    `# Assembled Lifty context: ${context.task}`,
+    "",
+    `Revision: ${context.revision}`,
+    `Format: ${context.format}`,
+    "",
+    "This dump is the assembled context Lifty serves for this task, including",
+    "every reference. It is for local copy rehearsal only.",
+    "",
+    "## Instructions",
+    "",
+    String(context.instructions).trim(),
+    "",
+  ];
+  for (const [name, text] of Object.entries(references)) {
+    lines.push(`## Reference: ${name}`, "", String(text).trim(), "");
+  }
+  return { markdown: `${lines.join("\n").trim()}\n`, references };
+}
+
+function exportTask(task, requiredReferences = []) {
+  const context = getAgentContext(task);
+  const { markdown, references } = renderContext(context);
+  for (const name of requiredReferences) {
+    if (!references[name] || String(references[name]).trim().length === 0) {
+      throw new Error(`${task} is missing required references.${name}`);
+    }
+  }
+  writeFileSync(join(scratch, `${task}.json`), `${JSON.stringify(context, null, 2)}\n`);
+  writeFileSync(join(scratch, `${task}.md`), markdown);
+  return context;
+}
+
+const campaigns = exportTask("campaigns", ["campaign", "writing", "anti_slop", "common"]);
+const commercialVoice = exportTask("commercial-voice", ["common", "interview", "configuration"]);
+
+const rehearsalRules = `You are running a local Lifty copy rehearsal, not a live onboarding session.
+
+Hard limits:
+- If this prompt has a Locked copy section, that copy wins. Reproduce locked channels exactly. Only draft unlocked channels. Never write "there is no lock file" when that section is present.
+- Use only the fictional saved company information in the scenario.
+- Generate drafts locally. Do not log in, read a hosted workspace, save a campaign, activate outreach, or send messages.
+- Keep current product behavior: LinkedIn is an invitation with no note, then three messages after acceptance. Email is five messages. Each email needs a subject and body.
+- Follow references.writing and references.anti_slop for copy shape. LinkedIn is one three-message conversation that builds on a single job. Never write "so I need to know", "Want a short conversation", "reply yes", "Should I take that", or "sit with". LinkedIn 3 CTA is exactly: Would you be open to a 15min intro call later this week or next? Do not say the same product word twice in one LinkedIn message. Every LinkedIn message and every email must make the named author obvious with an I. Emails use these six fields in order: subject, address, opener, main focus, hook, CTA. Same subject on all five. Hi/Hey plus {{first_name}}. Email 1 may omit the opener. Never write "Figured an email might be the easier place to start." Later openers are spoken (buried, keep this short, coming back, last note), not pain captions. By the end of main focus the reader knows who is writing and what they solve. Emails 1-2 are pain. Emails 3-4 are the offer, with the confirmed website in 3 or 4 if one is saved. Email 3 may use the same 15min intro-call sentence. Email 4 needs a new ask that names the saved offer. Email 5 is a better point of contact, then a natural close. Write emails to the Email quality bar in references.writing. Do not find-replace another company's emails. Use this scenario's facts only. The hook is a spoken bridge from main focus to CTA. It cannot narrate the email. Do not reuse the same ask or key phrase later in the sequence.
+- Name the author from the saved founder or sender. Use first person as that person in every LinkedIn and email step. The lead has to know who wrote a cold message.
+- Write the five emails as one conversation. Each email builds on the last with new wording. Do not repeat the same key phrase in back-to-back sentences or back-to-back emails. Do not use a stiff opener that labels the proof.
+- Print each email as it would appear in an inbox, with a blank line after the greeting, opener, main focus, and hook. Do not collapse fields onto one paragraph.
+- Do not use phrases from references.anti_slop, including "quick question", "I'm in this", "I stay on this", "I followed up because", "Want a short conversation", "reply yes", and "sit with".
+- Only {{first_name}}, {{last_name}}, and {{company_name}} are allowed substitutions.
+- Templates must work for the approved audience, including future eligible leads. Do not invent recipient-specific research or unsupported placeholders.
+- Preserve channel choice, cadence, stop-on-reply, and campaign approval requirements. Do not propose a different sequence length or send path.
+- Do not use previous drafts or any editing discussion, except locked copy in the lock file. Use only this scenario, any lock file, and the assembled guidance files named below.
+
+Show the copy so it can be judged. For each channel, include:
+1. The recommended angle in a few sentences, including which saved facts you used.
+2. The full templates. For email, show the composed inbox view first (subject, greeting with {{first_name}}, then opener, main focus, hook, and CTA separated by blank lines). Label the six fields only after that.
+3. A short checklist against specificity, credibility, named author, voice, CTA, connected flow, anti-slop, and whether each follow-up adds a useful reason to reply.
+
+If a fact is missing, stay general. Do not invent customers, results, websites, pain, or prior conversations.`;
+
+const scenarioFiles = readdirSync(scenariosDir).filter((name) => name.endsWith(".md")).sort();
+if (scenarioFiles.length === 0) throw new Error("No scenario files found");
+
+for (const fileName of scenarioFiles) {
+  const scenarioName = fileName.replace(/\.md$/, "");
+  const scenario = readFileSync(join(scenariosDir, fileName), "utf8").trim();
+  const prompt = `# Lifty copy rehearsal
+${lockBlock(scenarioName)}
+${rehearsalRules}
+
+## Scenario (fixed input)
+
+Read \`copy-rehearsal/scenarios/${fileName}\` and use it as the saved company context:
+
+${scenario}
+
+## Current assembled guidance
+
+Read these local export files. They were generated from getAgentContext in a fresh process. Use them as the product guidance. Include every reference, especially \`references.campaign\`.
+
+- \`copy-rehearsal/scratch/campaigns.md\`
+  - task: campaigns
+  - revision: ${campaigns.revision}
+  - references: ${Object.keys(campaigns.references).join(", ")}
+- \`copy-rehearsal/scratch/commercial-voice.md\`
+  - task: commercial-voice
+  - revision: ${commercialVoice.revision}
+  - references: ${Object.keys(commercialVoice.references).join(", ")}
+
+The campaigns export must include \`references.campaign\`. If that section is missing, stop and say so.
+
+After reading those files, recommend the drafts for this scenario. Reproduce any locked channel exactly.
+`;
+  writeFileSync(join(promptsDir, fileName), prompt);
+}
+
+const manifest = {
+  exported_at: new Date().toISOString(),
+  note: "Local copy rehearsal dump. Not a hosted campaign. Not for sending.",
+  campaigns_revision: campaigns.revision,
+  commercial_voice_revision: commercialVoice.revision,
+  campaigns_references: Object.keys(campaigns.references),
+  commercial_voice_references: Object.keys(commercialVoice.references),
+  scenarios: scenarioFiles.map((name) => name.replace(/\.md$/, "")),
+};
+writeFileSync(join(scratch, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+
+console.log("Copy rehearsal export complete.");
+console.log(`campaigns revision: ${campaigns.revision}`);
+console.log(`commercial-voice revision: ${commercialVoice.revision}`);
+console.log(`campaigns references: ${manifest.campaigns_references.join(", ")}`);
+console.log(`commercial-voice references: ${manifest.commercial_voice_references.join(", ")}`);
+console.log(`prompts: ${scenarioFiles.map((name) => `copy-rehearsal/scratch/prompts/${name}`).join(", ")}`);
+console.log("Drafts belong in copy-rehearsal/scratch/drafts/ and stay uncommitted.");
