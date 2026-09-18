@@ -45,8 +45,8 @@ anything.
    runs. Do not paste old drafts or our editing discussion.
 
 4. Paste the contents of one file from `copy-rehearsal/scratch/prompts/`.
-   Palletwing is locked. Helixpath is still open. Paste
-   `02-sparse-information.md` unless we agree to a different scenario.
+   Palletwing is locked. Helixpath LinkedIn is locked; email is still open.
+   Paste `02-sparse-information.md` unless we agree to a different scenario.
 
 5. Judge the copy. Then paste the drafts back into the setup chat, or save them
    yourself as:

@@ -46,8 +46,9 @@ If the copy has to stay general, keep it general and say so.
 These are writing rules, not new Helixpath facts. Company inputs above stay
 fixed and sparse.
 
-- Author is Sam Ortiz. Name Sam in LinkedIn 1 and email 1. Keep first person
-  in every later message, including LinkedIn 2.
+- Author is Sam Ortiz. Name Sam in LinkedIn 1. In email 1 use
+  `I'm Sam Ortiz at Helixpath`. Keep first person in every later message,
+  including LinkedIn 2.
 - LinkedIn: invitation with no note, then three connected messages.
 - Email: six fields, inbox spacing, same subject on all five, Hi/Hey plus
   `{{first_name}}` on every greeting.
@@ -81,8 +82,30 @@ builds:
    conversation on that same job. Do not restart with "I help with that..."
 
 Do not stack "view", "holds it", or "that work" as a substitute for a job.
-The v1 flow was scattered and too direct. The next draft has to read as
-three connected messages, not three separate pitches.
+The v1 flow was scattered and too direct. LinkedIn v2 is locked. Do not
+rewrite it.
+
+## Helixpath v2 email feedback
+
+LinkedIn is locked. Only rewrite email.
+
+The hook is one sentence that ties the main focus to the CTA. It is a
+bridge, not a reason for writing. Follow-up is assumed. Do not explain why
+you followed up, why you started with a topic, or why they should hear it
+from you.
+
+Ban these v2 hooks:
+
+- `I started with that wait because it is what spreads first.`
+- `I followed up because that pressure is the next part of the lag.`
+- `I am offering that help because you should hear it from me.`
+- `I am asking so you can hear that operations help directly.`
+- `You can judge the fit there, not from another email.`
+
+Email 1 opener is `I'm Sam Ortiz at Helixpath`. Email 4 must add a new
+detail, not restate email 3. Email 5 stays two short asks: point me to the
+person who owns this, or reconnect later. No extra process (`I am not
+asking you to take a meeting`, `I can work with either next step`).
 
 Email:
 

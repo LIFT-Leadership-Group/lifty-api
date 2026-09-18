@@ -1,6 +1,6 @@
 # Good and bad examples
 
-Status: Helixpath v1 notes from David, 2026-09-18.
+Status: Helixpath notes from David, 2026-09-18.
 
 ## LinkedIn — do not write this
 
@@ -8,7 +8,7 @@ Message 2: "I help with that view, so I need to know where it actually lives."
 
 "so I need to know" is never something you say to a prospect. It is too
 direct. The v1 LinkedIn flow was scattered and did not build across the
-three messages.
+three messages. LinkedIn v2 is locked.
 
 ## Email — do not write this
 
@@ -17,5 +17,12 @@ Opener: "Landing late is what costs you."
 Offer captions: "Helixpath's work is help with operations." / "Helixpath is
 me helping with operations."
 
+Hooks that explain why you wrote: "I started with that wait because it is
+what spreads first." / "I followed up because that pressure is the next
+part of the lag." / "I am offering that help because you should hear it
+from me." The hook is a one-sentence bridge from main focus to CTA.
+Follow-up is assumed.
+
 Email 5 process: "I don't need a long handoff. A name is enough." / "I'll
-pick this up with them if you send me over."
+pick this up with them if you send me over." / "I am not asking you to take
+a meeting." / "I can work with either next step."

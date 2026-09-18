@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v8
+Version: lifty-writing.v9
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -43,9 +43,8 @@ email 1. LinkedIn message 2 still needs an I. Later messages keep that same
 person. A lead who never accepted LinkedIn still has to know who wrote the
 email.
 
-Prefer lines like "I'm asking because..." and naming yourself with the saved
-founder first name and company. If the founder name is missing, ask for it
-before drafting. Do not send unnamed copy.
+Name yourself with the saved founder first name and company. If the founder
+name is missing, ask for it before drafting. Do not send unnamed copy.
 
 ## Write like a person
 
@@ -55,10 +54,11 @@ before drafting. Do not send unnamed copy.
   question must name the same job. Do not bolt a time-pressure clause onto an
   unrelated ask. If the ask makes sense alone and the first sentence does not
   earn it, rewrite until a reader can hear why the second line follows the first.
-- Use one relevant hook per message. The hook has to continue the same thought
-  as the main focus. Do not add a slogan, a flattery line, or a generic "people
-  like you feel this" closer. If the hook could sit on any company's email,
-  rewrite it.
+- Use one relevant hook per message. The hook is one sentence that ties the
+  main focus to the CTA. It is a bridge, not a reason for writing. Do not
+  explain why you followed up, why you started with a topic, or why they
+  should hear it from you. Follow-up is assumed. If the hook could sit on
+  any company's email, rewrite it.
 - Do not list everything researched about the recipient. Explain why the offer
   may help without claiming they have a problem you cannot verify.
 - Frame company-specific research as an observation in the same sentence, for
@@ -143,9 +143,14 @@ Every recommended email uses these six fields, in this order.
    rewrite it as a spoken sentence that names the thing.
 4. Main focus. Two or three sentences. This is the biggest variable. Do not
    repeat a sentence from the previous email with one word swapped.
-5. Hook. One sentence that continues the same thought. First person from the
-   author is required. Do not start every hook with the same "I'm asking
-   because..." stem. Vary how the author shows up.
+5. Hook. One sentence that ties the main focus to the CTA. It is a bridge
+   between those two fields, not a caption and not a reason for writing.
+   Do not explain why you followed up, why you started with a topic, or
+   why they should hear it from you. That is assumed. Ban stems such as
+   "I followed up because", "I started with that wait because", "I am
+   offering that help because", and "I am asking so you can hear". First
+   person from the author is required. Do not start hooks with "I'm asking
+   because..."
 6. CTA. One ask.
 
 When showing copy, print each email as it would appear in an inbox. Put a
@@ -162,13 +167,16 @@ Jobs by step:
   pains named in 1-2. Email 4 continues that thread. Do not open with a
   named customer's metric as if {{company_name}} already has that number.
   Attribute proof to the named customer in the same thought. The offer is
-  the hook. Ask for a short meeting, or the founder's saved walkthrough, so
-  they can see the solution. Do not diagnose a new problem. If a
-  founder-confirmed website is saved, include that exact URL in 3 or 4.
+  the main focus. The hook ties that offer to the meeting ask. Ask for a
+  short meeting, or the founder's saved walkthrough, so they can see the
+  solution. Do not diagnose a new problem. If a founder-confirmed website
+  is saved, include that exact URL in 3 or 4.
   If the saved offer is only a short line, say that line in spoken first
-  person. Do not caption it ("Our work is help with operations", "This
-  company is me helping with operations"). Do not invent a method,
-  walkthrough length, or site to make a thin offer sound complete.
+  person as the main focus. Do not put the offer in the hook. The hook
+  ties that offer to the meeting ask. Do not caption it ("Our work is help
+  with operations", "This company is me helping with operations"). Do not
+  invent a method, walkthrough length, or site to make a thin offer sound
+  complete. Email 4 must add a new detail, not restate email 3.
 - Email 5 is the final note. Do not pitch again. Do not call a miss "useful."
   Assume the timing may not be right, or this sits with someone else at
   {{company_name}}. Two short asks only: would they point you to whoever
@@ -215,15 +223,17 @@ I'm Alex at Harborline.
 When a customer issue changes owners, the next person often has to rebuild
 the story. That delay is what customers feel.
 
-I'm asking because this is the gap we help support teams close.
+That missing context is what I want to ask you about.
 
 How does the next person at {{company_name}} pick up the context today?
 
 Do not open with "Quick question". Later emails stay on that job, but each one
 uses new wording: 2 deepens the pain, 3-4 introduce the offer and the saved
 site, 5 uses two short asks only: point me to the better person, or reconnect
-later. LinkedIn message 2 keeps Alex in first person instead of dropping to
-"the floor" with no I.
+later. The hook in every email is one sentence that ties the main focus to
+the CTA. Do not use the hook to explain why you followed up. LinkedIn
+message 2 keeps Alex in first person instead of dropping to "the floor"
+with no I.
 
 ## Review, save and approve
 

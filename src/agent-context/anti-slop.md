@@ -1,6 +1,6 @@
 # LIFT outreach anti-slop list
 
-Version: lifty-anti-slop.v3
+Version: lifty-anti-slop.v4
 
 Do not use these words or phrases in recommended LinkedIn or email copy.
 Match case-insensitively. Do not use close variants that keep the same tell
@@ -80,6 +80,10 @@ writing ban, not a claim about response rates.
 - pick your brain
 - hop on a call
 - jump on a call
+- I followed up because
+- I started with that wait because
+- I am offering that help because
+- you should hear it from me
 - let me know if you'd be open
 - let me know if that resonates
 - does that resonate
