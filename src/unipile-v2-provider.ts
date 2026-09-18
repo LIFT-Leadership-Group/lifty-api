@@ -74,14 +74,14 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     const account = result.data;
     if (account.id !== accountId || account.application_id !== transport.application_id
       || (account.account_scope_id ?? null) !== transport.account_scope_id
-      || (transport.user_id && account.user_id !== transport.user_id)
+      || (channel !== "linkedin" && transport.user_id && account.user_id !== transport.user_id)
       || (transport.v1_account_id && account.metadata.v1_account_id !== transport.v1_account_id)
       || (transport.canonical_account_id && transport.provider_namespace !== `unipile:v2:${transport.application_id}`
         && account.metadata.v1_account_id !== transport.canonical_account_id)
       || ((channel === "linkedin") !== (account.provider === "linkedin"))) fail("UNIPILE_IDENTITY_MISMATCH", 409);
     const verifiedTransport: VerifiedTransport = {api_version: "v2", account_id: account.id,
       application_id: account.application_id, account_scope_id: account.account_scope_id ?? null,
-      user_id: account.user_id, v1_account_id: account.metadata.v1_account_id ?? null};
+      user_id: account.user_id, owner_profile_id: null, v1_account_id: account.metadata.v1_account_id ?? null};
     const products = account.metadata.products_connection_status;
     const healthy = !account.is_locked && account.status === "running"
       && (!products || Object.values(products).every(status => status === "running"));
@@ -123,19 +123,31 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
   }
   async function readLinkedinIdentity(accountId: string, transport: UnipileTransport, expectedProfileId?: string | null) {
     const {account, verifiedTransport, healthy, healthStatus} = await readAccount(accountId, transport, "linkedin");
-    if (expectedProfileId && account.user_id !== expectedProfileId) fail("UNIPILE_IDENTITY_MISMATCH", 409);
+    const retainedOwner = transport.owner_profile_id;
+    if ((transport.canonical_account_id && !retainedOwner)
+      || (retainedOwner && expectedProfileId && retainedOwner !== expectedProfileId)) fail("UNIPILE_IDENTITY_MISMATCH", 409);
     const canonical = transport.canonical_account_id ?? accountId;
-    if (!healthy) return {accountId: canonical, profileId: account.user_id, profileUrl: null, displayName: null, healthy, healthStatus, verifiedTransport};
-    const parsed = Profile.safeParse(await request(`${encodeURIComponent(accountId)}/users/${encodeURIComponent(account.user_id)}`));
+    // A disconnected connection can retain its established owner, but an
+    // unverified new connection must never infer ownership from Account.user_id.
+    if (!healthy) {
+      if (!retainedOwner) fail();
+      if (account.user_id === transport.user_id) return {accountId: canonical, profileId: retainedOwner, profileUrl: null, displayName: null, healthy, healthStatus, verifiedTransport};
+    }
+    // Copied Account.user_id may contain mutable display metadata. Report its
+    // current value, but only authenticated SELF proves the LinkedIn owner.
+    // Even unhealthy accounts must provide SELF if that metadata has changed.
+    const parsed = Profile.safeParse(await request(`${encodeURIComponent(accountId)}/users/me`));
     if (!parsed.success) fail();
-    if (parsed.data.id !== account.user_id) fail("UNIPILE_IDENTITY_MISMATCH", 409);
+    if ((retainedOwner && parsed.data.id !== retainedOwner)
+      || (expectedProfileId && parsed.data.id !== expectedProfileId)) fail("UNIPILE_IDENTITY_MISMATCH", 409);
+    verifiedTransport.owner_profile_id = parsed.data.id;
     let profileUrl: string | null = null;
     try {
       const url = new URL(parsed.data.profile_url ?? `https://www.linkedin.com/in/${parsed.data.public_identifier ?? ""}/`);
       if (url.protocol === "https:" && ["linkedin.com", "www.linkedin.com"].includes(url.hostname)
         && !url.username && !url.password && !url.port && !url.hash && !url.search && /^\/in\/[A-Za-z0-9_%~-]+\/?$/.test(url.pathname)) profileUrl = url.toString();
     } catch { /* Optional display metadata. */ }
-    return {accountId: canonical, profileId: account.user_id, profileUrl, displayName: parsed.data.display_name || null, healthy, healthStatus, verifiedTransport};
+    return {accountId: canonical, profileId: parsed.data.id, profileUrl, displayName: parsed.data.display_name || null, healthy, healthStatus, verifiedTransport};
   }
   return {createLink, readEmailIdentity, readLinkedinIdentity};
 }

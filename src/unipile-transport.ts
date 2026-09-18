@@ -7,6 +7,8 @@ export const UnipileTransport = z.object({
   canonical_account_id: ProviderIdentifier.nullable(), provider_namespace: z.string().min(1),
   account_id: ProviderIdentifier.nullable(), application_id: ProviderIdentifier.nullable(),
   account_scope_id: ProviderIdentifier.nullable(), user_id: z.string().min(1).max(255).nullable(),
+  // Older V1/Google snapshots predate this field. LinkedIn validates its presence separately.
+  owner_profile_id: ProviderIdentifier.nullable().default(null),
   v1_account_id: ProviderIdentifier.nullable(), generation: z.number().int().nonnegative(),
   hosted_auth_origin: z.url(),
 });
@@ -14,6 +16,6 @@ export type UnipileTransport = z.infer<typeof UnipileTransport>;
 export const VerifiedTransport = z.object({
   api_version: z.literal("v2"), account_id: ProviderIdentifier, application_id: ProviderIdentifier,
   account_scope_id: ProviderIdentifier.nullable(), user_id: z.string().min(1).max(255),
-  v1_account_id: ProviderIdentifier.nullable(),
+  v1_account_id: ProviderIdentifier.nullable(), owner_profile_id: ProviderIdentifier.nullable(),
 });
 export type VerifiedTransport = z.infer<typeof VerifiedTransport>;
