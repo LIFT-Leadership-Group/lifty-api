@@ -38,3 +38,7 @@ wait, or I can go to the other person."
 Yes/no closer: "If the books still live in a founder's Sunday night, reply
 yes." Do not paste that on every email. Email 5 cannot add "A later yes
 still works."
+
+Nettle v2 captions: "that is the person I am writing" / "that is the job I
+do" / "That is all of it" / "I am treating this as a timing miss" / "I
+should write that person instead."

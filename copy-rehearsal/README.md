@@ -45,8 +45,9 @@ anything.
    runs. Do not paste old drafts or our editing discussion.
 
 4. Paste the contents of one file from `copy-rehearsal/scratch/prompts/`.
-   Palletwing and Helixpath are locked. Next run is
-   `03-founder-voice.md` unless we agree to a different scenario.
+   Palletwing and Helixpath are locked. Nettle LinkedIn 1-2 are locked;
+   LinkedIn 3 and email are open. Paste `03-founder-voice.md` unless we
+   agree to a different scenario.
 
 5. Judge the copy. Then paste the drafts back into the setup chat, or save them
    yourself as:

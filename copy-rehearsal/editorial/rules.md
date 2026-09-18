@@ -1,8 +1,8 @@
 # Outreach rules
 
 Status: supplied by David, updated 2026-09-18. These are in
-`src/agent-context/writing.md` (lifty-writing.v13) and
-`src/agent-context/anti-slop.md` (lifty-anti-slop.v7).
+`src/agent-context/writing.md` (lifty-writing.v14) and
+`src/agent-context/anti-slop.md` (lifty-anti-slop.v8).
 
 ## Author
 
@@ -46,9 +46,10 @@ Field behavior:
 - If the saved offer is only a short line, say it in spoken first person.
   Do not caption it ("Helixpath's work is help with operations").
 - Main focus is the biggest variable.
-- Hook is one sentence that ties the main focus to the CTA. It is a bridge,
-  not a reason for writing. Follow-up is assumed. Do not explain why you
-  followed up, why you started, or why they should hear it from you.
+- Hook is one spoken sentence that ties the main focus to the CTA. It is a
+  bridge, not a caption for the email's job. Follow-up is assumed. Ban
+  "that is the person I am writing", "that is the job I do", and "I am
+  treating this as a timing miss."
 - CTA is one new ask in the founder's own words. Never write "Want a
   short conversation" or "reply yes." Do not reuse the previous CTA.
 - First person throughout. The six fields must disappear in the inbox.
@@ -59,10 +60,7 @@ Jobs by step:
 
 - Emails 1-2: pain points or problems the lead may be experiencing.
 - Emails 3-4: the client's products, offerings, or solutions for those pains.
-  Email 4 continues 1-3. Do not treat a named customer's metric as the lead's
-  number. Offer is the main focus. The hook ties that offer to a new ask.
-- Email 5: better point of contact, then close naturally. No pitch. No
-  "reply yes." Never call a miss "useful."
+- Email 5: better point of contact, then close naturally.
 
 ## Anti-slop
 

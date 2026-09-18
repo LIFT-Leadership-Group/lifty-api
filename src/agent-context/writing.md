@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v13
+Version: lifty-writing.v14
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -114,8 +114,9 @@ Message 1 names the author and one job, then asks how they handle it.
 Message 2 stays on that same job and adds a new specific detail or either/or
 they can answer. Message 3 offers only what is saved, then asks in that
 founder's own words. Never write "Want a short conversation." Do not
-scatter: do not jump to who owns the work (that is email 5), and do not
-restart with "I help with that..." as a new pitch. Never write "so I
+say the same product word twice in one message. Do not scatter: do not
+jump to who owns the work (that is email 5), and do not restart with
+"I help with that..." as a new pitch. Never write "so I
 need to know", "I need to know", or tell a
 prospect you require information from them. That is too direct. Ask like a
 person, not like you are collecting facts.
@@ -157,15 +158,15 @@ Every recommended email uses these six fields, in this order.
    rewrite it as a spoken sentence that names the thing.
 4. Main focus. Two or three sentences. This is the biggest variable. Do not
    repeat a sentence from the previous email with one word swapped.
-5. Hook. One sentence that ties the main focus to the CTA. It is a bridge
-   between those two fields, not a caption and not a reason for writing.
-   Do not explain why you followed up, why you started with a topic, or
-   why they should hear it from you. That is assumed. Ban stems such as
-   "I followed up because", "I started with that wait because", "I am
-   offering that help because", and "I am asking so you can hear". First
-   person from the author is required. Do not start hooks with "I'm asking
-   because..." Do not announce the CTA ("what I want to ask you about",
-   "I have two questions").
+5. Hook. One spoken sentence that ties the main focus to the CTA. It is
+   a bridge, not a caption for the email's job. Do not explain why you
+   followed up. Never write "I followed up because." Do not announce who
+   you are writing, what your job is, or
+   that you are treating this as a miss. Ban "that is the person I am
+   writing", "that is the job I do", "That is all of it", "I am treating
+   this as a timing miss", and "I should write that person instead."
+   Do not comment on the sequence or the act of writing. First person
+   from the author is required.
 6. CTA. One new ask. Never write "reply yes" or a yes/no closer. Do not
    reuse the previous email's CTA.
 
@@ -177,36 +178,17 @@ stack with no spacing. The stored `text` uses that same spacing.
 Jobs by step:
 
 - Emails 1-2 focus on a pain or problem this audience may recognize from the
-  saved offer. Ask; do not diagnose {{company_name}}. If saved context has no
-  concrete pain, stay general. Do not invent one. Do not pitch the offer
-  yet, and do not close with "reply yes."
+  saved offer. Ask; do not diagnose {{company_name}}. Do not pitch the
+  offer yet.
 - Emails 3-4 focus on the founder's product, offering, or solution for the
   pains named in 1-2. Email 4 continues that thread. Do not open with a
   named customer's metric as if {{company_name}} already has that number.
-  Attribute proof to the named customer in the same thought. The offer is
-  the main focus. The hook ties that offer to a new ask. Ask the way the
-  founder would ask, or use their saved walkthrough. Never write "Want a
-  short conversation" or "reply yes." Do not invent a demo. Do not
-  diagnose a new problem. If a founder-confirmed website is saved, include
-  that exact URL in 3 or 4.
-  If the saved offer is only a short line, say that line out loud as the
-  main focus, the way you would tell someone at a table. Do not comment
-  on the sequence. Ban "I haven't said what I actually do yet", "It is
-  my job at", "I'm the founder" as an opener, "This comes from me", and
-  "I can only see the fit when we are speaking." Do not put the offer in
-  the hook. Do not invent a method, walkthrough length, or site. Email 4
-  adds one new spoken detail, then asks for time like a person ("Got 15
-  minutes this week?"). It must not restate email 3 or announce that a
-  meeting is how you start.
+  Attribute proof to the named customer in the same thought. If a
+  founder-confirmed website is saved, include that exact URL in 3 or 4.
+  Do not invent a demo, method, or site.
 - Email 5 asks if there is a better point of contact, then closes the
-  conversation naturally. Do not pitch again. Do not call a miss
-  "useful." Do not repeat the Sunday-night line or write "reply yes."
-  Assume the timing isn't right, or this sits with someone else at
-  {{company_name}}. Two short asks only: would they point you to whoever
-  owns that work, and can you reconnect later. Do not narrate options
-  ("I won't rehash the offer", "A later yes still works", "I have two
-  questions"). No guilt. Write that in the author's voice. Do not paste
-  a canned close.
+  conversation naturally. Do not pitch again. Two short asks only: would
+  they point you to whoever owns that work, and can you reconnect later.
 
 ## Illustrative examples
 

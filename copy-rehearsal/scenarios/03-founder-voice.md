@@ -101,16 +101,19 @@ fixed. Improve Reese's copy. Do not replace it with a generic sequence.
   LinkedIn message and email still needs an I from Reese. Dry voice can
   keep we next to I. We cannot replace Reese.
 - LinkedIn: invitation with no note, then three connected messages that
-  build on one job. New wording each step. Do not repeat Sunday night or
-  the same ask.
-- Email: six fields, inbox spacing, same subject on all five, Hi/Hey plus
-  `{{first_name}}` on every greeting.
-- Hook is one sentence that ties the main focus to the CTA. Do not explain
-  why you followed up. Follow-up is assumed.
-- Emails 1-2 stay on the Sunday-night pain. Emails 3-4 use the saved
-  offer: monthly close plus a Monday numbers note. Put
-  `https://www.nettleandco.example` in 3 or 4. Use the 11-studio fact and
-  the quote only if they stay honest. No invented ROI.
+  build on one job. Messages 1-2 are locked. Message 3 is open. Do not
+  say "close" twice in message 3. New wording each step.
+- Email uses the six fields, in order, with inbox spacing: subject,
+  address, opener, main focus, hook, CTA. Same subject on all five.
+  Hi/Hey plus `{{first_name}}`. Email 1 opener is
+  `I'm Reese Lang at Nettle & Co.`
+- Hook is one spoken sentence that ties main focus to the CTA. It cannot
+  narrate the email. Ban `that is the person I am writing`, `that is the
+  job I do`, `That is all of it`, `I am treating this as a timing miss`,
+  and `I should write that person instead.`
+- Emails 1-2: pain only. Emails 3-4: monthly close plus a Monday numbers
+  note. Put `https://www.nettleandco.example` in 3 or 4. Use the 11-studio
+  fact and the quote only if they stay honest. No invented ROI.
 - Each CTA is a new sentence. Never write "reply yes", "If the books still
   live in a founder's Sunday night, reply yes", or "Want a short
   conversation." Do not swap in a demo.

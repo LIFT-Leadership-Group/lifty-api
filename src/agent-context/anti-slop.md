@@ -1,6 +1,6 @@
 # LIFT outreach anti-slop list
 
-Version: lifty-anti-slop.v7
+Version: lifty-anti-slop.v8
 
 Do not use these words or phrases in recommended LinkedIn or email copy.
 Match case-insensitively. Do not use close variants that keep the same tell
@@ -53,6 +53,9 @@ writing ban, not a claim about response rates.
 - yes/no
 - If the books still live
 - A later yes still works
+- that is the person I am writing
+- that is the job I do
+- I am treating this as a timing miss
 - —
 
 ## LinkedIn
