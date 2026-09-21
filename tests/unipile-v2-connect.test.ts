@@ -10,14 +10,16 @@ const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8
 const secret="connection-test-server-key-"+"x".repeat(40),email="founder@example.test";
 const expires=new Date(Date.now()+600000).toISOString();
 const transport={api_version:"v2",connection_ref:connection,canonical_account_id:"legacy",provider_namespace:"unipile:old",account_id:"acc_test",application_id:"app_test",account_scope_id:null,generation:1,user_id:"owner",v1_account_id:"legacy",hosted_auth_origin:"https://auth.unipile.com"};
-function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUserId?:string;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean}={}) {
+function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUserId?:string;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean;fresh?:boolean;completeTaken?:boolean;v2Siblings?:string[]}={}) {
   let phase=options.intentState??"ready",status=options.statusState??"pending",reads=0;
   const calls:{operation:string;payload:Record<string,unknown>;caller:boolean}[]=[];
-  const http:{url:string;body:Record<string,unknown>|null}[]=[];
+  const http:{url:string;body:Record<string,unknown>|null}[]=[],deleted:string[]=[];
   const authState=channel==="email"?sealEmailIntent(id,secret):sealLinkedinIntent(id,secret);
-  const stored=()=>({state:status,workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,account_id:"legacy",connection_ref:connection,intent_ref:id,
+  const unbound=()=>options.fresh===true && status!=="connected";
+  const stored=()=>({state:status,workspace_ref:workspace,email,mailbox_use:"personal",daily_limit:10,account_id:unbound()?null:"legacy",connection_ref:unbound()?null:connection,intent_ref:id,
     profile_id:"owner",profile_url:null,display_name:null,timezone:"UTC",health_status:status==="connected"?"running":"unknown",outbound_enabled:false,
-    transport:{...transport,user_id:options.rawUserId??transport.user_id,owner_profile_id:channel==="linkedin"?"owner":null},expires_at:expires});
+    transport:{...transport,...(options.fresh?{account_id:null,canonical_account_id:null,v1_account_id:null,connection_ref:null,generation:0}:{}),
+      user_id:options.rawUserId??transport.user_id,owner_profile_id:channel==="linkedin"?"owner":null},expires_at:expires});
   async function rpc(_name:string,args:Record<string,unknown>,caller:boolean) {
     const operation=String(args.p_operation),payload=args.p_payload as Record<string,unknown>;
     calls.push({operation,payload,caller});
@@ -26,8 +28,10 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUser
       authorization_received:options.authorized??false,authorization_account_id:options.authorized?options.authorizationId??"acc_test":null},error:null};
     if(operation==="issue_link") {const claimed=phase==="pending";phase="issuing";return {data:{claimed},error:null};}
     if(operation==="save_link") {if(options.saveFail)return {data:null,error:{code:"PT409",message:"save unavailable"}};phase="ready";}
+    if(operation==="probe")return {data:{referenced:[],mailbox:null},error:null};
     if(operation==="complete") {
       if(options.dbCompleteDenied)return {data:null,error:{code:"PT403",message:`${channel}_workspace_forbidden`}};
+      if(options.completeTaken)return {data:null,error:{code:"PT409",message:`${channel}_account_taken`}};
       phase="completed";status="connected";
     }
     if(operation==="fail"){phase="failed";status="failed";}
@@ -41,6 +45,9 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUser
     }
     http.push({url:target,body:init?.body?JSON.parse(String(init.body)):null});
     expect(target).toContain("https://api.unipile.com/v2/");
+    if(init?.method==="DELETE"){deleted.push(target);return new Response(JSON.stringify({success:true}));}
+    if(target.includes("/v2/accounts/?provider="))return new Response(JSON.stringify({object:"Accounts",has_more:false,
+      data:(options.v2Siblings??[]).map(id=>({object:"Account",id,provider:channel==="email"?"google":"linkedin",status:"running",is_locked:false,metadata:{}}))}));
     if(target.endsWith("/auth/link") && options.hostedStatus)return new Response("private provider details",{status:options.hostedStatus});
     if(target.endsWith("/auth/link") && options.hostedMalformed)return new Response("{}");
     if(options.providerFailsOnce && reads++===0)return new Response("{}",{status:503});
@@ -54,7 +61,7 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUser
     ...(options.missingV2?{}:{v2:{accessToken:"v2-test",applicationId:"app_test",hostedAuthOrigins:["https://auth.unipile.com"]}})};
   const ops=channel==="email"?createEmailConnectOperations(settings):createLinkedinConnectOperations(settings);
   const session={userId:id,client:{rpc:(name:string,args:Record<string,unknown>)=>rpc(name,args,true)}};
-  return {ops,session,calls,http,state:authState};
+  return {ops,session,calls,http,deleted,state:authState};
 }
 describe("V2 LinkedIn hosted diagnostics",()=>{
   for(const status of [429,503])it(`retains safe HTTP ${status} and does not retry`,async()=>{
@@ -161,4 +168,35 @@ it("completes a copied LinkedIn reconnect with separate account and canonical SE
   expect(h.calls.find(call=>call.operation==="complete")?.payload).toMatchObject({intent_ref:id,account_id:"legacy",profile_id:"owner",
     verified_transport:{account_id:"acc_test",user_id:"Copied Display Name",owner_profile_id:"owner",v1_account_id:"legacy"}});
   expect(h.http.some(call=>call.url==="https://api.unipile.com/v2/acc_test/users/me")).toBe(true);
+});
+
+describe("LIF-955 V2 duplicate provider accounts",()=>{
+  it("removes a refused fresh LinkedIn creation at the provider and records account_taken",async()=>{
+    const h=harness("linkedin",{authorized:true,fresh:true,completeTaken:true});
+    await expect(h.ops.status(h.session,workspace,id)).rejects.toMatchObject({code:"LINKEDIN_ACCOUNT_TAKEN",status:409});
+    expect(h.calls.filter(c=>c.operation==="fail").map(c=>c.payload)).toEqual([{intent_ref:id,failure_code:"account_taken"}]);
+    expect(h.deleted).toEqual(["https://api.unipile.com/v2/accounts/acc_test"]);
+  });
+  it("keeps a refused reconnect target",async()=>{
+    const h=harness("linkedin",{authorized:true,completeTaken:true});
+    await expect(h.ops.status(h.session,workspace,id)).rejects.toMatchObject({code:"LINKEDIN_ACCOUNT_TAKEN"});
+    expect(h.deleted).toEqual([]);
+    expect(h.calls.at(-1)?.payload).toEqual({intent_ref:id,failure_code:"account_taken"});
+  });
+  it("removes an unreferenced V2 duplicate of the same SELF profile after a verified binding",async()=>{
+    const h=harness("linkedin",{authorized:true,fresh:true,v2Siblings:["acc_dup"]});
+    expect((await h.ops.status(h.session,workspace,id)).status).toBe("connected");
+    expect(h.calls.filter(c=>c.operation==="probe").map(c=>c.payload)).toEqual([{intent_ref:id,account_ids:["acc_dup"]}]);
+    expect(h.deleted).toEqual(["https://api.unipile.com/v2/accounts/acc_dup"]);
+  });
+  it("reconnects an existing unreferenced Google account holding the mailbox and never deletes mailboxes",async()=>{
+    const h=harness("email",{intentState:"pending",fresh:true,v2Siblings:["acc_mail"]});
+    await h.ops.authorize(h.state);
+    expect(h.http.find(x=>x.url.endsWith("/auth/link"))?.body).toMatchObject({account_id:"acc_mail"});
+    expect(h.calls.filter(c=>c.operation==="probe").map(c=>c.payload)).toEqual([{intent_ref:id,email,account_ids:["acc_mail"]}]);
+    const refused=harness("email",{authorized:true,fresh:true,completeTaken:true});
+    await expect(refused.ops.status(refused.session,workspace,id)).rejects.toMatchObject({code:"EMAIL_ACCOUNT_TAKEN",status:409});
+    expect(refused.deleted).toEqual([]);
+    expect(refused.calls.at(-1)?.payload).toEqual({intent_ref:id,failure_code:"account_taken"});
+  });
 });

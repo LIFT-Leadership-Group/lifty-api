@@ -23,7 +23,7 @@ const Stored = z.object({
   email_policy: EmailPolicy.optional(),
   daily_limit: z.number().int().min(1).max(10).optional(),
   account_id: z.string().nullable().optional(), connection_ref: z.uuid().nullable().optional(), intent_ref: z.uuid().nullable().optional(),
-  expires_at: z.string().optional(), failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed"]).nullable().optional(),
+  expires_at: z.string().optional(), failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed","account_taken"]).nullable().optional(),
 });
 const Intent = z.object({provider_selection_required:z.boolean().optional(),email_provider:HostedEmailProvider.nullish(),transport:UnipileTransport.optional(),authorization_account_id:z.string().nullish(),state:z.enum(["pending","issuing","ready","completed","failed"]),intent_ref:z.uuid(),workspace_ref:z.uuid(),email:z.email().nullable(),expires_at:z.string(),account_id:z.string().nullable(),hosted_url:z.url().nullable(),selection_required:z.boolean().optional(),authorization_received:z.boolean().optional()});
 function fail(code: string, status = 409): never {
@@ -74,6 +74,43 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     await rpc("complete",{intent_ref:intentRef,account_id:identity.accountId,email:identity.email,
       ...(selectedProvider ? {email_provider:identityProvider(identity.type)} : {}),
       ...("verifiedTransport" in identity ? {verified_transport:identity.verifiedTransport} : {})});
+  }
+  async function recordAccountTaken(intentRef:string) {
+    try {await rpc("fail",{intent_ref:intentRef,failure_code:"account_taken"});}
+    catch {/* The rejection itself is the durable outcome; status explains it on the next read. */}
+  }
+  // Binding is refused only after the provider account exists. Record the
+  // precise cause so status can explain it. Mailbox accounts are never deleted
+  // here: removing a sibling Google account revokes the surviving grant.
+  async function bind(intentRef:string,identity:Awaited<ReturnType<typeof readIdentity>>,selectedProvider?:HostedEmailProvider|null) {
+    try {await complete(intentRef,identity,selectedProvider);}
+    catch(error){
+      if(error instanceof PublicError && error.code==="EMAIL_ACCOUNT_TAKEN")await recordAccountTaken(intentRef);
+      throw error;
+    }
+  }
+  const ProbeResult=z.object({referenced:z.array(z.string()),mailbox:z.enum(["free","taken","stale"]).nullable()});
+  // A mailbox known before the link is looked up at the provider so an existing
+  // account is reconnected instead of duplicated, and a mailbox held live by
+  // another workspace fails before any link exists. Explicit account selection
+  // and reconnects keep their own routes. Lookups are best-effort.
+  async function reusableAccount(intentRef:string,intent:z.infer<typeof Intent>):Promise<string|null>{
+    if(!intent.email || intent.account_id || intent.transport?.account_id || intent.provider_selection_required || intent.selection_required)return null;
+    const wanted=intent.email.toLowerCase();
+    let candidates:string[]=[];
+    try {
+      if(intent.transport?.api_version==="v2") {
+        const v2Provider=requireV2();
+        for(const account of (await v2Provider.listAccounts("google")).slice(0,20)) {
+          try {if(await v2Provider.readPrimarySenderEmail(account.id)===wanted)candidates.push(account.id);}
+          catch {/* An unreadable account is never reused. */}
+        }
+      } else candidates=await provider.findMailboxAccounts(wanted,intent.email_provider==="outlook"?"OUTLOOK":intent.email_provider==="imap"?"MAIL":intent.email_provider==="google"?"GOOGLE":undefined);
+    } catch {candidates=[];}
+    const probe=ProbeResult.parse(await rpc("probe",{intent_ref:intentRef,email:wanted,...(candidates.length ? {account_ids:candidates.slice(0,50)} : {})}));
+    if(probe.mailbox==="taken"){await recordAccountTaken(intentRef);fail("EMAIL_ACCOUNT_TAKEN");}
+    const free=candidates.filter(id=>!probe.referenced.includes(id));
+    return free.length===1 ? free[0]! : null;
   }
   const fetchImpl = settings.fetchImpl ?? fetch;
   async function rpc(operation:string,payload:Record<string,unknown>,session?:AuthSession,name:"lifty_email_connection"|"lifty_email_callback_hint"="lifty_email_connection"):Promise<unknown> {
@@ -129,7 +166,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
         try {
           if(pendingIntent?.transport?.account_id && pendingIntent.transport.account_id!==hint.account_id)fail("UNIPILE_IDENTITY_MISMATCH");
           const identity=await readIdentity(hint.account_id,pendingIntent ? pendingIntent.email : value.email,pendingIntent?.transport,pendingIntent?.email_provider);
-          if(identity.healthy)await complete(value.intent_ref,identity,pendingIntent?.email_provider);
+          if(identity.healthy)await bind(value.intent_ref,identity,pendingIntent?.email_provider);
         }catch(error){
           if(error instanceof PublicError && error.code==="UNIPILE_UNAVAILABLE")throw error;
           if(error instanceof PublicError && ["UNIPILE_IDENTITY_MISMATCH","UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code))
@@ -185,18 +222,21 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     if (intent.email_provider && ((intent.email_provider === "google") !== (intent.transport?.api_version === "v2"))) fail("EMAIL_PROVIDER_CONFLICT");
     const claim=z.object({claimed:z.boolean()}).parse(await rpc("issue_link",{intent_ref:id}));
     if(!claim.claimed)fail("EMAIL_LINK_PENDING");
+    let reuse:string|null=null;
+    try {reuse=await reusableAccount(id,intent);}
+    catch(error){if(error instanceof PublicError && error.code==="EMAIL_ACCOUNT_TAKEN")throw error;}
     let phase:"create"|"save"="create";
     try {
       let url:string;
       if(intent.transport?.api_version==="v2") {
         const authState=unipileV2AuthState("email",id,settings.serverKey);
         await rpc("auth_state",{intent_ref:id,state:authState});
-        url=await requireV2().createLink({channel:"email",state:authState,transport:intent.transport,
+        url=await requireV2().createLink({channel:"email",state:authState,transport:reuse ? {...intent.transport,account_id:reuse} : intent.transport,
           redirectUri:`${settings.publicBaseUrl}/unipile/v2/email/return?intent=${encodeURIComponent(state)}`,
           expiresAt:new Date(intent.expires_at).toISOString()});
       } else url=await provider.createLink({correlation:emailCallbackName(id,settings.serverKey),
         notifyUrl:`${settings.publicBaseUrl}/unipile/callback?intent=${encodeURIComponent(state)}`,
-        expiresAt:new Date(intent.expires_at).toISOString(),reconnectId:intent.account_id,
+        expiresAt:new Date(intent.expires_at).toISOString(),reconnectId:reuse ?? intent.account_id,
         ...(intent.email_provider ? {provider:intent.email_provider === "outlook" ? "OUTLOOK" as const : "MAIL" as const} : {})});
       phase="save";
       await rpc("save_link",{intent_ref:id,url}); return url;
@@ -223,7 +263,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
       throw error;
     }
     if(!identity.healthy)fail("EMAIL_PROVIDER_NOT_READY",503);
-    await complete(id,identity,intent.email_provider);
+    await bind(id,identity,intent.email_provider);
   }
   async function disconnect(session:AuthSession,workspace:string):Promise<EmailStatus> {
     await rpc("disconnect", {workspace}, session);

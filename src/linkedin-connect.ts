@@ -84,6 +84,51 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
       ...(identity.verifiedTransport ? {verified_transport:identity.verifiedTransport} : {}),
       ...(identity.profileUrl ? { profile_url: identity.profileUrl } : {}), ...(identity.displayName ? { display_name: identity.displayName } : {}) });
   }
+  async function recordAccountTaken(intentRef: string) {
+    try { await rpc("fail", { intent_ref: intentRef, failure_code: "account_taken" }); }
+    catch { /* The rejection itself is the durable outcome; status explains it on the next read. */ }
+  }
+  async function removeProviderAccount(accountId: string, transport?: UnipileTransport) {
+    try {
+      if (transport?.api_version === "v2") await requireV2().deleteAccount(accountId);
+      else await provider.deleteAccount(accountId);
+    } catch { /* Leave it for operator cleanup; never retry or surface provider bodies. */ }
+  }
+  // Binding is refused only after Unipile created the account. A rejected
+  // fresh creation is removed at the provider and its cause recorded; a
+  // reconnect target is not this attempt's to remove. A verified binding then
+  // removes unreferenced duplicates that authenticate the same SELF profile.
+  async function bind(intentRef: string, identity: LinkedinIdentity & {verifiedTransport?:VerifiedTransport}, transport: UnipileTransport | undefined, reconnectTarget: string | null | undefined) {
+    try { await complete(intentRef, identity); }
+    catch (error) {
+      if (error instanceof PublicError && error.code === "LINKEDIN_ACCOUNT_TAKEN") {
+        await recordAccountTaken(intentRef);
+        if (!reconnectTarget) await removeProviderAccount(identity.accountId, transport);
+      }
+      throw error;
+    }
+    await removeDuplicates(intentRef, identity, transport);
+  }
+  async function removeDuplicates(intentRef: string, identity: LinkedinIdentity, transport?: UnipileTransport) {
+    try {
+      const candidates: { id: string; aliases: string[] }[] = [];
+      if (transport?.api_version === "v2") {
+        const v2Provider = requireV2();
+        for (const account of (await v2Provider.listAccounts("linkedin")).slice(0, 20)) {
+          if (account.id === identity.accountId || account.v1AccountId === identity.accountId) continue;
+          let owner: string | null = null;
+          try { owner = await v2Provider.readOwnerProfileId(account.id); } catch { continue; }
+          if (owner === identity.profileId) candidates.push({ id: account.id, aliases: account.v1AccountId ? [account.v1AccountId] : [] });
+        }
+      } else for (const id of await provider.listProfileAccounts(identity.profileId)) if (id !== identity.accountId) candidates.push({ id, aliases: [] });
+      if (!candidates.length) return;
+      const ids = [...new Set(candidates.flatMap(candidate => [candidate.id, ...candidate.aliases]))].slice(0, 50);
+      const probe = z.object({ referenced: z.array(z.string()) }).parse(await rpc("probe", { intent_ref: intentRef, account_ids: ids }));
+      for (const candidate of candidates) {
+        if (![candidate.id, ...candidate.aliases].some(id => probe.referenced.includes(id))) await removeProviderAccount(candidate.id, transport);
+      }
+    } catch { /* Duplicate cleanup is best-effort and never fails a verified connection. */ }
+  }
   async function refreshHealth(session: AuthSession, workspace: string, value: z.infer<typeof Stored>) {
     if (!value.account_id || !value.profile_id || !value.connection_ref) linkedinFailure("LINKEDIN_CONNECTION_UNAVAILABLE");
     let status: LinkedinHealth = "unknown";
@@ -113,7 +158,10 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
         try {
           if(pendingIntent?.transport?.account_id && pendingIntent.transport.account_id!==hint.account_id)linkedinFailure("LINKEDIN_IDENTITY_MISMATCH",409);
           const identity = await readIdentity(hint.account_id, pendingIntent ? pendingIntent.profile_id : value.profile_id,pendingIntent?.transport);
-          if (identity.healthy) { await complete(value.intent_ref, identity); completed = true; }
+          if (identity.healthy) {
+            await bind(value.intent_ref, identity, pendingIntent?.transport ?? value.transport, value.account_id ?? pendingIntent?.transport?.account_id ?? pendingIntent?.account_id);
+            completed = true;
+          }
         } catch (error) {
           if (error instanceof PublicError && error.code === "UNIPILE_LINKEDIN_UNAVAILABLE") throw error;
           if (identityMismatch(error)) await rpc("fail", { intent_ref: value.intent_ref, failure_code: "identity_mismatch" });
@@ -199,7 +247,7 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
       throw error;
     }
     if (!identity.healthy) linkedinFailure("LINKEDIN_PROVIDER_NOT_READY", 503, "LinkedIn is still connecting or needs attention. Check status after resolving the provider prompt.");
-    await complete(id, identity);
+    await bind(id, identity, intent.transport, intent.account_id);
   }
   async function disconnect(session: AuthSession, workspace: string): Promise<LinkedinStatus> {
     await rpc("disconnect", { workspace, confirm: true }, session);

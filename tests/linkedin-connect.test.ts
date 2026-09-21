@@ -11,10 +11,11 @@ const account = { object: "Account", id: "account_1", type: "LINKEDIN", connecti
 const owner = { object: "AccountOwnerProfile", provider: "LINKEDIN", provider_id: "ACoFounder", first_name: "Founder", last_name: "Example", public_identifier: "founder" };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 
-function harness(options: { initial?: string; intentState?: string; pinnedAccount?: string; pinnedProfile?: string; hint?: string | null; hintWorkspace?: string; providerStatus?: number; source?: string; owner?: unknown; rpcError?: unknown; hintError?: unknown; outbound?: boolean } = {}) {
+function harness(options: { initial?: string; intentState?: string; pinnedAccount?: string; pinnedProfile?: string; hint?: string | null; hintWorkspace?: string; providerStatus?: number; source?: string; owner?: unknown; rpcError?: unknown; hintError?: unknown; outbound?: boolean;
+  siblings?: { id: string; profile: string }[]; referenced?: string[]; probeError?: boolean; completeError?: unknown } = {}) {
   let current = options.initial ?? "pending", intentState = options.intentState ?? "ready", hint = options.hint === undefined ? "account_1" : options.hint;
   let outbound = options.outbound ?? false, health = options.initial === "connected" ? "running" : "unknown", failed: string | null = null;
-  const events: string[] = [], calls: { operation: string; payload: Record<string, unknown>; caller: boolean }[] = [];
+  const events: string[] = [], deleted: string[] = [], calls: { operation: string; payload: Record<string, unknown>; caller: boolean }[] = [];
   const stored = () => ({ state: current, workspace_ref: workspace, connection_ref: current === "connected" || current === "disconnected" ? connection : null, account_id: current === "connected" || current === "disconnected" ? "account_1" : null,
     profile_id: current === "connected" || current === "disconnected" ? "ACoFounder" : null, profile_url: null, display_name: null, timezone,
     intent_ref: current === "pending" ? id : null, failure_code: failed, outbound_enabled: outbound, health_status: health, expires_at: new Date(Date.now() + 600_000).toISOString() });
@@ -32,7 +33,9 @@ function harness(options: { initial?: string; intentState?: string; pinnedAccoun
     if (operation === "intent") return { data: intent(), error: null };
     if (operation === "issue_link") { const claimed = intentState === "pending"; if (claimed) intentState = "issuing"; return { data: { claimed }, error: null }; }
     if (operation === "save_link") { intentState = "ready"; return { data: { ok: true }, error: null }; }
+    if (operation === "probe") return options.probeError ? { data: null, error: { code: "PT502", message: "probe unavailable" } } : { data: { referenced: options.referenced ?? [] }, error: null };
     if (operation === "complete") {
+      if (options.completeError) return { data: null, error: options.completeError };
       if (intentState === "completed") return { data: { ok: true }, error: null };
       expect(payload).toMatchObject({ intent_ref: id, account_id: "account_1", profile_id: "ACoFounder" });
       current = "connected"; health = "running"; outbound = false; intentState = "completed";
@@ -51,6 +54,8 @@ function harness(options: { initial?: string; intentState?: string; pinnedAccoun
     const target = new URL(String(url));
     if (target.hostname === "api1.unipile.com") {
       events.push(target.pathname);
+      if (init?.method === "DELETE") { deleted.push(target.pathname); return json({ object: "AccountDeleted" }); }
+      if (target.pathname === "/api/v1/accounts") return json({ items: [account, ...(options.siblings ?? []).map(sibling => ({ ...account, id: sibling.id, connection_params: { im: { id: sibling.profile } } }))] });
       if (target.pathname.endsWith("/hosted/accounts/link")) return json({ object: "HostedAuthUrl", url: "https://account.unipile.com/opaque" });
       if (target.pathname.endsWith("/users/me")) return json(options.owner ?? owner);
       return json({ ...account, sources: [{ id: "source", status: options.source ?? "OK" }] }, options.providerStatus ?? 200);
@@ -61,7 +66,7 @@ function harness(options: { initial?: string; intentState?: string; pinnedAccoun
     return json(result.error ?? result.data, result.error ? 409 : 200);
   };
   const session = { userId: id, client: { rpc: (name: string, args: Record<string, unknown>) => rpc(name, args, true) } };
-  return { ops: createLinkedinConnectOperations({ ...settings, fetchImpl }), session, events, calls };
+  return { ops: createLinkedinConnectOperations({ ...settings, fetchImpl }), session, events, calls, deleted };
 }
 
 describe("LinkedIn connection lifecycle", () => {
@@ -81,7 +86,8 @@ describe("LinkedIn connection lifecycle", () => {
   });
   it("records the bound callback hint before authenticated account and owner readback", async () => {
     const h = harness(); await h.ops.callback(state, body);
-    expect(h.events).toEqual(["server:lifty_linkedin_connection:intent", "server:lifty_linkedin_callback_hint:record", "/api/v1/accounts/account_1", "/api/v1/users/me", "server:lifty_linkedin_connection:complete"]);
+    expect(h.events).toEqual(["server:lifty_linkedin_connection:intent", "server:lifty_linkedin_callback_hint:record", "/api/v1/accounts/account_1", "/api/v1/users/me", "server:lifty_linkedin_connection:complete", "/api/v1/accounts"]);
+    expect(h.deleted).toEqual([]);
   });
   it.each([{ ...body, name: "a".repeat(64) }, { ...body, status: "OK" }, { ...body, account_id: "../foreign" }])("rejects forged callback before RPC: %j", async callback => {
     const h = harness(); await expect(h.ops.callback(state, callback)).rejects.toMatchObject({ code: "LINKEDIN_CALLBACK_INVALID" }); expect(h.events).toEqual([]);
@@ -105,7 +111,7 @@ describe("LinkedIn connection lifecycle", () => {
   it("reconciles a member-authorized hint on status and never activates sending", async () => {
     const h = harness();
     expect(await h.ops.status(h.session, "senja")).toMatchObject({ status: "connected", sending_enabled: false, profile_id: "ACoFounder" });
-    expect(h.events.slice(0, 6)).toEqual(["jwt:lifty_linkedin_connection:status", "jwt:lifty_linkedin_callback_hint:read", "/api/v1/accounts/account_1", "/api/v1/users/me", "server:lifty_linkedin_connection:complete", "jwt:lifty_linkedin_connection:status"]);
+    expect(h.events.slice(0, 7)).toEqual(["jwt:lifty_linkedin_connection:status", "jwt:lifty_linkedin_callback_hint:read", "/api/v1/accounts/account_1", "/api/v1/users/me", "server:lifty_linkedin_connection:complete", "/api/v1/accounts", "jwt:lifty_linkedin_connection:status"]);
     expect(h.calls.filter(call => call.operation === "complete")).toHaveLength(1);
   });
   it.each([{ hint: null }, { providerStatus: 404 }, { source: "CONNECTING" }])("keeps pending without a usable hint or ready provider: %j", async options => {
@@ -178,5 +184,44 @@ describe("provider access and source reads remain unverified", () => {
       await expect(h.ops.status(h.session, "senja")).rejects.toMatchObject({ code: "UNIPILE_LINKEDIN_UNAVAILABLE" });
       expect(h.calls.some(call => ["health", "fail", "complete", "disconnect"].includes(call.operation))).toBe(false);
     }
+  });
+});
+
+describe("LIF-955 duplicate provider accounts", () => {
+  const taken = { code: "PT409", message: "linkedin_account_taken" };
+  it("removes a refused fresh creation at the provider and records account_taken for status", async () => {
+    const h = harness({ completeError: taken });
+    await expect(h.ops.callback(state, body)).rejects.toMatchObject({ code: "LINKEDIN_ACCOUNT_TAKEN", status: 409 });
+    expect(h.calls.map(call => call.operation)).toEqual(["intent", "record", "complete", "fail"]);
+    expect(h.calls.at(-1)?.payload).toEqual({ intent_ref: id, failure_code: "account_taken" });
+    expect(h.deleted).toEqual(["/api/v1/accounts/account_1"]);
+    expect(h.events).not.toContain("/api/v1/accounts");
+    expect(await h.ops.status(h.session, "senja")).toMatchObject({ status: "failed", failure_code: "account_taken", sending_enabled: false });
+  });
+  it("never removes a reconnect target whose binding is refused", async () => {
+    const h = harness({ completeError: taken, pinnedAccount: "account_1" });
+    await expect(h.ops.callback(state, { ...body, status: "RECONNECTED" })).rejects.toMatchObject({ code: "LINKEDIN_ACCOUNT_TAKEN" });
+    expect(h.deleted).toEqual([]);
+    expect(h.calls.at(-1)?.payload).toEqual({ intent_ref: id, failure_code: "account_taken" });
+  });
+  it("rolls back on member status reconciliation only for accounts this attempt created", async () => {
+    const h = harness({ completeError: taken });
+    await expect(h.ops.status(h.session, "senja")).rejects.toMatchObject({ code: "LINKEDIN_ACCOUNT_TAKEN" });
+    expect(h.deleted).toEqual(["/api/v1/accounts/account_1"]);
+    const pinned = harness({ completeError: taken, initial: "disconnected" });
+    await expect(pinned.ops.status(pinned.session, "senja")).resolves.toMatchObject({ status: "disconnected" });
+    expect(pinned.deleted).toEqual([]);
+  });
+  it("removes unreferenced duplicates of the same profile after a verified binding and keeps referenced ones", async () => {
+    const h = harness({ siblings: [{ id: "account_dup", profile: "ACoFounder" }, { id: "account_bound", profile: "ACoFounder" }, { id: "account_other", profile: "ACoOther" }], referenced: ["account_bound"] });
+    await h.ops.callback(state, body);
+    expect(h.calls.filter(call => call.operation === "probe").map(call => call.payload)).toEqual([{ intent_ref: id, account_ids: ["account_dup", "account_bound"] }]);
+    expect(h.deleted).toEqual(["/api/v1/accounts/account_dup"]);
+  });
+  it("keeps a verified binding when duplicate cleanup cannot be answered", async () => {
+    const h = harness({ siblings: [{ id: "account_dup", profile: "ACoFounder" }], probeError: true });
+    await expect(h.ops.callback(state, body)).resolves.toBeUndefined();
+    expect(h.deleted).toEqual([]);
+    expect(h.calls.filter(call => call.operation === "complete")).toHaveLength(1);
   });
 });

@@ -50,13 +50,13 @@ export function createLinkedinProvider(settings: UnipileProviderSettings) {
   const timeoutMs = settings.timeoutMs ?? 15_000;
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30_000) throw new Error("Invalid Unipile timeout.");
   const fetchImpl = settings.fetchImpl ?? fetch;
-  async function request(path: string, body?: Record<string, unknown>): Promise<unknown> {
+  async function request(path: string, body?: Record<string, unknown>, method: "GET" | "POST" | "DELETE" = body ? "POST" : "GET"): Promise<unknown> {
     const hosted = path === "hosted/accounts/link";
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetchImpl(new URL(`/api/v1/${path}`, base), {
-        method: body ? "POST" : "GET", redirect: "error", signal: controller.signal,
+        method, redirect: "error", signal: controller.signal,
         headers: { "X-API-KEY": settings.accessToken, accept: "application/json", ...(body ? { "content-type": "application/json" } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
@@ -118,5 +118,25 @@ export function createLinkedinProvider(settings: UnipileProviderSettings) {
     return { accountId, profileId: owner.data.provider_id, profileUrl: profileUrl(owner.data),
       displayName: `${owner.data.first_name} ${owner.data.last_name}`.trim() || null, healthy, healthStatus };
   }
-  return { createLink, readIdentity };
+  const AccountPage = z.object({ items: z.array(z.object({ id: Identifier, type: z.string(),
+    connection_params: z.object({ im: z.object({ id: z.string().optional() }).passthrough().optional() }).passthrough().optional() }).passthrough()),
+    cursor: z.string().nullish() }).passthrough();
+  /** Other V1 LinkedIn accounts that authenticate the same SELF profile. Read-only; never returns credentials. */
+  async function listProfileAccounts(profileId: string): Promise<string[]> {
+    const found: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 5; page++) {
+      const parsed = AccountPage.safeParse(await request(`accounts?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`));
+      if (!parsed.success) throw failure();
+      for (const item of parsed.data.items) if (item.type === "LINKEDIN" && item.connection_params?.im?.id === profileId) found.push(item.id);
+      cursor = parsed.data.cursor ?? null;
+      if (!cursor) break;
+    }
+    return found;
+  }
+  /** Removes a provider account that this attempt created or that is a verified unreferenced duplicate. */
+  async function deleteAccount(accountId: string): Promise<void> {
+    await request(`accounts/${encodeURIComponent(Identifier.parse(accountId))}`, undefined, "DELETE");
+  }
+  return { createLink, readIdentity, listProfileAccounts, deleteAccount };
 }
