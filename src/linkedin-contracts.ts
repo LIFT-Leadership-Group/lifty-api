@@ -27,7 +27,7 @@ export const LinkedinConnectRequest = z.object({
 }).strict();
 export const LinkedinWorkspaceRequest = z.object({ workspace: LinkedinWorkspace }).strict();
 export const LinkedinDisconnectRequest = LinkedinWorkspaceRequest.extend({ confirm: z.literal(true) }).strict();
-export const LinkedinFailureCode = z.enum(["identity_mismatch", "provider_unavailable", "link_failed"]);
+export const LinkedinFailureCode = z.enum(["identity_mismatch", "provider_unavailable", "link_failed", "account_taken"]);
 const profile = {
   provider: z.literal("unipile"), channel: z.literal("linkedin"), workspace_ref: z.uuid(),
   profile_id: LinkedinProfileId.nullable(), profile_url: LinkedinProfileUrl.nullable(), display_name: z.string().max(401).nullable(),

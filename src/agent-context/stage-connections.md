@@ -30,6 +30,11 @@ availability check. GET without `attempt_ref` reads current connection health.
   whether to try a new POST. Do not turn a read/network failure into denial.
 - `failed`: explain the confirmed failure; use its safe reason if provided.
   Preserve the evidence and use the documented repair before another attempt.
+  A sending-account `failure_code: account_taken` means the authorized
+  LinkedIn profile or mailbox is already bound to another workspace. Another
+  link will not fix it: the founder connects a different account here or
+  resolves the binding in the workspace that holds it. Lifty already removed
+  the duplicate LinkedIn provider account it created; nothing else to clean.
   `error_code: attempt_superseded` means a newer attempt replaced this one;
   use its retained newer reference, never an old grant as proof of completion.
 - HTTP/network/status-read error: say the authorization could not yet be

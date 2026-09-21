@@ -50,7 +50,9 @@ restart campaigns, and still requires verified authorization for the new attempt
 
 Explain confirmed pending, expired, denied or failed attempts without exposing
 callback contents. Retry status reads using the same reference and wait the
-returned retry interval. Never interpret a failed read as disconnected or a
+returned retry interval. When a known mailbox already exists at the provider,
+Lifty reconnects that account instead of creating another one, and a mailbox
+held live by another workspace fails before any link is issued. Never interpret a failed read as disconnected or a
 previous connected grant as the new attempt. A verified connection does not
 authorize any email, message or invitation; use campaign previews and explicit
 approval/activation before sending. Connection can proceed while sample review

@@ -22,13 +22,15 @@ const imapOwner={object:"AccountOwnerProfile",provider:"IMAP",connection_params:
 const intent={state:"ready",intent_ref:id,workspace_ref:workspace,email,expires_at:new Date(Date.now()+120000).toISOString(),account_id:null,hosted_url:"https://account.unipile.com/example"};
 const body={status:"CREATION_SUCCESS",account_id:"account_1",name:emailCallbackName(id,secret)};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json"}});
-function harness(options:{identity?:unknown;owner?:unknown;intent?:unknown;status?:number}={}){
+function harness(options:{identity?:unknown;owner?:unknown;intent?:unknown;status?:number;completeError?:boolean}={}){
   const calls:{operation:string;payload:Record<string,unknown>}[]=[];
   const fetchImpl:typeof fetch=async(url,init)=>{
+    if(init?.method==="DELETE")throw new Error("mailbox accounts are never deleted");
     if(String(url).includes("/users/me?")){expect(new URL(String(url)).searchParams.get("account_id")).toBe("account_1");return json(options.owner??owner);}
     if(String(url).includes("/accounts/"))return json(options.identity??account,options.status??200);
     const args=JSON.parse(String(init?.body));
     expect(args.p_server_key).toBe(secret); calls.push({operation:args.p_operation,payload:args.p_payload});
+    if(args.p_operation==="complete" && options.completeError)return json({code:"PT409",message:"email_account_taken"},409);
     return json(args.p_operation==="intent"?(options.intent??intent):{ok:true});
   };
   return {ops:createEmailConnectOperations({...settings,fetchImpl}),calls};
@@ -193,15 +195,18 @@ describe("email hosted auth boundary",()=>{
   });
 });
 describe("hosted authorization lifecycle",()=>{
-  function authorizationHarness(failure?:"provider"|"save"|"schema") {
-    const operations:string[]=[];
+  function authorizationHarness(failure?:"provider"|"save"|"schema",options:{siblings?:unknown[];referenced?:string[];mailbox?:string;expectReconnect?:string;listStatus?:number}={}) {
+    const operations:string[]=[],probes:Record<string,unknown>[]=[],failures:string[]=[];
     let current="pending",hostedUrl:string|null=null,providerCalls=0;
     const fetchImpl:typeof fetch=async(url,init)=>{
       if(new URL(String(url)).hostname==="api1.unipile.com") {
+        const pathname=new URL(String(url)).pathname;
+        if(pathname==="/api/v1/accounts")return json(options.listStatus?{}:{items:options.siblings??[]},options.listStatus??200);
         providerCalls++;
-        expect(new URL(String(url)).pathname).toBe("/api/v1/hosted/accounts/link");
+        expect(pathname).toBe("/api/v1/hosted/accounts/link");
         const body=JSON.parse(String(init?.body));
-        expect(body).toMatchObject({providers:["GOOGLE","OUTLOOK","MAIL"],single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
+        if(options.expectReconnect)expect(body).toMatchObject({type:"reconnect",reconnect_account:options.expectReconnect,single_use:true});
+        else expect(body).toMatchObject({type:"create",providers:["GOOGLE","OUTLOOK","MAIL"],single_use:true,sync_limit:{MAILING:"NO_HISTORY_SYNC"}});
         if(failure==="provider")return json({message:"provider-SECRET https://account.unipile.com/private-token"},401);
         return json({object:failure==="schema"?"HostedAuthLink":"HostedAuthUrl",url:"https://account.unipile.com/opaque"});
       }
@@ -210,23 +215,28 @@ describe("hosted authorization lifecycle",()=>{
       if(args.p_operation==="issue_link"){
         const claimed=current==="pending";if(claimed)current="issuing";return json({claimed});
       }
+      if(args.p_operation==="probe"){
+        expect(current).toBe("issuing");probes.push(args.p_payload);
+        return json({referenced:options.referenced??[],mailbox:options.mailbox??"free"});
+      }
       if(args.p_operation==="save_link") {
         if(failure==="save")return json({code:"PT409",message:"internal private-token detail"},409);
         expect(current).toBe("issuing");hostedUrl=args.p_payload.url;current="ready";
       }
       if(args.p_operation==="fail") {
-        expect(args.p_payload).toEqual({intent_ref:id,failure_code:"link_failed"});current="failed";
+        expect(args.p_payload.intent_ref).toBe(id);failures.push(String(args.p_payload.failure_code));current="failed";
       }
       return json({ok:true});
     };
-    return {ops:createEmailConnectOperations({...settings,fetchImpl}),operations,providerCalls:()=>providerCalls};
+    return {ops:createEmailConnectOperations({...settings,fetchImpl}),operations,probes,failures,providerCalls:()=>providerCalls};
   }
   it("persists current OpenAPI success through claim/provider/save and reuses the ready link without another POST",async()=>{
     const h=authorizationHarness();
     await expect(h.ops.authorize(state)).resolves.toBe("https://account.unipile.com/opaque");
-    expect(h.operations).toEqual(["intent","issue_link","save_link"]);
+    expect(h.operations).toEqual(["intent","issue_link","probe","save_link"]);
+    expect(h.probes).toEqual([{intent_ref:id,email}]);
     await expect(h.ops.authorize(state)).resolves.toBe("https://account.unipile.com/opaque");
-    expect(h.operations).toEqual(["intent","issue_link","save_link","intent"]);
+    expect(h.operations).toEqual(["intent","issue_link","probe","save_link","intent"]);
     expect(h.providerCalls()).toBe(1);
   });
   it.each([["provider","UNIPILE_HOSTED_HTTP_401"],["schema","UNIPILE_HOSTED_RESPONSE_INVALID"],["save","EMAIL_LINK_SAVE_FAILED"]] as const)("terminal %s failure preserves safe stage code without leaking bodies or retrying",async(failure,code)=>{
@@ -234,9 +244,31 @@ describe("hosted authorization lifecycle",()=>{
     const error=await h.ops.authorize(state).catch(error=>error);
     expect(error).toMatchObject({code,status:502});
     expect(String(error)+JSON.stringify(error)).not.toMatch(/private-token|provider-SECRET|account\.unipile/);
-    expect(h.operations).toEqual(failure==="save"?["intent","issue_link","save_link","fail"]:["intent","issue_link","fail"]);
+    expect(h.operations).toEqual(failure==="save"?["intent","issue_link","probe","save_link","fail"]:["intent","issue_link","probe","fail"]);
+    expect(h.failures).toEqual(["link_failed"]);
     await expect(h.ops.authorize(state)).rejects.toMatchObject({code:"EMAIL_INTENT_EXPIRED",status:410});
     expect(h.operations.at(-1)).toBe("intent");expect(h.providerCalls()).toBe(1);
+  });
+  it("reconnects the single unreferenced account already holding this mailbox instead of creating another",async()=>{
+    const dup={id:"mail_dup",type:"GOOGLE_OAUTH",connection_params:{mail:{id:"mail_dup",username:email.toUpperCase()}}};
+    const h=authorizationHarness(undefined,{siblings:[dup,{...dup,id:"mail_other",connection_params:{mail:{username:"other@example.test"}}}],expectReconnect:"mail_dup"});
+    await expect(h.ops.authorize(state)).resolves.toBe("https://account.unipile.com/opaque");
+    expect(h.probes).toEqual([{intent_ref:id,email,account_ids:["mail_dup"]}]);
+    expect(h.operations).toEqual(["intent","issue_link","probe","save_link"]);
+  });
+  it("creates a new account when the matching mailbox account is referenced or ambiguous, or the lookup fails",async()=>{
+    const dup={id:"mail_dup",type:"GOOGLE_OAUTH",connection_params:{mail:{username:email}}};
+    for(const options of [{siblings:[dup],referenced:["mail_dup"]},{siblings:[dup,{...dup,id:"mail_dup2"}]},{siblings:[dup],listStatus:503}]) {
+      const h=authorizationHarness(undefined,options);
+      await expect(h.ops.authorize(state)).resolves.toBe("https://account.unipile.com/opaque");
+      expect(h.operations).toEqual(["intent","issue_link","probe","save_link"]);expect(h.providerCalls()).toBe(1);
+    }
+  });
+  it("fails before any provider link when the mailbox is live in another workspace",async()=>{
+    const h=authorizationHarness(undefined,{mailbox:"taken"});
+    await expect(h.ops.authorize(state)).rejects.toMatchObject({code:"EMAIL_ACCOUNT_TAKEN",status:409});
+    expect(h.operations).toEqual(["intent","issue_link","probe","fail"]);
+    expect(h.failures).toEqual(["account_taken"]);expect(h.providerCalls()).toBe(0);
   });
   it("concurrent authorization contenders obtain at most one provider link",async()=>{
     const h=authorizationHarness();
@@ -558,5 +590,14 @@ describe("unknown email source status", () => {
     const h = harness({ identity: { ...account, sources: [{ id: "s", status }] } });
     await expect(h.ops.callback(state, body)).rejects.toMatchObject({ code: "UNIPILE_UNAVAILABLE" });
     expect(h.calls.map(call => call.operation)).toEqual(["intent", "record"]);
+  });
+});
+
+describe("LIF-955 refused mailbox bindings",()=>{
+  it("records account_taken when completion is refused and never deletes the mailbox account",async()=>{
+    const h=harness({completeError:true});
+    await expect(h.ops.callback(state,body)).rejects.toMatchObject({code:"EMAIL_ACCOUNT_TAKEN",status:409});
+    expect(h.calls.map(call=>call.operation)).toEqual(["intent","record","complete","fail"]);
+    expect(h.calls.at(-1)?.payload).toEqual({intent_ref:id,failure_code:"account_taken"});
   });
 });

@@ -146,6 +146,27 @@ export function createUnipileProvider(settings: UnipileProviderSettings) {
     }
     return { accountId, email, type, healthy };
   }
+  const MailboxPage = z.object({ items: z.array(z.object({ id: AccountId, type: z.string(),
+    connection_params: z.object({ mail: z.object({ id: z.string().optional(), username: z.string().optional(), imap_user: z.string().optional() }).passthrough().optional() }).passthrough().optional() }).passthrough()),
+    cursor: z.string().nullish() }).passthrough();
+  /** V1 mailbox accounts whose configured login is this address. Read-only; never returns credentials. */
+  async function findMailboxAccounts(email: string, provider?: "GOOGLE" | "OUTLOOK" | "MAIL"): Promise<string[]> {
+    const wanted = email.toLowerCase();
+    const types = provider === "GOOGLE" ? ["GOOGLE_OAUTH"] : provider === "OUTLOOK" ? ["OUTLOOK"] : provider === "MAIL" ? ["MAIL"] : ["GOOGLE_OAUTH", "OUTLOOK", "MAIL"];
+    const found: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 5; page++) {
+      const parsed = MailboxPage.safeParse(await request(`accounts?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`));
+      if (!parsed.success) throw failure();
+      for (const item of parsed.data.items) {
+        const mail = item.connection_params?.mail;
+        if (types.includes(item.type) && [mail?.username, mail?.id, mail?.imap_user].some(value => value?.toLowerCase() === wanted)) found.push(item.id);
+      }
+      cursor = parsed.data.cursor ?? null;
+      if (!cursor) break;
+    }
+    return found;
+  }
 
-  return { createLink, readIdentity };
+  return { createLink, readIdentity, findMailboxAccounts };
 }
