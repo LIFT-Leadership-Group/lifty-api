@@ -7,6 +7,8 @@ import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguratio
 import { registerStageRoutes } from "./stage-routes.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
+import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
+import type { WarmupSetup } from "./warmup-setup.js";
 import { versionedHostedAuthUrl, parseHostedAuthOrigin, UNIPILE_HOSTED_AUTH_ORIGIN } from "./hosted-auth-branding.js";
 import { getConnectionAttempt, type ConnectionAttemptStatus, type ConnectionProvider } from "./connection-attempt.js";
 import {
@@ -143,6 +145,7 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  warmupSetup?: WarmupSetup;
   unipileHostedAuthOrigin: string;
   unipileV2HostedAuthOrigins: string[];
   receiveEmailV2Return: (state:string)=>Promise<void>;
@@ -411,7 +414,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/warmup",operationId:"getEmailWarmup",security:[{bearerAuth:[]}],
     request:{query:WarmupWorkspaceRequest},responses:{200:JsonResponse(WarmupStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/warmup/start",operationId:"startEmailWarmup",security:[{bearerAuth:[]}],
-    description:"Start or resume setup of Mailivery warmup for the workspace's verified email account. Returns a hosted Mailivery form URL while the mailbox still needs connecting; its expiry comes from the signed URL.",
+    description:"Start setup for the workspace's verified mailbox. OAuth-enabled servers return a one-hour Lifty setup link. Legacy servers return a signed Mailivery form link. An already-bound mailbox receives no new connection link.",
     request:{body:{required:true,content:{"application/json":{schema:WarmupWorkspaceRequest}}}},
     responses:{200:JsonResponse(WarmupStartResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),429:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   for (const operation of ["pause","resume","remove"] as const) {
@@ -1131,6 +1134,7 @@ export function createApp(
     await next();
   });
 
+  if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup));
   app.get("/healthz", (context) => context.json({ status: "ok" }));
   app.get("/readyz/crm", async (context) => {
     let ready = false;

@@ -14,6 +14,7 @@ import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
 import { createEmailWarmupOperations } from "./email-warmup.js";
+import { createWarmupSetup } from "./warmup-setup.js";
 
 import { randomBytes } from "node:crypto";
 
@@ -70,9 +71,11 @@ import {
 export function createProductionApp(config: ServiceConfig) {
   const linkedin = config.linkedin ? createLinkedinConnectOperations(config.linkedin) : null;
   const email = config.email ? createEmailConnectOperations(config.email) : null;
-  // Warmup reads/changes go through the founder RPC with the caller's session;
-  // only minting a hosted Mailivery form needs MAILIVERY_API_KEY.
-  const warmup = createEmailWarmupOperations({ mailivery: config.mailivery ?? null });
+  // Founder operations use their session. Browser setup uses a narrow,
+  // server-key-protected intent RPC, never a Supabase administrative key.
+  const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
+  const warmup = createEmailWarmupOperations({ mailivery: config.mailivery ?? null,
+    ...(warmupSetup ? {issueSetupLink:warmupSetup.issue} : {}) });
   const hubspot = createHubspotConnectOperations(config.hubspot);
   const slackSettings = config.slack;
   const slack = slackSettings
@@ -86,6 +89,7 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    ...(warmupSetup ? {warmupSetup} : {}),
     ...(config.unipileV2HostedAuthOrigins ? {unipileV2HostedAuthOrigins:config.unipileV2HostedAuthOrigins} : {}),
     ...(config.unipileHostedAuthOrigin ? { unipileHostedAuthOrigin: config.unipileHostedAuthOrigin } : {}),
     acquisitionRecovery: createAcquisitionRecoveryOperations({

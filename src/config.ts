@@ -8,6 +8,7 @@ import type { SlackConnectSettings } from "./slack-connect.js";
 import type { LinkedinConnectSettings } from "./linkedin-connect.js";
 import type { EmailConnectSettings } from "./email-connect.js";
 import type { MailiverySettings } from "./email-warmup.js";
+import type { WarmupSetupSettings } from "./warmup-setup.js";
 
 type Environment = Record<string, string | undefined>;
 
@@ -25,6 +26,7 @@ export interface ServiceConfig {
   linkedin?: Omit<LinkedinConnectSettings, "fetchImpl"> | null;
   /** Mailivery warmup (LIF-989). Null keeps warmup start closed. */
   mailivery?: MailiverySettings | null;
+  warmupSetup?: WarmupSetupSettings | null;
   trigger: {
     apiUrl: string;
     secretKey: string;
@@ -145,6 +147,18 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const mailiveryKey = environment.MAILIVERY_API_KEY?.trim();
   if (mailiveryKey && (mailiveryKey.length < 16 || mailiveryKey.length > 512 || /\s/.test(mailiveryKey))) throw new Error("MAILIVERY_API_KEY must be a single token of 16 to 512 characters.");
   if (mailiveryKey && [emailKey, linkedinKey, crmKey, publishableKey].includes(mailiveryKey)) throw new Error("MAILIVERY_API_KEY must be distinct from LIFTY service keys.");
+  const setupEnabled = environment.LIFTY_WARMUP_SETUP_ENABLED === "true";
+  const googleClientId = environment.LIFTY_WARMUP_GOOGLE_CLIENT_ID?.trim();
+  const googleClientSecret = environment.LIFTY_WARMUP_GOOGLE_CLIENT_SECRET?.trim();
+  for (const flag of ["LIFTY_WARMUP_SETUP_ENABLED", "LIFTY_WARMUP_APP_PASSWORD_ENABLED", "LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED"]) {
+    if (environment[flag] && !["true", "false"].includes(environment[flag]!)) throw new Error(`${flag} must be true or false.`);
+  }
+  if (setupEnabled && (!emailKey || !mailiveryKey || !googleClientId || !googleClientSecret || environment.LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED !== "true")) {
+    throw new Error("Google warmup setup requires email and Mailivery keys, both Google client credentials, and confirmed Mailivery OAuth readiness.");
+  }
+  if (setupEnabled && (publicBaseUrl.username || publicBaseUrl.password || publicBaseUrl.search || publicBaseUrl.hash || publicBaseUrl.pathname !== "/")) {
+    throw new Error("Google warmup setup PUBLIC_BASE_URL must be an origin without credentials, query or fragment.");
+  }
   if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
     unipileHostedAuthOrigin: parseHostedAuthOrigin(environment.UNIPILE_HOSTED_AUTH_ORIGIN),
@@ -152,6 +166,10 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,
     dashboardOrigin: dashboardUrl.origin,
     mailivery: mailiveryKey ? { apiKey: mailiveryKey } : null,
+    warmupSetup: setupEnabled && emailKey && mailiveryKey && googleClientId && googleClientSecret ? {
+      serverKey:emailKey, publicBaseUrl:publicBaseUrl.origin, supabaseUrl:supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
+      googleClientId, googleClientSecret, mailivery:{apiKey:mailiveryKey}, appPasswordEnabled:environment.LIFTY_WARMUP_APP_PASSWORD_ENABLED === "true",
+    } : null,
     linkedin: linkedinEnabled ? {
       ...(v2 ? {v2} : {}),
       dsn: required(environment, "UNIPILE_DSN"), accessToken: required(environment, "UNIPILE_ACCESS_TOKEN"),

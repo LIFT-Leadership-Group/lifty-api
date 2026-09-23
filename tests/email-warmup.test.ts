@@ -42,6 +42,17 @@ function harness(options: { data?: unknown; error?: unknown; key?: string | null
 }
 
 describe("warmup status presentation", () => {
+  it("issues a Lifty setup link when OAuth setup is enabled, without minting a hosted form", async () => {
+    const h = harness({data:stored({}, {state:"link_issued",provider_campaign_bound:false})});
+    let issued = 0;
+    const ops = createEmailWarmupOperations({mailivery:{apiKey}, issueSetupLink:async(session, selected)=>{
+      expect(session).toBe(h.session); expect(selected).toBe("lifty-gtm"); issued++;
+      return {url:`https://api.lifty.test/warmup/setup?intent=${"a".repeat(43)}`, expiresAt:now.toISOString()};
+    }, fetchImpl:async()=>{throw new Error("Hosted forms must not be requested");}});
+    const result = await ops.start(h.session, "lifty-gtm");
+    expect(result.connect_url).toContain("https://api.lifty.test/warmup/setup");
+    expect(issued).toBe(1);
+  });
   it("maps an outreach mailbox in warmup to days, volume, checks and a projected go-live", () => {
     const status = presentWarmupStatus(stored(), now);
     expect(WarmupStatus.parse(status)).toEqual(status);

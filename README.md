@@ -220,7 +220,7 @@ Routes, all bound to the caller's session and an explicit workspace:
   time, a plain-words blocking reason and `recommended_go_live`.
 - `POST /v1/email/warmup/start` `{workspace}` calls
   `lifty_email_warmup('start')`. Only while the binding is `link_issued`
-  (no Mailivery campaign bound yet) it mints a hosted Mailivery form URL tagged
+  (no Mailivery campaign bound yet) legacy mode mints a hosted Mailivery form URL tagged
   `lifty-ws:<workspace_ref>` and `lifty-sender:<sender_ref>`; `expires_at`
   comes from the signed URL's own `expires` claim. Without a verified email
   connection the database answers `email_connection_required`. A
@@ -235,6 +235,70 @@ Configure `MAILIVERY_API_KEY` in the API deployment to enable `start`. Without
 it `start` returns `EMAIL_WARMUP_NOT_CONFIGURED` before any write. The API never
 logs the key, the signed URL or Mailivery response bodies. Deploy the
 `lifty_email_warmup` founder RPC migration before this API.
+
+### Google OAuth setup (LIF-995)
+
+OAuth-enabled servers return a one-hour, single-use Lifty `/warmup/setup`
+link. The page displays the Unipile-verified mailbox and configures warmup
+volume (1–100), ramp (`slow/normal/fast`), reply rate (0–55%), one of Mailivery's
+six schedule presets, an IANA timezone and audience. These account-specific
+caps do not reserve the shared Mailivery daily pool or change Lifty's outreach
+cap. Provider refusal leaves setup blocked. Policy is immutable after handoff;
+editing an already-bound warmup is not part of this initial setup surface.
+
+Google consent requests `openid email https://mail.google.com/`, offline
+access, PKCE and a nonce. The callback verifies Google's signature, issuer,
+audience, expiry, nonce and `email_verified`, then compares the canonical
+address without treating aliases, dots or plus-addressing as equivalent.
+The access/refresh tokens exist only inside the callback request. They are
+forwarded once to Mailivery and never persisted, enqueued or logged by Lifty.
+Mailivery necessarily stores the credentials for its ongoing mailbox access.
+
+Browser form submissions require same-origin and a browser-bound CSRF cookie;
+OAuth state is also bound to that HttpOnly/SameSite cookie. Database intent
+records store only hashes and non-secret setup data. Every step revalidates
+the original member, active workspace, current Unipile connection and exact
+mailbox. A durable dispatch fence is committed before the provider POST.
+If the request fails or its response is lost, no callback, refreshed setup
+link or removal/recreation automatically resends the tokens. Jobs reconciles
+by authenticated campaign readback, including both tags and all email fields.
+No campaign becoming visible is not proof that creation failed: operator
+review is required to resolve a permanently ambiguous handoff.
+
+Deploy in order: the LIF-995 migration in `lift-supabase-functions`, the
+policy-aware Jobs worker, a CLI that trusts the pinned API setup URL, then
+this API. Existing signed Mailivery links must expire or be reconciled before
+the first OAuth canary; an already-open hosted form cannot be revoked here.
+
+Before setting `LIFTY_WARMUP_SETUP_ENABLED=true`:
+
+1. Have Mailivery enable the partner Google OAuth endpoint for the team.
+2. Configure one Google web OAuth client and the exact redirect URI
+   `<PUBLIC_BASE_URL>/warmup/google/callback`. Use an External production app
+   for founders outside LIFT; complete applicable restricted-scope verification
+   and security review. Testing-mode refresh expiry is unsuitable for 21 days.
+3. Save that same client ID and secret in Mailivery before creating a mailbox,
+   and deploy `LIFTY_WARMUP_GOOGLE_CLIENT_ID` / `LIFTY_WARMUP_GOOGLE_CLIENT_SECRET`.
+   `LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED=true` is an operator attestation of
+   steps 1–3, not an API availability probe.
+4. Optionally set `LIFTY_WARMUP_APP_PASSWORD_ENABLED=true`; default is off.
+   It redirects to Mailivery after saving strategy; Lifty never receives the
+   App Password. A lost hosted-form response is also held for review.
+5. Keep proxy/APM body capture off for these routes and outbound OAuth calls;
+   redact callback query strings and setup links from access logs. Application
+   errors expose only bounded public messages, never provider response bodies.
+
+Test first with an owned non-live-sender mailbox. Creating a Mailivery campaign
+may itself initiate provider activity: a disabled Jobs schedule is not a
+guarantee that Mailivery will send nothing. Verify token refresh after an
+hour, same-address rejection, cancellation/suspension, selected policy readback
+and 21-day health evidence before releasing founder v1. These live-provider
+checks are not replaced by the local fake-provider suite. OAuth must be enabled
+for v1 launch; the legacy mode exists only for staged compatibility.
+
+References: [Mailivery OAuth](https://mailivery.readme.io/reference/createcampaignwithgoogleoauth),
+[Google web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server),
+[Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect).
 
 
 Acquisition recovery is explicit and asynchronous: GET `/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}` reads status; POST `{operation:"request",expected_acquisition_ref:"UUID"}` requests authoritative task verification only. POST `{operation:"restart",expected_acquisition_ref:"UUID"}` restarts only the exact verified terminal acquisition, preserving the first-run cohort and historical allowance. Both mutations bind the selected workspace before SQL changes. Failed enqueue leaves its durable request/attempt intact; retry the same references. This requires the LIF-641 recovery DB/verifier deployment.

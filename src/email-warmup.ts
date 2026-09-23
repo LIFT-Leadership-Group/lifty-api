@@ -13,6 +13,7 @@ export interface MailiverySettings {
 }
 export interface EmailWarmupSettings {
   mailivery: MailiverySettings | null;
+  issueSetupLink?: (session: AuthSession, workspace: string) => Promise<{url:string;expiresAt:string}>;
   fetchImpl?: typeof fetch;
   now?: () => Date;
   requestId?: () => string;
@@ -34,6 +35,8 @@ const rpcMessages: Record<string, { status: number; message: string }> = {
   email_connection_required: { status: 409, message: "Connect and verify this workspace's email account before starting warmup." },
   email_warmup_mailbox_taken: { status: 409, message: "This mailbox is already being warmed up from another Lifty workspace. Remove warmup there first, or connect a different mailbox here." },
   email_warmup_not_started: { status: 409, message: "Warmup has not started for this mailbox. Start it first." },
+  email_warmup_setup_pending: { status: 409, message: "Mailivery setup is still being reconciled. No second connection will be created. Check warmup status or contact support." },
+  email_warmup_setup_unavailable: { status: 409, message: "This warmup setup is already submitted or needs review. Check warmup status before trying again." },
 };
 
 const blockingMessages: Record<string, string> = {
@@ -48,6 +51,7 @@ const blockingMessages: Record<string, string> = {
   warmup_start_rejected: "Mailivery didn't start warmup yet. Our team has been alerted and will follow up.",
   warmup_resume_rejected: "Mailivery didn't resume warmup yet. Our team has been alerted and will follow up.",
   workspace_suspended: "Warmup is paused because this workspace is suspended. Resume it once the workspace is active again.",
+  warmup_setup_pending: "Mailivery setup may still be completing. Removal stays pending until Lifty can verify and clean up the campaign; it will not create another warmup. Contact support if this persists.",
 };
 
 const stateLabels: Record<WarmupStatus["state"], string> = {
@@ -215,7 +219,9 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
     // Only an unbound binding gets a form. pending_consent already has a bound
     // campaign; a second form would create another billed Mailivery campaign.
     const needsLink = stored.binding.state === "link_issued";
-    const link = needsLink ? await mintFormUrl(stored.workspace_ref, stored.binding.sender_ref) : null;
+    const link = needsLink ? settings.issueSetupLink
+      ? await settings.issueSetupLink(session, input.workspace)
+      : await mintFormUrl(stored.workspace_ref, stored.binding.sender_ref) : null;
     return WarmupStartResult.parse({ ...presentWarmupStatus(stored, now()),
       connect_url: link?.url ?? null, expires_at: link?.expiresAt ?? null });
   }
