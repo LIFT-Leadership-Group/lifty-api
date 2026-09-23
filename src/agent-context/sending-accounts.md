@@ -46,21 +46,31 @@ date; do not compute your own.
   suggest what to prepare meanwhile: targeting, copy and schedule. Campaign
   previews can be prepared and approved now; activation waits for the unlock.
 
-`lifty email warmup start --workspace <workspace>` returns a Mailivery link.
-Show the real link as "Connect your existing mailbox to Mailivery". Mailivery
-needs separate mailbox access; Unipile's connection cannot grant it. This
-does not create another email account. Mailivery's current Google form asks
-for a Google App Password. Tell the founder before they open the link. They
-create the password in Google and enter it only on Mailivery's page, never in
-Lifty or chat. A different address stops warmup with a mismatch. After they
-finish, check
+`lifty email warmup start --workspace <workspace>` returns the actual setup
+link. When it points to Lifty, show it as "Set up warmup for your mailbox".
+The page shows the same Unipile-verified address and lets the founder choose
+volume, ramp, reply rate, schedule, timezone and audience. Google OAuth is
+the default; Google must verify that exact address before Lifty sends tokens
+to Mailivery. Lifty forwards those tokens once without storing or logging
+them. Mailivery stores the credentials it needs to run warmup. An optional
+App Password fallback opens Mailivery's own form; never collect that password
+in Lifty or chat. The setup flow does not create another email address.
+
+Legacy servers may still return a Mailivery-hosted link. That Google form
+requires a Google App Password, not the regular Google password. Explain this
+before opening it, and do not describe a legacy link as OAuth-enabled.
+Mailivery needs separate mailbox access; Unipile's grant cannot be reused.
+After the founder finishes, check
 `status` again. The state moves from waiting for the Mailivery connection to
 warming after Lifty's next check. If status says Microsoft consent is pending,
 the founder finishes the consent step inside Mailivery; do not run `start` for
 a new link. `start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
 verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
 another Lifty workspace already warms the same mailbox. After a removal,
-status shows `Removed`; `start` sets up a new warmup with a new link.
+status shows `Removed`; `start` can set up a new warmup with a new link only
+when previous provider creation is resolved. An ambiguous handoff is never
+retried automatically: check status and involve support, rather than trying
+another account or bypassing the setup hold.
 
 Pause, resume and remove only when the founder asks:
 `lifty email warmup pause|resume|remove --workspace <workspace>`. Lifty applies

@@ -16,6 +16,14 @@ const validEnvironment = {
 };
 
 describe("service configuration", () => {
+  it("requires explicit Mailivery readiness and both Google credentials to enable OAuth setup", () => {
+    const env = {...validEnvironment, LIFTY_EMAIL_SERVER_KEY:"e".repeat(32), UNIPILE_DSN:"https://api.unipile.test",
+      UNIPILE_ACCESS_TOKEN:"unipile-key", MAILIVERY_API_KEY:"mailivery-token-12345", LIFTY_WARMUP_SETUP_ENABLED:"true"};
+    expect(() => loadConfig(env)).toThrow(/warmup/i);
+    const ready = {...env, LIFTY_WARMUP_GOOGLE_CLIENT_ID:"client-id", LIFTY_WARMUP_GOOGLE_CLIENT_SECRET:"client-secret", LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED:"true"};
+    expect(loadConfig(ready).warmupSetup).toMatchObject({googleClientId:"client-id", appPasswordEnabled:false});
+    expect(loadConfig({...ready,LIFTY_WARMUP_APP_PASSWORD_ENABLED:"true"}).warmupSetup?.appPasswordEnabled).toBe(true);
+  });
   it("defaults to the verified dashboard and accepts another HTTPS origin", () => {
     expect(loadConfig(validEnvironment).dashboardOrigin).toBe("https://lift-gtm-dashboard.vercel.app");
     expect(loadConfig({...validEnvironment,LIFTY_DASHBOARD_ORIGIN:"https://dashboard.example.com"}).dashboardOrigin).toBe("https://dashboard.example.com");
