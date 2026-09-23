@@ -47,9 +47,13 @@ date; do not compute your own.
   previews can be prepared and approved now; activation waits for the unlock.
 
 `lifty email warmup start --workspace <workspace>` returns a Mailivery link.
-Show the real link as "Connect your mailbox to Mailivery". The founder signs in
-to the same address on Mailivery's page; Lifty never sees the password. A
-different address stops warmup with a mismatch. After they finish, check
+Show the real link as "Connect your existing mailbox to Mailivery". Mailivery
+needs separate mailbox access; Unipile's connection cannot grant it. This
+does not create another email account. Mailivery's current Google form asks
+for a Google App Password. Tell the founder before they open the link. They
+create the password in Google and enter it only on Mailivery's page, never in
+Lifty or chat. A different address stops warmup with a mismatch. After they
+finish, check
 `status` again. The state moves from waiting for the Mailivery connection to
 warming after Lifty's next check. If status says Microsoft consent is pending,
 the founder finishes the consent step inside Mailivery; do not run `start` for
