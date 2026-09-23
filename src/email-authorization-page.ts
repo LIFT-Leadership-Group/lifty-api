@@ -75,16 +75,26 @@ function providerChoices(): string {
   return `<fieldset><legend>Choose your email provider</legend><div class="providers">${providers.map(provider => `<label class="provider">${providerIcons[provider.value]}<span class="provider-copy"><span class="provider-name">${provider.name}</span><span class="provider-detail">${provider.detail}</span></span><input type="radio" name="email_provider" value="${provider.value}" aria-label="${provider.name} (${provider.detail})" required></label>`).join("")}</div></fieldset>`;
 }
 
-/** The existing personal-mailbox declaration is completed in the browser. */
+// Regular mailboxes stay the default. A new or dedicated account is declared
+// here and must finish verified warmup before any campaign can send (LIF-985).
+function mailboxUseChoices(): string {
+  const choices = [
+    { value: "personal", name: "A mailbox I already use", detail: "Personal or business conversations. Campaigns can start once you approve them.", checked: true },
+    { value: "outreach", name: "A new account for outreach", detail: "A new or dedicated address. It needs 21 active days of warmup before campaigns send.", checked: false },
+  ] as const;
+  return `<fieldset><legend>How do you use this mailbox?</legend><div class="providers">${choices.map(choice => `<label class="provider"><span class="provider-copy"><span class="provider-name">${choice.name}</span><span class="provider-detail">${choice.detail}</span></span><input type="radio" name="mailbox_use" value="${choice.value}" aria-label="${choice.name}"${choice.checked ? " checked" : ""} required></label>`).join("")}</div></fieldset>`;
+}
+
+/** Provider choice and the mailbox-use declaration are completed in the browser. */
 export function renderEmailAuthorizationPage(state: string, chooseProvider = false): string {
   const escapedState = state.replace(/[&<>"']/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character]!);
   return page("Connect your email account", `<h1 id="page-title">Connect your email account</h1>
-<p class="intro">Bring the mailbox you already use for everyday conversations into Lifty.</p>
+<p class="intro">Connect the mailbox Lifty should send from. It can be one you already use or a new account set up for outreach.</p>
 <form method="post" action="/unipile/start"><input type="hidden" name="intent" value="${escapedState}">
 ${chooseProvider ? providerChoices() : ""}
-<label class="declaration"><input type="checkbox" name="mailbox_use" value="personal" required><span><strong>I use this mailbox regularly for personal or business conversations.</strong><span class="declaration-detail">It is not a new or dedicated outreach mailbox.</span></span></label>
+${mailboxUseChoices()}
 <button type="submit">Continue to account selection</button></form>
 <p class="reassurance">Connecting your email does not start outreach. You will review and approve your outreach before any email is sent.</p>`);
 }

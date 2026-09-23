@@ -151,3 +151,18 @@ describe("staged V2 configuration",()=>{
     {UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"app_test",UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://user:pass@other.test"},
   ])("rejects incomplete or unsafe V2 config %j",extra=>{expect(()=>loadConfig({...baseline,...extra})).toThrow();});
 });
+
+describe("Mailivery warmup configuration", () => {
+  it("keeps warmup start closed without a key and accepts one dedicated token", () => {
+    expect(loadConfig(validEnvironment).mailivery).toBeNull();
+    const key = "mlv_" + "k".repeat(40);
+    expect(loadConfig({ ...validEnvironment, MAILIVERY_API_KEY: ` ${key} ` }).mailivery).toEqual({ apiKey: key });
+  });
+  it.each(["short", "has space inside the key value", "x".repeat(513)])("rejects malformed key %#", value => {
+    expect(() => loadConfig({ ...validEnvironment, MAILIVERY_API_KEY: value })).toThrow(/MAILIVERY_API_KEY/);
+  });
+  it("refuses to reuse a LIFTY service key", () => {
+    const key = "x".repeat(48);
+    expect(() => loadConfig({ ...validEnvironment, LIFTY_CRM_SERVER_KEY: key, MAILIVERY_API_KEY: key })).toThrow(/distinct/);
+  });
+});

@@ -7,7 +7,9 @@ describe("email authorization renderer", () => {
     expect(html).toContain('<form method="post" action="/unipile/start">');
     expect(html).toContain('name="intent" value="state&quot;&#39;&gt;&lt;script&gt;alert(1)&lt;/script&gt;&amp;"');
     expect(html).not.toContain("<script>");
-    expect(html).toMatch(/<input type="checkbox" name="mailbox_use" value="personal" required>/);
+    expect(html).toMatch(/<input type="radio" name="mailbox_use" value="personal" aria-label="[^"]+" checked required>/);
+    expect(html).toMatch(/<input type="radio" name="mailbox_use" value="outreach" aria-label="[^"]+" required>/);
+    expect(html).toContain("21 active days of warmup");
     expect(html).not.toMatch(/<script\b|<link\b|<iframe\b|https?:\/\//i);
   });
 
@@ -19,7 +21,7 @@ describe("email authorization renderer", () => {
     for (const value of ["google", "outlook", "imap"]) {
       expect(fresh).toMatch(new RegExp(`<input type="radio" name="email_provider" value="${value}"[^>]* required>`));
     }
-    expect(fresh).not.toMatch(/<input[^>]*\bchecked\b/);
+    expect(fresh).not.toMatch(/<input[^>]*name="email_provider"[^>]*\bchecked\b/);
   });
 
   it("acknowledges receipt without offering replay or claiming a connected account", () => {

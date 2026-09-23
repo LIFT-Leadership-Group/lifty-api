@@ -437,7 +437,7 @@ describe("backend beta connection policy",()=>{
   it.each(["personal","outreach"] as const)("returns truthful beta requirements for %s without provider I/O",async mailbox_use=>{
     const ops=createEmailConnectOperations({...settings,fetchImpl:async()=>{throw new Error("no provider I/O on start");}});
     const result=await ops.start({userId:id,client:{rpc:async()=>({error:null,data:{state:"pending",workspace_ref:workspace,email,mailbox_use,daily_limit:10,intent_ref:id,expires_at:intent.expires_at,email_policy:beta}})}},{workspace:"senja",email,mailbox_use});
-    expect(result.email_policy).toEqual(beta);expect(result.warmup_required).toBe(false);expect(result.sending_enabled).toBe(false);
+    expect(result.email_policy).toEqual(beta);expect(result.warmup_required).toBe(mailbox_use==="outreach");expect(result.sending_enabled).toBe(false);
   });
   it("rejects forged policy requests before RPC",async()=>{
     const ops=createEmailConnectOperations({...settings,fetchImpl:async()=>{throw Error("unexpected");}});
@@ -543,7 +543,7 @@ describe("hosted selection and exact-attempt verification", () => {
     const page = await app.request(`/unipile/start?intent=${state}`);
     expect(page.status).toBe(200); expect(page.headers.get("referrer-policy")).toBe("strict-origin");
     expect(page.headers.get("content-security-policy")).toContain("form-action 'self'");
-    expect(await page.text()).toContain('type="checkbox"'); expect(calls).toEqual(["intent"]);
+    expect(await page.text()).toContain('name="mailbox_use" value="outreach"'); expect(calls).toEqual(["intent"]);
     const send = (body: string, origin = "http://localhost") => app.request("/unipile/start", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin }, body });
     expect((await send(`intent=${state}`)).status).toBe(400);
     expect((await send(`intent=${state}&mailbox_use=personal`, "https://attacker.test")).status).toBe(403);
@@ -551,6 +551,20 @@ describe("hosted selection and exact-attempt verification", () => {
     const response = await send(`intent=${state}&mailbox_use=personal`);
     expect(response.status).toBe(303); expect(response.headers.get("location")).toBe(intent.hosted_url);
     expect(calls).toEqual(["intent", "declare", "intent"]);
+    expect((await send(`intent=${state}&mailbox_use=shared`)).status).toBe(400);
+  });
+  it("records a new or dedicated outreach declaration from the hosted form", async () => {
+    const declared: unknown[] = [];
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async (_url, init) => {
+      const args = JSON.parse(String(init?.body));
+      if (args.p_operation === "declare") { declared.push(args.p_payload.mailbox_use); return json({ ok: true }); }
+      return json({ ...intent, email: null, selection_required: declared.length === 0 });
+    } });
+    const app = createApp({ authorizeEmail: ops.authorize, declareEmail: ops.declare, log: () => {} });
+    const response = await app.request("/unipile/start", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin: "http://localhost" }, body: `intent=${state}&mailbox_use=outreach` });
+    expect(response.status).toBe(303);
+    expect(declared).toEqual(["outreach"]);
+    await expect(ops.declare(state, undefined, "shared" as never)).rejects.toMatchObject({ code: "EMAIL_DECLARATION_INVALID" });
   });
   it("verifies the selected primary mailbox from provider readback without inventing an address", async () => {
     const h = harness({ intent: { ...intent, email: null } });

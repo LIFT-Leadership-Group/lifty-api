@@ -29,6 +29,37 @@ Show the actual returned link immediately as “Connect LinkedIn” or “Connec
 your email account” in the founder's language. Keep `attempt_ref` and verify
 with GET using both the same channel and reference after authorization.
 
+## Email warmup after connection
+
+After GET confirms the email account is connected, read
+`lifty email warmup status --workspace <workspace>`. Its `mailbox_use` decides
+what to tell the founder. Use the returned `recommended_go_live` message and
+date; do not compute your own.
+
+- `personal`: campaigns can start now and warmup is optional. Explain the
+  tradeoff in plain words. Mailivery gets access to the mailbox, and warmup
+  emails and their replies pass through the inbox. In return it builds sending
+  reputation. Start warmup only if the founder says yes.
+- `outreach`: warmup is required before any campaign sends. Lifty needs 21
+  active warmup days. Paused days and days with a problem don't count, so the
+  go-live date moves later if either happens. Give the returned date and
+  suggest what to prepare meanwhile: targeting, copy and schedule. Campaign
+  previews can be prepared and approved now; activation waits for the unlock.
+
+`lifty email warmup start --workspace <workspace>` returns a Mailivery link.
+Show the real link as "Connect your mailbox to Mailivery". The founder signs in
+to the same address on Mailivery's page; Lifty never sees the password. A
+different address stops warmup with a mismatch. After they finish, check
+`status` again. The state moves from waiting for the Mailivery connection to
+warming after Lifty's next check. If status says Microsoft consent is pending,
+run `start` again for a fresh link. `start` fails with
+`EMAIL_CONNECTION_REQUIRED` until a connected, verified email account exists.
+
+Pause, resume and remove only when the founder asks:
+`lifty email warmup pause|resume|remove --workspace <workspace>`. Lifty applies
+the request at its next check. For an `outreach` account, pausing or removing
+warmup delays or blocks sending; say so and get an explicit yes first.
+
 ## Later edits
 
 Reconnection uses POST again and must verify the new attempt, even while the

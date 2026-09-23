@@ -7,6 +7,7 @@ import type { SlackConnectSettings } from "./slack-connect.js";
 
 import type { LinkedinConnectSettings } from "./linkedin-connect.js";
 import type { EmailConnectSettings } from "./email-connect.js";
+import type { MailiverySettings } from "./email-warmup.js";
 
 type Environment = Record<string, string | undefined>;
 
@@ -22,6 +23,8 @@ export interface ServiceConfig {
   slack: Omit<SlackConnectSettings, "fetchImpl"> | null;
   email?: Omit<EmailConnectSettings, "fetchImpl"> | null;
   linkedin?: Omit<LinkedinConnectSettings, "fetchImpl"> | null;
+  /** Mailivery warmup (LIF-989). Null keeps warmup start closed. */
+  mailivery?: MailiverySettings | null;
   trigger: {
     apiUrl: string;
     secretKey: string;
@@ -139,12 +142,16 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (emailKey && emailKey.length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
   if (linkedinKey && linkedinKey.length < 32) throw new Error("LIFTY_LINKEDIN_SERVER_KEY must contain at least 32 characters.");
   if (linkedinKey && linkedinKey === emailKey) throw new Error("LinkedIn requires a server key distinct from email.");
+  const mailiveryKey = environment.MAILIVERY_API_KEY?.trim();
+  if (mailiveryKey && (mailiveryKey.length < 16 || mailiveryKey.length > 512 || /\s/.test(mailiveryKey))) throw new Error("MAILIVERY_API_KEY must be a single token of 16 to 512 characters.");
+  if (mailiveryKey && [emailKey, linkedinKey, crmKey, publishableKey].includes(mailiveryKey)) throw new Error("MAILIVERY_API_KEY must be distinct from LIFTY service keys.");
   if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
     unipileHostedAuthOrigin: parseHostedAuthOrigin(environment.UNIPILE_HOSTED_AUTH_ORIGIN),
     ...(v2 ? {unipileV2HostedAuthOrigins:v2.hostedAuthOrigins} : {}),
     crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,
     dashboardOrigin: dashboardUrl.origin,
+    mailivery: mailiveryKey ? { apiKey: mailiveryKey } : null,
     linkedin: linkedinEnabled ? {
       ...(v2 ? {v2} : {}),
       dsn: required(environment, "UNIPILE_DSN"), accessToken: required(environment, "UNIPILE_ACCESS_TOKEN"),
