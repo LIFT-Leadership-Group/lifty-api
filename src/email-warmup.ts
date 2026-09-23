@@ -42,6 +42,12 @@ const blockingMessages: Record<string, string> = {
   dns_invalid: "SPF, DMARC or MX for this domain is not valid. Warmup days don't count until all three pass.",
   status_inactive: "Mailivery reports that warmup is not running for this mailbox.",
   microsoft_consent_pending: "Microsoft still needs your consent before Mailivery can warm this mailbox. Finish the Microsoft consent step in Mailivery. You don't need a new Lifty link.",
+  campaign_ambiguous: "Mailivery has more than one warmup entry for this mailbox. Setup is on hold until our team cleans it up.",
+  binding_conflict: "This Mailivery warmup is already linked to a different Lifty mailbox. Our team will look into it.",
+  warmup_settings_rejected: "Mailivery didn't accept the warmup settings. Our team has been alerted and will follow up.",
+  warmup_start_rejected: "Mailivery didn't start warmup yet. Our team has been alerted and will follow up.",
+  warmup_resume_rejected: "Mailivery didn't resume warmup yet. Our team has been alerted and will follow up.",
+  workspace_suspended: "Warmup is paused because this workspace is suspended. Resume it once the workspace is active again.",
 };
 
 const stateLabels: Record<WarmupStatus["state"], string> = {
