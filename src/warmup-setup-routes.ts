@@ -13,7 +13,7 @@ export function createWarmupSetupRouter(setup:WarmupSetup) {
   const cookieName = secure ? "__Host-lifty-warmup-browser" : "lifty-warmup-browser";
   const error = (c:Context, status:ContentfulStatusCode, message:string) => c.html(renderWarmupReceipt("Setup needs attention", message), status);
   app.use("*", async(c,next)=>{
-    c.header("cache-control","no-store"); c.header("referrer-policy","no-referrer"); c.header("x-content-type-options","nosniff");
+    c.header("cache-control","no-store, no-transform"); c.header("referrer-policy","no-referrer"); c.header("x-content-type-options","nosniff");
     c.header("content-security-policy",`default-src 'none'; style-src 'unsafe-inline'; script-src '${WARMUP_SETUP_SCRIPT_HASH}'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'`);
     await next();
   });
