@@ -239,12 +239,15 @@ logs the key, the signed URL or Mailivery response bodies. Deploy the
 ### Google OAuth setup (LIF-995)
 
 OAuth-enabled servers return a one-hour, single-use Lifty `/warmup/setup`
-link. The page displays the Unipile-verified mailbox and configures warmup
-volume (1–100), ramp (`slow/normal/fast`), reply rate (0–55%), one of Mailivery's
-six schedule presets, an IANA timezone and audience. These account-specific
-caps do not reserve the shared Mailivery daily pool or change Lifty's outreach
-cap. Provider refusal leaves setup blocked. Policy is immutable after handoff;
-editing an already-bound warmup is not part of this initial setup surface.
+link. The page shows the mailbox, asks only for the sender name and has one
+"Continue with Google" button. Lifty owns the warmup policy:
+the stored version-1 policy is `DEFAULT_WARMUP_POLICY` in `src/warmup-setup.ts`
+with the timezone the browser reports (the default applies when the browser
+sends none or an invalid IANA zone). The page's only script fills that
+timezone and is allowed by hash in the CSP. The policy does not reserve the
+shared Mailivery daily pool or change Lifty's outreach cap. Provider refusal
+leaves setup blocked. Policy is immutable after handoff; editing an
+already-bound warmup is not part of this setup surface.
 
 Google consent requests `openid email https://mail.google.com/`, offline
 access, PKCE and a nonce. The callback verifies Google's signature, issuer,
@@ -272,28 +275,27 @@ the first OAuth canary; an already-open hosted form cannot be revoked here.
 
 Before setting `LIFTY_WARMUP_SETUP_ENABLED=true`:
 
-1. Have Mailivery enable the partner Google OAuth endpoint for the team.
-2. Configure one Google web OAuth client and the exact redirect URI
-   `<PUBLIC_BASE_URL>/warmup/google/callback`. Use an External production app
-   for founders outside LIFT; complete applicable restricted-scope verification
-   and security review. Testing-mode refresh expiry is unsuitable for 21 days.
-3. Save that same client ID and secret in Mailivery before creating a mailbox,
-   and deploy `LIFTY_WARMUP_GOOGLE_CLIENT_ID` / `LIFTY_WARMUP_GOOGLE_CLIENT_SECRET`.
-   `LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED=true` is an operator attestation of
-   steps 1–3, not an API availability probe.
-4. Optionally set `LIFTY_WARMUP_APP_PASSWORD_ENABLED=true`; default is off.
-   It redirects to Mailivery after saving strategy; Lifty never receives the
-   App Password. A lost hosted-form response is also held for review.
-5. Keep proxy/APM body capture off for these routes and outbound OAuth calls;
+1. Configure one Google web OAuth client and the exact redirect URI
+   `<PUBLIC_BASE_URL>/warmup/google/callback`. Use an External app published
+   to production (unverified is acceptable for the pilot: 100-user cap and
+   Google's unverified-app screen). Testing-mode refresh expiry is unsuitable
+   for 21 days. Restricted-scope verification removes the screen and the cap.
+2. Save that same client ID and secret in Mailivery (Settings → Team Settings →
+   API Access → Google OAuth Credentials) before creating a mailbox, and deploy
+   `LIFTY_WARMUP_GOOGLE_CLIENT_ID` / `LIFTY_WARMUP_GOOGLE_CLIENT_SECRET`.
+   Mailivery's partner OAuth endpoint needs no separate enablement: a
+   placeholder probe on 2026-09-23 passed its enablement gate (LIF-986).
+3. Keep proxy/APM body capture off for these routes and outbound OAuth calls;
    redact callback query strings and setup links from access logs. Application
    errors expose only bounded public messages, never provider response bodies.
 
 Test first with an owned non-live-sender mailbox. Creating a Mailivery campaign
 may itself initiate provider activity: a disabled Jobs schedule is not a
-guarantee that Mailivery will send nothing. Verify token refresh after an
-hour, same-address rejection, cancellation/suspension, selected policy readback
-and 21-day health evidence before releasing founder v1. These live-provider
-checks are not replaced by the local fake-provider suite. OAuth must be enabled
+guarantee that Mailivery will send nothing. Within 48 hours verify token
+refresh after an hour, same-address rejection, that a second create for the
+same email is refused, policy readback, health polling and pause/resume
+before the first founder; keep the canary running and test removal last.
+These live-provider checks are not replaced by the local fake-provider suite. OAuth must be enabled
 for v1 launch; the legacy mode exists only for staged compatibility.
 
 References: [Mailivery OAuth](https://mailivery.readme.io/reference/createcampaignwithgoogleoauth),

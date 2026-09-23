@@ -16,13 +16,16 @@ const validEnvironment = {
 };
 
 describe("service configuration", () => {
-  it("requires explicit Mailivery readiness and both Google credentials to enable OAuth setup", () => {
+  it("requires both Google credentials to enable OAuth setup, with no separate Mailivery attestation", () => {
     const env = {...validEnvironment, LIFTY_EMAIL_SERVER_KEY:"e".repeat(32), UNIPILE_DSN:"https://api.unipile.test",
       UNIPILE_ACCESS_TOKEN:"unipile-key", MAILIVERY_API_KEY:"mailivery-token-12345", LIFTY_WARMUP_SETUP_ENABLED:"true"};
     expect(() => loadConfig(env)).toThrow(/warmup/i);
-    const ready = {...env, LIFTY_WARMUP_GOOGLE_CLIENT_ID:"client-id", LIFTY_WARMUP_GOOGLE_CLIENT_SECRET:"client-secret", LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED:"true"};
-    expect(loadConfig(ready).warmupSetup).toMatchObject({googleClientId:"client-id", appPasswordEnabled:false});
-    expect(loadConfig({...ready,LIFTY_WARMUP_APP_PASSWORD_ENABLED:"true"}).warmupSetup?.appPasswordEnabled).toBe(true);
+    expect(() => loadConfig({...env, LIFTY_WARMUP_GOOGLE_CLIENT_ID:"client-id"})).toThrow(/warmup/i);
+    const ready = {...env, LIFTY_WARMUP_GOOGLE_CLIENT_ID:"client-id", LIFTY_WARMUP_GOOGLE_CLIENT_SECRET:"client-secret"};
+    expect(loadConfig(ready).warmupSetup).toMatchObject({googleClientId:"client-id", googleClientSecret:"client-secret"});
+    expect(loadConfig(ready).warmupSetup).not.toHaveProperty("appPasswordEnabled");
+    expect(loadConfig({...ready, LIFTY_WARMUP_SETUP_ENABLED:"false"}).warmupSetup).toBeNull();
+    expect(() => loadConfig({...ready, LIFTY_WARMUP_SETUP_ENABLED:"yes"})).toThrow(/true or false/);
   });
   it("defaults to the verified dashboard and accepts another HTTPS origin", () => {
     expect(loadConfig(validEnvironment).dashboardOrigin).toBe("https://lift-gtm-dashboard.vercel.app");

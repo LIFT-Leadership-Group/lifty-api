@@ -3,7 +3,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
-import { readSignedFormUrl, type MailiverySettings } from "./email-warmup.js";
+import type { MailiverySettings } from "./email-warmup.js";
 
 export const WARMUP_SCHEDULES = ["Weekdays - 8am to 6pm", "Weekdays - 7am to 7pm", "Weekdays - 6am to 10pm",
   "With Weekends - 8am to 6pm", "With Weekends - 7am to 7pm", "With Weekends - 6am to 10pm"] as const;
@@ -17,15 +17,26 @@ export type WarmupPolicy = z.infer<typeof WarmupPolicy>;
 export const DEFAULT_WARMUP_POLICY: WarmupPolicy = {version:1, emails_per_day:22, ramp:"normal", reply_rate:30,
   schedule:"Weekdays - 8am to 6pm", timezone:"America/New_York", audience:"inherit"};
 const name = z.string().trim().max(80).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
-export const WarmupSetupSelection = z.strictObject({method:z.enum(["google", "app_password"]),
-  first_name:name.pipe(z.string().min(1)), last_name:name, policy:WarmupPolicy});
+// Browsers report some ICU ids that are only backward links in tzdata. PHP's
+// default identifier list (Mailivery) omits those, and a rejected create would
+// hold setup for review, so the long-standing canonical name is sent instead.
+const LEGACY_ZONES:Record<string,string> = {"America/Buenos_Aires":"America/Argentina/Buenos_Aires",
+  "America/Catamarca":"America/Argentina/Catamarca", "America/Cordoba":"America/Argentina/Cordoba",
+  "America/Jujuy":"America/Argentina/Jujuy", "America/Mendoza":"America/Argentina/Mendoza",
+  "America/Indianapolis":"America/Indiana/Indianapolis", "America/Louisville":"America/Kentucky/Louisville",
+  "America/Godthab":"America/Nuuk", "Asia/Calcutta":"Asia/Kolkata", "Asia/Saigon":"Asia/Ho_Chi_Minh",
+  "Asia/Katmandu":"Asia/Kathmandu", "Asia/Rangoon":"Asia/Yangon", "Atlantic/Faeroe":"Atlantic/Faroe"};
+// Lifty owns the warmup policy; the founder supplies only the sender name and
+// the browser supplies its timezone (an unusable one falls back to the default).
+export const WarmupSetupSelection = z.strictObject({first_name:name.pipe(z.string().min(1)), last_name:name,
+  timezone:z.string().max(100)});
 const SetupRecord = z.object({email:z.email().max(254), workspace_ref:z.uuid(), sender_ref:z.uuid(),
   expires_at:z.iso.datetime({offset:true}), state:z.enum(["draft", "authorizing", "claimed", "dispatched"]),
   policy:WarmupPolicy.nullable(), first_name:name, last_name:name});
 export type WarmupSetupRecord = z.infer<typeof SetupRecord>;
 export interface WarmupSetupSettings {
   serverKey:string; publicBaseUrl:string; supabaseUrl:string; publishableKey:string;
-  googleClientId:string; googleClientSecret:string; mailivery:MailiverySettings; appPasswordEnabled:boolean;
+  googleClientId:string; googleClientSecret:string; mailivery:MailiverySettings;
 }
 type Rpc = (operation:string, payload:Record<string,unknown>, session?:AuthSession) => Promise<unknown>;
 type Identity = {email:string; email_verified:boolean};
@@ -83,7 +94,6 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
     return {oauth_hash:hashSetupSecret(state), browser_hash:hashSetupSecret(browser)};
   };
   return {
-    appPasswordEnabled:settings.appPasswordEnabled,
     origin:new URL(base).origin,
     async issue(session:AuthSession, workspace:string) {
       const intent = newSetupSecret();
@@ -98,24 +108,12 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
       requireSecret(intent); requireSecret(browser);
       const parsed = WarmupSetupSelection.safeParse(input);
       if (!parsed.success) throw invalid();
-      const selection = parsed.data;
-      if (selection.method === "app_password" && !settings.appPasswordEnabled) throw invalid();
+      const {first_name, last_name} = parsed.data;
+      const browserZone = LEGACY_ZONES[parsed.data.timezone] ?? parsed.data.timezone;
+      const policy = {...DEFAULT_WARMUP_POLICY, ...(timezone.safeParse(browserZone).success ? {timezone:browserZone} : {})};
       const state = newSetupSecret();
       const record = await call("choose", {intent_hash:hashSetupSecret(intent), browser_hash:hashSetupSecret(browser),
-        ...(selection.method === "google" ? {oauth_hash:hashSetupSecret(state)} : {}), ...selection});
-      if (selection.method === "app_password") {
-        const tags = `lifty-ws:${record.workspace_ref},lifty-sender:${record.sender_ref}`;
-        try {
-          const response = await fetchImpl(`${settings.mailivery.baseUrl ?? "https://app.mailivery.io/api/v1"}/embed/form/secure?tags=${encodeURIComponent(tags)}`, {
-            headers:{authorization:`Bearer ${settings.mailivery.apiKey}`, accept:"application/json"}, redirect:"error", signal:AbortSignal.timeout(15000),
-          });
-          if (!response.ok) throw new Error();
-          const result = z.object({success:z.boolean().optional(), data:z.object({url:z.string().max(4096)})}).parse(await response.json());
-          const signed = readSignedFormUrl(result.data.url, new Date());
-          if (result.success === false || !signed) throw new Error();
-          return signed.url;
-        } catch { throw pending(); }
-      }
+        oauth_hash:hashSetupSecret(state), method:"google", first_name, last_name, policy});
       const query = new URLSearchParams({client_id:settings.googleClientId, redirect_uri:redirectUri,
         response_type:"code", scope:"openid email https://mail.google.com/", access_type:"offline", prompt:"consent select_account",
         login_hint:record.email, state, nonce:mac("nonce", state, browser), code_challenge:hashPkce(mac("pkce", state, browser)), code_challenge_method:"S256"});
