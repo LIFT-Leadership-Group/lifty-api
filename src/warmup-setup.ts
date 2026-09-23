@@ -17,6 +17,15 @@ export type WarmupPolicy = z.infer<typeof WarmupPolicy>;
 export const DEFAULT_WARMUP_POLICY: WarmupPolicy = {version:1, emails_per_day:22, ramp:"normal", reply_rate:30,
   schedule:"Weekdays - 8am to 6pm", timezone:"America/New_York", audience:"inherit"};
 const name = z.string().trim().max(80).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
+// Browsers report some ICU ids that are only backward links in tzdata. PHP's
+// default identifier list (Mailivery) omits those, and a rejected create would
+// hold setup for review, so the long-standing canonical name is sent instead.
+const LEGACY_ZONES:Record<string,string> = {"America/Buenos_Aires":"America/Argentina/Buenos_Aires",
+  "America/Catamarca":"America/Argentina/Catamarca", "America/Cordoba":"America/Argentina/Cordoba",
+  "America/Jujuy":"America/Argentina/Jujuy", "America/Mendoza":"America/Argentina/Mendoza",
+  "America/Indianapolis":"America/Indiana/Indianapolis", "America/Louisville":"America/Kentucky/Louisville",
+  "America/Godthab":"America/Nuuk", "Asia/Calcutta":"Asia/Kolkata", "Asia/Saigon":"Asia/Ho_Chi_Minh",
+  "Asia/Katmandu":"Asia/Kathmandu", "Asia/Rangoon":"Asia/Yangon", "Atlantic/Faeroe":"Atlantic/Faroe"};
 // Lifty owns the warmup policy; the founder supplies only the sender name and
 // the browser supplies its timezone (an unusable one falls back to the default).
 export const WarmupSetupSelection = z.strictObject({first_name:name.pipe(z.string().min(1)), last_name:name,
@@ -99,7 +108,8 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
       requireSecret(intent); requireSecret(browser);
       const parsed = WarmupSetupSelection.safeParse(input);
       if (!parsed.success) throw invalid();
-      const {first_name, last_name, timezone:browserZone} = parsed.data;
+      const {first_name, last_name} = parsed.data;
+      const browserZone = LEGACY_ZONES[parsed.data.timezone] ?? parsed.data.timezone;
       const policy = {...DEFAULT_WARMUP_POLICY, ...(timezone.safeParse(browserZone).success ? {timezone:browserZone} : {})};
       const state = newSetupSecret();
       const record = await call("choose", {intent_hash:hashSetupSecret(intent), browser_hash:hashSetupSecret(browser),

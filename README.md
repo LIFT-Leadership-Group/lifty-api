@@ -239,17 +239,15 @@ logs the key, the signed URL or Mailivery response bodies. Deploy the
 ### Google OAuth setup (LIF-995)
 
 OAuth-enabled servers return a one-hour, single-use Lifty `/warmup/setup`
-link. The page displays the Unipile-verified mailbox, asks only for the sender
-name and has one "Continue with Google" button. Lifty owns the warmup policy:
+link. The page shows the mailbox, asks only for the sender name and has one
+"Continue with Google" button. Lifty owns the warmup policy:
 the stored version-1 policy is `DEFAULT_WARMUP_POLICY` in `src/warmup-setup.ts`
 with the timezone the browser reports (the default applies when the browser
 sends none or an invalid IANA zone). The page's only script fills that
 timezone and is allowed by hash in the CSP. The policy does not reserve the
 shared Mailivery daily pool or change Lifty's outreach cap. Provider refusal
 leaves setup blocked. Policy is immutable after handoff; editing an
-already-bound warmup is not part of this setup surface. The page warns that
-Google shows its unverified-app screen until the app passes restricted-scope
-verification.
+already-bound warmup is not part of this setup surface.
 
 Google consent requests `openid email https://mail.google.com/`, offline
 access, PKCE and a nonce. The callback verifies Google's signature, issuer,

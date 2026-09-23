@@ -48,14 +48,10 @@ date; do not compute your own.
 
 `lifty email warmup start --workspace <workspace>` returns the actual setup
 link. When it points to Lifty, show it as "Set up warmup for your mailbox".
-The page shows the same Unipile-verified address, asks for the name on warmup
-emails and has one "Continue with Google" button. Lifty sets the warmup
-settings; the founder does not choose them. Google must verify that exact
-address before Lifty sends tokens to Mailivery. Lifty forwards those tokens
-once without storing or logging them. Mailivery stores the credentials it
-needs to run warmup. During the pilot Google shows a "hasn't verified this
-app" screen first; tell the founder to choose Advanced, then Go to Lifty.
-The page works for Gmail and Google Workspace mailboxes only. The setup flow
+The page shows the mailbox, asks for the name on warmup emails and has one
+"Continue with Google" button. Lifty sets the warmup settings. Google must
+verify that exact address before Lifty sends tokens to Mailivery. Lifty
+forwards those tokens once without storing or logging them. The setup flow
 does not create another email address.
 
 Legacy servers may still return a Mailivery-hosted link. That Google form

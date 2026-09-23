@@ -12,15 +12,14 @@ function harness() {
     choose:vi.fn(async()=>"https://accounts.google.com/o/oauth2/v2/auth?state=not-a-secret"), callback:vi.fn()};
   return {setup, app:createWarmupSetupRouter(setup)};
 }
-it("shows the verified mailbox with one Google button, no warmup settings, and protected browser cookies/headers", async () => {
+it("shows only the mailbox, name fields and one Google button, with protected browser cookies/headers", async () => {
   const {app} = harness();
   const res = await app.request(`https://api.lifty.test/setup?intent=${token}`);
   const html = await res.text();
   expect(res.status).toBe(200);
   expect(html).toContain("ada@example.test");
   expect(html).toContain("Continue with Google");
-  expect(html).toContain("Go to Lifty");
-  expect(html).not.toMatch(/type="password"|name="email"|name="method"|name="emails_per_day"|name="reply_rate"|App Password/);
+  expect(html).not.toMatch(/type="password"|name="email"|name="method"|name="emails_per_day"|name="reply_rate"|App Password|Unipile/);
   expect(html).toMatch(/name="timezone" id="tz" value="America\/New_York"/);
   expect(res.headers.get("set-cookie")).toMatch(/__Host-lifty-warmup-browser=.+HttpOnly.+Secure.+SameSite=Lax/);
   expect(res.headers.get("cache-control")).toBe("no-store");

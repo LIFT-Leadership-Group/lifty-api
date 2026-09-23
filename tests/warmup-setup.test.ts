@@ -53,6 +53,9 @@ describe("warmup setup OAuth handoff", () => {
     const h=harness();
     await h.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"Europe/Madrid"});
     expect(h.writes[0]?.payload).toMatchObject({method:"google",first_name:"Ada",last_name:"",policy:{...DEFAULT_WARMUP_POLICY,timezone:"Europe/Madrid"}});
+    const legacy=harness();
+    await legacy.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"America/Buenos_Aires"});
+    expect(legacy.writes[0]?.payload.policy).toEqual({...DEFAULT_WARMUP_POLICY,timezone:"America/Argentina/Buenos_Aires"});
     for (const zone of ["", "fake/zone"]) {
       const other=harness();
       await other.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:zone});
