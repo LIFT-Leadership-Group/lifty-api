@@ -127,13 +127,62 @@ describe("warmup operations", () => {
     expect(result).toMatchObject({ state: "link_issued", connect_url: signedUrl, expires_at: new Date(expires * 1000).toISOString() });
   });
 
-  it("re-issues a form for Microsoft consent but not for a running warmup", async () => {
-    const consent = harness({ data: stored({}, { state: "pending_consent", blocking_reason: "microsoft_consent_pending" }) });
-    expect((await consent.ops.start(consent.session, "senja")).connect_url).toBe(signedUrl);
+  it("never mints a second form while Microsoft consent is pending", async () => {
+    for (const reason of ["microsoft_consent_pending", null]) {
+      const consent = harness({ data: stored({}, { state: "pending_consent", blocking_reason: reason }) });
+      const result = await consent.ops.start(consent.session, "senja");
+      expect(result).toMatchObject({ state: "pending_consent", connect_url: null, expires_at: null,
+        blocking_reason: { code: "microsoft_consent_pending", message: expect.stringMatching(/Finish the Microsoft consent step in Mailivery/) } });
+      expect(consent.http).toHaveLength(0);
+    }
+    const noKey = harness({ key: null, data: stored({}, { state: "pending_consent" }) });
+    expect(await noKey.ops.start(noKey.session, "senja")).toMatchObject({ state: "pending_consent", connect_url: null });
+  });
+
+  it("starts a new warmup after removal with a fresh link", async () => {
+    let calls = 0;
+    const h = harness();
+    const session = { userId: user, client: { rpc: async (_name: string, args: Record<string, unknown>) => {
+      calls++;
+      return { data: args.p_operation === "status"
+        ? stored({ evidence: null }, { state: "removed", provider_campaign_bound: true })
+        : stored({ evidence: null }, { state: "link_issued", binding_ref: sender, sender_ref: binding, provider_campaign_bound: false, snapshot: null, last_readback_at: null }), error: null };
+    } } };
+    expect(await h.ops.status(session, "senja")).toMatchObject({ state: "removed", state_label: "Removed" });
+    const result = await h.ops.start(session, "senja");
+    expect(result).toMatchObject({ state: "link_issued", connect_url: signedUrl });
+    expect(new URL(h.http[0]!.url).searchParams.get("tags")).toBe(`lifty-ws:${workspace},lifty-sender:${binding}`);
+    expect(calls).toBe(2);
+  });
+
+  it("reflects pending actions in the label, with remove winning", () => {
+    expect(presentWarmupStatus(stored({}, { requested_action: "pause" }), now).state_label).toBe("Pausing warmup at the next check");
+    expect(presentWarmupStatus(stored({}, { state: "paused", requested_action: "resume" }), now).state_label).toBe("Resuming warmup at the next check");
+    expect(presentWarmupStatus(stored({}, { state: "paused", requested_action: "remove" }), now).state_label).toBe("Removing warmup at the next check");
+    expect(presentWarmupStatus(stored({}, { state: "problem", requested_action: "remove" }), now).state_label).toBe("Removing warmup at the next check");
+    expect(presentWarmupStatus(stored({}, { state: "paused", requested_action: null }), now).state_label).toBe("Paused");
+    const removing = presentWarmupStatus(stored({}, { requested_action: "remove" }), now);
+    expect(removing.recommended_go_live.message).toMatch(/not running right now/);
+  });
+
+  it("does not mint a form for a running warmup", async () => {
     const running = harness();
     const result = await running.ops.start(running.session, "senja");
     expect(result).toMatchObject({ state: "warming", connect_url: null, expires_at: null });
     expect(running.http).toHaveLength(0);
+  });
+
+  it.each([
+    ["PT401", "unauthenticated", 401, /Sign in/],
+    ["PT403", "email_workspace_forbidden", 403, /Lifty workspace you belong to/],
+    ["PT409", "email_warmup_mailbox_taken", 409, /another Lifty workspace/],
+    ["PT409", "email_workspace_suspended", 409, /paused/],
+    ["PT409", "email_warmup_not_started", 409, /Start it first/],
+    ["PT400", "email_invalid_request", 400, /workspace/],
+  ] as const)("maps %s %s to a founder message", async (code, message, status, text) => {
+    const h = harness({ error: { code, message } });
+    await expect(h.ops.start(h.session, "senja")).rejects.toMatchObject({ status, code: message.toUpperCase(), message: expect.stringMatching(text) });
+    expect(h.http).toHaveLength(0);
   });
 
   it("refuses without a verified email connection", async () => {

@@ -52,13 +52,18 @@ to the same address on Mailivery's page; Lifty never sees the password. A
 different address stops warmup with a mismatch. After they finish, check
 `status` again. The state moves from waiting for the Mailivery connection to
 warming after Lifty's next check. If status says Microsoft consent is pending,
-run `start` again for a fresh link. `start` fails with
-`EMAIL_CONNECTION_REQUIRED` until a connected, verified email account exists.
+the founder finishes the consent step inside Mailivery; do not run `start` for
+a new link. `start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
+verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
+another Lifty workspace already warms the same mailbox. After a removal,
+status shows `Removed`; `start` sets up a new warmup with a new link.
 
 Pause, resume and remove only when the founder asks:
 `lifty email warmup pause|resume|remove --workspace <workspace>`. Lifty applies
-the request at its next check. For an `outreach` account, pausing or removing
-warmup delays or blocks sending; say so and get an explicit yes first.
+the request at its next check. A pending removal wins over pause or resume,
+and resume on a running warmup only cancels a pending pause. For an `outreach`
+account, pausing or removing warmup delays or blocks sending; say so and get
+an explicit yes first.
 
 ## Later edits
 

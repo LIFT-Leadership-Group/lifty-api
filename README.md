@@ -219,11 +219,15 @@ Routes, all bound to the caller's session and an explicit workspace:
   N of 21, today's warmup volume and ramp target, SPF/DMARC/MX, last check
   time, a plain-words blocking reason and `recommended_go_live`.
 - `POST /v1/email/warmup/start` `{workspace}` calls
-  `lifty_email_warmup('start')`. While the binding is `link_issued` or
-  `pending_consent` it mints a hosted Mailivery form URL tagged
+  `lifty_email_warmup('start')`. Only while the binding is `link_issued`
+  (no Mailivery campaign bound yet) it mints a hosted Mailivery form URL tagged
   `lifty-ws:<workspace_ref>` and `lifty-sender:<sender_ref>`; `expires_at`
   comes from the signed URL's own `expires` claim. Without a verified email
-  connection the database answers `email_connection_required`.
+  connection the database answers `email_connection_required`. A
+  `pending_consent` binding already has its campaign, so `start` returns status
+  and tells the founder to finish Microsoft consent in Mailivery; a second form
+  would create another billed campaign. A mailbox warmed from another
+  workspace fails with `email_warmup_mailbox_taken`.
 - `POST /v1/email/warmup/pause|resume|remove` `{workspace}` record the
   requested action. The jobs worker applies it at the provider.
 

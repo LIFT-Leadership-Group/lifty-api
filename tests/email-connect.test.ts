@@ -566,6 +566,22 @@ describe("hosted selection and exact-attempt verification", () => {
     expect(declared).toEqual(["outreach"]);
     await expect(ops.declare(state, undefined, "shared" as never)).rejects.toMatchObject({ code: "EMAIL_DECLARATION_INVALID" });
   });
+  it.each([
+    ["email_profile_conflict", "EMAIL_PROFILE_CONFLICT", undefined],
+    ["email_provider_conflict", "EMAIL_PROVIDER_CONFLICT", "google"],
+  ] as const)("explains a changed declaration (%s) as a disconnect-and-reconnect step, not an outage", async (dbMessage, code, provider) => {
+    const ops = createEmailConnectOperations({ ...settings, fetchImpl: async (_url, init) => {
+      const args = JSON.parse(String(init?.body));
+      if (args.p_operation === "declare") return json({ code: "PT409", message: dbMessage }, 409);
+      return json({ ...intent, email: null, selection_required: true });
+    } });
+    await expect(ops.declare(state, provider, "outreach")).rejects.toMatchObject({ status: 409, code, message: expect.stringMatching(/disconnect .*connect again/i) });
+    const app = createApp({ authorizeEmail: ops.authorize, declareEmail: ops.declare, log: () => {} });
+    const response = await app.request("/unipile/start", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin: "http://localhost" },
+      body: `intent=${state}&mailbox_use=outreach${provider ? `&email_provider=${provider}` : ""}` });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatchObject({ code, message: expect.stringMatching(/disconnect .*connect again/i) });
+  });
   it("verifies the selected primary mailbox from provider readback without inventing an address", async () => {
     const h = harness({ intent: { ...intent, email: null } });
     await h.ops.callback(state, body);

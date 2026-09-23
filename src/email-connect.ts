@@ -29,12 +29,12 @@ const Intent = z.object({provider_selection_required:z.boolean().optional(),emai
 function fail(code: string, status = 409): never {
   const messages: Record<string,string> = {
     EMAIL_WORKSPACE_FORBIDDEN: "Choose a workspace you belong to.",
-    EMAIL_PROFILE_CONFLICT: "Disconnect this workspace’s email first, then run connect again.",
+    EMAIL_PROFILE_CONFLICT: "This mailbox already has a declared use. To change how you use it, disconnect this workspace’s email and connect again.",
     EMAIL_INTENT_EXPIRED: "This email connection link expired. Run the connect command again.",
     EMAIL_LINK_PENDING: "An email connection link is being prepared. Try opening it again shortly.",
     EMAIL_ACCOUNT_TAKEN: "This email is linked to another workspace. Another authorization link will not fix that. Resolve the existing workspace connection before trying again.",
     EMAIL_PROVIDER_REQUIRED: "Choose your email provider before continuing.",
-    EMAIL_PROVIDER_CONFLICT: "This link already has an email provider selected. Continue with the original selection or start again in Lifty.",
+    EMAIL_PROVIDER_CONFLICT: "This link already has an email provider or mailbox use chosen. Continue with the original choices, or disconnect and connect again in Lifty to change them.",
     EMAIL_PROVIDER_INVALID: "Choose one of the email providers shown in Lifty.",
     EMAIL_RESELECTION_REQUIRES_DISCONNECT: "Disconnect this workspace’s saved email before choosing another account or provider.",
     EMAIL_RESELECTION_PENDING_WORK: "This workspace still has email work in progress. Let it finish before choosing another email account.",

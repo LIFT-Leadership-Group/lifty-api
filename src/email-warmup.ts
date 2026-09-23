@@ -25,16 +25,15 @@ export const WARMUP_WORKSPACE_TAG = "lifty-ws:";
 export const WARMUP_SENDER_TAG = "lifty-sender:";
 const DEFAULT_MAILIVERY_BASE = "https://app.mailivery.io/api/v1";
 
+// Errors raised by lifty_email_warmup (LIF-987 migration 20260925123000).
 const rpcMessages: Record<string, { status: number; message: string }> = {
-  email_connection_required: { status: 409, message: "Connect and verify this workspace's email account before starting warmup." },
-  email_declaration_required: { status: 409, message: "Say whether this is a mailbox you already use or a new account for outreach, then start warmup." },
-  email_workspace_forbidden: { status: 403, message: "Choose a workspace you belong to." },
-  email_workspace_suspended: { status: 409, message: "This workspace is paused. Resume it before changing warmup." },
-  email_user_required: { status: 401, message: "Sign in to LIFTY before changing warmup." },
-  email_warmup_not_started: { status: 409, message: "Warmup has not started for this mailbox. Start it first." },
-  email_warmup_not_paused: { status: 409, message: "Warmup is not paused, so there is nothing to resume." },
-  email_warmup_removed: { status: 409, message: "Warmup was removed for this mailbox. Start it again to set up a new warmup." },
+  unauthenticated: { status: 401, message: "Sign in to LIFTY before checking or changing warmup." },
   email_invalid_request: { status: 400, message: "Choose a workspace and a supported warmup action." },
+  email_workspace_forbidden: { status: 403, message: "Choose a Lifty workspace you belong to." },
+  email_workspace_suspended: { status: 409, message: "This workspace is paused. Resume it before starting or resuming warmup." },
+  email_connection_required: { status: 409, message: "Connect and verify this workspace's email account before starting warmup." },
+  email_warmup_mailbox_taken: { status: 409, message: "This mailbox is already being warmed up from another Lifty workspace. Remove warmup there first, or connect a different mailbox here." },
+  email_warmup_not_started: { status: 409, message: "Warmup has not started for this mailbox. Start it first." },
 };
 
 const blockingMessages: Record<string, string> = {
@@ -42,7 +41,7 @@ const blockingMessages: Record<string, string> = {
   connection_problem: "Mailivery lost access to the mailbox. Warmup days stop counting until the mailbox is reconnected in Mailivery.",
   dns_invalid: "SPF, DMARC or MX for this domain is not valid. Warmup days don't count until all three pass.",
   status_inactive: "Mailivery reports that warmup is not running for this mailbox.",
-  microsoft_consent_pending: "Microsoft needs consent before Mailivery can warm this mailbox. Open the link again and finish the Microsoft step.",
+  microsoft_consent_pending: "Microsoft still needs your consent before Mailivery can warm this mailbox. Finish the Microsoft consent step in Mailivery. You don't need a new Lifty link.",
 };
 
 const stateLabels: Record<WarmupStatus["state"], string> = {
@@ -54,6 +53,14 @@ const stateLabels: Record<WarmupStatus["state"], string> = {
   problem: "Needs attention",
   removed: "Removed",
 };
+
+// A pending remove wins over pause/resume in the database, so it wins here too.
+function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"]): string {
+  if (state === "removed" || state === "not_started" || !requested) return stateLabels[state];
+  if (requested === "remove") return "Removing warmup at the next check";
+  if (requested === "pause") return state === "paused" ? stateLabels.paused : "Pausing warmup at the next check";
+  return state === "paused" ? "Resuming warmup at the next check" : stateLabels[state];
+}
 
 function mapRpcError(error: unknown): never {
   const parsed = z.object({ code: z.string().optional(), message: z.string().optional() }).safeParse(error);
@@ -80,7 +87,9 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
   const snapshot = binding?.snapshot ?? null;
   const activeDays = stored.evidence?.active_duration_days ?? 0;
   const required = stored.required_active_days;
-  const reasonCode = binding?.blocking_reason && /^[a-z][a-z0-9_]{0,63}$/.test(binding.blocking_reason) ? binding.blocking_reason : null;
+  const storedReason = binding?.blocking_reason && /^[a-z][a-z0-9_]{0,63}$/.test(binding.blocking_reason) ? binding.blocking_reason : null;
+  // A campaign waiting for Microsoft consent is already bound; say what the founder must finish.
+  const reasonCode = storedReason ?? (state === "pending_consent" ? "microsoft_consent_pending" : null);
   const blocking = reasonCode ? {
     code: reasonCode,
     message: blockingMessages[reasonCode] ?? "Warmup has a problem Lifty can't describe yet. Check status again later.",
@@ -115,7 +124,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
     warmup_required: stored.mailbox_use === "outreach",
     required_active_days: required,
     state,
-    state_label: stateLabels[state],
+    state_label: label(state, binding?.requested_action ?? null),
     requested_action: binding?.requested_action ?? null,
     blocking_reason: blocking,
     active_days: activeDays,
@@ -189,15 +198,17 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
   async function start(session: AuthSession, workspace: string): Promise<WarmupStartResult> {
     const input = WarmupWorkspaceRequest.parse({ workspace });
     if (!mailivery) {
-      // Without the provider key nothing is written; an already-running warmup is still reported.
+      // Without the provider key nothing is written; an existing bound warmup is still reported.
       const current = await rpc(session, "status", input.workspace);
       const state = current.binding?.state;
-      if (!state || state === "removed" || state === "link_issued" || state === "pending_consent") throw notConfigured();
+      if (!state || state === "removed" || state === "link_issued") throw notConfigured();
       return WarmupStartResult.parse({ ...presentWarmupStatus(current, now()), connect_url: null, expires_at: null });
     }
     const stored = await rpc(session, "start", input.workspace);
     if (!stored.binding || stored.email === null) throw new PublicError({ status: 502, code: "EMAIL_WARMUP_UNAVAILABLE", message: "LIFTY could not prepare warmup. Retry shortly." });
-    const needsLink = stored.binding.state === "link_issued" || stored.binding.state === "pending_consent";
+    // Only an unbound binding gets a form. pending_consent already has a bound
+    // campaign; a second form would create another billed Mailivery campaign.
+    const needsLink = stored.binding.state === "link_issued";
     const link = needsLink ? await mintFormUrl(stored.workspace_ref, stored.binding.sender_ref) : null;
     return WarmupStartResult.parse({ ...presentWarmupStatus(stored, now()),
       connect_url: link?.url ?? null, expires_at: link?.expiresAt ?? null });
