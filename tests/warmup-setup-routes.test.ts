@@ -22,7 +22,7 @@ it("shows only the mailbox, name fields and one Google button, with protected br
   expect(html).not.toMatch(/type="password"|name="email"|name="method"|name="emails_per_day"|name="reply_rate"|App Password|Unipile/);
   expect(html).toMatch(/name="timezone" id="tz" value="America\/New_York"/);
   expect(res.headers.get("set-cookie")).toMatch(/__Host-lifty-warmup-browser=.+HttpOnly.+Secure.+SameSite=Lax/);
-  expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("cache-control")).toBe("no-store, no-transform");
   expect(res.headers.get("referrer-policy")).toBe("same-origin");
   const csp = res.headers.get("content-security-policy")!;
   expect(csp).toContain("frame-ancestors 'none'");
