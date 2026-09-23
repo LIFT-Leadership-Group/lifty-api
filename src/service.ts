@@ -13,6 +13,7 @@ import { apolloCredentials } from "./apollo-credentials.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
+import { createEmailWarmupOperations } from "./email-warmup.js";
 
 import { randomBytes } from "node:crypto";
 
@@ -69,6 +70,9 @@ import {
 export function createProductionApp(config: ServiceConfig) {
   const linkedin = config.linkedin ? createLinkedinConnectOperations(config.linkedin) : null;
   const email = config.email ? createEmailConnectOperations(config.email) : null;
+  // Warmup reads/changes go through the founder RPC with the caller's session;
+  // only minting a hosted Mailivery form needs MAILIVERY_API_KEY.
+  const warmup = createEmailWarmupOperations({ mailivery: config.mailivery ?? null });
   const hubspot = createHubspotConnectOperations(config.hubspot);
   const slackSettings = config.slack;
   const slack = slackSettings
@@ -112,6 +116,9 @@ export function createProductionApp(config: ServiceConfig) {
       declareEmail: email.declare,
       completeEmailCallback: email.callback,
       receiveEmailV2Return: email.v2Return,
+      getEmailWarmup: warmup.status,
+      startEmailWarmup: warmup.start,
+      changeEmailWarmup: (session, workspace, operation) => warmup[operation](session, workspace),
     } : {}),
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,

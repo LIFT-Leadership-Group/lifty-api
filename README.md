@@ -206,6 +206,36 @@ policy. LIF-828 must enforce the per-physical-mailbox 10/day budget atomically
 across all automated sends, retries and workspace resets before any sending is
 enabled. Personal-use exemption never invents historical warmup dates.
 
+## Mailivery warmup (LIF-989)
+
+The hosted email form now asks how the founder uses the mailbox. `personal`
+stays the default. `outreach` (a new or dedicated account) is accepted and
+means warmup is required: outreach unlocks only after 21 active warmup days
+with a healthy check from the last 24 hours. Paused days do not count.
+
+Routes, all bound to the caller's session and an explicit workspace:
+
+- `GET /v1/email/warmup?workspace=<slug-or-id>` returns state, active days
+  N of 21, today's warmup volume and ramp target, SPF/DMARC/MX, last check
+  time, a plain-words blocking reason and `recommended_go_live`.
+- `POST /v1/email/warmup/start` `{workspace}` calls
+  `lifty_email_warmup('start')`. Only while the binding is `link_issued`
+  (no Mailivery campaign bound yet) it mints a hosted Mailivery form URL tagged
+  `lifty-ws:<workspace_ref>` and `lifty-sender:<sender_ref>`; `expires_at`
+  comes from the signed URL's own `expires` claim. Without a verified email
+  connection the database answers `email_connection_required`. A
+  `pending_consent` binding already has its campaign, so `start` returns status
+  and tells the founder to finish Microsoft consent in Mailivery; a second form
+  would create another billed campaign. A mailbox warmed from another
+  workspace fails with `email_warmup_mailbox_taken`.
+- `POST /v1/email/warmup/pause|resume|remove` `{workspace}` record the
+  requested action. The jobs worker applies it at the provider.
+
+Configure `MAILIVERY_API_KEY` in the API deployment to enable `start`. Without
+it `start` returns `EMAIL_WARMUP_NOT_CONFIGURED` before any write. The API never
+logs the key, the signed URL or Mailivery response bodies. Deploy the
+`lifty_email_warmup` founder RPC migration before this API.
+
 
 Acquisition recovery is explicit and asynchronous: GET `/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}` reads status; POST `{operation:"request",expected_acquisition_ref:"UUID"}` requests authoritative task verification only. POST `{operation:"restart",expected_acquisition_ref:"UUID"}` restarts only the exact verified terminal acquisition, preserving the first-run cohort and historical allowance. Both mutations bind the selected workspace before SQL changes. Failed enqueue leaves its durable request/attempt intact; retry the same references. This requires the LIF-641 recovery DB/verifier deployment.
 

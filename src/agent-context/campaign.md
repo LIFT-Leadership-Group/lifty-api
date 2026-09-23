@@ -176,14 +176,16 @@ update; current v5 operation/schema changes come from refreshed API context.
 
 If no eligible email account is connected, offer the hosted email connection
 from the `sending-accounts` stage. Start it with the published email input;
-provider/account selection and the habitual personal-mailbox declaration happen
+provider/account selection and the mailbox-use declaration happen
 in the browser. Do not ask for an address or mailbox-use questionnaire first.
 Reconnection creates a separately verifiable attempt while the existing grant
 remains usable; it does not require a destructive disconnect. A replacement
 account still follows the provider's existing pinned-account policy. Verify the
 exact returned attempt after the founder finishes. Connection never activates
-sending. The habitual-use beta supports existing correspondence mailboxes and
-blocks new/dedicated outreach mailboxes; read current preview policy and blockers
+sending. The hosted form asks whether the account is a mailbox the founder
+already uses (`personal`, the default) or a new or dedicated account for
+outreach (`outreach`). Once the connection is verified, offer warmup as the
+`sending-accounts` stage describes. Read current preview policy and blockers
 before preparing or approving a send.
 
 Use this path only when the founder asks to prepare or operate a campaign.
@@ -206,10 +208,14 @@ CLI returns; never substitute another workspace or provider silently.
    approval and cancel outstanding steps of the old version.
 4. GET the exact preview. Show sender, recipient, copy, schedule, daily ceiling
    and blockers. Do not fabricate warmup or placement evidence. Habitual personal
-   or business correspondence accounts may qualify, including corporate domains;
-   new/dedicated outreach accounts are blocked. Explain that managed warmup is
-   unavailable and offer a suitable account through the approved connection
-   workflow. Never disconnect an account without explicit authorization.
+   or business correspondence accounts may qualify, including corporate domains.
+   A new or dedicated `outreach` account shows `email_warmup_required` until
+   its warmup passes: 21 active days, healthy, checked within the last 24 hours.
+   Read `lifty email warmup status --workspace <workspace>` and give the
+   founder its `recommended_go_live` date and message. Never promise an earlier
+   date. The founder can still prepare and approve the preview; activation
+   stays blocked until outreach unlocks. Never disconnect an account without
+   explicit authorization.
    For `lifty.personal-beta.v1`, placement is neither required nor performed:
    do not request tests, confirm seeds or fabricate a passed result. Review the
    actual policy, blockers and digest. A policy/content change requires a new

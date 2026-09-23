@@ -102,7 +102,7 @@ describe("fresh hosted email provider choice",()=>{
     const h=harness(),response=await h.app.request(`/unipile/start?intent=${state}`),html=await response.text();
     expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-security-policy")).toContain("form-action 'self'");
-    for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","It is not a new or dedicated outreach mailbox."])expect(html).toContain(label);
+    for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","A new account for outreach"])expect(html).toContain(label);
     expect(html).toContain('class="brand" aria-label="Lifty"');
     // Opaque intent values can randomly contain V1/V2; branding is visible copy.
     expect(html.replace(/<[^>]+>/g," ")).not.toMatch(/\b(?:Unipile|V1|V2)\b/);expect(h.http).toHaveLength(0);

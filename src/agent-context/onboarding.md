@@ -304,14 +304,17 @@ only output shape.
     delivery only when all stages are confirmed by the receipt.
 16. When the founder chooses email setup, fetch `context sending-accounts`
     and follow its current email operation schema, even while sample review is
-    pending. Briefly recommend a Gmail, Google Workspace, Outlook, Microsoft 365, or IMAP/SMTP account they already
-    use regularly when appropriate under the current policy. Hosted selection
-    handles provider, account and habitual-use declarations; do not add an
-    email-address or mailbox-use questionnaire. GET the current state, POST
-    when the founder chooses connection, show the real returned link immediately
-    and verify GET for that same attempt. The founder enters credentials only
-    in the hosted flow. Connecting does not activate sending; skipping this
-    option never blocks onboarding.
+    pending. Recommend a Gmail, Google Workspace, Outlook, Microsoft 365, or
+    IMAP/SMTP account they already use, so campaigns can start without
+    waiting. A new or dedicated outreach account also works but needs 21
+    active days of warmup first. Hosted selection handles provider, account
+    and mailbox-use declarations; do not add an email-address or mailbox-use
+    questionnaire. GET the current state, POST when the founder chooses
+    connection, show the real returned link immediately and verify GET for
+    that same attempt. The founder enters credentials only in the hosted
+    flow. After it connects, offer warmup as the sending-accounts guide
+    describes. Connecting does not activate sending; skipping this option
+    never blocks onboarding.
 17. For requested LinkedIn setup, use the same `context sending-accounts`
     guide and its current LinkedIn declarations and operation schema. Ask only
     for missing required inputs. Keep credentials in the browser, show the

@@ -122,6 +122,7 @@ import { LinkedinCampaignRequest, LinkedinCampaignResult, linkedinCampaignResult
 import { LinkedinConnectRequest, LinkedinConnectResult, LegacyLinkedinConnectResult, LinkedinConnectionStatus, LinkedinWorkspaceRequest, LinkedinDisconnectRequest, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 import { HostedEmailProvider, EmailConnectRequest, EmailConnectResult, LegacyEmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
+import { WarmupStartResult, WarmupStatus, WarmupWorkspaceRequest, type WarmupStartResult as WarmupStart, type WarmupStatus as WarmupStatusValue } from "./email-warmup-contracts.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
 // The create-workspace body carries only a bounded name and description.
@@ -165,7 +166,10 @@ export interface AppDependencies {
   getEmailConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<EmailStatus>;
   disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
   authorizeEmail(state: string): Promise<string>;
-  declareEmail(state: string, provider?: HostedEmailProvider): Promise<string>;
+  declareEmail(state: string, provider?: HostedEmailProvider, mailboxUse?: "personal" | "outreach"): Promise<string>;
+  getEmailWarmup(session: AuthSession, workspace: string): Promise<WarmupStatusValue>;
+  startEmailWarmup(session: AuthSession, workspace: string): Promise<WarmupStart>;
+  changeEmailWarmup(session: AuthSession, workspace: string, operation: "pause" | "resume" | "remove"): Promise<WarmupStatusValue>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
   getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
@@ -404,6 +408,17 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/connect",operationId:"startEmailConnect",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:EmailConnectRequest}}}},
     responses:{200:JsonResponse(LegacyEmailConnectResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/warmup",operationId:"getEmailWarmup",security:[{bearerAuth:[]}],
+    request:{query:WarmupWorkspaceRequest},responses:{200:JsonResponse(WarmupStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/warmup/start",operationId:"startEmailWarmup",security:[{bearerAuth:[]}],
+    description:"Start or resume setup of Mailivery warmup for the workspace's verified email account. Returns a hosted Mailivery form URL while the mailbox still needs connecting; its expiry comes from the signed URL.",
+    request:{body:{required:true,content:{"application/json":{schema:WarmupWorkspaceRequest}}}},
+    responses:{200:JsonResponse(WarmupStartResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),429:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  for (const operation of ["pause","resume","remove"] as const) {
+    app.openAPIRegistry.registerPath({method:"post",path:`/v1/email/warmup/${operation}`,operationId:`${operation}EmailWarmup`,security:[{bearerAuth:[]}],
+      request:{body:{required:true,content:{"application/json":{schema:WarmupWorkspaceRequest}}}},
+      responses:{200:JsonResponse(WarmupStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  }
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email",operationId:"getEmailConnection",security:[{bearerAuth:[]}],
     request:{query:z.object({workspace:EmailConnectRequest.shape.workspace})},responses:{200:JsonResponse(EmailConnectionStatus),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({
@@ -936,6 +951,9 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 const defaultDependencies: AppDependencies = {
   getConnectionAttempt,
   declareEmail: async () => { throw new PublicError({ status: 503, code: "EMAIL_NOT_CONFIGURED", message: "Email connection is not configured yet." }); },
+  getEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet." }); },
+  startEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet. Nothing was changed." }); },
+  changeEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet. Nothing was changed." }); },
   denyHubspotCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
   denySlackCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
   getApolloAllowance: async () => { throw new PublicError({status:503,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"Apollo allowance is not configured yet."}); },
@@ -1444,10 +1462,12 @@ export function createApp(
     if (form.getAll("intent").length !== 1 || form.getAll("mailbox_use").length !== 1
       || form.getAll("email_provider").length > 1
       || (form.has("email_provider") && !HostedEmailProvider.safeParse(form.get("email_provider")).success)
-      || [...form.keys()].some(key => !["intent", "mailbox_use", "email_provider"].includes(key)) || form.get("mailbox_use") !== "personal") {
-      return errorJson(context, 400, "INVALID_REQUEST", "Confirm your regular personal mailbox before continuing.");
+      || [...form.keys()].some(key => !["intent", "mailbox_use", "email_provider"].includes(key))
+      || !["personal", "outreach"].includes(form.get("mailbox_use") ?? "")) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Say how you use this mailbox before continuing.");
     }
-    const target = await dependencies.declareEmail(form.get("intent")!, form.has("email_provider") ? HostedEmailProvider.parse(form.get("email_provider")) : undefined);
+    const mailboxUse = form.get("mailbox_use") === "outreach" ? "outreach" as const : "personal" as const;
+    const target = await dependencies.declareEmail(form.get("intent")!, form.has("email_provider") ? HostedEmailProvider.parse(form.get("email_provider")) : undefined, mailboxUse);
     if (target === "authorization_received") {
       return context.html(renderEmailAuthorizationReceivedPage(), 200, {
         "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
@@ -1579,7 +1599,7 @@ export function createApp(
   // Expired entries are removed on access, without a process-owning timer.
   app.use("/v1/*", async (context, next) => {
     if (context.req.method !== "POST" || ![
-      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/linkedin/connect",
+      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
       "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
       "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync",
     ].includes(context.req.path)) return next();
@@ -2407,6 +2427,27 @@ export function createApp(
     if (result.status === "pending") delete result.expires_at;
     return context.json(LegacyEmailConnectResult.parse(result));
   });
+  app.get("/v1/email/warmup", async (context) => {
+    context.header("cache-control", "no-store");
+    const parsed = WarmupWorkspaceRequest.safeParse(context.req.query());
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace.");
+    return context.json(WarmupStatus.parse(await dependencies.getEmailWarmup(context.get("authSession"), parsed.data.workspace)));
+  });
+  for (const operation of ["start", "pause", "resume", "remove"] as const) {
+    app.post(`/v1/email/warmup/${operation}`, async (context) => {
+      context.header("cache-control", "no-store");
+      const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+      if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Warmup request is too large.");
+      let body: unknown;
+      try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace."); }
+      const parsed = WarmupWorkspaceRequest.safeParse(body);
+      if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace explicitly.");
+      const session = context.get("authSession");
+      return context.json(operation === "start"
+        ? WarmupStartResult.parse(await dependencies.startEmailWarmup(session, parsed.data.workspace))
+        : WarmupStatus.parse(await dependencies.changeEmailWarmup(session, parsed.data.workspace, operation)));
+    });
+  }
   app.get("/v1/email", async (context) => {
     context.header("cache-control", "no-store");
     const workspace = EmailConnectRequest.shape.workspace.safeParse(context.req.query("workspace"));

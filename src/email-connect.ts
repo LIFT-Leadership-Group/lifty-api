@@ -29,17 +29,18 @@ const Intent = z.object({provider_selection_required:z.boolean().optional(),emai
 function fail(code: string, status = 409): never {
   const messages: Record<string,string> = {
     EMAIL_WORKSPACE_FORBIDDEN: "Choose a workspace you belong to.",
-    EMAIL_PROFILE_CONFLICT: "Disconnect this workspace’s email first, then run connect again with a mailbox you use regularly.",
+    EMAIL_PROFILE_CONFLICT: "This mailbox already has a declared use. To change how you use it, disconnect this workspace’s email and connect again.",
     EMAIL_INTENT_EXPIRED: "This email connection link expired. Run the connect command again.",
     EMAIL_LINK_PENDING: "An email connection link is being prepared. Try opening it again shortly.",
     EMAIL_ACCOUNT_TAKEN: "This email is linked to another workspace. Another authorization link will not fix that. Resolve the existing workspace connection before trying again.",
     EMAIL_PROVIDER_REQUIRED: "Choose your email provider before continuing.",
-    EMAIL_PROVIDER_CONFLICT: "This link already has an email provider selected. Continue with the original selection or start again in Lifty.",
+    EMAIL_PROVIDER_CONFLICT: "This link already has an email provider or mailbox use chosen. Continue with the original choices, or disconnect and connect again in Lifty to change them.",
     EMAIL_PROVIDER_INVALID: "Choose one of the email providers shown in Lifty.",
     EMAIL_RESELECTION_REQUIRES_DISCONNECT: "Disconnect this workspace’s saved email before choosing another account or provider.",
     EMAIL_RESELECTION_PENDING_WORK: "This workspace still has email work in progress. Let it finish before choosing another email account.",
     EMAIL_PROVIDER_SELECTION_UNAVAILABLE: "Lifty could not open a new email provider selector. Try again later; the saved account has not been reconnected.",
     EMAIL_IDENTITY_MISMATCH: "Authorize the exact email address you selected in LIFTY.",
+    EMAIL_DECLARATION_INVALID: "Choose whether this is a mailbox you already use or a new account for outreach.",
   };
   throw new PublicError({status,code,message:messages[code] ?? "LIFTY could not complete the email connection. Try again from the CLI."});
 }
@@ -130,7 +131,9 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
   const publicProfile=(value:z.infer<typeof Stored>)=>({provider:"unipile" as const,channel:"email" as const,workspace_ref:value.workspace_ref,email:value.email??null,
     mailbox_use:value.mailbox_use??null,daily_limit:value.daily_limit,
     ...(value.email_policy ? {email_policy:value.email_policy} : {}),
-    warmup_required:value.email_policy?.habitual_only ? false : value.mailbox_use==="outreach",sending_enabled:false as const});
+    // Outreach (new/dedicated) mailboxes need verified warmup under every policy
+    // (LIF-985); regular personal/business mailboxes never do.
+    warmup_required:value.mailbox_use==="outreach",sending_enabled:false as const});
   async function status(session:AuthSession,workspace:string,attemptRef?:string):Promise<EmailStatus>{
     return readStatus(session,workspace,attemptRef,true);
   }
@@ -216,7 +219,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
       if (intent.account_id || intent.transport?.canonical_account_id || intent.transport?.connection_ref) fail("EMAIL_PROVIDER_CONFLICT");
       fail("EMAIL_PROVIDER_REQUIRED");
     }
-    if(intent.selection_required)throw new PublicError({status:409,code:"EMAIL_DECLARATION_REQUIRED",message:"Confirm that you regularly use this mailbox for personal or business conversations in the hosted connection flow."});
+    if(intent.selection_required)throw new PublicError({status:409,code:"EMAIL_DECLARATION_REQUIRED",message:"Say in the hosted connection flow whether this is a mailbox you already use or a new account for outreach."});
     if(intent.state==="ready" && intent.hosted_url)return intent.hosted_url;
     if(intent.state==="failed")fail("EMAIL_INTENT_EXPIRED",410);
     if (intent.email_provider && ((intent.email_provider === "google") !== (intent.transport?.api_version === "v2"))) fail("EMAIL_PROVIDER_CONFLICT");
@@ -269,10 +272,11 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     await rpc("disconnect", {workspace}, session);
     return status(session,workspace);
   }
-  async function declare(state:string,selectedProvider?:HostedEmailProvider):Promise<string>{
+  async function declare(state:string,selectedProvider?:HostedEmailProvider,mailboxUse:"personal"|"outreach"="personal"):Promise<string>{
     const id=open(state);
     if (selectedProvider !== undefined && !HostedEmailProvider.safeParse(selectedProvider).success) fail("EMAIL_PROVIDER_INVALID",400);
-    await rpc("declare",{intent_ref:id,mailbox_use:"personal",...(selectedProvider ? {email_provider:selectedProvider} : {})});
+    if (mailboxUse !== "personal" && mailboxUse !== "outreach") fail("EMAIL_DECLARATION_INVALID",400);
+    await rpc("declare",{intent_ref:id,mailbox_use:mailboxUse,...(selectedProvider ? {email_provider:selectedProvider} : {})});
     return authorize(state);
   }
   async function v2Return(state:string):Promise<void> {
