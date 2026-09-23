@@ -4,7 +4,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { newSetupSecret, type WarmupSetup } from "./warmup-setup.js";
-import { renderWarmupReceipt, renderWarmupSetupPage } from "./warmup-setup-page.js";
+import { renderWarmupReceipt, renderWarmupSetupPage, WARMUP_SETUP_SCRIPT_HASH } from "./warmup-setup-page.js";
 import { PublicError } from "./errors.js";
 
 export function createWarmupSetupRouter(setup:WarmupSetup) {
@@ -14,7 +14,7 @@ export function createWarmupSetupRouter(setup:WarmupSetup) {
   const error = (c:Context, status:ContentfulStatusCode, message:string) => c.html(renderWarmupReceipt("Setup needs attention", message), status);
   app.use("*", async(c,next)=>{
     c.header("cache-control","no-store"); c.header("referrer-policy","no-referrer"); c.header("x-content-type-options","nosniff");
-    c.header("content-security-policy","default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.google.com https://mailivery.io https://*.mailivery.io; base-uri 'none'; frame-ancestors 'none'");
+    c.header("content-security-policy",`default-src 'none'; style-src 'unsafe-inline'; script-src '${WARMUP_SETUP_SCRIPT_HASH}'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'`);
     await next();
   });
   // Deliberately no exception, query, request body or OAuth response logging.
@@ -31,7 +31,7 @@ export function createWarmupSetupRouter(setup:WarmupSetup) {
     const previous = getCookie(c,cookieName);
     const csrf = previous && /^[A-Za-z0-9_-]{43}$/.test(previous) ? previous : newSetupSecret();
     setCookie(c,cookieName,csrf,{httpOnly:true,secure,sameSite:"Lax",path:"/",maxAge:3600});
-    return c.html(renderWarmupSetupPage(record,intent,csrf,setup.appPasswordEnabled));
+    return c.html(renderWarmupSetupPage(record,intent,csrf));
   });
   app.post("/setup",async c=>{
     if (c.req.header("origin") !== setup.origin || c.req.header("sec-fetch-site") === "cross-site") return error(c,403,"Submit this form from the Lifty setup page.");
@@ -47,12 +47,9 @@ export function createWarmupSetupRouter(setup:WarmupSetup) {
     const cookie = getCookie(c,cookieName) ?? "", csrf = form.get("csrf") ?? "";
     if (!/^[A-Za-z0-9_-]{43}$/.test(cookie) || !/^[A-Za-z0-9_-]{43}$/.test(csrf)
       || !timingSafeEqual(Buffer.from(cookie),Buffer.from(csrf))) return error(c,403,"Reopen the Lifty setup link in this browser.");
-    const keys=["intent","csrf","first_name","last_name","emails_per_day","ramp","reply_rate","schedule","timezone","audience","method"];
+    const keys=["intent","csrf","first_name","last_name","timezone"];
     if(keys.some(key=>form.getAll(key).length!==1)||[...form.keys()].some(key=>!keys.includes(key))) return error(c,400,"Submit each setup field once.");
-    if(!/^[0-9]{1,3}$/.test(form.get("emails_per_day")!) || !/^[0-9]{1,2}$/.test(form.get("reply_rate")!)) return error(c,400,"Enter a whole-number volume and reply rate.");
-    const target = await setup.choose(form.get("intent")!,cookie,{method:form.get("method"),first_name:form.get("first_name"),last_name:form.get("last_name"),
-      policy:{version:1,emails_per_day:Number(form.get("emails_per_day")),ramp:form.get("ramp"),reply_rate:Number(form.get("reply_rate")),
-        schedule:form.get("schedule"),timezone:form.get("timezone"),audience:form.get("audience")}});
+    const target = await setup.choose(form.get("intent")!,cookie,{first_name:form.get("first_name"),last_name:form.get("last_name"),timezone:form.get("timezone")});
     return c.redirect(target,303);
   });
   app.get("/google/callback",async c=>{

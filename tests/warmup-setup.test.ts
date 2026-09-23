@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
-import { createWarmupSetup, hashSetupSecret, verifyGoogleWarmupIdentity, WarmupPolicy } from "../src/warmup-setup.js";
+import { createWarmupSetup, DEFAULT_WARMUP_POLICY, hashSetupSecret, verifyGoogleWarmupIdentity, WarmupPolicy } from "../src/warmup-setup.js";
 
 const secret = "a".repeat(43), browser = "b".repeat(43);
 const policy = { version: 1, emails_per_day: 22, ramp: "slow", reply_rate: 30,
@@ -27,14 +27,14 @@ function harness(email = record.email, providerFailure = false, tokenOverrides:R
   };
   const setup = createWarmupSetup({serverKey: "k".repeat(32), publicBaseUrl: "https://api.lifty.test",
     supabaseUrl: "https://db.test", publishableKey: "publishable", googleClientId: "client-id", googleClientSecret: "client-secret",
-    mailivery: {apiKey: "mailivery-secret"}, appPasswordEnabled: false}, {rpc, fetchImpl,
+    mailivery: {apiKey: "mailivery-secret"}}, {rpc, fetchImpl,
       verifyIdentity: async () => ({email, email_verified: true})});
   return {setup, requests, writes};
 }
 describe("warmup setup OAuth handoff", () => {
   it("checks PKCE, offline access, nonce and exact mailbox hint on Google's consent URL", async()=>{
     const h=harness();
-    const url=new URL(await h.setup.choose(secret,browser,{method:"google",first_name:"Ada",last_name:"",policy}));
+    const url=new URL(await h.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"Europe/Madrid"}));
     expect(url.origin).toBe("https://accounts.google.com");
     expect(Object.fromEntries(url.searchParams)).toMatchObject({access_type:"offline",prompt:"consent select_account",login_hint:record.email,
       scope:"openid email https://mail.google.com/",code_challenge_method:"S256",redirect_uri:"https://api.lifty.test/warmup/google/callback"});
@@ -49,9 +49,22 @@ describe("warmup setup OAuth handoff", () => {
     expect(h.requests).toHaveLength(1);
     expect(h.writes.map(x=>x.operation)).toEqual(["claim"]);
   });
-  it("refuses App Password when the explicit fallback switch is off",async()=>{
+  it("stores Lifty's default policy with the browser timezone and always chooses Google",async()=>{
     const h=harness();
-    await expect(h.setup.choose(secret,browser,{method:"app_password",first_name:"Ada",last_name:"",policy})).rejects.toMatchObject({code:"WARMUP_SETUP_INVALID"});
+    await h.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"Europe/Madrid"});
+    expect(h.writes[0]?.payload).toMatchObject({method:"google",first_name:"Ada",last_name:"",policy:{...DEFAULT_WARMUP_POLICY,timezone:"Europe/Madrid"}});
+    for (const zone of ["", "fake/zone"]) {
+      const other=harness();
+      await other.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:zone});
+      expect(other.writes[0]?.payload.policy).toEqual(DEFAULT_WARMUP_POLICY);
+    }
+  });
+  it("rejects founder-supplied policy, method or missing name before any write",async()=>{
+    const h=harness();
+    for (const input of [{method:"app_password",first_name:"Ada",last_name:"",timezone:"UTC"},{first_name:"Ada",last_name:"",timezone:"UTC",policy},
+      {first_name:"",last_name:"",timezone:"UTC"},{first_name:"Ada",last_name:""}]) {
+      await expect(h.setup.choose(secret,browser,input)).rejects.toMatchObject({code:"WARMUP_SETUP_INVALID"});
+    }
     expect(h.requests).toHaveLength(0);expect(h.writes).toHaveLength(0);
   });
   it("rejects another Google address before any Mailivery request or dispatch", async () => {
@@ -112,21 +125,9 @@ it("stores only a hash for issued setup URLs and uses the founder session for is
   const calls:unknown[]=[];
   const session={userId:"user",client:{rpc:async(n:string,args:unknown)=>{calls.push({n,args});return {data:{...record,state:"draft",policy:null},error:null};}}};
   const setup=createWarmupSetup({serverKey:"k".repeat(32),publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://db.test",publishableKey:"publishable",
-    googleClientId:"client",googleClientSecret:"secret",mailivery:{apiKey:"key"},appPasswordEnabled:false});
+    googleClientId:"client",googleClientSecret:"secret",mailivery:{apiKey:"key"}});
   const link=await setup.issue(session,"workspace");
   const intent=new URL(link.url).searchParams.get("intent")!;
   expect(calls).toEqual([{n:"lifty_email_warmup_setup",args:{p_server_key:"k".repeat(32),p_operation:"issue",p_payload:{workspace:"workspace",intent_hash:hashSetupSecret(intent)}}}]);
   expect(JSON.stringify(calls)).not.toContain(intent);
-});
-it("redirects optional App Password to Mailivery only after policy and its dispatch fence are stored",async()=>{
-  const order:string[]=[];const calls:unknown[]=[];
-  const url=`https://app.mailivery.io/embed/form?expires=${Math.floor(Date.now()/1000)+600}&signature=signed`;
-  const setup=createWarmupSetup({serverKey:"k".repeat(32),publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://db.test",publishableKey:"publishable",
-    googleClientId:"client",googleClientSecret:"secret",mailivery:{apiKey:"key"},appPasswordEnabled:true},
-    {rpc:async(op,payload)=>{order.push(op);calls.push(payload);return {...record,state:"dispatched"};},fetchImpl:async(target)=>{
-      order.push("provider"); expect(String(target)).toContain("/embed/form/secure?tags="); return Response.json({success:true,data:{url}});
-    }});
-  expect(await setup.choose(secret,browser,{method:"app_password",first_name:"Ada",last_name:"",policy})).toBe(url);
-  expect(order).toEqual(["choose","provider"]);
-  expect(calls[0]).not.toHaveProperty("oauth_hash");expect(JSON.stringify(calls)).not.toContain("password_secret");
 });

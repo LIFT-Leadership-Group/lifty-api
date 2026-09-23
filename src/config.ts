@@ -150,11 +150,9 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const setupEnabled = environment.LIFTY_WARMUP_SETUP_ENABLED === "true";
   const googleClientId = environment.LIFTY_WARMUP_GOOGLE_CLIENT_ID?.trim();
   const googleClientSecret = environment.LIFTY_WARMUP_GOOGLE_CLIENT_SECRET?.trim();
-  for (const flag of ["LIFTY_WARMUP_SETUP_ENABLED", "LIFTY_WARMUP_APP_PASSWORD_ENABLED", "LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED"]) {
-    if (environment[flag] && !["true", "false"].includes(environment[flag]!)) throw new Error(`${flag} must be true or false.`);
-  }
-  if (setupEnabled && (!emailKey || !mailiveryKey || !googleClientId || !googleClientSecret || environment.LIFTY_WARMUP_MAILIVERY_OAUTH_CONFIRMED !== "true")) {
-    throw new Error("Google warmup setup requires email and Mailivery keys, both Google client credentials, and confirmed Mailivery OAuth readiness.");
+  if (environment.LIFTY_WARMUP_SETUP_ENABLED && !["true", "false"].includes(environment.LIFTY_WARMUP_SETUP_ENABLED)) throw new Error("LIFTY_WARMUP_SETUP_ENABLED must be true or false.");
+  if (setupEnabled && (!emailKey || !mailiveryKey || !googleClientId || !googleClientSecret)) {
+    throw new Error("Google warmup setup requires email and Mailivery keys and both Google client credentials.");
   }
   if (setupEnabled && (publicBaseUrl.username || publicBaseUrl.password || publicBaseUrl.search || publicBaseUrl.hash || publicBaseUrl.pathname !== "/")) {
     throw new Error("Google warmup setup PUBLIC_BASE_URL must be an origin without credentials, query or fragment.");
@@ -168,7 +166,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     mailivery: mailiveryKey ? { apiKey: mailiveryKey } : null,
     warmupSetup: setupEnabled && emailKey && mailiveryKey && googleClientId && googleClientSecret ? {
       serverKey:emailKey, publicBaseUrl:publicBaseUrl.origin, supabaseUrl:supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
-      googleClientId, googleClientSecret, mailivery:{apiKey:mailiveryKey}, appPasswordEnabled:environment.LIFTY_WARMUP_APP_PASSWORD_ENABLED === "true",
+      googleClientId, googleClientSecret, mailivery:{apiKey:mailiveryKey},
     } : null,
     linkedin: linkedinEnabled ? {
       ...(v2 ? {v2} : {}),
