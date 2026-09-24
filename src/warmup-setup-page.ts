@@ -17,6 +17,7 @@ h1{font:400 42px/1.15 Georgia,serif;letter-spacing:-.8px;margin:0 0 12px}p{margi
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 24px}label{display:block;font-size:14px;font-weight:600}input{width:100%;min-height:46px;border:1px solid #9fb3b0;border-radius:6px;background:white;color:var(--ink);font:inherit;padding:9px 11px;margin-top:6px}
 input:focus-visible,button:focus-visible{outline:3px solid var(--sage);outline-offset:3px}
 .actions{margin-top:28px;border-top:1px solid var(--line);padding-top:24px}button{min-height:50px;padding:12px 24px;border:1px solid var(--ink);border-radius:8px;background:var(--ink);color:white;font:600 16px/1.4 inherit;cursor:pointer}button:hover{background:#174b56}
+.disclosure{max-width:680px;margin-top:12px;font-size:13px;line-height:1.5}.disclosure a{color:var(--ink);text-underline-offset:2px}
 .notice{border-left:3px solid var(--sage);padding:2px 0 2px 16px;margin:24px 0}@media(max-width:540px){main{padding:24px 20px 40px}.grid{grid-template-columns:1fr}h1{font-size:34px}.brand{margin-bottom:24px}button{width:100%}}
 `;
 function shell(title:string, body:string) { return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Lifty</title><style>${styles}</style></head><body><main><div class="brand" aria-label="Lifty">lifty</div>${body}</main></body></html>`; }
@@ -28,7 +29,7 @@ export function renderWarmupSetupPage(record:WarmupSetupRecord, intent:string, c
 <div class="grid">
 <label>First name<input name="first_name" autocomplete="given-name" required maxlength="80" value="${escape(record.first_name)}"></label>
 <label>Last name<input name="last_name" autocomplete="family-name" maxlength="80" value="${escape(record.last_name)}"></label></div>
-<div class="actions"><button type="submit">Continue with Google</button></div></form>
+<div class="actions"><button type="submit">Continue with Google</button><p class="disclosure">Google grants full Gmail access, including reading, sending and deleting mail. Lifty shares this access with Mailivery to send and receive warmup mail. <a href="https://liftygtm.com/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy policy</a>.</p></div></form>
 <script>${timezoneScript}</script>`);
 }
 export function renderWarmupReceipt(title="Authorization sent", detail="Mailivery received the handoff. Return to your agent to check warmup status. Lifty still needs to verify the mailbox through Mailivery before marking it connected.") {

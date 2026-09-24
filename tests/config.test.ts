@@ -24,6 +24,13 @@ describe("service configuration", () => {
     const ready = {...env, LIFTY_WARMUP_GOOGLE_CLIENT_ID:"client-id", LIFTY_WARMUP_GOOGLE_CLIENT_SECRET:"client-secret"};
     expect(loadConfig(ready).warmupSetup).toMatchObject({googleClientId:"client-id", googleClientSecret:"client-secret"});
     expect(loadConfig(ready).warmupSetup).not.toHaveProperty("appPasswordEnabled");
+    const branded = loadConfig({...ready, LIFTY_WARMUP_PUBLIC_BASE_URL:"https://warmup.liftygtm.com"});
+    expect(branded.warmupSetup?.publicBaseUrl).toBe("https://warmup.liftygtm.com");
+    expect(branded.hubspot.publicBaseUrl).toBe(validEnvironment.PUBLIC_BASE_URL);
+    expect(branded.slack?.publicBaseUrl).toBe(validEnvironment.PUBLIC_BASE_URL);
+    for (const origin of ["http://warmup.example.com", "https://warmup.example.com/path", "https://warmup.example.com:444", "https://user:pass@warmup.example.com", "https://warmup.example.com?q=x", "https://warmup.example.com#x"]) {
+      expect(() => loadConfig({...ready, LIFTY_WARMUP_PUBLIC_BASE_URL:origin})).toThrow();
+    }
     expect(loadConfig({...ready, LIFTY_WARMUP_SETUP_ENABLED:"false"}).warmupSetup).toBeNull();
     expect(() => loadConfig({...ready, LIFTY_WARMUP_SETUP_ENABLED:"yes"})).toThrow(/true or false/);
   });
