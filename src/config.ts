@@ -116,6 +116,9 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     required(environment, "PUBLIC_BASE_URL"),
     "PUBLIC_BASE_URL",
   );
+  const warmupBaseUrl = environment.LIFTY_WARMUP_PUBLIC_BASE_URL?.trim()
+    ? secureUrl(environment.LIFTY_WARMUP_PUBLIC_BASE_URL.trim(), "LIFTY_WARMUP_PUBLIC_BASE_URL")
+    : publicBaseUrl;
   const dashboardUrl = secureUrl(environment.LIFTY_DASHBOARD_ORIGIN?.trim() || "https://lift-gtm-dashboard.vercel.app", "LIFTY_DASHBOARD_ORIGIN");
   if (dashboardUrl.protocol !== "https:" || dashboardUrl.username || dashboardUrl.password || dashboardUrl.port || dashboardUrl.pathname !== "/" || dashboardUrl.search || dashboardUrl.hash) {
     throw new Error("LIFTY_DASHBOARD_ORIGIN must be an HTTPS origin without credentials, port or path.");
@@ -154,8 +157,8 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (setupEnabled && (!emailKey || !mailiveryKey || !googleClientId || !googleClientSecret)) {
     throw new Error("Google warmup setup requires email and Mailivery keys and both Google client credentials.");
   }
-  if (setupEnabled && (publicBaseUrl.username || publicBaseUrl.password || publicBaseUrl.search || publicBaseUrl.hash || publicBaseUrl.pathname !== "/")) {
-    throw new Error("Google warmup setup PUBLIC_BASE_URL must be an origin without credentials, query or fragment.");
+  if (setupEnabled && (warmupBaseUrl.username || warmupBaseUrl.password || warmupBaseUrl.port || warmupBaseUrl.search || warmupBaseUrl.hash || warmupBaseUrl.pathname !== "/")) {
+    throw new Error("Google warmup setup public base URL must be an HTTPS origin without credentials, port, path, query or fragment.");
   }
   if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
@@ -165,7 +168,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     dashboardOrigin: dashboardUrl.origin,
     mailivery: mailiveryKey ? { apiKey: mailiveryKey } : null,
     warmupSetup: setupEnabled && emailKey && mailiveryKey && googleClientId && googleClientSecret ? {
-      serverKey:emailKey, publicBaseUrl:publicBaseUrl.origin, supabaseUrl:supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
+      serverKey:emailKey, publicBaseUrl:warmupBaseUrl.origin, supabaseUrl:supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
       googleClientId, googleClientSecret, mailivery:{apiKey:mailiveryKey},
     } : null,
     linkedin: linkedinEnabled ? {
