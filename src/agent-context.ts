@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ConfigUpdateRequestSchema } from "./contracts.js";
 import { EmailCampaignRequest } from "./email-campaign-contracts.js";
 import { LinkedinCampaignRequest } from "./linkedin-campaign-contracts.js";
+import { WorkspaceCampaignRequest, WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { StageOperationSchema, stageOperations } from "./stage-contracts.js";
 
 export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v5";
@@ -39,6 +40,8 @@ const documents = {
   campaign: {
     instructions: readFileSync(new URL("./agent-context/campaign.md", import.meta.url), "utf8"),
     schemas: {
+      workspace_campaign: z.toJSONSchema(WorkspaceCampaignRequest, { io: "input" }),
+      workspace_campaign_result: z.toJSONSchema(WorkspaceCampaignResult),
       email_campaign: z.toJSONSchema(EmailCampaignRequest, { io: "input" }),
       linkedin_campaign: z.toJSONSchema(LinkedinCampaignRequest, { io: "input" }),
     },

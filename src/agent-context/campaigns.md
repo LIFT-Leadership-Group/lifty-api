@@ -1,61 +1,65 @@
 # Campaigns
 
-Purpose: configure the workspace journey once and activate automatic outreach
-after one informed confirmation. `references.campaign` is the authoritative
-setup context: read it for sequence, audience, personalization, cadence and
-conversation behavior. Read `references.writing` and `references.anti_slop`
-before recommending or editing copy. Writing supplies LIFT's defaults and the
-founder review process. Anti-slop is the phrase ban. Never suggest a listed
-phrase. Read `references.common` for transport rules.
+Purpose: configure a persistent campaign using the existing shared engine's
+graph, compose modes and outreach overlays. New campaigns use shared_v1.
+Read references.campaign for supported actions, schemas, runnable examples,
+composition, preview and approval. Read references.writing and
+references.anti_slop before recommending copy; references.common owns transport.
 
 ## Read current state
 
-GET with empty query reads the current workspace sequence and its blockers.
+GET with empty query reads the saved workspace configuration, version_ref,
+digest, preparation state, blockers and saved recipient examples. Read before
+creating or modifying. A failed read is unavailable, not missing setup.
+The campaign includes current and future eligible A/B leads unless the founder
+explicitly narrows lead_ids. Calibration leads are examples, not the audience.
 
 ## First setup
 
-Before writing templates or calling prepare, follow the channel-choice and
-sequence-explanation steps in `references.campaign`. Ask **LinkedIn, email,
-both, or not right now** when the founder has not explicitly chosen, and wait.
-Account availability is not channel intent; accepting leads is not a channel
-choice. Keep disconnected channels available as connection options. Reuse a
-choice already made. Explain the selected sequence and current/future audience
-before asking for founder-written copy or permission to recommend templates.
-Skipping keeps the lead-only path resumable without preparing or activating.
+Reuse the founder's explicit channel choice. If missing, offer LinkedIn, email,
+both, or not right now and wait. Connection and sample acceptance are not channel
+intent. Explain the chosen journey and future audience before drafting.
 
-POST with `scope: "workspace"` and a prepare request saves the full recommended
-configuration for the selected channels only: invitation plus three LinkedIn
-messages and/or five emails. Never include a channel just because it is connected. Reuse saved targeting, commercial voice, sender and normal cadence.
-Do not default to individual campaigns, choosing two Tier A sample leads or
-asking for a date/time per recipient. Honor explicit audience/start overrides.
+POST scope workspace, operation configure saves engine shared_v1, name, graph
+and selected channels with connection_ref, compose_mode and overlay. Generate
+composes for each lead using reusable outreach instructions; templates uses the
+existing Markdown template bank. This outreach overlay is separate from Scout.
+Do not add a country field or a separate language configuration. Do not require
+fixed message arrays in generate mode. The graph defines steps, waits and end;
+one invitation without a note, acceptance, one greeting and end is supported.
+Do not create a campaign per calibration lead or impose three messages.
 
-Show the complete returned preview, including sender, current and future
-audience, templates, personalization and timing. The email branch follows the
-existing journey: five business days without acceptance or the second confirmed
-LinkedIn message; email-only configuration starts directly. Preparation never
-sends. One explicit confirmation authorizes activation of the exact version and
-digest. Read status afterward; activation is distinct from confirmed sending.
-Material edits pause automatic outreach and require fresh confirmation.
+Omit lead_ids for current and future eligible leads. Omit not_before for normal
+timing. Initial configure omits version_ref/digest; replacement requires both
+from a fresh read. Configuration does not send. Preparation pending means wait
+and read again; failed includes errors; ready still requires resolved blockers
+and founder approval. Show the saved graph, composition policy, sender, audience,
+timing and saved examples. Examples are not the full future recipient list.
+The founder can approve a generation policy for future leads. After explicit
+confirmation, activate the exact version_ref/digest with confirm true, then read
+status. Activation and actual sending are different facts.
 
 ## Later edits
 
-Use workspace prepare to save a complete updated configuration, then show the
-new preview before fresh confirmation. Use pause to stop automatic outreach.
+Read first. PATCH scope workspace, operation modify with current version_ref,
+digest and only changes requested. Nested channel fields merge; arrays and graph
+replace. Omitted fields stay saved. Null removes a channel, lead_ids override,
+not_before override or template_bank. Switching templates to generate clears
+template_bank with null. A timing edit copies the saved graph and changes only
+the relevant transition, preserving the rest. Stale references require a read.
+Read back the result; do not rewrite unrelated graph, channels, mode or overlay.
 
-### Existing individual campaigns
-
-Only when explicitly requested, use the channel contracts for an individual
-campaign or recovery. GET requires channel, workspace and campaign_ref; it is
-not a campaign inventory. POST supports explicit lifecycle operations. Channel
-PATCH only prepares an existing campaign. Follow `references.campaign` for the
-channel-specific requirements and approval rules. Individual approval never
-authorizes workspace-wide enrollment or future leads.
+Material edits pause automatic outreach and need fresh preparation and approval.
+Continuing_versions identifies enrolled leads on earlier approved definitions.
+Use pause with current version/digest when asked to stop. Legacy workspace
+prepare and explicit individual operations remain available for compatibility
+and recovery; they are not the default for a new campaign.
 
 ## User-facing behavior and errors
 
-Explain actual returned blockers, preserve receipts after an uncertain write,
-and read status before retrying. Sample acceptance and account connection never
-authorize sending. Pending calibration or exhausted discovery allowance does
-not prevent drafting from suitable saved leads. If workspace operations are
-unavailable, retain the draft and state the limitation; do not silently fall
-back to the old per-lead setup.
+Explain actual blockers and preparation errors. An unsupported graph does not
+become executable because structural validation succeeded. Preserve receipts
+and read after uncertain writes. Never treat saved preview examples as sends.
+Pending calibration or exhausted discovery allowance does not prevent drafting.
+If shared workspace operations are unavailable, retain the draft and explain
+the limitation; do not silently fall back to individual campaigns.

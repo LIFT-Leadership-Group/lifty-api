@@ -2,8 +2,8 @@
 
 Before proposing setup or changes in a new authenticated session, read `summary.get`
 using `context summary`. Reuse verified saved state. Read business before asking
-for a website, sending-accounts before reconnecting, and campaigns before writing
-templates. Unavailable reads require a retry, not assumptions that setup is missing.
+for a website, sending-accounts before reconnecting, and campaigns before configuring
+outreach. Unavailable reads require a retry, not assumptions that setup is missing.
 
 Use the current stage index for ordinary workspace work. Compatibility context
 names and older commands remain supported, but their fixed routes do not select

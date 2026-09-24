@@ -13,10 +13,10 @@ describe("outreach writing context", () => {
       expect(response.status).toBe(200);
       const context = await response.json();
       expect(context.references.writing).toEqual(expect.any(String));
-      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v18\n/);
+      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v19\n/);
       expect(context.references.writing).toContain("Email shape");
       expect(context.references.writing).toContain("Subject line");
-      expect(context.references.writing).toContain("same subject line on all five steps");
+      expect(context.references.writing).toContain("Use a consistent subject so follow-ups read as one thread");
       expect(context.references.writing).toContain("Emails 1-2 focus on a pain");
       expect(context.references.writing).toContain("Emails 3-4 focus on the founder's product");
       expect(context.references.writing).toContain("Two short asks only");
@@ -28,7 +28,8 @@ describe("outreach writing context", () => {
       expect(context.references.writing).toContain("LinkedIn message 2 still needs an I");
       expect(context.references.writing).toContain("reframes the last note");
       expect(context.references.writing).toContain("already has that number");
-      expect(context.references.writing).toContain("builds across all three");
+      expect(context.references.writing).toContain("not mandatory sequence lengths or mandatory questions");
+      expect(context.references.writing).toContain("single greeting stays a single greeting");
       expect(context.references.writing).toContain("so I need to know");
       expect(context.references.writing).toContain("ties the main focus to the CTA");
       expect(context.references.writing).toContain("Want a short conversation");

@@ -2,8 +2,8 @@
 
 Before proposing setup or changes in a new authenticated session, read `summary.get`
 using `context summary`. Reuse verified saved state. Read business before asking
-for a website, sending-accounts before reconnecting, and campaigns before writing
-templates. Unavailable reads require a retry, not assumptions that setup is missing.
+for a website, sending-accounts before reconnecting, and campaigns before configuring
+outreach. Unavailable reads require a retry, not assumptions that setup is missing.
 # LIFTY workspace outreach configuration
 
 ## Authorization links
@@ -37,122 +37,295 @@ node "<installed-runner>" stage campaigns post --input -
 node "<installed-runner>" stage campaigns patch --input -
 ```
 
-## Default setup: one workspace sequence
+## Default setup: one persistent shared-engine campaign
 
-This campaign context owns the setup policy. Read it through the campaigns
-stage before proposing or changing outreach; do not substitute a locally
-remembered campaign questionnaire. Use the current published operation schemas.
+New campaigns use `engine: "shared_v1"` through workspace `configure` and
+`modify`. The graph, composition modes and outreach overlays are existing shared
+engine capabilities. Lifty configures that engine and reads its saved state.
+The graph determines channel entry, message count, conditions, delays and end;
+do not substitute a fixed three-message journey or one campaign per sample lead.
 
-The founder flow is **choose channels → explain the sequence → choose copy
-approach → prepare the workspace sequence → show its complete preview → one
-informed confirmation → activate automatic outreach**. The
-backend owns continued enrollment and execution after the conversation closes.
+The campaign covers **current and future eligible A/B leads** by default.
+Calibration is a sample for learning and reviewing examples, not a recipient
+list. Omit `lead_ids` unless the founder explicitly limits the audience. A
+language or tone request belongs in the ordinary outreach overlay when needed;
+it does not require a new language setting, a country field, or a campaign per
+recipient. Ground generated copy in the actual evidence available for each lead.
+
+The founder flow is **read saved state → choose channels and journey → configure
+composition → read ready preview → one informed confirmation → activate**.
+The backend enrolls future eligible leads and executes after the chat closes.
 Account connection, sample acceptance and a saved draft never authorize sends.
 
-## Who writes the copy
+## Read before configuring or editing
 
-Read `references.writing`, the versioned LIFT outreach writing guide, and
-`references.anti_slop` before drafting. Do not recommend a banned phrase.
-The local agent writes recommendations using that guide and the workspace's
-saved business, commercial voice and lead evidence. Explain this plainly:
-"I'll draft the sequence here using your saved business context and LIFT's
-writing guidance. We'll review the angle and wording together. Lifty stores
-the templates and handles scheduling and sending after you approve the
-complete preview."
+GET the campaigns stage with empty query `{}`. Read the saved configuration,
+version_ref, digest, preparation, blockers, continuing_versions and previews.
+Reuse the business, targeting, commercial voice and sending-account stages when
+needed. Unavailable reads require retry; they do not mean setup is missing.
 
-First read the saved campaign. If templates already exist, show and reuse them;
-do not overwrite approved copy just because the guide offers different defaults.
-For a new recommendation, explain the proposed angle, which saved facts support
-it, and the purpose of each message. Give the founder room to revise it before
-prepare saves the templates. Reuse a direction they already gave. Do not claim
-that a proposed draft has proven results or passed a copy-quality validator.
-Server validation checks the published contract and sending prerequisites;
-founder review and exact preview approval remain required.
+If channel choice is missing, offer **LinkedIn, email, both, or not right now**
+and wait. Reuse an explicit choice; a connected account does not choose its
+channel. Keep disconnected channels available as connection options. Explain
+the requested journey, current/future audience and stop-on-reply before writing
+copy. Ask only for missing intent or required account declarations. Pending
+calibration or exhausted discovery allowance does not prevent drafting.
 
-## Prepare and activate
+## Composition and outreach overlay
 
-1. Read the campaigns stage with empty query `{}` (workspace status is the
-   default). Reuse saved targeting, commercial voice and verified sending
-   accounts. Read their current stages if that information is missing or stale.
-   Do not ask the founder to repeat saved business answers.
-2. Establish the founder's outreach choice before writing templates or calling
-   prepare. If no explicit choice exists, ask: **"Would you like to use LinkedIn,
-   email, both, or not right now?"** Wait for the answer. A connected mailbox
-   does not select email; disconnected LinkedIn remains an option to connect.
-   "Looks good" after lead review accepts that sample only. A request to
-   continue is not a channel choice. Reuse an explicit choice already made in
-   this conversation or confirmed for the campaign being edited; do not ask again.
-   If the founder skips, keep the lead-only path resumable and do not prepare
-   or activate a campaign. Deferring new setup does not pause existing campaigns;
-   a request to stop existing outreach follows the explicit pause workflow.
-3. Before drafting, explain the selected sequence in plain language using the
-   fixed journey below: steps, acceptance dependency, channel entry, follow-up
-   delays and stop-on-reply. Mention the recommended audience of current and
-   future eligible A/B leads; the five reviewed leads are a sample, not the
-   default campaign limit. Use a verified count when available. Ask whether the
-   founder wants to provide their own copy or have Lifty recommend it, and wait
-   unless they already requested one approach. Channel/copy choices are setup
-   decisions, not sending approval. Connect only selected missing accounts via
-   their stage guidance; reuse healthy accounts. Resolve requested CRM activity
-   logging through current supported operations before drafting, reporting any
-   unsupported setting honestly. Do not silently drop a selected channel when
-   its account is disconnected or blocked; explain and offer connection or an
-   explicit change of choice.
-4. Prepare a complete recommended configuration for only the selected channels using POST with
-   `scope: "workspace"` and `request.operation: "prepare"`. The payload contains
-   the current workspace and `configuration`: name, the selected LinkedIn
-   account plus all three message templates and/or the selected email account
-   plus all five email templates. Omit channels the founder did not select,
-   even when their accounts are connected. Follow the published schema. Omit `lead_ids`
-   for current and future eligible A/B leads. Omit `not_before` to use the normal
-   cadence from activation. Drafting is possible without a new calibration run.
-5. Show the returned full workspace preview: actual senders, audience rule
-   (including future leads), complete templates, allowed personalization,
-   current recipient examples, channel entry, cadence and stop rules. Explain
-   real blockers, including `blocked_leads` and the total blocked count; never
-   report those leads as scheduled. Missing placeholder data skips that recipient; it is never
-   invented. Only `{{first_name}}`, `{{last_name}}` and `{{company_name}}` are
-   permitted substitutions. Do not imply that approval covers arbitrary future
-   model-generated copy.
-6. Ask once for confirmation of that complete configuration and authorization
-   to start automatic outreach. On confirmation, POST `scope: "workspace"`
-   with `request.operation: "activate"`, the exact `version_ref`, `digest`,
-   workspace and `confirm: true`. Read status afterward. Report activation only
-   from the confirmed receipt, and distinguish activation from an actual send.
-7. Later material edits use workspace prepare and a fresh preview/confirmation.
-   They pause automatic outreach. The new version applies to newly enrolled
-   leads; existing journeys retain their approved copy, sender and cadence.
-   Show `continuing_versions` and each recipient example’s `version_ref` in the
-   preview so this is explicit. A narrowed audience also fences excluded leads.
-   Explicit pause uses the current version and digest. Retain receipts and read status after uncertain writes before retrying.
+Read `references.writing` and `references.anti_slop`. Preserve the founder's
+chosen purpose, voice and previously approved content.
 
-The fixed journey is an invitation without a note, then three LinkedIn messages
-only after confirmed acceptance. The second message waits four business days
-from the first confirmed send; the third waits five more business days. When
-both channels are selected, the five-email sequence enters after five business days
-without LinkedIn acceptance, or after the second LinkedIn message is confirmed
-sent. With email-only selected, email enters directly. Email follow-ups wait
-3, 4, 4 and 4 days from their preceding confirmed sends. Sender working windows,
-health, pacing and shared account limits still apply. Replies, suppression and
-other terminal stops cancel remaining outreach across channels: 3/5 are planned
-lengths, not promises to send despite a response.
+- `compose_mode: "generate"` uses the shared outreach compositor for each lead.
+  `overlay` stores reusable instructions such as the purpose of each graph step,
+  voice, factual constraints and founder preferences. It may be empty to use
+  shared defaults. Do not supply fixed `messages` or `steps` text arrays or a
+  `template_bank` in generated mode.
+- `compose_mode: "templates"` uses the existing channel template-bank mechanism.
+  `template_bank`, when supplied, is the existing Markdown bank, not a new array
+  of three texts. Existing shared defaults may supply a bank when omitted;
+  preparation reports missing or invalid templates. Read the saved bank before
+  modifying it. Generated mode and templates are distinct supported choices.
+- This `overlay` is the campaign's **outreach** overlay. The generated onboarding
+  configuration and Scout research overlay configure discovery/research; they
+  do not configure outreach copy. Use campaign operations for outreach changes.
 
-Do not default to choosing “the two Tier A leads or all five accepted leads”,
-preparing one opening email per person, or asking for a Thursday date/time.
-Prepare the workspace recommendation from the saved settings. A founder who
-explicitly asks for two named leads gets a narrowed `lead_ids` audience; an
-explicit custom start uses `not_before`. Those are optional overrides, not
-required setup questions. Ask only for a genuinely missing business input or
-required account declaration. A pending/stale sample, fewer than five leads,
-no Tier A leads, exhausted discovery allowance or an unconnected CRM does not
-block connection or drafting. Preserve grades and reuse saved fit evidence;
-never claim it was freshly researched. Activation still respects real account,
-audience and approval blockers.
+An overlay should work for future recipients. Sample-specific observations are
+review examples, not universal claims to paste into every message. The shared
+compositor uses the approved policy and the lead's evidence, then persists the
+resulting copy. Retrying and preview reads reuse saved copy.
 
-If the current API does not publish workspace operations or cannot verify their
-result, retain a clearly labeled draft and explain that automatic workspace
-activation is unavailable. Do not fall back to silently creating individual
-campaigns or claim a graph/flag change enables execution.
+## Existing template-bank format
+
+For a one-greeting LinkedIn graph, a complete minimal template_bank string is
+this Markdown. Keep its marker, Fit/Slots guidance and fenced text intact:
+
+````markdown
+<!-- template: id=hello channel=linkedin case=first_dm arm=pain coverage=broad -->
+Fit: A short greeting for an eligible lead.
+Slots: {first_name} = the lead's given name.
+```text
+Hi {first_name}, glad to connect.
+```
+````
+
+Each template ID is unique. Keep at least one broad opener. Later LinkedIn slots
+use case linkedin_followup, touch 3 for the second message and touch 4 for the
+third. Creative slots need explicit Slots guidance; trusted sender/lead slots
+remain scoped to saved data. The template bank count must cover the graph.
+Email banks declare `<!-- email-bank: sequence_steps=4 -->` or 5, a Subject line,
+and a template marker per step such as
+`<!-- template: id=hello-email channel=email step=1 arm=direct variant=intro coverage=broad -->`.
+Steps 2..4 or 2..5 retain a coherent arm/variant route. Follow the same Fit,
+Slots and fenced-text format. Preparation rejects malformed/incomplete banks;
+it never guesses missing steps or approves a client-placeholder skeleton.
+
+## Configure, preview, activate
+
+POST `{ "scope": "workspace", "request": { "operation": "configure",
+"payload": { ... } } }` with workspace and configuration. Initial configuration
+omits version_ref/digest. Replacing an existing configuration requires **both**
+references from its latest read; stale identity is rejected. Configuration
+includes name, engine, graph, selected channel connection_ref/compose_mode/overlay,
+optional template_bank and optional delivery_specs. Omit unselected channels.
+Omit not_before for normal timing from activation.
+
+Configuration saves an inactive version. `preparation.state: "pending"` means
+the backend still has to validate the graph and pin shared composition context
+and examples. Read GET again; do not activate while pending. `failed` includes
+errors to resolve through an edit. A ready preparation does not by itself mean
+sending prerequisites or approval are satisfied. Show actual blockers and
+blocked_leads, and preserve receipts after uncertain writes before retrying.
+
+Show the **saved definition** (graph, composition policy, sender, current/future
+audience, timing and stop rules) together with the **saved recipient examples**
+from previews. Preview examples do not restrict the audience. In generated mode,
+the founder can approve the reusable generation policy for future eligible leads;
+do not impose individual review of every future lead as a universal rule. The
+approval binds this exact configuration and its pinned composition context.
+
+After one explicit confirmation of the complete ready preview and authorization
+to start automatic outreach, POST `activate` with workspace, exact version_ref,
+digest and `confirm: true`. Read status afterward. Distinguish activation from
+confirmed invitation/message receipts. Sending still respects account health,
+working windows, pacing, caps, suppression and replies.
+
+## Supported graph contract
+
+Use the published JSON schema and the existing compiled format
+`journey_graph.v1.1`. Blocks have key/kind and optional label/channel/provider/
+action/delivery_spec_key/terminal_reason. Transitions have key/branch_key/from/to
+and trigger. Triggers are start, event, or time with after and anchor. Delays use
+`{ "business_days": N }` or `{ "days": N }`; sending timers must anchor to
+`action_completed`, so a hold or unsent action cannot start the next delay.
+`fork` allows a branch, and `close: "branch" | "journey"` belongs on end edges.
+Preparation validates supported execution semantics; structural acceptance alone
+is not proof an arbitrary action is executable.
+
+The current Lifty adapters execute these shared graph blocks:
+
+- `start`: kind start, channel system.
+- `send_connection_request`: provider_action, channel linkedin, provider unipile,
+  action connection_request; the invitation has no note.
+- `send_first_linkedin_message`, `send_second_linkedin_message`,
+  `send_third_linkedin_message`: provider_action, channel linkedin, provider
+  unipile, action linkedin_message. Include only the contiguous slots needed:
+  one, two or three. The first waits for linkedin_connection_request_accepted;
+  follow-ups and completion wait for the preceding confirmed action. One greeting
+  after acceptance is a valid journey. Do not add later messages automatically.
+- `email_sequence`: provider_campaign, channel email, provider unipile, with a
+  delivery_spec_key referencing configuration.delivery_specs. The graph controls
+  email entry and completion; the declared spec controls internal email timing.
+  Its steps use seq_number 1..4 or 1..5 and delay_in_days: first 0, later 1..30.
+  Completion uses the existing email_sequence_completed event.
+- End nodes such as sequence_complete, replied and no_connection use kind end
+  and channel system. Only supported terminal behavior is accepted.
+
+Retain stop_policies for reply/meeting_booked with complete_journey, suppression
+with suppress_journey, and manual_stop with manual_stop_journey, all scoped to
+journey. These stops fence pending actions across channels. The backend rejects
+unsupported providers/actions, cycles, acceptance bypass and premature completion.
+Do not promise manual/decision blocks or arbitrary providers merely because the
+shared parser knows their structural kinds. Omit event_policies or use an empty
+array: Lifty does not execute arbitrary event-policy actions such as notify or
+crm_update from graph metadata. For an email graph, preserve the event_registry
+alias email_sequence_completed: ["lifty_email_sequence_completed"].
+
+## Example: invitation, acceptance, one generated greeting, end
+
+Replace the example workspace/connection UUIDs with references from authenticated
+reads. Feed this body to `stage campaigns post --input -` using JSON stdin. It
+has no recipient list, so future eligible A/B leads are included.
+
+```json
+{
+  "scope": "workspace",
+  "request": {
+    "operation": "configure",
+    "payload": {
+      "workspace": "22222222-2222-4222-8222-222222222222",
+      "configuration": {
+        "engine": "shared_v1",
+        "name": "A greeting after acceptance",
+        "linkedin": {
+          "connection_ref": "33333333-3333-4333-8333-333333333333",
+          "compose_mode": "generate",
+          "overlay": "Write a brief greeting after acceptance from the saved sender. Follow the saved commercial voice and use only supported lead facts. No pitch, question or meeting request."
+        },
+        "graph": {
+          "schema_version": "journey_graph.v1.1",
+          "blocks": [
+            { "key": "start", "kind": "start", "channel": "system" },
+            { "key": "send_connection_request", "kind": "provider_action", "channel": "linkedin", "provider": "unipile", "action": "connection_request" },
+            { "key": "send_first_linkedin_message", "kind": "provider_action", "channel": "linkedin", "provider": "unipile", "action": "linkedin_message" },
+            { "key": "sequence_complete", "kind": "end", "channel": "system", "terminal_reason": "no_reply" }
+          ],
+          "transitions": [
+            { "key": "invite", "branch_key": "outreach", "from": "start", "to": "send_connection_request", "trigger": { "type": "start" } },
+            { "key": "accepted", "branch_key": "outreach", "from": "send_connection_request", "to": "send_first_linkedin_message", "trigger": { "type": "event", "event": "linkedin_connection_request_accepted" } },
+            { "key": "finished", "branch_key": "outreach", "from": "send_first_linkedin_message", "to": "sequence_complete", "trigger": { "type": "time", "after": { "business_days": 0 }, "anchor": "action_completed" } }
+          ],
+          "stop_policies": [
+            { "event": "reply", "scope": "journey", "action": "complete_journey" },
+            { "event": "meeting_booked", "scope": "journey", "action": "complete_journey" },
+            { "event": "suppression", "scope": "journey", "action": "suppress_journey" },
+            { "event": "manual_stop", "scope": "journey", "action": "manual_stop_journey" }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+## Modify only what the founder changes
+
+Read first, then PATCH with operation modify and current version_ref/digest.
+Use changes for only the requested fields. Omitted fields remain saved; nested
+channel fields merge. Arrays and supplied graph/delivery_specs replace their
+whole previous value. Null removes a channel, clears lead_ids back to the
+current/future audience, clears not_before, or removes template_bank. To switch
+from templates to generate, send compose_mode generate and template_bank null.
+Do not copy sample IDs into lead_ids while changing an overlay.
+
+This example changes only the LinkedIn overlay. Replace both version references
+with the latest saved values and feed it to `stage campaigns patch --input -`.
+
+```json
+{
+  "scope": "workspace",
+  "request": {
+    "operation": "modify",
+    "payload": {
+      "workspace": "22222222-2222-4222-8222-222222222222",
+      "version_ref": "44444444-4444-4444-8444-444444444444",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "changes": {
+        "linkedin": { "overlay": "Keep the greeting to one short sentence in the saved sender's voice, without a pitch or question." }
+      }
+    }
+  }
+}
+```
+
+To change a follow-up from four to two business days, copy the graph from GET,
+find the transition from send_first_linkedin_message to
+send_second_linkedin_message, change only trigger.after to
+`{ "business_days": 2 }`, retain trigger.anchor action_completed, and submit
+that full graph in changes.graph. Preserve every other edge, channel, mode,
+overlay and audience setting. A graph without that follow-up should not acquire
+it from a timing edit. Read the resulting configuration and verify the requested
+change and preserved values.
+
+For that timing edit, save the GET response privately as saved-campaign.json.
+This complete timing-edit.mjs script creates the PATCH body from the saved
+receipt and fails if the requested follow-up does not exist:
+
+```javascript
+import { readFileSync } from "node:fs";
+const saved = JSON.parse(readFileSync(process.argv[2], "utf8"));
+if (saved.configuration?.engine !== "shared_v1" || !saved.version_ref || !saved.digest) {
+  throw new Error("Read the current shared campaign first.");
+}
+const graph = structuredClone(saved.configuration.graph);
+const matches = graph.transitions.filter(edge =>
+  edge.from === "send_first_linkedin_message" && edge.to === "send_second_linkedin_message");
+if (matches.length !== 1 || matches[0].trigger.type !== "time" ||
+    matches[0].trigger.anchor !== "action_completed") {
+  throw new Error("This campaign does not have that timed follow-up.");
+}
+matches[0].trigger.after = { business_days: 2 };
+process.stdout.write(JSON.stringify({ scope: "workspace", request: {
+  operation: "modify", payload: { workspace: saved.workspace_ref,
+    version_ref: saved.version_ref, digest: saved.digest, changes: { graph } }
+} }));
+```
+
+Use `umask 077`, then `node timing-edit.mjs saved-campaign.json > timing-edit.json`.
+Submit with `node "<installed-runner>" stage campaigns patch --input timing-edit.json`.
+An old saved receipt will be rejected as stale; read again rather than replacing
+its version references with guessed values.
+
+Material edits pause automatic outreach and require new preparation and explicit
+activation. Existing enrolled journeys retain their approved version; show
+continuing_versions and each preview's version_ref. Do not claim an edit rewrote
+those journeys. An unchanged edit may return the same version. Pause explicitly
+with the current version/digest and confirm true when asked to stop outreach.
+
+## Existing campaigns and unavailable operations
+
+Existing fixed workspace campaigns remain readable, pausable and activatable
+with their original contract. `prepare` is the legacy full-text compatibility
+operation; it requires the old three LinkedIn/five email text arrays. That is
+not the shared engine's minimum and not the default for new setup. Migrating a
+legacy workspace definition uses configure with its current version/digest and
+a complete shared definition after explaining the change.
+
+Existing individual drafts and enrollments retain their references. Do not
+silently replace them or create duplicates. Explain returned conflicts instead
+of treating per-lead drafts as the automatic onboarding solution. If the API
+cannot verify workspace configuration, retain the draft and describe the actual
+blocker; do not fall back to per-lead campaigns. No setup operation sends.
 
 ## Explicit individual campaign operations
 
@@ -247,7 +420,8 @@ before deciding whether any retry is safe. Do not replay uncertain sends.
 
 ## LinkedIn campaigns
 
-Use this separate channel path when the founder asks for LinkedIn outreach.
+Use this separate channel path only for explicitly requested individual LinkedIn
+work or recovery. New workspace outreach uses shared configure above.
 The beta supports one existing habitual-use account per workspace. Read the
 `sending-accounts` stage and obtain the founder's IANA timezone plus explicit
 personal-use and no-other-automation declarations required by its LinkedIn POST.
@@ -296,12 +470,14 @@ without approval of the exact recipient, account and copy.
 
 ## Hard stops
 
-- Never activate without authorization for the exact recipient, sender, copy
-  and schedule. Preparation, preview, approval and activation stay separate.
+- Never activate without authorization for the exact campaign definition and
+  sender: graph, audience, composition policy and timing for shared campaigns;
+  exact recipient/copy for individual campaigns. Preparation never sends.
 - Never request, print or summarize tokens, keys, callback payloads or credentials.
 - Never disconnect without the founder's explicit yes in this conversation.
 - Configuration changes use the relevant stage's PATCH and generated-artifact
-  workflow. Do not repeat first onboarding for an already-configured workspace.
+  workflow where that stage requires one. Campaign graph/mode/overlay edits use
+  campaign modify. Do not repeat first onboarding for an already-configured workspace.
 - Multi-lane and protected-prompt restrictions stay in force; do not combine
   lanes, replace hand-tuned prompts or route around a rejection.
 
