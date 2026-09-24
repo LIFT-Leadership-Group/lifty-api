@@ -9,7 +9,7 @@ import {
   CrmMappingSyncRequestSchema, CrmMappingSyncSchema, CrmMappingStatusQuerySchema, CrmMappingStatusSchema,
 } from "./crm-mapping/contracts.js";
 import { z } from "zod";
-import { WorkspaceCampaignRequest, WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
+import { WorkspaceCampaignConfigureRequest, WorkspaceCampaignModifyRequest, WorkspaceCampaignRequest, WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import {
   ConfigUpdateGenerationContextSchema, ConfigUpdateRequestSchema, ConfigUpdateResultSchema,
   ConfigUpdateStatusSchema, CreateWorkspaceRequestSchema, CreateWorkspaceResultSchema,
@@ -129,7 +129,7 @@ export const CampaignStageRequestSchema = z.union([
   z.object({ scope: z.literal("workspace"), request: WorkspaceCampaignRequest }).strict(), ChannelCampaignRequestSchema,
 ]);
 export const CampaignStagePatchSchema = z.union([
-  z.object({ scope: z.literal("workspace"), request: WorkspaceCampaignRequest.options[1] }).strict(), ChannelCampaignPatchSchema,
+  z.object({ scope: z.literal("workspace"), request: z.union([WorkspaceCampaignModifyRequest, WorkspaceCampaignConfigureRequest, WorkspaceCampaignRequest.options[1]]) }).strict(), ChannelCampaignPatchSchema,
 ]);
 
 function json(schema: z.ZodType, io: "input" | "output" = "output") {
@@ -211,9 +211,9 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
   },
   campaigns: {
-    get: operation("GET", stageRoute("campaigns"), "Read the workspace sequence by default. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),
-    post: operation("POST", stageRoute("campaigns"), "Prepare the full workspace sequence, then activate its exact preview with one informed confirmation. Preparation does not send. Individual channel operations remain explicit.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
-    patch: operation("PATCH", stageRoute("campaigns"), "Prepare an updated workspace sequence or individual campaign. Material changes pause automatic outreach and require fresh digest-bound activation.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStagePatchSchema),
+    get: operation("GET", stageRoute("campaigns"), "Read the saved workspace graph, composition policy, current/future audience and preparation state by default. Previews are saved recipient examples. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),
+    post: operation("POST", stageRoute("campaigns"), "Configure a shared_v1 campaign graph, compose modes and outreach overlays; omission of lead_ids covers current and future eligible leads. Read its ready preview, then activate the exact version/digest after informed confirmation. Configuration does not send. Legacy prepare and individual operations remain compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
+    patch: operation("PATCH", stageRoute("campaigns"), "Modify only requested fields using the saved version_ref and digest. Nested channel fields merge; arrays replace; null removes a channel, audience override, start override or template_bank. Material changes pause automatic outreach and require fresh preparation and activation. Legacy prepare remains compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStagePatchSchema),
   },
   notifications: {
     get: operation("GET", stageRoute("notifications"), "Read notification routes/destinations and Slack state, or verify the exact Slack attempt_ref.", z.union([NotificationConfigSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),

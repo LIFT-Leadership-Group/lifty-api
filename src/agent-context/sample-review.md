@@ -66,5 +66,5 @@ with chosen saved leads; exact sending approval remains separate.
 continues toward outreach, fetch `context campaigns`. If channel intent is
 missing, offer LinkedIn, email, both, or not right now and wait. Do not recommend
 email simply because a mailbox is connected. Follow the campaign context to
-explain the chosen sequence before writing templates. Reuse explicit choices;
+explain the chosen sequence before configuring outreach. Reuse explicit choices;
 never turn sample acceptance into campaign activation consent.

@@ -2,8 +2,8 @@
 
 Before proposing setup or changes in a new authenticated session, read `summary.get`
 using `context summary`. Reuse verified saved state. Read business before asking
-for a website, sending-accounts before reconnecting, and campaigns before writing
-templates. Unavailable reads require a retry, not assumptions that setup is missing.
+for a website, sending-accounts before reconnecting, and campaigns before configuring
+outreach. Unavailable reads require a retry, not assumptions that setup is missing.
 # LIFTY founder onboarding
 
 ## Authentication and connection guidance
@@ -99,12 +99,12 @@ may also launch the CLI's reviewed OAuth handoff. It never asks for or prints
 tokens, manually installs provider apps, activates outreach, or sends anything.
 Configure one primary motion and record every secondary motion as parked.
 When the founder asks to continue outreach setup, fetch `context campaigns` and
-follow its channel-choice step before writing templates: LinkedIn, email,
+follow its channel-choice step before configuring outreach: LinkedIn, email,
 both, or not right now. Reuse an explicit choice; never infer it from connected
 accounts or sample acceptance. Explain the chosen sequence before the copy
 choice and drafting, then advance the steps whose prerequisites are met.
 Collect missing account details,
-connect the chosen channel, and prepare the complete workspace sequence from
+connect the chosen channel, and configure the shared graph, compose mode and outreach overlay from
 saved targeting and voice even while calibration is pending. The campaign
 context owns that setup; do not default to individual lead/schedule questions. Explain a blocker only for the operation it actually prevents.
 

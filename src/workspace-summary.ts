@@ -35,6 +35,9 @@ const Account = z.object({ connection_status: z.enum(["not_connected", "pending"
 const Campaign = z.object({
   state: WorkspaceCampaignResult.shape.state, outreach_enabled: z.boolean(), version_ref: z.uuid().nullable(),
   selected_channels: z.array(z.enum(["email", "linkedin"])), templates: z.object({ email: z.number().int(), linkedin: z.number().int() }).strict(),
+  engine: z.enum(["fixed_v1", "shared_v1"]).nullable(),
+  compose_modes: z.object({ email: z.enum(["generate", "templates"]).nullable(), linkedin: z.enum(["generate", "templates"]).nullable() }).strict().nullable(),
+  preparation: WorkspaceCampaignResult.shape.preparation.nullable(),
   eligible_count: z.number().int(), includes_future_leads: z.boolean().nullable(),
   audience: z.enum(["qualified_ab", "explicit_leads"]).nullable(),
   progress: WorkspaceCampaignResult.shape.progress, blockers: WorkspaceCampaignResult.shape.blockers,
@@ -77,9 +80,14 @@ export async function getWorkspaceSummary(deps: AppDependencies, session: AuthSe
     readComponent(async () => {
       const v = scoped(WorkspaceCampaignResult.parse(await deps.workspaceCampaign(session, { operation: "status", payload: { workspace: current } })), current);
       const cfg = v.configuration;
+      const shared = cfg && "engine" in cfg ? cfg : null;
       return { state: v.state, outreach_enabled: v.outreach_enabled, version_ref: v.version_ref,
         selected_channels: [...(cfg?.email ? ["email" as const] : []), ...(cfg?.linkedin ? ["linkedin" as const] : [])],
-        templates: { email: cfg?.email?.steps.length ?? 0, linkedin: cfg?.linkedin?.messages.length ?? 0 },
+        templates: { email: cfg?.email && "steps" in cfg.email ? cfg.email.steps.length : 0,
+          linkedin: cfg?.linkedin && "messages" in cfg.linkedin ? cfg.linkedin.messages.length : 0 },
+        engine: shared ? "shared_v1" as const : cfg ? "fixed_v1" as const : null,
+        compose_modes: shared ? { email: shared.email?.compose_mode ?? null, linkedin: shared.linkedin?.compose_mode ?? null } : null,
+        preparation: v.preparation ?? null,
         eligible_count: v.eligible_count, includes_future_leads: cfg?.audience.includes_future_leads ?? null,
         audience: cfg ? (cfg.audience.lead_ids ? "explicit_leads" as const : "qualified_ab" as const) : null,
         progress: v.progress, blockers: v.blockers, continuing_version_count: v.continuing_versions.length };
