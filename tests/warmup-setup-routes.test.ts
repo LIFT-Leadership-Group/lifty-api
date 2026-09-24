@@ -19,6 +19,9 @@ it("shows only the mailbox, name fields and one Google button, with protected br
   expect(res.status).toBe(200);
   expect(html).toContain("ada@example.test");
   expect(html).toContain("Continue with Google");
+  expect(html).toContain("Google grants full Gmail access, including reading, sending and deleting mail.");
+  expect(html).toContain("Lifty shares this access with Mailivery to send and receive warmup mail.");
+  expect(html).toContain('href="https://liftygtm.com/privacy-policy"');
   expect(html).not.toMatch(/type="password"|name="email"|name="method"|name="emails_per_day"|name="reply_rate"|App Password|Unipile/);
   expect(html).toMatch(/name="timezone" id="tz" value="America\/New_York"/);
   expect(res.headers.get("set-cookie")).toMatch(/__Host-lifty-warmup-browser=.+HttpOnly.+Secure.+SameSite=Lax/);
