@@ -188,6 +188,18 @@ describe("recovery link and password update browser behavior",()=>{
 });
 
 describe("login browser errors and normal CLI handoff",()=>{
+  it("treats an interrupted CLI callback as uncertain without replaying it",async()=>{
+    const fetcher=vi.fn(async()=>reply(200,{access_token:"NORMAL_ACCESS",refresh_token:"NORMAL_REFRESH",expires_in:3600}));
+    fetcher.mockResolvedValueOnce(reply(200,{access_token:"NORMAL_ACCESS",refresh_token:"NORMAL_REFRESH",expires_in:3600})).mockRejectedValueOnce(new Error("PRIVATE_NETWORK"));
+    const b=login(fetcher);b.get("email").value="owner@example.test";
+    await b.get("auth-form").dispatch("submit");
+    await b.get("approve").dispatch("click");
+    expect(b.get("approve-status").textContent).toContain("couldn't confirm");
+    expect(b.get("approve-status").textContent).toContain("lifty whoami");
+    expect(b.get("approve-status").textContent).not.toContain("PRIVATE_NETWORK");
+    expect(b.get("approve").disabled).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
   it.each([{code:400,error_code:"invalid_credentials",msg:"Invalid login credentials"},{code:"invalid_credentials",message:"PRIVATE"},{code:400,msg:"Invalid login credentials"}])("recognizes legacy numeric and modern semantic errors %#",async payload=>{
     const b=login(vi.fn(async()=>reply(400,payload)));await b.get("auth-form").dispatch("submit");
     expect(b.get("auth-error").textContent).toBe("The email or password is incorrect.");expect(b.get("approve-card").hidden).toBe(true);
