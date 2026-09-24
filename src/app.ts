@@ -1118,6 +1118,7 @@ export function createApp(
   const hostedAuthOrigin = parseHostedAuthOrigin(dependencies.unipileHostedAuthOrigin);
   const v2HostedAuthOrigins=dependencies.unipileV2HostedAuthOrigins.map(origin=>parseHostedAuthOrigin(origin));
   if(v2HostedAuthOrigins.includes(UNIPILE_HOSTED_AUTH_ORIGIN))throw new Error("V2 hosted origins cannot include V1.");
+  const emailAuthorizationCsp = `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${[hostedAuthOrigin,...v2HostedAuthOrigins].join(" ")}; base-uri 'none'; frame-ancestors 'none'`;
   const app = new OpenAPIHono<AppEnvironment>();
   registerOpenApi(app);
   const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
@@ -1434,7 +1435,7 @@ export function createApp(
       if (!(error instanceof PublicError) || !["EMAIL_DECLARATION_REQUIRED", "EMAIL_PROVIDER_REQUIRED"].includes(error.code)) throw error;
       return context.html(renderEmailAuthorizationPage(state, error.code === "EMAIL_PROVIDER_REQUIRED"), 200, {
         "cache-control": "no-store", "referrer-policy": "strict-origin", "x-content-type-options": "nosniff",
-        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "content-security-policy": emailAuthorizationCsp,
       });
     }
     if (target === "authorization_received") {

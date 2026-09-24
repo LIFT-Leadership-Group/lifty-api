@@ -101,7 +101,7 @@ describe("fresh hosted email provider choice",()=>{
   it("renders all providers on Lifty without issuing a vendor link and preserves the declaration",async()=>{
     const h=harness(),response=await h.app.request(`/unipile/start?intent=${state}`),html=await response.text();
     expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(response.headers.get("content-security-policy")).toContain("form-action 'self'");
+    expect(response.headers.get("content-security-policy")).toContain("form-action 'self' https://account.unipile.com https://auth.lifty.test");
     for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","A new account for outreach"])expect(html).toContain(label);
     expect(html).toContain('class="brand" aria-label="Lifty"');
     // Opaque intent values can randomly contain V1/V2; branding is visible copy.
