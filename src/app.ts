@@ -7,6 +7,7 @@ import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguratio
 import { registerStageRoutes } from "./stage-routes.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
+import { renderConnectionReturnPage } from "./connection-return-page.js";
 import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
 import type { WarmupSetup } from "./warmup-setup.js";
 import { versionedHostedAuthUrl, parseHostedAuthOrigin, UNIPILE_HOSTED_AUTH_ORIGIN } from "./hosted-auth-branding.js";
@@ -1398,9 +1399,9 @@ export function createApp(
       await receive(context.req.query("intent") ?? "");
       // Browser result fields are hints only. Signed lifecycle events and later
       // authenticated polling determine success, including provider-error returns.
-      return context.html("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Lifty connection</title><h1>Continue in Lifty</h1><p>You can close this page and check your connection status in Lifty.</p></html>",200,{
+      return context.html(renderConnectionReturnPage(channel),200,{
         "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
-        "content-security-policy":"default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       });
     });
   }

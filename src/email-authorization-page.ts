@@ -1,3 +1,5 @@
+import { liftyBrand } from "./lifty-brand.js";
+
 const styles = `
   :root{color-scheme:light;--ink:#01333f;--muted:#33616d;--sage:#7fa369;--paper:#f6f8f7;--line:#dbe4e2}
   *{box-sizing:border-box}
@@ -39,23 +41,6 @@ const styles = `
   @media(forced-colors:active){.provider:has(input:checked){outline:2px solid Highlight;outline-offset:-2px}}
 `;
 
-// Static LiftyMark/BirdGlyph/PerchedHead geometry from the dashboard landing brand.
-// Keep these paths aligned with components/landing/lifty-mark.tsx and perched-head.tsx.
-const brand = `<div class="brand" aria-label="Lifty" role="img"><svg viewBox="18 7 43 60" fill="none" aria-hidden="true" focusable="false">
-<path stroke="hsl(192 26% 86%)" stroke-width="1.3" stroke-linejoin="bevel" d="M39 54 38 60 34 63 33 65 M38 60 42 63 42 65 M46 51 45 59 43 62 42 64 M45 59 50 62 50 64"/>
-<path fill="hsl(140 16% 96%)" stroke="hsl(195 40% 37% / .55)" stroke-width=".55" stroke-linejoin="round" d="M32 42 21 65 27 63 39 46Z"/>
-<path fill="hsl(195 40% 37%)" d="M50 25Q57 27 56 34L52 44 46 50 48 35Z"/>
-<path fill="hsl(196 66% 16% / .22)" d="M54 28 56 32 52 44 46 50 50 41Z"/>
-<path fill="hsl(140 16% 96%)" stroke="hsl(195 40% 37% / .55)" stroke-width=".55" stroke-linejoin="round" d="M33 21 44 19Q52 20 55 27Q54 33 50 39L43 54 38 57 33 53 29 43 29 31Z"/>
-<path fill="hsl(192 26% 86%)" d="M48 22Q53 23 55 27Q54 33 50 39L43 54 38 57 46 39Q53 29 48 22Z"/>
-<g fill="hsl(140 16% 96%)" stroke="hsl(195 40% 37% / .55)" stroke-width=".55" stroke-linejoin="round"><path d="M33 18.5L46 18L50 27L40 29L33 23Z"/><path d="M29 15.5L32 11.5L39 9.5L45 10.5L49 15.5L50 22.5L44 24.5L37 20.5L32 20.5Z"/></g>
-<g fill="hsl(195 40% 37%)"><path d="M27 17.5L31 15.5L35 16.5L32 19.5L26 20.5Z"/><path d="M28 17.5Q23 18.5 25 22.5L28 25.5L27.5 21.5L32 19.5Z"/></g>
-<path fill="hsl(196 66% 16% / .22)" d="M25 20.5L27.5 21.5L28 25.5L25 22.5Z"/>
-<circle fill="hsl(196 66% 16%)" cx="36" cy="16.3" r="4.4"/><circle stroke="hsl(99 34% 65%)" stroke-width=".45" cx="36" cy="16.3" r="3.55"/><circle fill="hsl(99 34% 65%)" cx="36" cy="16.3" r="1.55"/>
-<path fill="hsl(195 40% 37%)" d="M32 25Q37 24 40 28L38 36 32 48 22 62 26 39Q27 30 32 25Z"/>
-<path fill="hsl(196 66% 16% / .22)" d="m37 26 3 2-2 8-6 12-10 14 8-17 5-12Z"/>
-</svg><span aria-hidden="true">lifty</span></div>`;
-
 const providerIcons = {
   google: `<svg class="provider-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#4285f4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.04H12v3.87h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.32 2.98-7.36Z"/><path fill="#34a853" d="M12 22c2.7 0 4.97-.9 6.62-2.41l-3.24-2.51c-.9.6-2.05.97-3.38.97-2.6 0-4.8-1.76-5.59-4.13H3.07v2.59A10 10 0 0 0 12 22Z"/><path fill="#fbbc05" d="M6.41 13.92a6 6 0 0 1 0-3.84V7.49H3.07a10 10 0 0 0 0 9.02Z"/><path fill="#ea4335" d="M12 5.95c1.47 0 2.79.51 3.83 1.51l2.87-2.87A9.61 9.61 0 0 0 12 2a10 10 0 0 0-8.93 5.49l3.34 2.59C7.2 7.71 9.4 5.95 12 5.95Z"/></svg>`,
   outlook: `<svg class="provider-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#f25022" d="M2 2h9v9H2z"/><path fill="#7fba00" d="M13 2h9v9h-9z"/><path fill="#00a4ef" d="M2 13h9v9H2z"/><path fill="#ffb900" d="M13 13h9v9h-9z"/></svg>`,
@@ -63,7 +48,7 @@ const providerIcons = {
 };
 
 function page(title: string, content: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Lifty</title><style>${styles}</style></head><body><main class="shell"><section class="panel" aria-labelledby="page-title">${brand}${content}</section></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Lifty</title><style>${styles}</style></head><body><main class="shell"><section class="panel" aria-labelledby="page-title">${liftyBrand}${content}</section></main></body></html>`;
 }
 
 function providerChoices(): string {

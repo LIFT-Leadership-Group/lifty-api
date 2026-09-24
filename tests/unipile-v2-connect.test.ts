@@ -147,12 +147,25 @@ for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifec
     expect(h.http).toHaveLength(0);
   });
 });
-it("V2 browser return ignores forged account/provider fields and never displays success",async()=>{
-  const observed:string[]=[];
-  const app=createCurrentClient({receiveEmailV2Return:async state=>{observed.push(state);}});
-  const response=await app.request("/unipile/v2/email/return?intent=opaque&account_id=foreign&provider=google&state=forged");
-  expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
-  expect(observed).toEqual(["opaque"]);expect(await response.text()).toContain("check your connection status");
+it.each(["email","linkedin"] as const)("V2 %s browser return is branded without claiming connection success",async channel=>{
+  const observed:{channel:string;state:string}[]=[];
+  const app=createCurrentClient({
+    receiveEmailV2Return:async state=>{observed.push({channel:"email",state});},
+    receiveLinkedinV2Return:async state=>{observed.push({channel:"linkedin",state});},
+  });
+  const response=await app.request(`/unipile/v2/${channel}/return?intent=opaque&account_id=foreign&provider=google&state=forged`);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+  expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
+  expect(observed).toEqual([{channel,state:"opaque"}]);
+  const html=await response.text();
+  expect(html).toContain('aria-label="Lifty"');
+  expect(html).toContain("<style>");
+  expect(html).toContain(channel==="linkedin" ? "Back from LinkedIn" : "Back from your email provider");
+  expect(html).toContain("Ask your agent to verify whether");
+  expect(html).toContain("This page does not confirm that your account is connected.");
+  expect(html).not.toMatch(/<script\b|<form\b|<a\s/i);
 });
 
 it("pins LinkedIn health writes to the exact transport generation read",async()=>{
