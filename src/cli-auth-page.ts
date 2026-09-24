@@ -170,7 +170,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
         byId("done-title").textContent = "You're authenticated";
         byId("done-message").textContent = "Return to your agent to continue. You can close this tab.";
       } catch {
-        status.textContent = "We couldn't reach the CLI. Keep lifty login running and try again in a Chromium browser.";
+        status.textContent = "The browser couldn't confirm whether the CLI signed in. Return to your agent and ask it to run lifty whoami. If signed in, continue; otherwise run lifty login again and retry in Chrome.";
         status.className = "error";
         approve.disabled = false;
       } finally {
