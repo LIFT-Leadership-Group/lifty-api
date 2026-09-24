@@ -11,6 +11,20 @@ const stages = ["business", "targeting", "research-criteria", "sample-review", "
   "crm", "sending-accounts", "campaigns", "notifications", "capacity"];
 
 describe("runtime stage context", () => {
+  it("publishes a bound local submission with exact receipt correlation and read-only completion operations", async () => {
+    const app = createApp();
+    const response = await app.request(`/v1/context/targeting?client_contract=${STAGE_CLIENT_CONTRACT}`);
+    const context = await response.json();
+    const plan = context.operations.post.submission;
+    expect(plan).toBeDefined();
+    expect(plan.version).toBe("lifty-local-submission.v1");
+    expect(plan.status.match).toContainEqual({ receipt: "/submission_ref", response: "/submission_ref" });
+    expect(plan.status.match).toContainEqual({ receipt: "/draft_digest", response: "/draft_digest" });
+    for (const read of [plan.status, ...plan.readback]) {
+      expect(context.operations[read.operation].method).toBe("GET");
+    }
+    expect(plan.readback[0].match).toContainEqual({ receipt: "/workspace/workspace_ref", response: "/workspace_ref" });
+  });
   it("resolves every index link directly to a public current guide", async () => {
     const app = createApp();
     const response = await app.request("/v1/context/stages");
@@ -71,11 +85,8 @@ describe("runtime stage context", () => {
         expect(stageOperations[match[1]!]![match[2]!], match[0]).toBeDefined();
       }
     }
-    const targeting = getAgentContext("targeting")!;
-    expect(targeting.references.configuration).toContain("readMatchingConfiguration");
-    expect(targeting.references.configuration).toContain("does not save");
-    expect(targeting.references.configuration).toContain("same-saved-body");
-    expect(targeting.references.configuration).toContain("onboarding_status");
+    // The installed CLI/API smoke executes the served first-configuration
+    // commands and checks private bindings, rejection, receipts and readback.
   });
 
   it("returns 404 for built-in object names and unknown tasks", async () => {

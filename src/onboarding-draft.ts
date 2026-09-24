@@ -81,16 +81,24 @@ export function lintOnboardingDraft(draft: Record<string, unknown>): OnboardingL
       if (!root || !configuredRoots.has(root) || !parts.length || !result.found || !isDeepStrictEqual(result.value, finding.value)) add("draft_research_mismatch", path, "Confirmed research must match its actual configured field.");
     }
   });
-  const latest = new Map<string, typeof value.founder_statement_history[number]>();
+  const latest = new Map<string, { statement: typeof value.founder_statement_history[number]; index: number }>();
   const sequences = new Set<number>();
   value.founder_statement_history.forEach((statement, index) => {
     if (sequences.has(statement.sequence)) add("draft_history_duplicate", `/founder_statement_history/${index}`, "Founder statement sequences must be unique.");
     sequences.add(statement.sequence);
-    if (statement.sequence > (latest.get(statement.field)?.sequence ?? 0)) latest.set(statement.field, statement);
+    if (statement.sequence > (latest.get(statement.field)?.statement.sequence ?? 0)) latest.set(statement.field, { statement, index });
   });
-  for (const [field, statement] of latest) {
+  for (const [field, { statement, index }] of latest) {
     const result = resolve(field);
-    if (!result.found || !isDeepStrictEqual(result.value, statement.value)) add("draft_latest_statement_mismatch", "/founder_statement_history", "The newest founder statement must match the configured decision.");
+    // Identify the actual array entry (sequence order need not equal index).
+    // Reflect only a valid configured path, never the private decision values.
+    const safeField = field.length <= 200 && /^(?:[a-z_]+|\d+)(?:\.(?:[a-z_]+|\d+))*$/.test(field)
+      && configuredRoots.has(field.split(".")[0]!);
+    if (!result.found) add("draft_latest_statement_mismatch", `/founder_statement_history/${index}/field`,
+      "This founder statement must name an existing configured decision using its dotted field path.");
+    else if (!isDeepStrictEqual(result.value, statement.value)) add("draft_latest_statement_mismatch", `/founder_statement_history/${index}/value`,
+      safeField ? `The newest founder statement must match the exact JSON value at /draft/${field.replaceAll(".", "/")}.`
+        : "The newest founder statement must match the exact JSON value at its configured field.");
   }
   return issues;
 }

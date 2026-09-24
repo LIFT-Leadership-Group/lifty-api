@@ -197,56 +197,47 @@ only output shape.
     draft, tell them nothing was lost, and offer a fresh sign-in link — but relaunch only after they confirm they're at the browser,
     never in a retry loop. When it succeeds, tell the founder their workspace exists — name
     it — and keep the rest of the CLI output to yourself.
-11. After login succeeds, refresh the index and targeting contract:
+11. After login succeeds, read the current targeting contract and its
+    `references.configuration` in full. Use the CLI private-file conveniences:
 
     ```text
-    node "<installed-runner>" context stages
-    node "<installed-runner>" context targeting
-    node "<installed-runner>" stage targeting onboarding_context
+    lifty context targeting
+    lifty get targeting onboarding_context --save onboarding-context.json
+    lifty artifact read onboarding-context.json
     ```
 
-    Read `references.configuration` in full and follow its executable private
-    storage recipe. This operation returns JSON; it does not save a local file.
-    Use the installed `onboarding-configuration.mjs` helper to save successful
-    context as `.lifty/onboarding-context.json` (directory 0700, files 0600).
-    Read the actual draft, authenticated `generation_rules`, current
-    `configuration_schema` and Scout base. Generate locally using confirmed
-    intent; Scout executes research, not configuration generation. Give each
-    material criterion concrete lookups, sufficient evidence and unknown/failure
-    treatment. Check the reference's worked example without copying its target.
-    Pass the generated business fields from the current schema on stdin:
+    Read the actual confirmed draft, authenticated `generation_rules` and current
+    `configuration_schema`. Generate locally using confirmed intent; Scout
+    executes research, not configuration generation. Give each material
+    criterion concrete lookups, sufficient evidence and unknown/failure treatment.
+    Check the reference's worked example without copying its target. Send the
+    generated business fields from the current schema on stdin:
 
     ```text
-    node "<skill-root>/scripts/write-onboarding-config.mjs" \
-      --project-dir "<active-project>" --input -
+    node "<skill-root>/scripts/write-onboarding-config.mjs" --project-dir "<active-project>" --input -
+    lifty submit targeting
+    lifty artifact read onboarding-validation.json
     ```
 
-    The writer binds the actual saved draft and context. Follow the reference's
-    `readMatchingConfiguration` recipe to enforce source-draft equality, metadata
-    and size before assembling `{ "body": { "draft": ..., "configuration": ... } }`.
-    Save the exact request privately, then submit once and explicitly read status:
-
-    ```text
-    node "<installed-runner>" stage targeting post --input -
-    node "<installed-runner>" stage targeting onboarding_status
-    node "<installed-runner>" stage targeting get
-    ```
-
-    These are separate operations: the generic transport does not save a receipt,
-    poll or perform readback automatically. Preserve the request and receipt with
-    the private helper. Research criteria and commercial voice share the same
-    initial import; never repeat POST per stage. Poll `onboarding_status` with
-    bounded waits while pending, then GET targeting, research-criteria and any
-    other saved section needed for the summary. Explain the confirmed market and
+    The writer binds the saved draft and context. `submit` checks source-draft
+    equality and size, preserves the exact request, submits once through the
+    current stage route, saves diagnostics/receipt, and waits for matching import
+    status plus saved targeting readback. Use its confirmed readback in the
+    summary; do not repeat identical polling or GETs. Research criteria and
+    commercial voice share this transaction. Explain the confirmed market and
     personas, buyer location versus headquarters, and discovery limits versus
-    research checks. Industry labels are not verified native Apollo filters.
+    research checks. Read other stages only for additional saved detail.
 
-    Follow `references.configuration` for technical repairs and uncertain writes.
-    A definite validation rejection may be repaired locally up to three times
-    while preserving confirmed intent. Stale context or changed draft requires
-    regeneration, not a replaced fingerprint. On timeout check onboarding_status
-    and saved state without automatically resubmitting. Ask only for missing
-    business intent. Preserve hand-tuned/already-configured workspaces.
+    After a pending timeout or interrupted read, use `lifty submit targeting
+    --resume`. It checks the original request without another POST. A missing
+    receipt leaves the outcome uncertain even when an unrelated status is live.
+    Follow the configuration reference for definite rejections: read exact
+    diagnostic paths, repair technical mistakes while preserving confirmed
+    intent, regenerate after any draft/context change, and submit changed
+    artifacts at most three times. Never edit only the fingerprint, rebind old
+    generated content, or overwrite a receipt to force a retry. Preserve
+    hand-tuned/already-configured workspaces. A CLI without `submit` needs its
+    installation updated; an unavailable API contract is a visible blocker.
 12. Once import is confirmed, tell the founder Lifty will research five initial
     candidates and review their actual grades together. Do not promise five A
     leads. Read `references.calibration` in full, refresh `context capacity` and
