@@ -27,7 +27,11 @@ If the founder says `skip`, `no sé`, `avancemos`, or an equivalent:
 
 Do not repeat a confirmation before asking the next necessary question. When
 the founder changes an answer, state the replacement once and store the newest
-value in `founder_statement_history`.
+value in `founder_statement_history`. Its `field` is the exact dotted draft path;
+its `value` is that field's JSON value, including the same type, array or object
+structure. Update the configured decision and append the matching history entry
+together. Keep earlier entries; do not replace structured values with prose
+summaries. These are two representations of the same confirmed decision.
 
 ## Public research playback
 

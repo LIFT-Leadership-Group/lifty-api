@@ -31,12 +31,37 @@ import { LocalOnboardingConfigurationSchema, LocalConfigUpdateConfigurationSchem
 // This is the transport envelope, not a client-side business registry. The API
 // publishes current operation definitions; clients pass business data unchanged.
 const JsonSchema = z.record(z.string(), z.unknown());
+const JsonPointer = z.string().regex(/^\/(?:[^~]|~[01])*$/);
+const OperationKey = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/);
+const ReceiptInput = z.object({
+  path: z.record(z.string(), JsonPointer).optional(),
+  query: z.record(z.string(), JsonPointer).optional(),
+});
+const ReceiptMatch = z.object({ receipt: JsonPointer, response: JsonPointer });
+const SubmissionRead = z.object({ operation: OperationKey, input: ReceiptInput,
+  match: z.array(ReceiptMatch).min(1).max(8).optional() });
+// A finite local-artifact submission protocol, not a stage/business registry.
+// State fields, receipt bindings, routes and readback remain API-owned.
+export const LocalSubmissionSchema = z.object({
+  version: z.literal("lifty-local-submission.v1"),
+  artifact: z.literal("onboarding-configuration"),
+  status: SubmissionRead.extend({ state: JsonPointer,
+    pending: z.array(z.string().min(1)).min(1).max(20),
+    succeeded: z.array(z.string().min(1)).min(1).max(20),
+    failed: z.array(z.string().min(1)).min(1).max(20),
+    match: z.array(ReceiptMatch).min(1).max(8),
+    poll_interval_ms: z.number().int().min(1).max(60000),
+    timeout_ms: z.number().int().min(1).max(300000),
+  }),
+  readback: z.array(SubmissionRead).min(1).max(8),
+});
 export const StageOperationSchema = z.object({
   method: z.enum(["GET", "POST", "PATCH"]),
   route: z.string().regex(/^\/v1\/[A-Za-z0-9_{}\/-]+$/),
   description: z.string().min(1),
   request: z.object({ path: JsonSchema, query: JsonSchema, body: JsonSchema.nullable() }),
   responses: z.record(z.string().regex(/^[1-5][0-9]{2}$/), JsonSchema),
+  submission: LocalSubmissionSchema.optional(),
 });
 export type StageOperation = z.infer<typeof StageOperationSchema>;
 
@@ -156,9 +181,21 @@ const configRead = (stage: string, description: string) =>
 const configWrite = (stage: string, section: string, body: z.ZodType) =>
   operation("PATCH", stageRoute(stage), `Update only the ${section} section using the existing config validation/import. Supply section=${section}; another section is rejected. A queued receipt requires status polling and GET readback.`, ConfigUpdateResultSchema,
     body);
-const initialSetup = (stage: string) => operation("POST", stageRoute(stage),
+const initialSetup = (stage: string): StageOperation => ({ ...operation("POST", stageRoute(stage),
   "Submit the complete first onboarding configuration once, using current private generation context. Not a partial-stage replacement; an existing configuration is rejected.",
-  OnboardingPushResultSchema, SubmitOnboardingRequestSchema);
+  OnboardingPushResultSchema, SubmitOnboardingRequestSchema),
+  submission: {
+    version: "lifty-local-submission.v1", artifact: "onboarding-configuration",
+    status: { operation: "onboarding_status", input: {}, state: "/state",
+      pending: ["pending"], succeeded: ["imported"], failed: ["failed"],
+      match: [
+        { receipt: "/submission_ref", response: "/submission_ref" },
+        { receipt: "/draft_digest", response: "/draft_digest" },
+        { receipt: "/workspace/workspace_ref", response: "/workspace/workspace_ref" },
+      ], poll_interval_ms: 3000, timeout_ms: 60000 },
+    readback: [{ operation: "get", input: {}, match: [{ receipt: "/workspace/workspace_ref", response: "/workspace_ref" }] }],
+  },
+});
 const configSupport = {
   generation_context: operation("GET", "/v1/config/context", "Read private current configuration, generation rules and current artifact schema before an edit.", ConfigUpdateGenerationContextSchema),
   onboarding_context: operation("GET", "/v1/onboarding/context", "Read private generation rules and artifact schema before first setup.", OnboardingGenerationContextSchema),

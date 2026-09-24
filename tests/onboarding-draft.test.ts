@@ -16,6 +16,19 @@ const badDrafts = [
   { ...confirmedDraft, founder_statement_history: [{ sequence: 1, field: "company.name", value: "Example" }, { sequence: 1, field: "company.name", value: "Example" }] },
 ];
 describe("API-owned onboarding decisions", () => {
+  it("locates each latest mismatching history entry and names its configured field without exposing values", () => {
+    const issues = lintOnboardingDraft({ ...confirmedDraft, founder_statement_history: [
+      { sequence: 4, field: "company.name", value: "PRIVATE_WRONG_NAME" },
+      { sequence: 2, field: "company.name", value: "Superseded" },
+      { sequence: 5, field: "primary_motion.name", value: "PRIVATE_WRONG_MOTION" },
+    ] });
+    expect(issues.map(issue => issue.path)).toEqual([
+      "/draft/founder_statement_history/0/value", "/draft/founder_statement_history/2/value",
+    ]);
+    expect(issues[0]?.message).toContain("/draft/company/name");
+    expect(issues[1]?.message).toContain("/draft/primary_motion/name");
+    expect(JSON.stringify(issues)).not.toContain("PRIVATE_WRONG");
+  });
   it("accepts the current schema and latest matching confirmed decisions", () => {
     expect(lintOnboardingDraft({ ...confirmedDraft, research_findings: [finding], founder_statement_history: [
       { sequence: 2, field: "company.name", value: "Example" }, { sequence: 1, field: "company.name", value: "Old name" },
