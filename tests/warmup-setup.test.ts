@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
-import { createWarmupSetup, DEFAULT_WARMUP_POLICY, hashSetupSecret, verifyGoogleWarmupIdentity, WarmupPolicy } from "../src/warmup-setup.js";
+import { createWarmupSetup, DEFAULT_WARMUP_POLICY, hashSetupSecret, verifyGoogleWarmupIdentity, WarmupPolicy, type WarmupSetupRecord } from "../src/warmup-setup.js";
 
 const secret = "a".repeat(43), browser = "b".repeat(43);
 const policy = { version: 1, emails_per_day: 22, ramp: "slow", reply_rate: 30,
@@ -8,14 +8,14 @@ const policy = { version: 1, emails_per_day: 22, ramp: "slow", reply_rate: 30,
 const record = { email: "founder@example.test", workspace_ref: "22222222-2222-4222-8222-222222222222",
   sender_ref: "33333333-3333-4333-8333-333333333333", expires_at: "2026-10-01T00:00:00Z",
   state: "claimed", policy, first_name: "Ada", last_name: "Lovelace" };
-function harness(email = record.email, providerFailure = false, tokenOverrides:Record<string,unknown> = {}) {
+function harness(email = record.email, providerFailure = false, tokenOverrides:Record<string,unknown> = {}, recordOverrides:Partial<WarmupSetupRecord> = {}) {
   const writes: {operation: string; payload: Record<string, unknown>}[] = [];
   let claimed = false, dispatched = false;
   const rpc = vi.fn(async (operation: string, payload: Record<string, unknown>) => {
     writes.push({operation, payload});
     if (operation === "claim") { if (claimed) throw new Error("replay"); claimed = true; }
     if (operation === "dispatch") { if (dispatched) throw new Error("duplicate"); dispatched = true; }
-    return record;
+    return {...record, ...recordOverrides};
   });
   const requests: {url: string; body: unknown}[] = [];
   const fetchImpl: typeof fetch = async (url, init) => {
@@ -96,6 +96,24 @@ describe("warmup setup OAuth handoff", () => {
     expect(h.requests).toHaveLength(2);
     expect(h.writes.at(-1)?.operation).toBe("dispatch");
   });
+
+  it("uses each binding's opaque sender reference for different mailboxes in one workspace", async () => {
+    const mailboxes = [
+      {email:"david@liftygtm.test",sender_ref:"44444444-4444-4444-8444-444444444444"},
+      {email:"david@liftyhq.test",sender_ref:"55555555-5555-4555-8555-555555555555"},
+      {email:"david@runlifty.test",sender_ref:"66666666-6666-4666-8666-666666666666"},
+    ];
+    const tags:string[]=[];
+    for (const mailbox of mailboxes) {
+      const h=harness(mailbox.email,false,{},mailbox);
+      await h.setup.callback(secret,browser,"code");
+      const fields=Object.fromEntries((h.requests[1]!.body as FormData).entries());
+      expect(fields.email).toBe(mailbox.email);
+      expect(fields.tags).toBe(`lifty-ws:${record.workspace_ref},lifty-sender:${mailbox.sender_ref}`);
+      tags.push(fields.tags as string);
+    }
+    expect(new Set(tags).size).toBe(3);
+  });
   it("rejects invalid policy fields and unknown keys before an external call", () => {
     expect(WarmupPolicy.safeParse(policy).success).toBe(true);
     for (const change of [{emails_per_day:101},{reply_rate:56},{ramp:"extreme"},{timezone:"fake/zone"},{audience:"custom"},{google_token:"secret"}]) {
@@ -133,4 +151,20 @@ it("stores only a hash for issued setup URLs and uses the founder session for is
   const intent=new URL(link.url).searchParams.get("intent")!;
   expect(calls).toEqual([{n:"lifty_email_warmup_setup",args:{p_server_key:"k".repeat(32),p_operation:"issue",p_payload:{workspace:"workspace",intent_hash:hashSetupSecret(intent)}}}]);
   expect(JSON.stringify(calls)).not.toContain(intent);
+});
+
+it("issues a client setup intent for the selected connection through the authenticated member session",async()=>{
+  const calls:unknown[]=[];
+  const session={userId:"member",client:{rpc:async(n:string,args:unknown)=>{calls.push({n,args});return {data:{...record,state:"draft",policy:null},error:null};}}};
+  const setup=createWarmupSetup({serverKey:"k".repeat(32),publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://db.test",publishableKey:"publishable",
+    googleClientId:"client",googleClientSecret:"secret",mailivery:{apiKey:"key"}}, {fetchImpl:async()=>{throw Error("issue must use the authenticated session");}});
+  const connection="55555555-5555-4555-8555-555555555555";
+  const link=await setup.issue(session,"lift",connection);
+  const intent=new URL(link.url).searchParams.get("intent")!;
+  expect(calls).toEqual([{n:"lifty_email_warmup_setup",args:{p_server_key:"k".repeat(32),p_operation:"issue",
+    p_payload:{workspace:"lift",connection_ref:connection,intent_hash:hashSetupSecret(intent)}}}]);
+  expect(JSON.stringify(calls)).not.toContain(intent);
+  expect(link.url).not.toContain(connection);
+  await expect(setup.issue(session,"lift","not-a-uuid")).rejects.toThrow();
+  expect(calls).toHaveLength(1);
 });

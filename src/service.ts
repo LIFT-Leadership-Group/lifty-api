@@ -71,7 +71,7 @@ import {
 export function createProductionApp(config: ServiceConfig) {
   const linkedin = config.linkedin ? createLinkedinConnectOperations(config.linkedin) : null;
   const email = config.email ? createEmailConnectOperations(config.email) : null;
-  // Founder operations use their session. Browser setup uses a narrow,
+  // Workspace member operations use their session. Browser setup uses a narrow,
   // server-key-protected intent RPC, never a Supabase administrative key.
   const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
   const warmup = createEmailWarmupOperations({ mailivery: config.mailivery ?? null,
@@ -122,7 +122,7 @@ export function createProductionApp(config: ServiceConfig) {
       receiveEmailV2Return: email.v2Return,
       getEmailWarmup: warmup.status,
       startEmailWarmup: warmup.start,
-      changeEmailWarmup: (session, workspace, operation) => warmup[operation](session, workspace),
+      changeEmailWarmup: (session, workspace, operation, connectionRef) => warmup[operation](session, workspace, connectionRef),
     } : {}),
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,

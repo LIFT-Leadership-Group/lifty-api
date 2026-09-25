@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import type { MailiverySettings } from "./email-warmup.js";
+import { WarmupWorkspaceRequest } from "./email-warmup-contracts.js";
 
 export const WARMUP_SCHEDULES = ["Weekdays - 8am to 6pm", "Weekdays - 7am to 7pm", "Weekdays - 6am to 10pm",
   "With Weekends - 8am to 6pm", "With Weekends - 7am to 7pm", "With Weekends - 6am to 10pm"] as const;
@@ -95,9 +96,10 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
   };
   return {
     origin:new URL(base).origin,
-    async issue(session:AuthSession, workspace:string) {
+    async issue(session:AuthSession, workspace:string, connectionRef?:string) {
+      const input = WarmupWorkspaceRequest.parse({workspace, ...(connectionRef === undefined ? {} : {connection_ref:connectionRef})});
       const intent = newSetupSecret();
-      const record = await call("issue", {workspace, intent_hash:hashSetupSecret(intent)}, session);
+      const record = await call("issue", {...input, intent_hash:hashSetupSecret(intent)}, session);
       return {url:`${base}/warmup/setup?intent=${intent}`, expiresAt:record.expires_at};
     },
     async read(intent:string) {
