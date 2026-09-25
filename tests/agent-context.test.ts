@@ -6,7 +6,9 @@ describe("public agent task context", () => {
     const app = createApp();
     for (const task of ["onboarding", "workspace", "campaign"]) {
       for (const version of ["v1", "v2", "v3", "v4"]) {
-        const legacy = await (await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.${version}`)).json();
+        const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.${version}`);
+        expect(response.status).toBe(409);
+        const legacy = await response.json();
         expect(legacy.error.code).toBe("CONTEXT_CLIENT_UNSUPPORTED");
         expect(legacy.schemas).toBeUndefined(); expect(legacy.references).toBeUndefined();
       }
@@ -19,6 +21,7 @@ describe("public agent task context", () => {
       expect(current.instructions).toContain("project or global");
       expect(current.instructions).not.toContain("<active-project>/.lifty/bin/lifty.mjs");
       if (task !== "campaign") expect(current.instructions).toContain("stage crm mapping_context");
+      if (task === "workspace") expect(current.instructions).toContain("generation_context");
     }
   });
   it("serves onboarding guidance before login without reading a workspace", async () => {
