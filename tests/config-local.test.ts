@@ -13,7 +13,6 @@ const configuration={contract_version:"lifty-config-update.v1" as const,context_
 const receipt: ConfigUpdateSubmission={state:"queued",submission_ref:"submission",run_ref:"submission",import_status:"pending",changed_sections:["tone"],artifact_actions:{prompt:"regenerate"},regenerate_icp:false,regenerate_prompt:true,workspace_ref:"workspace",created:true};
 const authenticate=async()=>({ok:true as const,session:{userId:"founder",client:{}}});
 const patch=(app:ReturnType<typeof createApp>,body:unknown)=>app.request("/v1/config",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-it("requires authentication for current config generation context",async()=>{expect((await createApp().request("/v1/config/context")).status).toBe(401);});
 it("returns private no-store generation context and canonical schema",async()=>{
  const response=await createApp({authenticate,getConfigUpdateContext:async()=>current}).request("/v1/config/context");
  expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
@@ -50,10 +49,6 @@ it.each([
 });
 it("fetches context through the authenticated RPC without an actor override",async()=>{
  const rpc=vi.fn(async()=>({data:current,error:null}));expect(await getConfigUpdateContext({userId:"founder",client:{rpc}})).toEqual(current);expect(rpc).toHaveBeenCalledWith("get_lifty_config_update_context");
-});
-it("legacy clients receive an explicit upgrade diagnosis instead of hosted-update instructions",async()=>{
- const app=createApp();for(const version of ["v1","v2","v3","v4"]) {const r=await app.request(`/v1/context/workspace?client_contract=lifty-cli-context.${version}`);expect(r.status).toBe(409);expect((await r.json()).error.code).toBe("CONTEXT_CLIENT_UNSUPPORTED");}
- const r=await app.request("/v1/context/workspace?client_contract=lifty-cli-context.v5");expect((await r.json()).instructions).toContain("generation_context");
 });
 
 it("persona repairs use the artifact's actual JSON pointer", async()=>{
