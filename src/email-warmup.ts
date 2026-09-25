@@ -4,7 +4,7 @@ import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import {
   StoredWarmupStatus, WarmupStartResult, WarmupStatus, WarmupWorkspaceRequest,
-  type WarmupOperation,
+  type WarmupOperation, type WarmupWorkspaceInput,
 } from "./email-warmup-contracts.js";
 
 export interface MailiverySettings {
@@ -13,7 +13,7 @@ export interface MailiverySettings {
 }
 export interface EmailWarmupSettings {
   mailivery: MailiverySettings | null;
-  issueSetupLink?: (session: AuthSession, workspace: string) => Promise<{url:string;expiresAt:string}>;
+  issueSetupLink?: (session: AuthSession, workspace: string, connectionRef?: string) => Promise<{url:string;expiresAt:string}>;
   fetchImpl?: typeof fetch;
   now?: () => Date;
   requestId?: () => string;
@@ -30,7 +30,7 @@ const DEFAULT_MAILIVERY_BASE = "https://app.mailivery.io/api/v1";
 const rpcMessages: Record<string, { status: number; message: string }> = {
   unauthenticated: { status: 401, message: "Sign in to LIFTY before checking or changing warmup." },
   email_invalid_request: { status: 400, message: "Choose a workspace and a supported warmup action." },
-  email_workspace_forbidden: { status: 403, message: "Choose a Lifty workspace you belong to." },
+  email_workspace_forbidden: { status: 403, message: "Choose a workspace you belong to." },
   email_workspace_suspended: { status: 409, message: "This workspace is paused. Resume it before starting or resuming warmup." },
   email_connection_required: { status: 409, message: "Connect and verify this workspace's email account before starting warmup." },
   email_warmup_mailbox_taken: { status: 409, message: "This mailbox is already being warmed up from another Lifty workspace. Remove warmup there first, or connect a different mailbox here." },
@@ -90,7 +90,7 @@ function addUtcDays(now: Date, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Maps the contract status object to the founder-facing shape. Pure; exported for tests. */
+/** Maps the contract status object to the public shape. Pure; exported for tests. */
 export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): WarmupStatus {
   const binding = stored.binding;
   const state: WarmupStatus["state"] = binding ? binding.state : "not_started";
@@ -105,7 +105,23 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
     message: blockingMessages[reasonCode] ?? "Warmup has a problem Lifty can't describe yet. Check status again later.",
   } : null;
   let goLive: WarmupStatus["recommended_go_live"];
-  if (stored.mailbox_use === null) {
+  if (stored.connection_ref !== undefined) {
+    const remaining = Math.max(0, required - activeDays);
+    if (stored.outreach_unlocked === true) {
+      goLive = { kind: stored.campaign_send_paused ? "awaiting_release" : "unlocked", date: null, remaining_active_days: 0,
+        message: stored.campaign_send_paused
+          ? `The mailbox has completed ${required} active warmup days and a fresh healthy check. Campaign sending stays paused until an operator explicitly releases this connection. Warmup resume does not release campaigns.`
+          : "The warmup requirement is met. Campaign sending is currently not paused; campaign scheduling is managed separately." };
+    } else if (remaining === 0) {
+      goLive = { kind: "awaiting_check", date: null, remaining_active_days: 0,
+        message: `The mailbox has ${required} active warmup days. A healthy check from the last 24 hours and explicit operator release are still required before campaign sending can start.` };
+    } else {
+      const running = state === "warming" && !blocking && binding?.requested_action !== "pause" && binding?.requested_action !== "remove";
+      const date = addUtcDays(now, remaining);
+      goLive = { kind: "projected", date, remaining_active_days: remaining,
+        message: `${running ? `Earliest readiness review is ${date}` : `Warmup is not running right now. If it runs every day starting today, the earliest readiness review is ${date}`}, after ${remaining} more active ${remaining === 1 ? "day" : "days"}. Paused days and days with a problem don't count. Campaign sending requires explicit operator release after warmup and a fresh healthy check; warmup resume does not release campaigns.` };
+    }
+  } else if (stored.mailbox_use === null) {
     goLive = { kind: "connect_email", date: null, remaining_active_days: null,
       message: "Connect an email account and say how you use it. Lifty can then tell you when campaigns can start." };
   } else if (stored.mailbox_use === "personal") {
@@ -143,6 +159,11 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
     last_checked_at: binding?.last_readback_at ?? stored.evidence?.observed_at ?? null,
     outreach_unlocked: stored.mailbox_use === "outreach" ? stored.outreach_unlocked ?? false : null,
     recommended_go_live: goLive,
+    ...(stored.connection_ref === undefined ? {} : {
+      connection_ref: stored.connection_ref,
+      campaign_send_paused: stored.campaign_send_paused,
+      campaign_release_required: stored.campaign_release_required,
+    }),
   });
 }
 
@@ -169,14 +190,16 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
   const mailivery = settings.mailivery && settings.mailivery.apiKey.trim() ? settings.mailivery : null;
   const baseUrl = (mailivery?.baseUrl ?? DEFAULT_MAILIVERY_BASE).replace(/\/$/, "");
 
-  async function rpc(session: AuthSession, operation: "status" | WarmupOperation, workspace: string): Promise<StoredWarmupStatus> {
+  async function rpc(session: AuthSession, operation: "status" | WarmupOperation, input: WarmupWorkspaceInput): Promise<StoredWarmupStatus> {
     const client = session.client as RpcClient;
     let response: { data: unknown; error: unknown };
-    try { response = await client.rpc("lifty_email_warmup", { p_operation: operation, p_payload: { workspace } }); }
+    try { response = await client.rpc("lifty_email_warmup", { p_operation: operation, p_payload: input }); }
     catch { mapRpcError(null); }
     if (response.error) mapRpcError(response.error);
     const parsed = StoredWarmupStatus.safeParse(response.data);
-    if (!parsed.success) throw new PublicError({ status: 502, code: "EMAIL_WARMUP_UNAVAILABLE", message: "LIFTY returned an invalid warmup status. Retry shortly." });
+    if (!parsed.success || parsed.data.connection_ref !== input.connection_ref) {
+      throw new PublicError({ status: 502, code: "EMAIL_WARMUP_UNAVAILABLE", message: "LIFTY returned an invalid warmup status. Retry shortly." });
+    }
     return parsed.data;
   }
 
@@ -200,35 +223,38 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
     return signed;
   }
 
-  async function status(session: AuthSession, workspace: string): Promise<WarmupStatus> {
-    const input = WarmupWorkspaceRequest.parse({ workspace });
-    return presentWarmupStatus(await rpc(session, "status", input.workspace), now());
+  async function status(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStatus> {
+    const input = WarmupWorkspaceRequest.parse({ workspace, ...(connectionRef === undefined ? {} : { connection_ref: connectionRef }) });
+    return presentWarmupStatus(await rpc(session, "status", input), now());
   }
 
-  async function start(session: AuthSession, workspace: string): Promise<WarmupStartResult> {
-    const input = WarmupWorkspaceRequest.parse({ workspace });
+  async function start(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStartResult> {
+    const input = WarmupWorkspaceRequest.parse({ workspace, ...(connectionRef === undefined ? {} : { connection_ref: connectionRef }) });
+    // Explicit client connections may only use the branded Google OAuth flow.
+    // Check before the start RPC writes a binding; never fall back to hosted forms.
+    if (input.connection_ref !== undefined && !settings.issueSetupLink) throw notConfigured();
     if (!mailivery) {
       // Without the provider key nothing is written; an existing bound warmup is still reported.
-      const current = await rpc(session, "status", input.workspace);
+      const current = await rpc(session, "status", input);
       const state = current.binding?.state;
       if (!state || state === "removed" || state === "link_issued") throw notConfigured();
       return WarmupStartResult.parse({ ...presentWarmupStatus(current, now()), connect_url: null, expires_at: null });
     }
-    const stored = await rpc(session, "start", input.workspace);
+    const stored = await rpc(session, "start", input);
     if (!stored.binding || stored.email === null) throw new PublicError({ status: 502, code: "EMAIL_WARMUP_UNAVAILABLE", message: "LIFTY could not prepare warmup. Retry shortly." });
     // Only an unbound binding gets a form. pending_consent already has a bound
     // campaign; a second form would create another billed Mailivery campaign.
     const needsLink = stored.binding.state === "link_issued";
     const link = needsLink ? settings.issueSetupLink
-      ? await settings.issueSetupLink(session, input.workspace)
+      ? await settings.issueSetupLink(session, input.workspace, input.connection_ref)
       : await mintFormUrl(stored.workspace_ref, stored.binding.sender_ref) : null;
     return WarmupStartResult.parse({ ...presentWarmupStatus(stored, now()),
       connect_url: link?.url ?? null, expires_at: link?.expiresAt ?? null });
   }
 
-  const change = (operation: "pause" | "resume" | "remove") => async (session: AuthSession, workspace: string): Promise<WarmupStatus> => {
-    const input = WarmupWorkspaceRequest.parse({ workspace });
-    return presentWarmupStatus(await rpc(session, operation, input.workspace), now());
+  const change = (operation: "pause" | "resume" | "remove") => async (session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStatus> => {
+    const input = WarmupWorkspaceRequest.parse({ workspace, ...(connectionRef === undefined ? {} : { connection_ref: connectionRef }) });
+    return presentWarmupStatus(await rpc(session, operation, input), now());
   };
   return { status, start, pause: change("pause"), resume: change("resume"), remove: change("remove") };
 }

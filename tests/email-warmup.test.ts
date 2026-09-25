@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEmailWarmupOperations, presentWarmupStatus, readSignedFormUrl } from "../src/email-warmup.js";
+import { createEmailWarmupOperations, presentWarmupStatus, readSignedFormUrl, type EmailWarmupSettings } from "../src/email-warmup.js";
 import { WarmupStartResult, WarmupStatus, type StoredWarmupStatus } from "../src/email-warmup-contracts.js";
 import { createCurrentClient as createApp } from "./current-client.js";
 
@@ -7,6 +7,8 @@ const workspace = "22222222-2222-4222-8222-222222222222";
 const binding = "33333333-3333-4333-8333-333333333333";
 const sender = "44444444-4444-4444-8444-444444444444";
 const user = "11111111-1111-4111-8111-111111111111";
+const connection = "55555555-5555-4555-8555-555555555555";
+const otherConnection = "66666666-6666-4666-8666-666666666666";
 const now = new Date("2026-09-22T15:00:00Z");
 const expires = Math.floor(now.getTime() / 1000) + 3600;
 const signedUrl = `https://app.mailivery.io/embed/form?tags=x&expires=${expires}&signature=SIGNATURE_SECRET_VALUE`;
@@ -25,7 +27,12 @@ function stored(overrides: Partial<StoredWarmupStatus> = {}, bindingOverrides: R
   };
 }
 
-function harness(options: { data?: unknown; error?: unknown; key?: string | null; provider?: () => Response | Promise<Response> } = {}) {
+function clientStored(overrides: Partial<StoredWarmupStatus> = {}, bindingOverrides: Record<string, unknown> | null = {}): StoredWarmupStatus {
+  return stored({ connection_ref: connection, campaign_send_paused: true, campaign_release_required: true, ...overrides }, bindingOverrides);
+}
+
+function harness(options: { data?: unknown; error?: unknown; key?: string | null; provider?: () => Response | Promise<Response>;
+  issueSetupLink?: EmailWarmupSettings["issueSetupLink"] } = {}) {
   const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
   const http: { url: string; init: RequestInit | undefined }[] = [];
   const session = { userId: user, client: { rpc: async (name: string, args: Record<string, unknown>) => {
@@ -37,6 +44,7 @@ function harness(options: { data?: unknown; error?: unknown; key?: string | null
     return options.provider ? options.provider() : new Response(JSON.stringify({ success: true, data: { url: signedUrl } }), { status: 200 });
   };
   const ops = createEmailWarmupOperations({ mailivery: options.key === null ? null : { apiKey: options.key ?? apiKey },
+    ...(options.issueSetupLink ? {issueSetupLink: options.issueSetupLink} : {}),
     fetchImpl, now: () => now, requestId: () => "req-1" });
   return { ops, session, rpcCalls, http };
 }
@@ -112,6 +120,33 @@ describe("warmup status presentation", () => {
     const status = presentWarmupStatus(stored({}, { state: "problem", blocking_reason: "provider_quirk" }), now);
     expect(status.blocking_reason).toEqual({ code: "provider_quirk", message: expect.stringContaining("can't describe") });
   });
+
+  it("keeps the founder response free of client-only fields", () => {
+    const status = presentWarmupStatus(stored(), now);
+    expect(status).not.toHaveProperty("connection_ref");
+    expect(status).not.toHaveProperty("campaign_send_paused");
+    expect(status).not.toHaveProperty("campaign_release_required");
+    expect(status.recommended_go_live.kind).toBe("projected");
+  });
+
+  it("requires explicit release for a client connection after 21 healthy active days", () => {
+    const status = presentWarmupStatus(clientStored({ outreach_unlocked: true,
+      evidence: { active_duration_days: 21, healthy: true, passed: true, observed_at: "2026-09-22T14:00:00Z", fresh: true } }), now);
+    expect(status).toMatchObject({ connection_ref: connection, campaign_send_paused: true, campaign_release_required: true,
+      outreach_unlocked: true, recommended_go_live: { kind: "awaiting_release", date: null, remaining_active_days: 0 } });
+    expect(status.recommended_go_live.message).toMatch(/stays paused until an operator explicitly releases this connection/);
+    expect(status.recommended_go_live.message).not.toMatch(/Outreach is unlocked|Campaigns can run now/);
+  });
+
+  it("separates client readiness projections and stale evidence from campaign release", () => {
+    const projected = presentWarmupStatus(clientStored(), now);
+    expect(projected.recommended_go_live).toMatchObject({ kind: "projected", date: "2026-10-01", remaining_active_days: 9 });
+    expect(projected.recommended_go_live.message).toMatch(/readiness review.*explicit operator release/);
+    const stale = presentWarmupStatus(clientStored({ evidence: { active_duration_days: 21, healthy: true, passed: false,
+      observed_at: "2026-09-20T14:00:00Z", fresh: false } }), now);
+    expect(stale.recommended_go_live).toMatchObject({ kind: "awaiting_check", date: null });
+    expect(stale.recommended_go_live.message).toMatch(/healthy check.*explicit operator release/);
+  });
 });
 
 describe("warmup operations", () => {
@@ -185,7 +220,7 @@ describe("warmup operations", () => {
 
   it.each([
     ["PT401", "unauthenticated", 401, /Sign in/],
-    ["PT403", "email_workspace_forbidden", 403, /Lifty workspace you belong to/],
+    ["PT403", "email_workspace_forbidden", 403, /Choose a workspace you belong to/],
     ["PT409", "email_warmup_mailbox_taken", 409, /another Lifty workspace/],
     ["PT409", "email_workspace_suspended", 409, /paused/],
     ["PT409", "email_warmup_not_started", 409, /Start it first/],
@@ -257,6 +292,53 @@ describe("warmup operations", () => {
     expect(readSignedFormUrl("https://app.mailivery.io/x", now)).toBeNull();
     expect(readSignedFormUrl(`https://app.mailivery.io/x?expires=${expires}&expires=${expires}`, now)).toBeNull();
   });
+
+  it.each(["status", "pause", "resume", "remove"] as const)("targets only the selected client connection for %s", async operation => {
+    const h = harness({ data: clientStored({}, { requested_action: operation === "status" ? null : operation }) });
+    const result = await h.ops[operation](h.session, "lift", connection);
+    expect(h.rpcCalls).toEqual([{ name: "lifty_email_warmup", args: { p_operation: operation,
+      p_payload: { workspace: "lift", connection_ref: connection } } }]);
+    expect(result).toMatchObject({ connection_ref: connection, campaign_send_paused: true, campaign_release_required: true });
+    expect(h.http).toHaveLength(0);
+  });
+
+  it("issues separate branded setup links for two connections in the same workspace", async () => {
+    const selected: string[] = [];
+    for (const connectionRef of [connection, otherConnection]) {
+      const h = harness({ data: clientStored({ connection_ref: connectionRef }, { state: "link_issued" }),
+        issueSetupLink: async (session, workspace, ref) => {
+          expect(session).toBe(h.session); expect(workspace).toBe("lift"); selected.push(ref!);
+          return {url:`https://api.lifty.test/warmup/setup?intent=${ref}`, expiresAt:now.toISOString()};
+        } });
+      const result = await h.ops.start(h.session, "lift", connectionRef);
+      expect(result).toMatchObject({ connection_ref: connectionRef, connect_url: expect.stringContaining(connectionRef) });
+      expect(h.rpcCalls).toEqual([{ name: "lifty_email_warmup", args: { p_operation: "start",
+        p_payload: { workspace: "lift", connection_ref: connectionRef } } }]);
+      expect(h.http).toHaveLength(0);
+    }
+    expect(selected).toEqual([connection, otherConnection]);
+  });
+
+  it.each([null, "link_issued", "warming"] as const)("rejects client start without branded OAuth before writing (%s)", async state => {
+    const h = harness({ data: clientStored({}, state ? {state} : null) });
+    await expect(h.ops.start(h.session, "lift", connection)).rejects.toMatchObject({status:503,code:"EMAIL_WARMUP_NOT_CONFIGURED"});
+    expect(h.rpcCalls).toHaveLength(0);
+    expect(h.http).toHaveLength(0);
+  });
+
+  it("fails closed on old, mismatched or incomplete client RPC status", async () => {
+    for (const data of [stored(), clientStored({connection_ref: otherConnection}),
+      {...clientStored(), campaign_send_paused: undefined}, {...clientStored(), campaign_release_required: false}]) {
+      const h = harness({data});
+      await expect(h.ops.status(h.session, "lift", connection)).rejects.toMatchObject({code:"EMAIL_WARMUP_UNAVAILABLE"});
+    }
+  });
+
+  it.each(["status", "start", "pause", "resume", "remove"] as const)("rejects malformed client connection UUID before %s", async operation => {
+    const h = harness();
+    await expect(h.ops[operation](h.session, "lift", "not-a-uuid")).rejects.toThrow();
+    expect(h.rpcCalls).toHaveLength(0); expect(h.http).toHaveLength(0);
+  });
 });
 
 describe("warmup routes", () => {
@@ -313,6 +395,26 @@ describe("warmup routes", () => {
     const response = await post(client, "/v1/email/warmup/start", { workspace: "senja" });
     expect(response.status).toBe(503);
     expect((await response.json()).error.code).toBe("EMAIL_WARMUP_NOT_CONFIGURED");
+  });
+
+  it("passes explicit connection selection through every authenticated route", async () => {
+    const h = app();
+    const read = await h.client.request(`/v1/email/warmup?workspace=lift&connection_ref=${connection}`, {headers:{authorization:"Bearer test"}});
+    expect(read.status).toBe(200);
+    for (const operation of ["start", "pause", "resume", "remove"] as const) {
+      expect((await post(h.client, `/v1/email/warmup/${operation}`, {workspace:"lift",connection_ref:connection})).status).toBe(200);
+    }
+    expect(h.calls).toEqual([["status",session,"lift",connection],["start",session,"lift",connection],
+      ["change",session,"lift","pause",connection],["change",session,"lift","resume",connection],["change",session,"lift","remove",connection]]);
+  });
+
+  it("rejects malformed connection selection on query and body without an upstream call", async () => {
+    const h=app();
+    expect((await h.client.request("/v1/email/warmup?workspace=lift&connection_ref=other",{headers:{authorization:"Bearer test"}})).status).toBe(400);
+    for (const operation of ["start", "pause", "resume", "remove"]) {
+      expect((await post(h.client, `/v1/email/warmup/${operation}`, {workspace:"lift",connection_ref:null})).status).toBe(400);
+    }
+    expect(h.calls).toEqual([]);
   });
 
   it("publishes every warmup route as authenticated OpenAPI", async () => {

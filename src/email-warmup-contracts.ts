@@ -3,7 +3,10 @@ import { EmailConnectRequest } from "./email-contracts.js";
 
 export const REQUIRED_WARMUP_ACTIVE_DAYS = 21;
 
-export const WarmupWorkspaceRequest = z.object({ workspace: EmailConnectRequest.shape.workspace }).strict();
+export const WarmupWorkspaceRequest = z.object({
+  workspace: EmailConnectRequest.shape.workspace,
+  connection_ref: z.uuid().optional(),
+}).strict();
 export type WarmupWorkspaceInput = z.infer<typeof WarmupWorkspaceRequest>;
 
 export const WarmupOperation = z.enum(["start", "pause", "resume", "remove"]);
@@ -12,7 +15,7 @@ export type WarmupOperation = z.infer<typeof WarmupOperation>;
 const timestamp = z.iso.datetime({ offset: true });
 const count = z.number().int().min(0).max(1_000_000);
 
-// Founder RPC status object (LIF-985 contract). Parsing strips unknown keys so
+// Session-scoped RPC status object. Parsing strips unknown keys so
 // a newer database cannot leak additions (for example provider IDs) outward.
 const DbCheck = z.string().max(64).nullish();
 export const WarmupSnapshot = z.object({
@@ -49,14 +52,20 @@ export const StoredWarmupStatus = z.object({
     observed_at: timestamp, fresh: z.boolean(),
   }).nullable(),
   outreach_unlocked: z.boolean().nullable(),
-});
+  connection_ref: z.uuid().optional(),
+  campaign_send_paused: z.boolean().optional(),
+  campaign_release_required: z.literal(true).optional(),
+}).refine(value => {
+  const fields = [value.connection_ref, value.campaign_send_paused, value.campaign_release_required];
+  return fields.every(field => field === undefined) || fields.every(field => field !== undefined);
+}, { message: "Client connection status must include campaign release state." });
 export type StoredWarmupStatus = z.infer<typeof StoredWarmupStatus>;
 
 // Public founder-facing shape. Strict so older clients fail closed on additions.
 export const WarmupState = z.enum(["not_started", ...WarmupBindingState.options]);
 const Check = z.enum(["valid", "not_valid", "unknown"]);
 export const WarmupGoLive = z.object({
-  kind: z.enum(["connect_email", "now", "unlocked", "awaiting_check", "projected"]),
+  kind: z.enum(["connect_email", "now", "unlocked", "awaiting_check", "projected", "awaiting_release"]),
   date: z.iso.date().nullable(),
   remaining_active_days: z.number().int().min(0).max(365).nullable(),
   message: z.string().min(1).max(600),
@@ -78,6 +87,10 @@ export const WarmupStatus = z.object({
   last_checked_at: timestamp.nullable(),
   outreach_unlocked: z.boolean().nullable(),
   recommended_go_live: WarmupGoLive,
+  // Present only for an explicitly selected client connection. Founder output is unchanged.
+  connection_ref: z.uuid().optional(),
+  campaign_send_paused: z.boolean().optional(),
+  campaign_release_required: z.literal(true).optional(),
 }).strict();
 export type WarmupStatus = z.infer<typeof WarmupStatus>;
 export const WarmupStartResult = WarmupStatus.extend({

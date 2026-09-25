@@ -236,6 +236,63 @@ it `start` returns `EMAIL_WARMUP_NOT_CONFIGURED` before any write. The API never
 logs the key, the signed URL or Mailivery response bodies. Deploy the
 `lifty_email_warmup` founder RPC migration before this API.
 
+### Multiple client mailboxes (LIF-1000)
+
+Members of a non-Lifty client workspace select one verified Unipile email
+connection with `connection_ref` (its UUID), in addition to `workspace`.
+The same selector is supported on status, start, pause, resume and remove.
+Client requests must supply it; the database checks workspace membership and
+that the selected connection belongs to that workspace. Founder requests
+continue to use `{workspace}` and receive the existing response shape.
+
+For example, an operator with a Lifty API session for a member of `lift` can
+issue one request per connected mailbox. Set `CONNECTION_REF` to the verified
+connection UUID for that address; it is not the sender UUID or the Unipile
+provider account ID. Use the existing API authentication flow to obtain
+`LIFTY_ACCESS_TOKEN`; no administrative credential is needed.
+
+```sh
+curl --fail-with-body "$LIFTY_API_BASE/v1/email/warmup/start" \
+  -H "Authorization: Bearer $LIFTY_ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data "{\"workspace\":\"lift\",\"connection_ref\":\"$CONNECTION_REF\"}"
+
+curl --fail-with-body \
+  "$LIFTY_API_BASE/v1/email/warmup?workspace=lift&connection_ref=$CONNECTION_REF" \
+  -H "Authorization: Bearer $LIFTY_ACCESS_TOKEN"
+
+curl --fail-with-body "$LIFTY_API_BASE/v1/email/warmup/pause" \
+  -H "Authorization: Bearer $LIFTY_ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data "{\"workspace\":\"lift\",\"connection_ref\":\"$CONNECTION_REF\"}"
+```
+
+Use `/resume` or `/remove` with the same body to resume or remove that
+mailbox's warmup. These actions never resume outreach campaigns. `start`
+returns a branded Google OAuth `connect_url` for the selected address; the
+mailbox owner opens it and authorizes that exact Google account. Client
+starts fail before writing when branded OAuth setup is unavailable and
+never fall back to the legacy Mailivery hosted form. Distinct connections
+under one actual sender have distinct binding references in the provider
+tags, so each mailbox is reconciled independently.
+
+Client status additionally includes `connection_ref`, `campaign_send_paused`
+and `campaign_release_required: true`. The 21-day requirement counts active,
+healthy warmup days for each mailbox, beginning with its actual warmup.
+`outreach_unlocked` describes warmup eligibility only: campaigns remain
+paused until an operator explicitly releases that connection. After a fresh
+healthy check and 21 active days, a paused connection reports
+`recommended_go_live.kind: "awaiting_release"`. A projected date is the
+earliest readiness review, not an automatic release date. Verify each
+mailbox's evidence and keep its campaign pause through the entire warmup.
+
+Deploy in order: the LIF-1000 connection-scoped database contract, then the
+Jobs runtime that admits new Unipile connections without Smartlead IDs,
+then this API. Complete that rollout before sharing David's connection or
+warmup links. API verification covers request propagation and response
+contracts; the database release owns workspace isolation and persistent
+campaign holds.
+
 ### Google OAuth setup (LIF-995)
 
 OAuth-enabled servers return a one-hour, single-use Lifty `/warmup/setup`

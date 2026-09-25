@@ -171,9 +171,9 @@ export interface AppDependencies {
   disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
   authorizeEmail(state: string): Promise<string>;
   declareEmail(state: string, provider?: HostedEmailProvider, mailboxUse?: "personal" | "outreach"): Promise<string>;
-  getEmailWarmup(session: AuthSession, workspace: string): Promise<WarmupStatusValue>;
-  startEmailWarmup(session: AuthSession, workspace: string): Promise<WarmupStart>;
-  changeEmailWarmup(session: AuthSession, workspace: string, operation: "pause" | "resume" | "remove"): Promise<WarmupStatusValue>;
+  getEmailWarmup(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStatusValue>;
+  startEmailWarmup(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStart>;
+  changeEmailWarmup(session: AuthSession, workspace: string, operation: "pause" | "resume" | "remove", connectionRef?: string): Promise<WarmupStatusValue>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
   getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
@@ -2437,7 +2437,9 @@ export function createApp(
     context.header("cache-control", "no-store");
     const parsed = WarmupWorkspaceRequest.safeParse(context.req.query());
     if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace.");
-    return context.json(WarmupStatus.parse(await dependencies.getEmailWarmup(context.get("authSession"), parsed.data.workspace)));
+    const target: [string, string?] = parsed.data.connection_ref === undefined
+      ? [parsed.data.workspace] : [parsed.data.workspace, parsed.data.connection_ref];
+    return context.json(WarmupStatus.parse(await dependencies.getEmailWarmup(context.get("authSession"), ...target)));
   });
   for (const operation of ["start", "pause", "resume", "remove"] as const) {
     app.post(`/v1/email/warmup/${operation}`, async (context) => {
@@ -2449,9 +2451,10 @@ export function createApp(
       const parsed = WarmupWorkspaceRequest.safeParse(body);
       if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace explicitly.");
       const session = context.get("authSession");
+      const connection: [] | [string] = parsed.data.connection_ref === undefined ? [] : [parsed.data.connection_ref];
       return context.json(operation === "start"
-        ? WarmupStartResult.parse(await dependencies.startEmailWarmup(session, parsed.data.workspace))
-        : WarmupStatus.parse(await dependencies.changeEmailWarmup(session, parsed.data.workspace, operation)));
+        ? WarmupStartResult.parse(await dependencies.startEmailWarmup(session, parsed.data.workspace, ...connection))
+        : WarmupStatus.parse(await dependencies.changeEmailWarmup(session, parsed.data.workspace, operation, ...connection)));
     });
   }
   app.get("/v1/email", async (context) => {
