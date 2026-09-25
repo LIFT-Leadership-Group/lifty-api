@@ -97,8 +97,12 @@ describe("member email account proxy",()=>{
     const h=harness({...status,status:"pending",connection_ref:null,campaign_send_paused:null});
     expect(await h.ops.status(session,{workspace:"lift",attempt_ref:attempt()})).toMatchObject({status:"pending",connection_ref:null,campaign_send_paused:null});
   });
+  it.each([{connection_ref:null,campaign_send_paused:true},{connection_ref:connection,campaign_send_paused:null}])("rejects partial connection identity and pause state even while pending: %j",async change=>{
+    const h=harness({...status,status:"pending",...change});
+    await expect(h.ops.status(session,{workspace:"lift",attempt_ref:attempt()})).rejects.toMatchObject({code:"EMAIL_ACCOUNTS_UNAVAILABLE"});
+  });
   it.each([{workspace_slug:"other"},{workspace_ref:other,workspace_slug:"other"},{accounts:[{...accounts.accounts[0],status:"unknown"}]},
-    {senders:[{sender_ref:sender,display_name:"PRIVATE\n"}]},{provider_payload:"PRIVATE"}])("rejects inconsistent or unsafe account inventory %j",async change=>{
+    {senders:[{sender_ref:sender,display_name:"PRIVATE\n"}]},{senders:[{sender_ref:sender,display_name:""}]},{provider_payload:"PRIVATE"}])("rejects inconsistent or unsafe account inventory %j",async change=>{
     const h=harness({...accounts,...change});
     await expect(h.ops.accounts(session,{workspace:"lift"})).rejects.toMatchObject({code:"EMAIL_ACCOUNTS_UNAVAILABLE"});
   });

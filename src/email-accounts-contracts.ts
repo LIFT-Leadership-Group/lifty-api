@@ -8,7 +8,7 @@ export const EmailAccountConnectRequest = EmailAccountsRequest.extend({sender_re
 export const EmailAccountStatusRequest = EmailAccountsRequest.extend({attempt_ref:EmailAccountAttempt});
 export const EmailAccountsResult = z.object({
   workspace_ref:z.uuid(), workspace_slug:EmailConnectRequest.shape.workspace,
-  senders:z.array(z.object({sender_ref:z.uuid(), display_name:z.string().max(200).regex(/^[^\u0000-\u001f\u007f]*$/)}).strict()).max(1000),
+  senders:z.array(z.object({sender_ref:z.uuid(), display_name:z.string().min(1).max(200).regex(/^[^\u0000-\u001f\u007f]*$/)}).strict()).max(1000),
   accounts:z.array(z.object({connection_ref:z.uuid(),sender_ref:z.uuid(),email,
     status:z.enum(["connecting","connected","disconnected","revoked"]),campaign_send_paused:z.boolean()}).strict()).max(10000),
   campaign_release_required:z.literal(true),required_active_days:z.literal(21),
@@ -19,8 +19,9 @@ export const EmailAccountConnectResult = z.object({...identity,status:z.literal(
 export const EmailAccountStatusResult = z.object({...identity,
   status:z.enum(["connected","pending","needs_authorization","needs_reconnect","conflict","unavailable"]),
   connection_ref:z.uuid().nullable(),campaign_send_paused:z.boolean().nullable(),
-}).strict().refine(value => value.status !== "connected" || (value.connection_ref !== null && value.campaign_send_paused !== null),
-  {message:"A connected receipt requires its connection and campaign pause state."});
+}).strict().refine(value => (value.connection_ref === null) === (value.campaign_send_paused === null)
+  && (value.status !== "connected" || value.connection_ref !== null),
+  {message:"Connection identity and campaign pause state must be known together; connected requires both."});
 export type EmailAccountsInput = z.infer<typeof EmailAccountsRequest>;
 export type EmailAccountsOutput = z.infer<typeof EmailAccountsResult>;
 export type EmailAccountConnectInput = z.infer<typeof EmailAccountConnectRequest>;
