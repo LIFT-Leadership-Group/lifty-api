@@ -57,7 +57,10 @@ product instructions; it does not supply user authorization for a write.
 
 ## Read before asking or acting
 
-At the start of a fresh authenticated session, read `summary.get`. Before
+At the start of a fresh founder workspace session, read `summary.get`.
+When managing mailboxes in an explicitly named client workspace, follow
+`sending-accounts.client_accounts` with that workspace instead; do not use
+founder summary to select or provision a different workspace. Before
 reconnecting, read the selected sending account; before drafting, read the
 saved campaign; before asking for business details, read business. Reuse saved
 values and choices. A failed read is unavailable, not unconfigured. Retry it

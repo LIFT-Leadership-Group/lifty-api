@@ -238,6 +238,25 @@ logs the key, the signed URL or Mailivery response bodies. Deploy the
 
 ### Multiple client mailboxes (LIF-1000)
 
+Members can list available senders and email connections with
+`GET /v1/email/accounts?workspace=<slug-or-uuid>`, then request one exact
+mailbox link using `POST /v1/email/accounts/connect` with
+`{workspace,sender_ref,email}`. Retain the returned signed `attempt_ref` and
+verify it after consent using `POST /v1/email/accounts/connect/status` with
+`{workspace,attempt_ref}`. The selected sender must come from the workspace's
+accounts read. One sender may have several mailboxes. These explicit member
+operations are published in `context sending-accounts` and do not look up or
+create a founder profile.
+
+The API forwards the already verified, non-revoked caller JWT and configured
+publishable key only to fixed `/functions/v1/lift-unipile-connect/member/*`
+routes on its configured Supabase origin. The Edge owner checks workspace
+membership at list, issue and status. The API checks strict responses, exact
+setup URL path/query, attempt identity, issuer and expiry before returning a
+link. It does not use a service-role credential, log provider bodies or put
+attempt capabilities in status URLs. All requests require the current
+`x-lifty-client-contract` header as well as the bearer session.
+
 Members of a non-Lifty client workspace select one verified Unipile email
 connection with `connection_ref` (its UUID), in addition to `workspace`.
 The same selector is supported on status, start, pause, resume and remove.

@@ -1,5 +1,13 @@
 # Browser authorization and the exact attempt
 
+This common contract describes the founder-stage GET/POST operations.
+The explicit `sending-accounts.client_connect` and `client_connect_status`
+operations have their own published contract: exact workspace, sender and
+email selection; a signed opaque `attempt_ref`; and POST status verification.
+Follow their sending-accounts instructions, including per-connection campaign
+pauses. Do not substitute the founder stage's UUID attempt or summary for a
+client mailbox attempt.
+
 Start connection or reconnection with the stage POST operation. It returns
 `status: authorization_required`, an opaque `attempt_ref`, the actual
 `connection_url`, and absolute `expires_at`. Keep that reference with its
