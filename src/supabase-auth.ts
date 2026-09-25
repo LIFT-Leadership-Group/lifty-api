@@ -1,7 +1,12 @@
 import type { SupabaseEnv } from "@supabase/server";
 import { createContextClient, verifyAuth } from "@supabase/server/core";
 
-import type { AuthenticationResult } from "./app.js";
+import type { AuthenticationResult, AuthSession } from "./app.js";
+
+// Only successfully verified, non-revoked sessions enter this map. Keeping the
+// JWT off AuthSession prevents accidental serialization by handlers or loggers.
+const verifiedSessionTokens=new WeakMap<AuthSession,string>();
+export const getVerifiedSessionToken=(session:AuthSession)=>verifiedSessionTokens.get(session);
 
 export function createTimeoutFetch(
   fetchImplementation: typeof fetch,
@@ -72,7 +77,7 @@ export function createSupabaseAuthenticator(
       auth: "user",
       env,
     });
-    if (error || !data.userClaims) {
+    if (error || !data.userClaims || !data.token) {
       return { ok: false, reason: "invalid_session" };
     }
     const claims = data.jwtClaims;
@@ -99,12 +104,8 @@ export function createSupabaseAuthenticator(
     } catch {
       return { ok: false, reason: "invalid_session" };
     }
-    return {
-      ok: true,
-      session: {
-        userId: data.userClaims.id,
-        client,
-      },
-    };
+    const session:AuthSession={userId:data.userClaims.id,client};
+    verifiedSessionTokens.set(session,data.token);
+    return {ok:true,session};
   };
 }

@@ -23,6 +23,9 @@ import { ApolloAllowanceSchema } from "./apollo-allowance.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
 import { EmailConnectionStatus } from "./email-contracts.js";
+import { EmailAccountsRequest, EmailAccountsResult, EmailAccountConnectRequest, EmailAccountConnectResult,
+  EmailAccountStatusRequest, EmailAccountStatusResult } from "./email-accounts-contracts.js";
+import { WarmupWorkspaceRequest, WarmupStatus, WarmupStartResult } from "./email-warmup-contracts.js";
 import { LinkedinConnectRequest, LinkedinConnectionStatus } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult } from "./email-campaign-contracts.js";
 import { LinkedinCampaignRequest, LinkedinCampaignResult } from "./linkedin-campaign-contracts.js";
@@ -246,6 +249,12 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     get: operation("GET", stageRoute("sending-accounts"), "Read the selected channel's current account, or verify the exact attempt_ref. A healthy previous account is not a new attempt's success.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema),
     post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. For email, select_account: true opens provider/account selection after an explicit disconnect; omit it to reconnect the saved account.", AuthorizationRequiredSchema, SendingAccountStartSchema),
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
+    client_accounts: operation("GET","/v1/email/accounts","Read the explicitly named client workspace's available senders and email connections using member authorization. This does not require or infer a founder workspace.",EmailAccountsResult,null,EmailAccountsRequest),
+    client_connect: operation("POST","/v1/email/accounts/connect","Create one Unipile authorization link for the selected workspace sender and exact email. Keep the returned attempt_ref and verify this attempt after browser consent; campaigns stay paused.",EmailAccountConnectResult,EmailAccountConnectRequest),
+    client_connect_status: operation("POST","/v1/email/accounts/connect/status","Verify the retained client email attempt in the same explicit workspace. The bounded capability is a POST body, never a query parameter. Only connected with its connection_ref confirms this attempt.",EmailAccountStatusResult,EmailAccountStatusRequest),
+    warmup_status: operation("GET","/v1/email/warmup","Read warmup status for an explicit workspace. Client workspaces require connection_ref; founder requests retain workspace-only behavior. Read campaign pause separately from warmup eligibility.",WarmupStatus,null,WarmupWorkspaceRequest),
+    warmup_start: operation("POST","/v1/email/warmup/start","Start separate Mailivery setup for the verified connection. Client workspaces require connection_ref and branded Google OAuth; no password fallback. Campaigns stay paused for 21 active days and require explicit operator release.",WarmupStartResult,WarmupWorkspaceRequest),
+    ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and client connection_ref. Warmup resume never releases outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),
   },
   campaigns: {
     get: operation("GET", stageRoute("campaigns"), "Read the saved workspace graph, composition policy, current/future audience and preparation state by default. Previews are saved recipient examples. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),

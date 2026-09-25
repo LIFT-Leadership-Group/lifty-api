@@ -11,6 +11,22 @@ const stages = ["business", "targeting", "research-criteria", "sample-review", "
   "crm", "sending-accounts", "campaigns", "notifications", "capacity"];
 
 describe("runtime stage context", () => {
+  it("publishes member mailbox and connection-scoped warmup operations without founder inference",()=>{
+    const context=getAgentContext("sending-accounts")!,operations=context.operations!;
+    expect(operations.client_accounts).toMatchObject({method:"GET",route:"/v1/email/accounts",request:{query:{required:["workspace"]}}});
+    expect(operations.client_connect).toMatchObject({method:"POST",route:"/v1/email/accounts/connect",request:{body:{required:["workspace","sender_ref","email"]}}});
+    expect(operations.client_connect_status).toMatchObject({method:"POST",route:"/v1/email/accounts/connect/status",request:{body:{required:["workspace","attempt_ref"]}}});
+    for(const action of ["status","start","pause","resume","remove"]) {
+      const operation=operations[`warmup_${action}`]!;
+      expect(operation.route).toBe(`/v1/email/warmup${action==="status"?"":`/${action}`}`);
+      const input=action==="status"?operation.request.query:operation.request.body;
+      expect(input).toMatchObject({properties:{workspace:expect.any(Object),connection_ref:expect.any(Object)}});
+    }
+    expect(context.instructions).toContain("Do not infer a founder workspace");
+    expect(context.instructions).toContain("One sender can own");
+    expect(context.instructions).toContain("Warmup resume never resumes campaigns");
+    expect(context.instructions).toContain("21\nactive warmup days");
+  });
   it("publishes a bound local submission with exact receipt correlation and read-only completion operations", async () => {
     const app = createApp();
     const response = await app.request(`/v1/context/targeting?client_contract=${STAGE_CLIENT_CONTRACT}`);

@@ -1,20 +1,54 @@
 # Sending accounts
 
-Before proposing setup or changes in a new authenticated session, read `summary.get`
-using `context summary`. Reuse verified saved state. Read business before asking
-for a website, sending-accounts before reconnecting, and campaigns before writing
-templates. Unavailable reads require a retry, not assumptions that setup is missing.
+For a founder workspace, read `summary.get` using `context summary` before
+proposing setup or changes in a new authenticated session. For a named client
+workspace such as `lift`, start with `client_accounts` below using that exact
+workspace. Do not infer a founder workspace from summary or create a founder
+profile to manage client mailboxes. Reuse verified saved state. Unavailable
+reads require a retry, not assumptions that setup is missing.
 
 Purpose: connect the requested sending channel through hosted Unipile flows.
 Read `references.common` and `references.connections` in full.
 
 ## Read current state
 
+For a named client workspace, use `client_accounts` with query
+`{"workspace":"<slug-or-uuid>"}`. It returns the workspace identity,
+available senders, each email connection and its campaign pause. Select the
+intended sender from that returned roster; do not invent its UUID, choose an
+unrelated sender, or reuse one from another workspace. One sender can own
+multiple mailboxes. If no sender is available, explain that a workspace
+operator must add one before setup. Do not request administrative credentials.
+
+The remaining main GET/POST instructions describe the founder flow.
 GET requires `channel: linkedin` or `channel: email` in the query. It reads
 the current account, health and provider policy. Add `attempt_ref` when
 verifying authorization; ordinary current-account state is insufficient.
 
 ## First setup and required inputs
+
+For a named client workspace, use `client_connect` with
+`{"workspace":"<slug-or-uuid>","sender_ref":"<returned-sender-uuid>","email":"<exact-address>"}`.
+Connect each requested mailbox separately under its intended sender. Show the
+actual returned `connection_url` as a clickable link labeled with that exact
+mailbox. The owner signs into the matching Google account and approves access;
+no separate Unipile signup is needed. Keep the returned `attempt_ref` private
+and retain it with that workspace, sender and email. Never guess it or use a
+previous healthy connection as evidence of the new authorization.
+
+After consent, call `client_connect_status` with body
+`{"workspace":"<same-workspace>","attempt_ref":"<retained-reference>"}`.
+Only `status: connected` with its returned `connection_ref` confirms the
+selected mailbox. Keep checking the same attempt after pending or an
+unavailable read. `needs_authorization` or `needs_reconnect` requires the owner
+to finish or renew consent; `conflict` needs operator review. Do not create
+another account to bypass a conflict. An expired attempt needs a fresh link
+after reading current accounts. These operations use membership in the
+explicit workspace and require no founder onboarding.
+
+The dedicated CLI equivalents are `lifty email accounts --workspace <workspace>`,
+`lifty email connect --workspace <workspace> --sender-ref <sender> --email <address>`,
+and `lifty email connect --workspace <workspace> --attempt-ref <attempt> --status`.
 
 POST selects the channel. For LinkedIn, obtain only missing current-contract
 declarations (`timezone`, personal `account_use`, and no `other_automation`)
@@ -31,6 +65,31 @@ with GET using both the same channel and reference after authorization.
 
 ## Email warmup after connection
 
+For client mailboxes, use `warmup_status` and `warmup_start` with both the
+explicit `workspace` and the verified `connection_ref`. GET inputs belong in
+query; POST inputs belong in body. The CLI uses
+`lifty email warmup status|start --workspace <workspace> --connection-ref <connection>`.
+Mailivery authorization is a separate Google OAuth step from Unipile. Show
+the returned branded setup link for that exact mailbox; the owner must choose
+the same Google account again. Client setup has no app-password fallback.
+
+Keep every requested connection's campaigns paused throughout its own 21
+active warmup days, starting from its actual Mailivery warmup. Paused days and
+problem days do not count. Read the returned progress and recommendation;
+do not calculate release from the day a link was generated. A healthy check
+from the last 24 hours is also required. `outreach_unlocked` is warmup
+eligibility only. `campaign_send_paused` reports the separate campaign hold;
+`campaign_release_required: true` means an operator must explicitly release
+campaign sending after review. `awaiting_release` confirms that warmup alone
+has not enabled campaigns. Never claim sending is enabled just because the
+warmup reaches 21 days.
+
+Use `warmup_pause`, `warmup_resume` or `warmup_remove` with the same two
+selectors when requested. CLI equivalents add `--connection-ref` to those
+warmup commands. Warmup resume never resumes campaigns. Report each mailbox
+separately; readiness or consent for one cannot satisfy another mailbox.
+
+For the founder flow without `connection_ref`, continue as follows.
 After GET confirms the email account is connected, read
 `lifty email warmup status --workspace <workspace>`. Its `mailbox_use` decides
 what to tell the founder. Use the returned `recommended_go_live` message and
