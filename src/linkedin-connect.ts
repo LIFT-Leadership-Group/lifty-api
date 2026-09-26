@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { verifySenderChoice } from "./sender-choice.js";
 import { UnipileTransport, type VerifiedTransport } from "./unipile-transport.js";
 import { createUnipileV2Provider } from "./unipile-v2-provider.js";
 import { unipileV2AuthState } from "./unipile-v2-state.js";
@@ -18,6 +19,7 @@ export interface LinkedinConnectSettings extends UnipileProviderSettings {
 }
 interface RpcClient { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }
 const Stored = z.object({
+  sender_ref: z.uuid().optional(), sender_name: z.string().optional(),
   transport: UnipileTransport.optional(),
   state: z.enum(["not_connected", "pending", "connecting", "connected", "disconnected", "failed", "revoked"]),
   workspace_ref: z.uuid(), timezone: LinkedinTimezone.nullish(),
@@ -180,12 +182,14 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
   async function start(session: AuthSession, input: LinkedinConnectInput): Promise<LinkedinStart> {
     const parsed = LinkedinConnectRequest.parse(input);
     let value = Stored.parse(await rpc("start", parsed, session));
+    verifySenderChoice(parsed.sender, value);
     if (z.uuid().safeParse(parsed.workspace).success && value.workspace_ref !== parsed.workspace) linkedinFailure("LINKEDIN_CONNECTION_UNAVAILABLE");
     if (value.state === "connected") {
       value = await refreshHealth(session, parsed.workspace, value);
       if (value.state === "connected" && value.health_status === "running") return LinkedinConnectResult.parse({ ...profile(value), status: "connected", connection_ref: value.connection_ref });
       await rpc("disconnect", { workspace: parsed.workspace, confirm: true }, session);
       value = Stored.parse(await rpc("start", parsed, session));
+      verifySenderChoice(parsed.sender, value);
     }
     if (!value.intent_ref || !value.expires_at) linkedinFailure("LINKEDIN_CONNECTION_UNAVAILABLE");
     const seconds = Math.min(1800, Math.floor((Date.parse(value.expires_at) - Date.now()) / 1000));
