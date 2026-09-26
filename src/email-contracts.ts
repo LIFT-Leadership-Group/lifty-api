@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SenderChoice } from "./sender-choice.js";
 
 export const HostedEmailProvider = z.enum(["google", "outlook", "imap"]);
 export type HostedEmailProvider = z.infer<typeof HostedEmailProvider>;
@@ -9,6 +10,7 @@ export const EmailPolicy = z.discriminatedUnion("version", [
 ]);
 
 export const EmailConnectRequest = z.object({
+  sender: SenderChoice.optional(),
   workspace: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
   email: z.email().max(254).transform(value => value.toLowerCase()).optional(),
   mailbox_use: z.enum(["personal", "outreach"]).optional(),

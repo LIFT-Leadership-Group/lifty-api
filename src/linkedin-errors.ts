@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { throwSenderError } from "./sender-choice.js";
 import { PublicError } from "./errors.js";
 
 const messages: Record<string, string> = {
@@ -54,6 +55,7 @@ export function linkedinFailure(code: string, status = 502, message = "LIFTY cou
 }
 export function mapLinkedinRpcError(error: unknown, fallback = "LINKEDIN_CONNECTION_UNAVAILABLE"): never {
   if (error instanceof PublicError) throw error;
+  throwSenderError(error);
   const parsed = z.object({ code: z.string().optional(), message: z.string().optional() }).safeParse(error);
   const code = parsed.success ? parsed.data.code : undefined;
   const rawMessage = parsed.success ? parsed.data.message ?? "" : "";

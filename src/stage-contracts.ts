@@ -1,3 +1,4 @@
+import { SenderChoice, SenderRoster } from "./sender-choice.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { BusinessWebsiteSchema, BusinessWebsitePatchSchema } from "./business-website.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
@@ -94,7 +95,7 @@ export const SendingAccountStartSchema = z.discriminatedUnion("channel", [
   LinkedinConnectRequest.omit({ workspace: true, reconnect: true }).extend({ channel: z.literal("linkedin") }),
   // The hosted email flow owns account/provider selection. No pre-link address
   // or use questionnaire, credentials, or authorization override is accepted.
-  z.object({ channel: z.literal("email"), select_account: z.boolean().optional() }).strict(),
+  z.object({ channel: z.literal("email"), select_account: z.boolean().optional(), sender: SenderChoice.optional() }).strict(),
 ]);
 export const BusinessStageSchema = z.object({
   workspace: WorkspaceStatusSchema,
@@ -246,6 +247,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     mapping_context: operation("GET", "/v1/workspace/crm/mapping-context", "Read the current authenticated workspace's live portal schema/mapping and its current bounded input schema.", CompanyMappingContextSchema),
   },
   "sending-accounts": {
+    senders: operation("GET", "/v1/workspace/sending-accounts/senders", "Read named senders and their connections. The first sender defaults to the account creator; later account setup requires a choice of existing or new sender.", SenderRoster),
     get: operation("GET", stageRoute("sending-accounts"), "Read the selected channel's current account, or verify the exact attempt_ref. A healthy previous account is not a new attempt's success.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema),
     post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. For email, select_account: true opens provider/account selection after an explicit disconnect; omit it to reconnect the saved account.", AuthorizationRequiredSchema, SendingAccountStartSchema),
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { throwSenderError, verifySenderChoice } from "./sender-choice.js";
 import { UnipileTransport } from "./unipile-transport.js";
 import { createUnipileV2Provider } from "./unipile-v2-provider.js";
 import { unipileV2AuthState } from "./unipile-v2-state.js";
@@ -16,6 +17,7 @@ export interface EmailConnectSettings extends UnipileProviderSettings {
 }
 interface RpcClient { rpc(name: string,args: Record<string,unknown>): Promise<{data:unknown;error:unknown}> }
 const Stored = z.object({
+  sender_ref: z.uuid().optional(), sender_name: z.string().optional(),
   transport: UnipileTransport.optional(),
   provider_selection_required: z.boolean().optional(), email_provider: HostedEmailProvider.nullish(),
   state: z.enum(["not_connected","pending","connected","disconnected","failed","revoked"]),
@@ -45,6 +47,7 @@ function fail(code: string, status = 409): never {
   throw new PublicError({status,code,message:messages[code] ?? "LIFTY could not complete the email connection. Try again from the CLI."});
 }
 function mapRpcError(error: unknown): never {
+  throwSenderError(error);
   const parsed = z.object({code:z.string().optional(),message:z.string().optional()}).safeParse(error);
   const message = parsed.success ? parsed.data.message ?? "" : "";
   const safe = ["email_workspace_forbidden","email_workspace_suspended","email_profile_conflict","email_intent_expired","email_identity_mismatch","email_account_taken","email_namespace_mismatch","email_callback_invalid","email_callback_conflict","email_provider_required","email_provider_conflict","email_provider_invalid","email_reselection_requires_disconnect","email_reselection_pending_work","email_provider_selection_unavailable"];
@@ -192,6 +195,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
   async function start(session:AuthSession,input:EmailConnectInput):Promise<EmailStart>{
     const parsed=EmailConnectRequest.parse(input);
     let value=Stored.parse(await rpc("start",parsed,session));
+    verifySenderChoice(parsed.sender,value);
     // An explicit choose-again request must never silently become the retained
     // account's reconnect, including when an older database ignores the flag.
     if(parsed.select_account && (value.state!=="pending" || value.provider_selection_required!==true
@@ -202,6 +206,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
       if(identity.healthy)return EmailConnectResult.parse({...publicProfile(value),status:"connected",connection_ref:value.connection_ref});
       await rpc("disconnect",{workspace:parsed.workspace},session);
       value=Stored.parse(await rpc("start",parsed,session));
+      verifySenderChoice(parsed.sender,value);
     }
     if(!value.intent_ref || !value.expires_at)fail("EMAIL_CONNECTION_UNAVAILABLE",502);
     const seconds=Math.min(1800,Math.floor((Date.parse(value.expires_at)-Date.now())/1000));

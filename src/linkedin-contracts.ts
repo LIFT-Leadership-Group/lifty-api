@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SenderChoice } from "./sender-choice.js";
 
 export const LinkedinWorkspace = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
 export const LinkedinTimezone = z.string().min(1).max(100).refine(value => {
@@ -21,6 +22,7 @@ export const LinkedinPolicy = z.object({
 }).strict();
 export const LINKEDIN_POLICY = LinkedinPolicy.parse({ invitations_per_day: 5, invitations_per_7_days: 25, messages_per_day: 5, weekdays: [1, 2, 3, 4, 5], start: "09:00", end: "17:00", spacing_minutes: [15, 45] });
 export const LinkedinConnectRequest = z.object({
+  sender: SenderChoice.optional(),
   workspace: LinkedinWorkspace, timezone: LinkedinTimezone,
   account_use: z.literal("personal"), other_automation: z.literal(false),
   reconnect: z.boolean().optional(),

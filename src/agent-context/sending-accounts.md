@@ -25,6 +25,33 @@ GET requires `channel: linkedin` or `channel: email` in the query. It reads
 the current account, health and provider policy. Add `attempt_ref` when
 verifying authorization; ordinary current-account state is insufficient.
 
+## Sender identity
+
+For the founder flow, call `senders` before starting an account connection.
+A sender is a person and may own both email and LinkedIn. Keep the returned
+sender references and account associations; never infer ownership from matching
+names, email domains, the Lifty login, or a shared workspace.
+
+If the roster is empty, the first sender defaults to the account creator.
+Do not ask whether to create a sender or choose an existing one. Use the saved
+creator name. If it is missing, ask only for their name, then include
+`sender: {"kind":"self","name":"<confirmed person name>"}` in POST.
+With a saved creator name, the first POST may omit `sender`.
+
+For an additional account, ask which listed person owns it or whether to create
+a new sender. Include either `sender: {"kind":"existing","sender_ref":"<returned reference>"}`
+or `sender: {"kind":"new","name":"<confirmed person name>"}`. Reuse a choice
+already made in this conversation. Use person names such as Valen, never channel
+labels such as LinkedIn or Email, and never name a sender after an inbox address.
+
+Reconnects keep their existing sender and need no repeated ownership question.
+A pending attempt also retains its selected sender: continue that attempt rather
+than selecting a different person. A sender conflict requires reviewing the
+saved binding; never disconnect or move an account to bypass it. After successful
+authorization, read `senders` again to confirm the exact connection is attached
+to the selected person. The returned connection status alone does not prove a
+new authorization; continue the exact-attempt verification below as well.
+
 ## First setup and required inputs
 
 For a named client workspace, use `client_connect` with
@@ -53,7 +80,7 @@ and `lifty email connect --workspace <workspace> --attempt-ref <attempt> --statu
 POST selects the channel. For LinkedIn, obtain only missing current-contract
 declarations (`timezone`, personal `account_use`, and no `other_automation`)
 before the hosted LinkedIn account connection. Preserve existing policy limits.
-For email, the request is simply `channel: email`: provider/account selection
+For email, use `channel: email` plus the sender choice above: provider/account selection
 happens on the hosted email connection screen for a new account. A saved account
 reconnects with its existing provider. Do not add an email-address or
 mailbox-use questionnaire, ask for a password, or create an artificial address.
@@ -146,7 +173,8 @@ Use the supported authorization flow to replace consent; do not patch around it.
 When the founder explicitly wants to choose another email account or provider,
 use the supported email disconnect command first if the saved account is still
 connected. After the requested disconnect succeeds, POST
-`{"channel":"email","select_account":true}`. This opens a new hosted provider
+`{"channel":"email","select_account":true,"sender":{"kind":"existing","sender_ref":"<selected sender>"}}`
+(or the confirmed new-sender choice). This opens a new hosted provider
 selector with Google, Microsoft and IMAP/SMTP and leaves sending disabled.
 An ordinary POST without `select_account: true` reconnects the saved mailbox;
 it does not reopen provider selection. Do not disconnect a working account just

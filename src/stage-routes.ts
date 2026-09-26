@@ -1,3 +1,4 @@
+import { readSenderRoster } from "./sender-choice.js";
 import { getWorkspaceSummary, readComponent } from "./workspace-summary.js";
 import { BusinessWebsiteSchema } from "./business-website.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
@@ -151,6 +152,12 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     return forward(context, "GET", `/v1/integrations/hubspot/company-mapping/context?workspace_ref=${encodeURIComponent(current)}`);
   });
 
+  app.get("/v1/workspace/sending-accounts/senders", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    return context.json(await readSenderRoster(context.get("authSession"), await workspace(context)));
+  });
+
   for (const stage of Object.keys(stageOperations)) {
     app.get(`/v1/workspace/${stage}`, async context => {
       context.header("cache-control", "no-store");
@@ -223,9 +230,11 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         const input = parse(SendingAccountStartSchema, body);
         const result = input.channel === "email"
           ? await dependencies.startEmailConnect(session, { workspace: current, reconnect: true,
+            ...(input.sender ? { sender: input.sender } : {}),
             ...(input.select_account === undefined ? {} : { select_account: input.select_account }) })
           : await dependencies.startLinkedinConnect(session, { workspace: current, timezone: input.timezone,
-            account_use: input.account_use, other_automation: input.other_automation, reconnect: true });
+            account_use: input.account_use, other_automation: input.other_automation, reconnect: true,
+            ...(input.sender ? { sender: input.sender } : {}) });
         if (result.status !== "pending") throw new PublicError({ status: 502, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The new authorization attempt could not be started." });
         return context.json(authorization(result));
       }
