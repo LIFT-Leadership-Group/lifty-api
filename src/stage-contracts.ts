@@ -21,16 +21,20 @@ import {
   OnboardingStatusSchema, RunStatusSchema, SetNotificationRouteRequestSchema,
   SlackNotificationChannelsSchema, StartRunResultSchema, SubmitOnboardingRequestSchema,
   UpsertNotificationDestinationRequestSchema, WorkspaceConfigSchema, WorkspaceStatusSchema,
-  StartCrmSyncResultSchema, CrmSyncStatusSchema,
+  StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema,
+  WorkspaceOverviewSchema,
 } from "./contracts.js";
+import { ApolloCredentialResult } from "./apollo-credentials.js";
+import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult } from "./acquisition-recovery.js";
+import { RetireWorkspaceConfirmation, RetireWorkspaceResult } from "./workspace-retirement.js";
 import { ApolloAllowanceSchema } from "./apollo-allowance.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
-import { EmailConnectionStatus } from "./email-contracts.js";
+import { EmailConnectionStatus, EmailConnectRequest } from "./email-contracts.js";
 import { EmailAccountsRequest, EmailAccountsResult, EmailAccountConnectRequest, EmailAccountConnectResult,
   EmailAccountStatusRequest, EmailAccountStatusResult } from "./email-accounts-contracts.js";
 import { WarmupWorkspaceRequest, WarmupStatus, WarmupStartResult } from "./email-warmup-contracts.js";
-import { LinkedinConnectRequest, LinkedinConnectionStatus } from "./linkedin-contracts.js";
+import { LinkedinConnectRequest, LinkedinConnectionStatus, LinkedinDisconnectRequest, LinkedinWorkspaceRequest, LegacyLinkedinConnectResult } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult } from "./email-campaign-contracts.js";
 import { LinkedinCampaignRequest, LinkedinCampaignResult } from "./linkedin-campaign-contracts.js";
 import { LocalOnboardingConfigurationSchema, LocalConfigUpdateConfigurationSchema } from "./generated/lifty-configuration.js";
@@ -102,6 +106,16 @@ export const SendingAccountStartSchema = z.discriminatedUnion("channel", [
   // or use questionnaire, credentials, or authorization override is accepted.
   z.object({ channel: z.literal("email"), select_account: z.boolean().optional(), sender: SenderChoice.optional() }).strict(),
 ]);
+// Current-workspace disconnection. The explicit confirmation mirrors the
+// existing LinkedIn route; the adapter supplies the authenticated workspace.
+export const SendingAccountDisconnectSchema = z.object({
+  channel: z.enum(["email", "linkedin"]), confirm: z.literal(true),
+}).strict();
+const WorkspaceRefPath = z.object({ workspace_ref: z.uuid() }).strict();
+const RecoveryPath = WorkspaceRefPath.extend({ first_run_ref: z.uuid() }).strict();
+const AcquisitionRecoveryWriteSchema = z.union(AcquisitionRecoveryBody.options.slice(1) as [
+  typeof AcquisitionRecoveryBody.options[1], typeof AcquisitionRecoveryBody.options[2]]);
+const ClientEmailDisconnectSchema = z.object({ workspace: EmailConnectRequest.shape.workspace }).strict();
 export const BusinessStageSchema = z.object({
   workspace: WorkspaceStatusSchema,
   configuration: WorkspaceConfigSchema.nullable(),
@@ -227,6 +241,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     next_step: operation("GET", "/v1/workspace/next-step", "Read the next onboarding step when starting or resuming setup. Returns saved interview, configuration, import and research progress together with the complete stage guide. Does not start work, accept a sample or authorize sending.", NextStepSchema),
     context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for a specific requested Lifty stage.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
     get: { ...operation("GET", stageRoute("summary"), "Refresh this authenticated workspace's business, website, connection and saved campaign state after approval. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema), readOnly: false },
+    status: { ...operation("GET", "/v1/status", "Read the workspace overview: onboarding import, first research run, live ICP version, the latest configuration update, HubSpot connection with its last sync, and email connection. The email check can update saved connection health. Does not start work or authorize outreach.", WorkspaceOverviewSchema), readOnly: false },
     post: unsupported("summary", "POST", "Use the summary GET operation; its connection checks can change saved provider state."),
     patch: unsupported("summary", "PATCH", "Use the summary GET operation; its connection checks can change saved provider state."),
   },
@@ -236,6 +251,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     post: operation("POST", stageRoute("business"), "Provision the authenticated founder's workspace using the existing create operation.", CreateWorkspaceResultSchema, CreateWorkspaceRequestSchema),
     patch: operation("PATCH", stageRoute("business"), "Update name/description with section=workspace, or the confirmed primary website with section=website and its current expected_version. Website updates are immediate; read back after uncertain writes. No campaign changes.", z.union([ConfigUpdateResultSchema, BusinessWebsiteSchema]), BusinessStagePatchSchema),
     update_status: configSupport.update_status,
+    retire: operation("POST", "/v1/workspaces/{workspace_ref}/retire", "Permanently delete a LIFTY-created workspace you belong to. Requires its exact ID, slug and name. Disconnect email and HubSpot first; a workspace with LinkedIn history cannot be retired. Mailbox send counters are preserved. Irreversible.", RetireWorkspaceResult, RetireWorkspaceConfirmation, Empty, WorkspaceRefPath),
   },
   targeting: { get: configRead("targeting", "Read saved ICP/personas; versions and lane allocation are read-only."), post: initialSetup("targeting"), patch: configWrite("targeting", "icp", TargetingStagePatchSchema), ...configSupport },
   "research-criteria": { get: configRead("research-criteria", "Read the saved research prompt and provenance; protected prompts remain read-only."), post: initialSetup("research-criteria"), patch: configWrite("research-criteria", "prompt", ResearchStagePatchSchema), ...configSupport },
@@ -261,6 +277,9 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     post: operation("POST", stageRoute("crm"), "Start a new HubSpot connection/reconnection and return the real consent link immediately.", AuthorizationRequiredSchema, Empty),
     patch: operation("PATCH", stageRoute("crm"), "Apply a bounded company mapping plan using the current mapping schema. No tokens, arbitrary mappings or connected flag updates.", CompanyMappingReceiptSchema, CompanyPlanSchema),
     mapping_context: operation("GET", "/v1/workspace/crm/mapping-context", "Read the current authenticated workspace's live portal schema/mapping and its current bounded input schema.", CompanyMappingContextSchema),
+    disconnect: operation("POST", "/v1/workspace/crm/disconnect", "Disconnect HubSpot from the current workspace and request revocation of the grant at HubSpot. Refused while a CRM sync is running or when HubSpot is not connected. CRM records already written stay in HubSpot.", DisconnectResponseSchema, Empty),
+    client_mapping_context: operation("GET", "/v1/integrations/hubspot/company-mapping/context", "Read the live HubSpot company schema, current mapping and bounded plan schema for an explicitly named workspace you belong to.", CompanyMappingContextSchema, null, z.object({ workspace_ref: z.uuid() }).strict()),
+    client_mapping_apply: operation("POST", "/v1/integrations/hubspot/company-mapping", "Apply a bounded company mapping plan to the workspace named in the plan, using its current mapping and schema versions. No tokens, arbitrary mappings or connected flag updates.", CompanyMappingReceiptSchema, CompanyPlanSchema),
   },
   "sending-accounts": {
     senders: operation("GET", "/v1/workspace/sending-accounts/senders", "Read named senders and their connections. The first sender defaults to the account creator; later account setup requires a choice of existing or new sender.", SenderRoster),
@@ -273,10 +292,17 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     warmup_status: operation("GET","/v1/email/warmup","Read warmup status for an explicit workspace. Client workspaces require connection_ref; founder requests retain workspace-only behavior. Warmup eligibility does not imply campaigns are unpaused.",WarmupStatus,null,WarmupWorkspaceRequest),
     warmup_start: operation("POST","/v1/email/warmup/start","Start separate Mailivery setup for the verified connection. Client workspaces require connection_ref and branded Google OAuth; no password fallback. Campaigns stay paused for 21 active days and require explicit operator release.",WarmupStartResult,WarmupWorkspaceRequest),
     ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and client connection_ref. Warmup resume never releases outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),
+    disconnect: operation("POST", "/v1/workspace/sending-accounts/disconnect", "Disconnect the current workspace's email or LinkedIn account with explicit confirmation. Future campaign steps on that channel are blocked; history and consumed sending limits are kept. Reconnecting does not restart campaigns.", z.union([EmailConnectionStatus, LinkedinConnectionStatus]), SendingAccountDisconnectSchema),
+    client_email_disconnect: operation("POST", "/v1/email/disconnect", "Disconnect the email account of an explicitly named workspace you belong to. Future campaign emails from it are blocked; reconnecting does not restart campaigns.", EmailConnectionStatus, ClientEmailDisconnectSchema),
+    client_linkedin_status: { ...operation("GET", "/v1/linkedin", "Check the LinkedIn account of an explicitly named workspace you belong to. The check can update saved health and remove unreferenced duplicate provider accounts. Does not authorize outreach.", LinkedinConnectionStatus, null, LinkedinWorkspaceRequest), readOnly: false },
+    client_linkedin_connect: operation("POST", "/v1/linkedin/connect", "Start hosted LinkedIn connection or reconnection for an explicitly named workspace you belong to and return the authorization link. Sending stays disabled until campaigns are separately approved.", LegacyLinkedinConnectResult, LinkedinConnectRequest),
+    client_linkedin_disconnect: operation("POST", "/v1/linkedin/disconnect", "Disconnect LinkedIn for an explicitly named workspace you belong to with explicit confirmation. Future LinkedIn actions are blocked; history and limits are kept.", LinkedinConnectionStatus, LinkedinDisconnectRequest),
   },
   campaigns: {
     get: operation("GET", stageRoute("campaigns"), "Read the saved workspace graph, composition policy, current/future audience and preparation state by default. Previews are saved recipient examples. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),
     post: operation("POST", stageRoute("campaigns"), "Configure a shared_v1 campaign graph, compose modes and outreach overlays; omission of lead_ids covers current and future eligible leads. Activation requires the exact prepared version/digest and informed confirmation. Configuration does not send. Legacy prepare and individual operations remain compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
+    client_email: operation("POST", "/v1/email/campaign", "Run an individual email campaign operation for an explicitly named workspace you belong to. Activation requires the exact prepared digest and sends from that workspace's connected mailbox.", EmailCampaignResult, EmailCampaignRequest),
+    client_linkedin: operation("POST", "/v1/linkedin/campaign", "Run an individual LinkedIn campaign operation for an explicitly named workspace you belong to. Activation requires the exact prepared digest and acts from that workspace's connected LinkedIn account.", LinkedinCampaignResult, LinkedinCampaignRequest),
     patch: operation("PATCH", stageRoute("campaigns"), "Modify only requested fields using the saved version_ref and digest. Nested channel fields merge; arrays replace; null removes a channel, audience override, start override or template_bank. Material changes pause automatic outreach and require fresh preparation and activation. Legacy prepare remains compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStagePatchSchema),
   },
   notifications: {
@@ -284,9 +310,16 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     post: operation("POST", stageRoute("notifications"), "Start Slack connection/reconnection and immediately return the workspace consent link.", AuthorizationRequiredSchema, Empty),
     patch: operation("PATCH", stageRoute("notifications"), "Save a supported Slack destination or notification route using existing handlers. This cannot authorize Slack or send a test.", z.union([NotificationDestinationSchema, NotificationRouteSchema]), NotificationStagePatchSchema),
     channels: operation("GET", "/v1/notifications/slack/channels", "Read Slack channels currently available to Lifty before choosing a destination.", SlackNotificationChannelsSchema),
+    test: operation("POST", "/v1/notifications/destinations/{destination_ref}/test", "Send one test notification to a saved Slack destination. Posts a visible message in that channel; it does not change routes or authorize outreach.", NotificationTestResultSchema, Empty, Empty, z.object({ destination_ref: z.uuid() }).strict()),
+    disconnect: operation("POST", "/v1/workspace/notifications/disconnect", "Disconnect Slack from the current workspace. Notifications stop until Slack is reconnected; saved destinations and routes are not deleted.", DisconnectResponseSchema, Empty),
   },
   capacity: {
     get: operation("GET", stageRoute("capacity"), "Read workspace daily discovery target and actual weekly allowance including used, reserved, remaining and reset time.", CapacityStageSchema),
+    allowance: operation("GET", "/v1/workspaces/{workspace_ref}/apollo/allowance", "Read the weekly discovery allowance of an explicitly named workspace you belong to: limit, used, reserved, remaining, key source and reset time.", ApolloAllowanceSchema, null, Empty, WorkspaceRefPath),
+    apollo_key_status: operation("GET", "/v1/workspaces/{workspace_ref}/integrations/apollo/key-source", "Read whether a workspace you belong to uses the platform Apollo key or its own key. Never returns the key.", ApolloCredentialResult, null, Empty, WorkspaceRefPath),
+    apollo_platform_default: operation("POST", "/v1/workspaces/{workspace_ref}/integrations/apollo/platform-default", "Switch a workspace you belong to back to the platform Apollo key. Blocked while discovery or enrichment is in progress. A customer-owned key cannot be entered here.", ApolloCredentialResult, Empty, Empty, WorkspaceRefPath),
+    apollo_recovery_status: operation("GET", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}", "Read the Apollo acquisition recovery state of an exact failed first run: current acquisition, attempt, whether a restart is allowed and the blocker.", AcquisitionRecoveryStatus, null, Empty, RecoveryPath),
+    apollo_recovery: operation("POST", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}", "For an exact failed first run, request verification that its acquisition finished, or restart acquisition once verification allows it. Requires the current acquisition reference. Restart queues new Apollo discovery; acquired leads and allowance history are kept.", z.union([AcquisitionRecoveryStatus, AcquisitionRestartResult]), AcquisitionRecoveryWriteSchema, Empty, RecoveryPath),
     post: unsupported("capacity", "POST", "Capacity is platform-managed; there is no capacity setup operation."),
     patch: unsupported("capacity", "PATCH", "Operating target, lane weights, provider limits and allowance counters are read-only."),
   },

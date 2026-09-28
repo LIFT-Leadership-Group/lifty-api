@@ -17,7 +17,7 @@ or shared context.
 | Sending accounts | [sending-accounts](/v1/context/sending-accounts) | Hosted LinkedIn and email authorization |
 | Campaigns | [campaigns](/v1/context/campaigns) | Workspace sequence setup, preview and automatic outreach activation |
 | Notifications | [notifications](/v1/context/notifications) | Slack authorization, destinations and routing |
-| Capacity | [capacity](/v1/context/capacity) | Read-only operating target and discovery allowance |
+| Capacity | [capacity](/v1/context/capacity) | Operating target, discovery allowance, Apollo key source and recovery |
 
 Sign in through the current client before private reads. Start onboarding with
 `next_step`, also available as the summary stage's `next_step` operation. It

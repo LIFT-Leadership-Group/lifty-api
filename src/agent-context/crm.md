@@ -77,6 +77,12 @@ healthy portal grant is not success. For a field mapping or requested data fix:
    `mapping_status` for the returned exact `run_ref` and report its per-field
    readback. Mapping replay does not discover leads, rewrite notes or send outreach.
 
+To disconnect HubSpot, use `disconnect` only after the founder confirms.
+It is refused while a sync runs. Records already written stay in HubSpot.
+`client_mapping_context` and `client_mapping_apply` run the bounded company
+mapping for an explicitly named workspace you belong to; the plan's
+`workspace_ref` selects that workspace.
+
 ## User-facing behavior and errors
 
 Name HubSpot in clickable links and report only verified authorization or

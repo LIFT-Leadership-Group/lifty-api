@@ -5,7 +5,10 @@ founder's approval. Its connection checks can complete previously authorized
 bindings, update health, and remove unreferenced duplicate LinkedIn provider
 accounts. Refresh after reconnecting, an edit, a failed check, or a workspace
 change. This operation never authorizes outreach. Use `next_step` for read-only
-onboarding guidance.
+onboarding guidance. `status` returns the compact overview: onboarding import,
+first run, live ICP version, the latest configuration update and each
+integration's connection and last sync. Its email check can also update saved
+health, so it needs the same approval.
 
 Summarize only what matters to the user's request: saved business, confirmed
 website, connected accounts, and the saved campaign's channels, engine, composition

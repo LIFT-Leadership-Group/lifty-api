@@ -17,6 +17,22 @@ unsupported (405): capacity is managed by existing platform/provider policy.
 The platform-default allowance and customer-owned-key posture remain as
 returned by the API. Do not create an allowance configuration workflow.
 
+## Apollo key source and recovery
+
+`allowance` and `apollo_key_status` read an explicitly named workspace you
+belong to. `apollo_platform_default` only returns a workspace to the platform Apollo
+key; it is blocked while discovery or enrichment runs. A customer-owned Apollo
+key is a secret: never ask for it or accept it in the conversation. Direct the
+founder to the Lifty CLI, which reads it from standard input.
+
+For an exact failed first run, `apollo_recovery_status` reports the current
+acquisition, attempt, blocker and whether a restart is allowed.
+`apollo_recovery` with `request` asks Lifty to verify that the previous
+acquisition finished; `restart` is allowed only after that verification and
+queues new Apollo discovery. Both require the current `expected_acquisition_ref`.
+Restart only when the founder asks for it, and report the queued state as
+pending.
+
 ## Later edits
 
 PATCH is explicitly unsupported (405). The workspace daily discovery target,

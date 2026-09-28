@@ -27,8 +27,11 @@ and enabled flag saves the routing rule. Read GET to confirm the saved setup.
 
 Use the same supported PATCH for a destination or routing change. Reconnect
 Slack via a fresh POST and verify its exact attempt; old healthy Slack state
-does not prove completion. PATCH cannot authorize Slack, set connection state,
-or silently send a test notification.
+does not prove completion. PATCH cannot authorize Slack or set connection state.
+`test` posts one visible test message to a saved destination; send it only when
+the founder asks to check a channel. `disconnect` removes the Slack grant from
+the current workspace after the founder confirms; notifications stop until Slack
+is reconnected.
 
 ## User-facing behavior and errors
 

@@ -15,7 +15,8 @@ describe("generated MCP stage operations", () => {
       const name = stage === "summary" && action === "next_step" ? "next_step" : `${stage.replace(/-/g, "_")}_${action}`;
       const supported = Object.keys(operation.responses).some(status => status.startsWith("2"));
       const matches = tools.filter(tool => tool.name === name || tool.name === `${name}_read` || tool.name === `${name}_write`);
-      expect(matches.length, name).toBe(supported ? stage === "campaigns" && action === "post" ? 2 : 1 : 0);
+      const split = stage === "campaigns" && ["post", "client_email", "client_linkedin"].includes(action);
+      expect(matches.length, name).toBe(supported ? split ? 2 : 1 : 0);
       for (const tool of matches) {
         expect(tool.title.length).toBeGreaterThan(0);
         expect(typeof tool.annotations.readOnlyHint).toBe("boolean");
@@ -23,7 +24,7 @@ describe("generated MCP stage operations", () => {
         if (tool.annotations.readOnlyHint) expect(tool.annotations.destructiveHint).toBe(false);
         expect(tool.inputSchema.properties.path).toEqual(operation.request.path);
         expect(tool.inputSchema.properties.query).toEqual(operation.request.query);
-        if (!(stage === "campaigns" && action === "post") && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(operation.request.body);
+        if (!split && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(operation.request.body);
       }
     }
     expect(tools.find(tool => tool.name === "crm_mapping_sources")!.annotations.readOnlyHint).toBe(true);
@@ -94,5 +95,108 @@ describe("generated MCP stage operations", () => {
     expect(enqueue).toHaveBeenCalledOnce();
     expect(read).not.toHaveBeenCalled();
     expect(getStageMcpTools().find(tool => tool.name === "sample_review_progress")!.annotations.readOnlyHint).toBe(true);
+  });
+
+  it("exposes every Lifty CLI API capability as a tool on the route the CLI calls", () => {
+    const tools = new Map(getStageMcpTools().map(tool => [tool.name, tool]));
+    const operationFor = (name: string) => Object.entries(stageOperations).flatMap(([stage, operations]) =>
+      Object.entries(operations).filter(([action]) => name.startsWith(`${stage.replace(/-/g, "_")}_${action}`)).map(([, operation]) => operation))[0];
+    // CLI command -> [tool, method, route]. Commands that only touch local files
+    // (install, login loopback, artifacts) have no connector equivalent.
+    const cli: Record<string, [string, string, string]> = {
+      "status": ["summary_status", "GET", "/v1/status"],
+      "disconnect hubspot": ["crm_disconnect", "POST", "/v1/workspace/crm/disconnect"],
+      "disconnect slack": ["notifications_disconnect", "POST", "/v1/workspace/notifications/disconnect"],
+      "disconnect unipile": ["sending_accounts_disconnect", "POST", "/v1/workspace/sending-accounts/disconnect"],
+      "disconnect unipile --workspace": ["sending_accounts_client_email_disconnect", "POST", "/v1/email/disconnect"],
+      "disconnect linkedin --workspace": ["sending_accounts_client_linkedin_disconnect", "POST", "/v1/linkedin/disconnect"],
+      "connect linkedin --workspace": ["sending_accounts_client_linkedin_connect", "POST", "/v1/linkedin/connect"],
+      "connect linkedin --workspace --status": ["sending_accounts_client_linkedin_status", "GET", "/v1/linkedin"],
+      "notifications test": ["notifications_test", "POST", "/v1/notifications/destinations/{destination_ref}/test"],
+      "get allowance --workspace": ["capacity_allowance", "GET", "/v1/workspaces/{workspace_ref}/apollo/allowance"],
+      "apollo status": ["capacity_apollo_key_status", "GET", "/v1/workspaces/{workspace_ref}/integrations/apollo/key-source"],
+      "apollo platform-default": ["capacity_apollo_platform_default", "POST", "/v1/workspaces/{workspace_ref}/integrations/apollo/platform-default"],
+      "apollo recovery status": ["capacity_apollo_recovery_status", "GET", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}"],
+      "apollo recovery request|restart": ["capacity_apollo_recovery", "POST", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}"],
+      "workspace retire": ["business_retire", "POST", "/v1/workspaces/{workspace_ref}/retire"],
+      "campaign --workspace (read)": ["campaigns_client_email_read", "POST", "/v1/email/campaign"],
+      "campaign --workspace (write)": ["campaigns_client_email_write", "POST", "/v1/email/campaign"],
+      "campaign linkedin --workspace (read)": ["campaigns_client_linkedin_read", "POST", "/v1/linkedin/campaign"],
+      "campaign linkedin --workspace (write)": ["campaigns_client_linkedin_write", "POST", "/v1/linkedin/campaign"],
+      "crm companies context --workspace": ["crm_client_mapping_context", "GET", "/v1/integrations/hubspot/company-mapping/context"],
+      "crm companies apply --workspace": ["crm_client_mapping_apply", "POST", "/v1/integrations/hubspot/company-mapping"],
+    };
+    for (const [command, [name, method, route]] of Object.entries(cli)) {
+      expect(tools.has(name), command).toBe(true);
+      expect(operationFor(name), command).toMatchObject({ method, route });
+    }
+    const annotations = (name: string) => tools.get(name)!.annotations;
+    for (const name of ["crm_disconnect", "notifications_disconnect", "sending_accounts_disconnect", "business_retire",
+      "sending_accounts_client_email_disconnect", "sending_accounts_client_linkedin_disconnect", "capacity_apollo_platform_default"]) {
+      expect(annotations(name), name).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+    }
+    for (const name of ["notifications_test", "capacity_apollo_recovery", "campaigns_client_email_write", "campaigns_client_linkedin_write"]) {
+      expect(annotations(name), name).toMatchObject({ readOnlyHint: false, openWorldHint: true });
+    }
+    for (const name of ["capacity_allowance", "capacity_apollo_key_status", "capacity_apollo_recovery_status",
+      "crm_client_mapping_context", "campaigns_client_email_read", "campaigns_client_linkedin_read"]) {
+      expect(annotations(name), name).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    }
+    // Both GETs check provider connections and can update saved health.
+    for (const name of ["summary_status", "sending_accounts_client_linkedin_status"]) expect(annotations(name).readOnlyHint, name).toBe(false);
+    // A customer-owned Apollo key is a secret and never enters a chat tool.
+    expect(JSON.stringify(tools.get("capacity_apollo_platform_default")!.inputSchema)).not.toContain("api_key");
+    expect(JSON.stringify(tools.get("capacity_apollo_recovery")!.inputSchema)).not.toContain("\"status\"");
+  });
+
+  it("disconnects only the current workspace through the existing handlers", async () => {
+    const other = "33333333-3333-4333-8333-333333333333";
+    const disconnectIntegration = vi.fn(async (_session: unknown, provider: "hubspot" | "slack") => ({ provider, status: "disconnected" as const,
+      portal_id: null, disconnected_at: "2026-09-28T00:00:00Z", workspace, revocation_ref: null }));
+    const disconnectEmail = vi.fn(async (_session: unknown, _workspace: string) => ({ provider: "unipile" as const, channel: "email" as const,
+      workspace_ref: workspace.workspace_ref, status: "not_connected" as const }));
+    const disconnectLinkedin = vi.fn(async (_session: unknown, _workspace: string) => ({ provider: "unipile" as const, channel: "linkedin" as const,
+      workspace_ref: workspace.workspace_ref, status: "not_connected" as const }));
+    const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
+      getWorkspace: async () => ({ state: "ready_for_connections", workspace, next_action: null }),
+      disconnectIntegration, disconnectEmail, disconnectLinkedin, enqueueIntegrationRevocation: vi.fn(), log: () => {} } as never);
+    const dispatch = (route: string, init: RequestInit) => Promise.resolve(app.request(route, init));
+    const call = (name: string, args: unknown) => callStageMcpTool(name, args, incoming(), dispatch);
+
+    expect((await call("crm_disconnect", { body: {} })).structuredContent).toMatchObject({ status: 200, data: { provider: "hubspot", status: "disconnected" } });
+    expect((await call("notifications_disconnect", { body: {} })).structuredContent).toMatchObject({ status: 200, data: { provider: "slack" } });
+    expect(disconnectIntegration.mock.calls.map(([, provider]) => provider)).toEqual(["hubspot", "slack"]);
+    expect((await call("crm_disconnect", { body: { workspace: other } })).isError).toBe(true);
+
+    expect((await call("sending_accounts_disconnect", { body: { channel: "email", confirm: true } })).isError).toBe(false);
+    expect((await call("sending_accounts_disconnect", { body: { channel: "linkedin", confirm: true } })).isError).toBe(false);
+    expect(disconnectEmail).toHaveBeenCalledWith(expect.anything(), workspace.workspace_ref);
+    expect(disconnectLinkedin).toHaveBeenCalledWith(expect.anything(), workspace.workspace_ref);
+    for (const body of [{ channel: "email" }, { channel: "email", confirm: true, workspace: other }]) {
+      expect((await call("sending_accounts_disconnect", { body })).isError).toBe(true);
+    }
+    expect(disconnectEmail).toHaveBeenCalledOnce();
+    expect(disconnectLinkedin).toHaveBeenCalledOnce();
+  });
+
+  it("keeps sends out of the client campaign read tools and Apollo keys out of the key-source tool", async () => {
+    const dispatch = vi.fn(async () => Response.json({ state: "ok" }));
+    const payload = { workspace: "client", campaign_ref: "11111111-1111-4111-8111-111111111111", digest: "a".repeat(64) };
+    expect((await callStageMcpTool("campaigns_client_email_read", { body: { operation: "activate", payload } }, incoming(), dispatch)).isError).toBe(true);
+    expect((await callStageMcpTool("campaigns_client_linkedin_read", { body: { operation: "activate", payload } }, incoming(), dispatch)).isError).toBe(true);
+    expect((await callStageMcpTool("campaigns_client_email_write", { body: { operation: "status", payload } }, incoming(), dispatch)).isError).toBe(true);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect((await callStageMcpTool("campaigns_client_email_read", { body: { operation: "status", payload } }, incoming(), dispatch)).isError).toBe(false);
+    expect(dispatch).toHaveBeenCalledWith("/v1/email/campaign", expect.objectContaining({ method: "POST" }));
+
+    const credentials = vi.fn(async (_session: unknown, workspace_ref: string) => ({ workspace_ref, tool: "apollo" as const,
+      key_source: "platform_default" as const, configured: true, changed: true }));
+    const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }), apolloCredentials: credentials, log: () => {} } as never);
+    const apollo = (body: unknown) => callStageMcpTool("capacity_apollo_platform_default", { path: { workspace_ref: workspace.workspace_ref }, body },
+      incoming(), (route, init) => Promise.resolve(app.request(route, init)));
+    expect((await apollo({ operation: "own_key", api_key: "secret-value" })).structuredContent).toMatchObject({ status: 400 });
+    expect(credentials).not.toHaveBeenCalled();
+    expect((await apollo({})).structuredContent).toMatchObject({ status: 200, data: { key_source: "platform_default" } });
+    expect(credentials).toHaveBeenCalledWith(expect.anything(), workspace.workspace_ref, { operation: "platform_default" });
   });
 });
