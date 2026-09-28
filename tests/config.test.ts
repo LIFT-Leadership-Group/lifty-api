@@ -16,6 +16,27 @@ const validEnvironment = {
 };
 
 describe("service configuration", () => {
+  it("keeps domain verification absent until a single portal token is configured", () => {
+    expect(loadConfig(validEnvironment).openAiAppsChallenge).toBeUndefined();
+    expect(loadConfig({ ...validEnvironment, LIFTY_OPENAI_APPS_CHALLENGE: "openai-verification=example_token" }).openAiAppsChallenge).toBe("openai-verification=example_token");
+    for (const value of ["", "one\ntwo", " one", "one two", "x".repeat(4097)]) {
+      expect(() => loadConfig({ ...validEnvironment, LIFTY_OPENAI_APPS_CHALLENGE: value })).toThrow(/single exact/);
+    }
+  });
+  it("keeps MCP opt-in and pins its resource and browser origins to safe configuration", () => {
+    expect(loadConfig(validEnvironment).mcp).toBeNull();
+    expect(loadConfig({ ...validEnvironment, LIFTY_MCP_ENABLED: "true" }).mcp).toEqual({
+      resourceUrl: validEnvironment.PUBLIC_BASE_URL + "/mcp", authorizationServer: "https://project.supabase.co/auth/v1",
+      allowedOrigins: [validEnvironment.PUBLIC_BASE_URL],
+    });
+    expect(() => loadConfig({ ...validEnvironment, LIFTY_MCP_ENABLED: "yes" })).toThrow(/true or false/);
+    for (const PUBLIC_BASE_URL of ["http://127.0.0.1", "https://user:secret@example.test", "https://example.test/prefix", "https://example.test?query=value"]) {
+      expect(() => loadConfig({ ...validEnvironment, PUBLIC_BASE_URL, LIFTY_MCP_ENABLED: "true" })).toThrow(/HTTPS origin/);
+    }
+    for (const LIFTY_MCP_ALLOWED_ORIGINS of ["https://good.test,http://evil.test", "https://good.test/path", "https://user:secret@example.test"]) {
+      expect(() => loadConfig({ ...validEnvironment, LIFTY_MCP_ENABLED: "true", LIFTY_MCP_ALLOWED_ORIGINS })).toThrow();
+    }
+  });
   it("requires both Google credentials to enable OAuth setup, with no separate Mailivery attestation", () => {
     const env = {...validEnvironment, LIFTY_EMAIL_SERVER_KEY:"e".repeat(32), UNIPILE_DSN:"https://api.unipile.test",
       UNIPILE_ACCESS_TOKEN:"unipile-key", MAILIVERY_API_KEY:"mailivery-token-12345", LIFTY_WARMUP_SETUP_ENABLED:"true"};

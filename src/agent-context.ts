@@ -55,14 +55,14 @@ const stageReferences: Record<string, string> = {
 };
 const stageDocuments = Object.fromEntries(Object.entries(stageOperations).map(([stage, operations]) => [stage, {
   instructions: readGuide(stage),
-  schemas: ["targeting", "research-criteria", "commercial-voice"].includes(stage)
+  schemas: ["business", "targeting", "research-criteria", "commercial-voice"].includes(stage)
     ? { draft: documents.onboarding.schemas.draft } : {},
   operations,
   references: {
     ...stageReferences,
     ...(["crm", "sending-accounts", "notifications"].includes(stage)
       ? { connections: readGuide("stage-connections") } : {}),
-    ...(["targeting", "research-criteria", "commercial-voice"].includes(stage)
+    ...(["business", "targeting", "research-criteria", "commercial-voice"].includes(stage)
       ? { interview, configuration: readGuide("configuration") } : {}),
     ...(["targeting", "research-criteria", "sample-review"].includes(stage) ? { calibration } : {}),
     ...(stage === "campaigns" ? { campaign: readGuide("campaign"), writing, anti_slop: antiSlop } : {}),

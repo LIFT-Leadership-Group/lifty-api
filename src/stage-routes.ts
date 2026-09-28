@@ -1,5 +1,7 @@
 import { readSenderRoster } from "./sender-choice.js";
 import { getWorkspaceSummary, readComponent } from "./workspace-summary.js";
+import { getNextStep } from "./next-step.js";
+import { NextStepSchema } from "./next-step-contracts.js";
 import { BusinessWebsiteSchema } from "./business-website.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
 import {
@@ -62,6 +64,13 @@ function parse<T extends z.ZodType>(schema: T, input: unknown): z.output<T> {
 }
 
 export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependencies: AppDependencies): void {
+  app.openAPIRegistry.registerPath({ method: "get", path: "/v1/workspace/next-step", security: [{ bearerAuth: [] }],
+    responses: { 200: { description: "Next onboarding step observed from server state", content: { "application/json": { schema: NextStepSchema } } } } });
+  app.get("/v1/workspace/next-step", async context => {
+    parse(Empty, context.req.query());
+    context.header("cache-control", "no-store");
+    return context.json(await getNextStep(dependencies, context.get("authSession")));
+  });
   // Dispatch locally into the existing route: its authentication, rate limit,
   // body limit, business validation, jobs and receipt projection run unchanged.
   function forward(context: Context<AppEnvironment>, method: string, route: string, body?: unknown) {

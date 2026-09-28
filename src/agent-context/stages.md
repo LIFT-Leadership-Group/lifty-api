@@ -19,14 +19,16 @@ or shared context.
 | Notifications | [notifications](/v1/context/notifications) | Slack authorization, destinations and routing |
 | Capacity | [capacity](/v1/context/capacity) | Read-only operating target and discovery allowance |
 
-Lifty login is the stable CLI bootstrap exception: use the existing login
-primitive before authenticated workspace operations. The legacy onboarding,
-workspace and campaign contexts remain available for their installed flows.
-The glossary is an index, not a persisted progress checklist or prerequisite
-scheduler. Work on the stage the founder requested.
+Sign in through the current client before private reads. Start onboarding with
+`next_step`, also available as the summary stage's `next_step` operation. It
+reads saved interview, import and research state and returns the current guide.
+It never starts work, confirms founder acceptance or activates sending.
 
-Start every authenticated session with `context summary` and its `get` operation.
-Use the saved-state summary to choose the next stage; never restart setup from
-conversation memory. Summary is read-only.
+For an existing workspace task, obtain approval to refresh `summary.get`, whose
+connection checks can update bindings and health or remove unreferenced
+duplicate LinkedIn provider accounts. Then read the guide
+for the requested stage. A failed read is unknown, not missing setup. The
+founder's requested task may proceed independently of pending calibration when
+its own prerequisites are satisfied.
 
-The [session summary](/v1/context/summary) is the first authenticated read.
+The [session summary](/v1/context/summary) describes the workspace check.

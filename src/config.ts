@@ -9,10 +9,13 @@ import type { LinkedinConnectSettings } from "./linkedin-connect.js";
 import type { EmailConnectSettings } from "./email-connect.js";
 import type { MailiverySettings } from "./email-warmup.js";
 import type { WarmupSetupSettings } from "./warmup-setup.js";
+import type { McpSettings } from "./mcp.js";
 
 type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
+  openAiAppsChallenge?: string;
+  mcp?: McpSettings | null;
   unipileHostedAuthOrigin?: string;
   unipileV2HostedAuthOrigins?: string[];
   crm?: { serverKey: string; readOnly: boolean } | null;
@@ -116,6 +119,31 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     required(environment, "PUBLIC_BASE_URL"),
     "PUBLIC_BASE_URL",
   );
+  const mcpEnabled = environment.LIFTY_MCP_ENABLED === "true";
+  const openAiAppsChallenge = environment.LIFTY_OPENAI_APPS_CHALLENGE;
+  if (openAiAppsChallenge !== undefined && !/^[\x21-\x7e]{1,4096}$/.test(openAiAppsChallenge)) {
+    throw new Error("LIFTY_OPENAI_APPS_CHALLENGE must be the single exact printable verification token.");
+  }
+  if (environment.LIFTY_MCP_ENABLED && !["true", "false"].includes(environment.LIFTY_MCP_ENABLED)) {
+    throw new Error("LIFTY_MCP_ENABLED must be true or false.");
+  }
+  let mcp: McpSettings | null = null;
+  if (mcpEnabled) {
+    if (publicBaseUrl.protocol !== "https:" || publicBaseUrl.username || publicBaseUrl.password
+      || publicBaseUrl.pathname !== "/" || publicBaseUrl.search || publicBaseUrl.hash) {
+      throw new Error("MCP requires PUBLIC_BASE_URL to be an HTTPS origin.");
+    }
+    const allowedOrigins = [publicBaseUrl.origin, ...(environment.LIFTY_MCP_ALLOWED_ORIGINS?.split(",") ?? [])]
+      .map(value => {
+        const url = secureUrl(value.trim(), "LIFTY_MCP_ALLOWED_ORIGINS");
+        if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+          throw new Error("LIFTY_MCP_ALLOWED_ORIGINS must contain HTTPS origins.");
+        }
+        return url.origin;
+      });
+    mcp = { resourceUrl: new URL("/mcp", publicBaseUrl).href,
+      authorizationServer: new URL("/auth/v1", supabaseUrl).href, allowedOrigins: [...new Set(allowedOrigins)] };
+  }
   const warmupBaseUrl = environment.LIFTY_WARMUP_PUBLIC_BASE_URL?.trim()
     ? secureUrl(environment.LIFTY_WARMUP_PUBLIC_BASE_URL.trim(), "LIFTY_WARMUP_PUBLIC_BASE_URL")
     : publicBaseUrl;
@@ -162,6 +190,8 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   }
   if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
+    mcp,
+    ...(openAiAppsChallenge === undefined ? {} : { openAiAppsChallenge }),
     unipileHostedAuthOrigin: parseHostedAuthOrigin(environment.UNIPILE_HOSTED_AUTH_ORIGIN),
     ...(v2 ? {unipileV2HostedAuthOrigins:v2.hostedAuthOrigins} : {}),
     crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,

@@ -1,12 +1,12 @@
 import { authBrowserScript } from "./auth-browser.js";
+import { oauthConsentBrowserScript } from "./oauth-consent-browser.js";
 
-export interface CliAuthPageOptions {
+export type CliAuthPageOptions = {
   supabaseUrl: string;
   publishableKey: string;
-  state: string;
-  port: number;
   scriptNonce: string;
-}
+} & ({ state: string; port: number; authorizationId?: never }
+  | { authorizationId: string; state?: never; port?: never });
 
 function jsonForInlineScript(value: unknown): string {
   return JSON.stringify(value)
@@ -16,15 +16,17 @@ function jsonForInlineScript(value: unknown): string {
 }
 
 /**
- * Minimal hosted login surface for `lifty login`. Session tokens stay in JS
- * memory and leave the page only in the JSON body sent to 127.0.0.1.
+ * Shared hosted login for CLI and OAuth. Tokens stay in JS memory. OAuth
+ * returns only the Auth-issued authorization code to the registered client.
  */
 export function renderCliAuthPage(options: CliAuthPageOptions): string {
+  const oauth = options.authorizationId !== undefined;
   const configuration = jsonForInlineScript({
     supabaseUrl: options.supabaseUrl.replace(/\/$/, ""),
     publishableKey: options.publishableKey,
-    state: options.state,
-    callbackUrl: `http://127.0.0.1:${options.port}/callback`,
+    ...(oauth ? { authorizationId: options.authorizationId } : {
+      state: options.state, callbackUrl: `http://127.0.0.1:${options.port}/callback`,
+    }),
   });
 
   return `<!doctype html>
@@ -33,7 +35,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>Authorize the LIFTY CLI</title>
+  <title>${oauth ? "Connect LIFTY" : "Authorize the LIFTY CLI"}</title>
   <style>
     :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
     body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #0b0d10; color: #f4f4f5; }
@@ -58,7 +60,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
     <p class="brand">LIFTY</p>
     <section class="card" id="auth-card">
       <h1 id="auth-title">Sign in to LIFTY</h1>
-      <p id="auth-description">Sign in to authorize the CLI on this machine.</p>
+      <p id="auth-description">${oauth ? "Sign in to connect Lifty to your app." : "Sign in to authorize the CLI on this machine."}</p>
       <form id="auth-form">
         <label>Email<input id="email" type="email" autocomplete="email" required></label>
         <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
@@ -69,8 +71,9 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
       <p><span id="mode-prompt">New to LIFTY?</span> <button class="link" id="switch-mode" type="button">Create account</button></p>
     </section>
     <section class="card" id="approve-card" hidden>
-      <h1>Authorize the LIFTY CLI on this machine</h1>
-      <p>The CLI will act as <strong id="account-email"></strong> until you sign out or revoke access.</p>
+      <h1>${oauth ? 'Connect <span id="client-name"></span> to Lifty' : "Authorize the LIFTY CLI on this machine"}</h1>
+      <p>${oauth ? "This app" : "The CLI"} will act as <strong id="account-email"></strong> until you sign out or revoke access.</p>
+      ${oauth ? '<p>It can access your Lifty workspace and perform the actions your account permits.</p><p>Requested account information: <span id="client-scopes"></span></p><p>Return address: <span id="client-redirect"></span></p>' : ""}
       <p id="approve-status" role="status"></p>
       <div class="actions">
         <button class="primary" id="approve" type="button">Approve</button>
@@ -93,12 +96,15 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
     const doneCard = byId("done-card");
 
     ${authBrowserScript}
+    ${oauth ? oauthConsentBrowserScript : ""}
 
     function setMode(nextMode) {
       mode = nextMode;
       const creating = mode === "create";
       byId("auth-title").textContent = creating ? "Create your LIFTY account" : "Sign in to LIFTY";
-      byId("auth-description").textContent = creating ? "Create an account, then authorize the CLI on this machine." : "Sign in to authorize the CLI on this machine.";
+      byId("auth-description").textContent = config.authorizationId
+        ? (creating ? "Create an account, then connect Lifty to your app." : "Sign in to connect Lifty to your app.")
+        : (creating ? "Create an account, then authorize the CLI on this machine." : "Sign in to authorize the CLI on this machine.");
       byId("submit").textContent = creating ? "Create account" : "Sign in";
       byId("password").autocomplete = creating ? "new-password" : "current-password";
       byId("password").minLength = creating ? 8 : 0;
@@ -123,7 +129,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
         const payload = await authRequest(endpoint, { body: { email, password } });
         const candidate = payload.session || payload;
         if (!candidate.access_token || !candidate.refresh_token) {
-          error.textContent = "Check your email to confirm the account, then run lifty login again.";
+          error.textContent = config.authorizationId ? "Check your email to confirm the account, then connect Lifty again from your app." : "Check your email to confirm the account, then run lifty login again.";
           error.hidden = false;
           return;
         }
@@ -134,6 +140,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
           expires_at: Number(candidate.expires_at) || now + Number(candidate.expires_in || 0)
         };
         byId("account-email").textContent = email;
+        if (config.authorizationId) { await showOAuthConsent(); return; }
         authCard.hidden = true;
         approveCard.hidden = false;
       } catch (caught) {
@@ -146,6 +153,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
     });
 
     byId("approve").addEventListener("click", async () => {
+      if (config.authorizationId) { await approveAuthorization(); return; }
       if (!session) return;
       const approve = byId("approve");
       const status = byId("approve-status");
@@ -178,7 +186,8 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
       }
     });
 
-    byId("deny").addEventListener("click", () => {
+    byId("deny").addEventListener("click", async () => {
+      if (config.authorizationId) { await denyAuthorization(); return; }
       session = null;
       approveCard.hidden = true;
       doneCard.hidden = false;

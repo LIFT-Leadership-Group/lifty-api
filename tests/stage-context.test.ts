@@ -26,6 +26,9 @@ describe("runtime stage context", () => {
     expect(context.instructions).toContain("One sender can own");
     expect(context.instructions).toContain("Warmup resume never resumes campaigns");
     expect(context.instructions).toContain("21\nactive warmup days");
+    expect(context.instructions).toContain("Warmup setup uses Google OAuth only");
+    expect(context.instructions).toContain("Never request an App Password");
+    expect(context.instructions).not.toMatch(/requires a Google App Password|finishes the consent step inside Mailivery/);
   });
   it("publishes a bound local submission with exact receipt correlation and read-only completion operations", async () => {
     const app = createApp();
@@ -171,7 +174,7 @@ describe("runtime stage context", () => {
       expect(context.references.connections).toContain("retry_after_seconds");
       expect(context.references.connections).toContain("previous healthy grant");
       expect(context.references.connections).toContain("denied");
-      expect(context.references.connections).toContain("localhost listener");
+      expect(context.references.connections).toContain("connector's OAuth flow");
       expect(context.operations?.get?.request.query.properties).toHaveProperty("attempt_ref");
       expect(context.operations?.post?.responses["200"]?.required).toEqual(["status", "attempt_ref", "connection_url", "expires_at"]);
     }

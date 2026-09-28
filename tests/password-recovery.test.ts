@@ -25,14 +25,14 @@ function browser(html:string, url:string, fetcher = vi.fn(async (_url:string,_in
     const element = new Element(); element.hidden = /\shidden(?:\s|>)/.test(match[0]);
     element.disabled = /\sdisabled(?:\s|>)/.test(match[0]); elements.set(match[1]!,element);
   }
-  const location = new URL(url);
+  const location = Object.assign(new URL(url), { assign: vi.fn((value: string) => { location.href = value; }) });
   const clock = {now:Date.now()};
   const timers = new Map<number,()=>void>(); let timerId=0;
   const handlers = new Map<string,()=>void>();
   const get = (id:string) => {const value=elements.get(id);if(!value)throw new Error(`Missing test element ${id}`);return value;};
   const history = {replaceState:vi.fn((_state:unknown,_title:string,path:string)=>{location.href=new URL(path,location).href;})};
   const context = vm.createContext({document:{getElementById:get},window:{location,addEventListener:(event:string,handler:()=>void)=>handlers.set(event,handler)},history,
-    URLSearchParams,Date:{now:()=>clock.now},AbortController,fetch:fetcher,
+    URL,URLSearchParams,Date:{now:()=>clock.now},AbortController,fetch:fetcher,
     setTimeout:(fn:()=>void)=>{timers.set(++timerId,fn);return timerId;},clearTimeout:(id:number)=>timers.delete(id),
     // Any storage, logging or implicit navigation is an immediate test failure.
     localStorage:{setItem(){throw Error("persistent storage");}},sessionStorage:{setItem(){throw Error("persistent storage");}},
@@ -49,6 +49,70 @@ function recovery(page:"request"|"update", tail=fragment, fetcher?:ReturnType<ty
 function login(fetcher?:ReturnType<typeof vi.fn<(url:string,init:RequestInit)=>Promise<ReturnType<typeof reply>>>>) {
   return browser(renderCliAuthPage({...options,state:"s".repeat(43),port:49152}),options.publicBaseUrl+"/cli/auth",fetcher);
 }
+
+describe("shared OAuth login and consent", () => {
+  const authorizationId = "11111111-1111-4111-8111-111111111111";
+  const details = { authorization_id: authorizationId, client: { name: "Founder app <script>" },
+    redirect_uri: "https://chat.example.test/connector-specific/callback", scope: "openid email profile" };
+  const oauthLogin = (fetcher: ReturnType<typeof vi.fn<(url:string,init:RequestInit)=>Promise<ReturnType<typeof reply>>>>) =>
+    browser(renderCliAuthPage({ ...options, authorizationId }), options.publicBaseUrl + "/oauth/consent?authorization_id=" + authorizationId, fetcher);
+  const signIn = async (b: ReturnType<typeof browser>) => {
+    b.get("email").value = "founder@example.test"; b.get("password").value = "password";
+    await b.get("auth-form").dispatch("submit");
+  };
+  it("serves the production consent surface with Auth-only CSP and a validated authorization ID", async () => {
+    const app = createDeploymentApp({ SUPABASE_URL: options.supabaseUrl, SUPABASE_PUBLISHABLE_KEY: options.publishableKey,
+      SUPABASE_JWKS_URL: options.supabaseUrl + "/auth/v1/.well-known/jwks.json", PUBLIC_BASE_URL: options.publicBaseUrl,
+      HUBSPOT_CLIENT_ID: "client", HUBSPOT_CLIENT_SECRET: "secret", TRIGGER_SECRET_KEY: "fixture", LIFTY_MCP_ENABLED: "true" });
+    const response = await app.request("/oauth/consent?authorization_id=" + authorizationId + "&returnTo=https://evil.test&port=4444");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toContain("connect-src " + options.supabaseUrl);
+    expect(response.headers.get("content-security-policy")).not.toContain("127.0.0.1");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    const html = await response.text();
+    expect(html).not.toContain("evil.test"); expect(html).not.toContain("127.0.0.1");
+    expect(html).toContain(authorizationId);
+    expect((await app.request("/oauth/consent?authorization_id=invalid")).status).toBe(400);
+    expect((await createApp().request("/oauth/consent?authorization_id=" + authorizationId)).status).toBe(404);
+  });
+  it.each(["approve", "deny"])("uses the Auth %s decision and returns only the authorization response to the registered app", async action => {
+    const returnUrl = details.redirect_uri + (action === "approve" ? "?code=authorization-code&state=state" : "?error=access_denied&state=state");
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) => reply())
+      .mockResolvedValueOnce(reply(200, { access_token: "PRIVATE_ACCESS", refresh_token: "PRIVATE_REFRESH", expires_in: 3600 }))
+      .mockResolvedValueOnce(reply(200, details))
+      .mockResolvedValueOnce(reply(200, { redirect_url: returnUrl }));
+    const b = oauthLogin(fetcher);
+    await signIn(b);
+    expect(b.get("password").value).toBe("");
+    expect(b.get("client-name").textContent).toBe(details.client.name);
+    expect(b.get("client-scopes").textContent).toBe(details.scope);
+    expect(b.get("client-redirect").textContent).toBe(details.redirect_uri);
+    expect(fetcher.mock.calls[1]?.[0]).toBe(options.supabaseUrl + "/auth/v1/oauth/authorizations/" + authorizationId);
+    expect(fetcher.mock.calls[1]?.[1]).toMatchObject({ method: "GET", headers: { Authorization: "Bearer PRIVATE_ACCESS" } });
+    expect(b.location.assign).not.toHaveBeenCalled();
+    await b.get(action).dispatch("click");
+    expect(fetcher.mock.calls[2]?.[0]).toBe(options.supabaseUrl + "/auth/v1/oauth/authorizations/" + authorizationId + "/consent");
+    expect(fetcher.mock.calls[2]?.[1].body).toBe(JSON.stringify({ action }));
+    expect(b.location.href).toBe(returnUrl);
+    expect(b.location.href).not.toContain("PRIVATE_");
+    expect(b.location.href).not.toContain("127.0.0.1");
+    await b.get(action).dispatch("click");
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+  it("handles previously granted consent, expired authorizations and unsafe redirects without persisting or disclosing tokens", async () => {
+    for (const payload of [ { redirect_url: details.redirect_uri + "?code=existing" }, { redirect_url: "javascript:alert(1)" }, { message: "PRIVATE_DETAIL" } ]) {
+      const fetcher = vi.fn(async (_url:string,_init:RequestInit)=>reply())
+        .mockResolvedValueOnce(reply(200, { access_token:"PRIVATE_ACCESS",refresh_token:"PRIVATE_REFRESH" }))
+        .mockResolvedValueOnce(reply(200, payload));
+      const b = oauthLogin(fetcher); await signIn(b);
+      if (payload.redirect_url?.startsWith("https:")) expect(b.location.assign).toHaveBeenCalledWith(payload.redirect_url);
+      else { expect(b.location.assign).not.toHaveBeenCalled(); expect(b.get("auth-error").textContent).toContain("expired"); }
+      expect(b.get("auth-error").textContent).not.toContain("PRIVATE_");
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    }
+  });
+});
 async function update(b:ReturnType<typeof browser>,password="new-password-fixture",confirmation=password) {
   b.get("new-password").value=password;b.get("confirm-password").value=confirmation;
   await b.get("update-form").dispatch("submit");

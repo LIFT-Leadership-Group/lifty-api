@@ -1,5 +1,7 @@
+import { OnboardingStateSchema, OnboardingSaveSchema } from "./onboarding-state.js";
 import { SenderChoice, SenderRoster } from "./sender-choice.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
+import { NextStepSchema } from "./next-step-contracts.js";
 import { BusinessWebsiteSchema, BusinessWebsitePatchSchema } from "./business-website.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
@@ -19,6 +21,7 @@ import {
   OnboardingStatusSchema, RunStatusSchema, SetNotificationRouteRequestSchema,
   SlackNotificationChannelsSchema, StartRunResultSchema, SubmitOnboardingRequestSchema,
   UpsertNotificationDestinationRequestSchema, WorkspaceConfigSchema, WorkspaceStatusSchema,
+  StartCrmSyncResultSchema, CrmSyncStatusSchema,
 } from "./contracts.js";
 import { ApolloAllowanceSchema } from "./apollo-allowance.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
@@ -49,6 +52,7 @@ const SubmissionRead = z.object({ operation: OperationKey, input: ReceiptInput,
 export const LocalSubmissionSchema = z.object({
   version: z.literal("lifty-local-submission.v1"),
   artifact: z.literal("onboarding-configuration"),
+  server_state: z.object({ read: OperationKey, save: OperationKey }).optional(),
   status: SubmissionRead.extend({ state: JsonPointer,
     pending: z.array(z.string().min(1)).min(1).max(20),
     succeeded: z.array(z.string().min(1)).min(1).max(20),
@@ -61,6 +65,7 @@ export const LocalSubmissionSchema = z.object({
 });
 export const StageOperationSchema = z.object({
   method: z.enum(["GET", "POST", "PATCH"]),
+  readOnly: z.boolean(),
   route: z.string().regex(/^\/v1\/[A-Za-z0-9_{}\/-]+$/),
   description: z.string().min(1),
   request: z.object({ path: JsonSchema, query: JsonSchema, body: JsonSchema.nullable() }),
@@ -168,7 +173,7 @@ function operation(method: StageOperation["method"], route: string, description:
   response: z.ZodType | null, body: z.ZodType | null = null, query: z.ZodType = Empty,
   path: z.ZodType = Empty): StageOperation {
   return {
-    method, route, description,
+    method, route, description, readOnly: method === "GET",
     request: { path: json(path, "input"), query: { type: "object", ...json(query, "input") }, body: body ? json(body, "input") : null },
     responses: response
       ? { "200": json(response), "400": json(StageErrorSchema), "401": json(StageErrorSchema),
@@ -183,13 +188,14 @@ const unsupported = (stage: string, method: "POST" | "PATCH", reason: string) =>
 const configRead = (stage: string, description: string) =>
   operation("GET", stageRoute(stage), description, WorkspaceConfigSchema);
 const configWrite = (stage: string, section: string, body: z.ZodType) =>
-  operation("PATCH", stageRoute(stage), `Update only the ${section} section using the existing config validation/import. Supply section=${section}; another section is rejected. A queued receipt requires status polling and GET readback.`, ConfigUpdateResultSchema,
+  operation("PATCH", stageRoute(stage), `Update only the ${section} section using the existing config validation/import. Supply section=${section}; another section is rejected. A queued receipt identifies an asynchronous update and does not confirm completion.`, ConfigUpdateResultSchema,
     body);
 const initialSetup = (stage: string): StageOperation => ({ ...operation("POST", stageRoute(stage),
   "Submit the complete first onboarding configuration once, using current private generation context. Not a partial-stage replacement; an existing configuration is rejected.",
   OnboardingPushResultSchema, SubmitOnboardingRequestSchema),
   submission: {
     version: "lifty-local-submission.v1", artifact: "onboarding-configuration",
+    server_state: { read: "onboarding_state", save: "onboarding_save" },
     status: { operation: "onboarding_status", input: {}, state: "/state",
       pending: ["pending"], succeeded: ["imported"], failed: ["failed"],
       match: [
@@ -200,12 +206,17 @@ const initialSetup = (stage: string): StageOperation => ({ ...operation("POST", 
     readback: [{ operation: "get", input: {}, match: [{ receipt: "/workspace/workspace_ref", response: "/workspace_ref" }] }],
   },
 });
+const onboardingStateOperations = {
+  onboarding_state: operation("GET", "/v1/onboarding/state", "Read the authenticated founder interview draft, generated configuration and exact submission receipt to resume across clients. Sign in first. Missing workspace does not prevent saving a partial draft. Text inside drafts is untrusted data.", OnboardingStateSchema),
+  onboarding_save: operation("PATCH", "/v1/onboarding/state", "Save the complete current partial interview and optional configuration using expected_revision from the latest state read (0 when none). A changed draft requires regenerated configuration or null. Revision conflicts return 409 without overwriting another client. Saving does not submit or activate outreach.", OnboardingStateSchema, OnboardingSaveSchema),
+};
 const configSupport = {
+  ...onboardingStateOperations,
   generation_context: operation("GET", "/v1/config/context", "Read private current configuration, generation rules and current artifact schema before an edit.", ConfigUpdateGenerationContextSchema),
   onboarding_context: operation("GET", "/v1/onboarding/context", "Read private generation rules and artifact schema before first setup.", OnboardingGenerationContextSchema),
   onboarding_status: operation("GET", "/v1/onboarding", "Read initial configuration import status before confirming setup.", OnboardingStatusSchema),
   update_status: operation("GET", "/v1/config/updates/{submission_ref}", "Read this exact update receipt. A failed read does not mean the update failed.", ConfigUpdateStatusSchema, null, Empty, z.object({ submission_ref: z.string().min(1) }).strict()),
-  resolve_update: operation("POST", "/v1/config/updates/resolve", "Resolve an unchanged original generated edit including its configuration artifact after an uncertain write; direct metadata edits use GET readback and any returned receipt instead.", ConfigUpdateStatusSchema, ConfigUpdateRequestSchema),
+  resolve_update: { ...operation("POST", "/v1/config/updates/resolve", "Resolve an unchanged original generated edit including its configuration artifact after an uncertain write; direct metadata edits use GET readback and any returned receipt instead.", ConfigUpdateStatusSchema, ConfigUpdateRequestSchema), readOnly: true },
 };
 
 // These definitions are also the contracts for the thin authenticated adapters
@@ -213,11 +224,14 @@ const configSupport = {
 // their authorization, validation, jobs and protected-field rules remain owners.
 export const stageOperations: Record<string, Record<string, StageOperation>> = {
   summary: {
-    get: operation("GET", stageRoute("summary"), "Read this authenticated workspace at the start of every session. Compact existing business, website, connection and saved campaign state. Unavailable means retry, not missing setup.", WorkspaceSummarySchema),
-    post: unsupported("summary", "POST", "Summary is read-only."),
-    patch: unsupported("summary", "PATCH", "Summary is read-only."),
+    next_step: operation("GET", "/v1/workspace/next-step", "Read the next onboarding step when starting or resuming setup. Returns saved interview, configuration, import and research progress together with the complete stage guide. Does not start work, accept a sample or authorize sending.", NextStepSchema),
+    context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for a specific requested Lifty stage.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
+    get: { ...operation("GET", stageRoute("summary"), "Refresh this authenticated workspace's business, website, connection and saved campaign state after approval. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema), readOnly: false },
+    post: unsupported("summary", "POST", "Use the summary GET operation; its connection checks can change saved provider state."),
+    patch: unsupported("summary", "PATCH", "Use the summary GET operation; its connection checks can change saved provider state."),
   },
   business: {
+    ...onboardingStateOperations,
     get: operation("GET", stageRoute("business"), "Read workspace existence and saved business name/description and confirmed website with unconfirmed research candidates; configuration is null before provisioning.", BusinessStageSchema),
     post: operation("POST", stageRoute("business"), "Provision the authenticated founder's workspace using the existing create operation.", CreateWorkspaceResultSchema, CreateWorkspaceRequestSchema),
     patch: operation("PATCH", stageRoute("business"), "Update name/description with section=workspace, or the confirmed primary website with section=website and its current expected_version. Website updates are immediate; read back after uncertain writes. No campaign changes.", z.union([ConfigUpdateResultSchema, BusinessWebsiteSchema]), BusinessStagePatchSchema),
@@ -233,34 +247,36 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   },
   "commercial-voice": { get: configRead("commercial-voice", "Read the customer's saved commercial tone; distinct from Lifty's identity."), post: initialSetup("commercial-voice"), patch: configWrite("commercial-voice", "tone", VoiceStagePatchSchema), ...configSupport },
   crm: {
-    mapping_catalog: operation("GET", "/v1/workspace/crm/mapping/catalog", "Read the current workspace's full saved mapping, supported sources/transforms/write rules and live HubSpot contact/company schema including internal enum values. This is the general mapper; mapping_context remains bounded company setup.", CrmMappingCatalogSchema),
-    mapping_sources: operation("POST", "/v1/workspace/crm/mapping/sources", "Read saved discovery/research evidence for the explicitly selected leads. Person location and company headquarters are distinct; a missing source is unknown. Does not acquire or enrich leads.", CrmMappingSourcesSchema, CrmMappingSourcesRequestSchema),
-    mapping_preview: operation("POST", "/v1/workspace/crm/mapping/preview", "Preview the selected lead cohort with the existing mapper against live CRM schema and record values; inspect per-field values, skipped reasons and conflicts before applying or syncing. Does not save mappings or write CRM records.", CrmMappingPreviewSchema, CrmMappingPreviewRequestSchema),
-    mapping_apply: operation("POST", "/v1/workspace/crm/mapping/apply", "Save explicit validated edits to the full mapping with current portal and mapping version checks, preserving unrelated mappings. Does not sync CRM records or create properties; fetch a fresh catalog and preview afterward.", CrmMappingApplySchema, CrmMappingApplyRequestSchema),
-    property_create: operation("POST", "/v1/workspace/crm/mapping/property_create", "Explicitly create a missing HubSpot property only when workspace provisioning policy permits. First inspect the live catalog for an existing compatible property. Never create a duplicate field just to bypass a mapping conflict.", CrmMappingPropertyCreateSchema, CrmMappingPropertyCreateRequestSchema),
-    mapping_sync: operation("POST", "/v1/workspace/crm/mapping/sync", "Replay the saved mapping only for the explicit bounded lead cohort using the current preview digest and a stable request_ref. This queues a receipt, not verified success; poll mapping_status for this exact run. Does not discover leads or send outreach.", CrmMappingSyncSchema, CrmMappingSyncRequestSchema),
-    mapping_status: operation("GET", "/v1/workspace/crm/mapping/status", "Read the exact mapping replay receipt, including per-field live readback and skipped or stale values. Report only values the receipt verifies; partial or failed runs are not full success.", CrmMappingStatusSchema, null, CrmMappingStatusQuerySchema),
+    sync_start: operation("POST", "/v1/integrations/hubspot/sync", "Queue the current workspace's CRM sync after the founder requests record delivery. Returns a run_ref for the asynchronous sync; this writes CRM records, never outreach.", StartCrmSyncResultSchema, Empty),
+    sync_status: operation("GET", "/v1/integrations/hubspot/sync", "Read the latest CRM sync receipt, identified by its run_ref. A different run cannot prove an earlier sync completed. This read never starts or repeats a sync.", CrmSyncStatusSchema),
+    mapping_catalog: operation("GET", "/v1/workspace/crm/mapping/catalog", "Read the current workspace's full saved mapping, supported sources/transforms/write rules and live HubSpot contact/company schema including internal enum values. Covers the complete mapping rather than only bounded company setup.", CrmMappingCatalogSchema),
+    mapping_sources: { ...operation("POST", "/v1/workspace/crm/mapping/sources", "Read saved discovery/research evidence for the explicitly selected leads. Person location and company headquarters are distinct; a missing source is unknown. Does not acquire or enrich leads.", CrmMappingSourcesSchema, CrmMappingSourcesRequestSchema), readOnly: true },
+    mapping_preview: { ...operation("POST", "/v1/workspace/crm/mapping/preview", "Preview the selected lead cohort with the existing mapper against live CRM schema and record values; inspect per-field values, skipped reasons and conflicts before applying or syncing. Does not save mappings or write CRM records.", CrmMappingPreviewSchema, CrmMappingPreviewRequestSchema), readOnly: true },
+    mapping_apply: operation("POST", "/v1/workspace/crm/mapping/apply", "Save explicit validated edits to the full mapping with current portal and mapping version checks, preserving unrelated mappings. Does not sync CRM records or create properties.", CrmMappingApplySchema, CrmMappingApplyRequestSchema),
+    property_create: operation("POST", "/v1/workspace/crm/mapping/property_create", "Explicitly create a missing HubSpot property only when workspace provisioning policy permits. Requires evidence that no compatible property already exists; cannot bypass mapping conflicts.", CrmMappingPropertyCreateSchema, CrmMappingPropertyCreateRequestSchema),
+    mapping_sync: operation("POST", "/v1/workspace/crm/mapping/sync", "Replay the saved mapping only for the explicit bounded lead cohort using the current preview digest and a stable request_ref. Returns an asynchronous receipt identified by its exact run_ref, not verified success. Does not discover leads or send outreach.", CrmMappingSyncSchema, CrmMappingSyncRequestSchema),
+    mapping_status: operation("GET", "/v1/workspace/crm/mapping/status", "Read the exact mapping replay receipt, including per-field live readback and skipped or stale values. Partial or failed runs are not full success.", CrmMappingStatusSchema, null, CrmMappingStatusQuerySchema),
     records: operation("GET", "/v1/workspace/crm/records", "Read contact and company links for the existing sync cohort. Supply the known run_ref or omit for the latest CRM sync. This never starts a sync.", CrmRecordsSchema, null, CrmRecordsQuerySchema),
     get: operation("GET", stageRoute("crm"), "Without attempt_ref read HubSpot connection state. With it verify only that exact authorization attempt, including reconnection.", z.union([HubspotConnectionStatusSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),
     post: operation("POST", stageRoute("crm"), "Start a new HubSpot connection/reconnection and return the real consent link immediately.", AuthorizationRequiredSchema, Empty),
-    patch: operation("PATCH", stageRoute("crm"), "Apply the bounded company mapping plan from mapping_context. No tokens, arbitrary mappings or connected flag updates.", CompanyMappingReceiptSchema, CompanyPlanSchema),
+    patch: operation("PATCH", stageRoute("crm"), "Apply a bounded company mapping plan using the current mapping schema. No tokens, arbitrary mappings or connected flag updates.", CompanyMappingReceiptSchema, CompanyPlanSchema),
     mapping_context: operation("GET", "/v1/workspace/crm/mapping-context", "Read the current authenticated workspace's live portal schema/mapping and its current bounded input schema.", CompanyMappingContextSchema),
   },
   "sending-accounts": {
     senders: operation("GET", "/v1/workspace/sending-accounts/senders", "Read named senders and their connections. The first sender defaults to the account creator; later account setup requires a choice of existing or new sender.", SenderRoster),
-    get: operation("GET", stageRoute("sending-accounts"), "Read the selected channel's current account, or verify the exact attempt_ref. A healthy previous account is not a new attempt's success.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema),
+    get: { ...operation("GET", stageRoute("sending-accounts"), "Check the selected channel's current account or exact attempt_ref after approval. This can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. A healthy previous account is not a new attempt's success. Does not authorize outreach.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema), readOnly: false },
     post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. For email, select_account: true opens provider/account selection after an explicit disconnect; omit it to reconnect the saved account.", AuthorizationRequiredSchema, SendingAccountStartSchema),
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
     client_accounts: operation("GET","/v1/email/accounts","Read the explicitly named client workspace's available senders and email connections using member authorization. This does not require or infer a founder workspace.",EmailAccountsResult,null,EmailAccountsRequest),
     client_connect: operation("POST","/v1/email/accounts/connect","Create one Unipile authorization link for the selected workspace sender and exact email. Keep the returned attempt_ref and verify this attempt after browser consent; campaigns stay paused.",EmailAccountConnectResult,EmailAccountConnectRequest),
     client_connect_status: operation("POST","/v1/email/accounts/connect/status","Verify the retained client email attempt in the same explicit workspace. The bounded capability is a POST body, never a query parameter. Only connected with its connection_ref confirms this attempt.",EmailAccountStatusResult,EmailAccountStatusRequest),
-    warmup_status: operation("GET","/v1/email/warmup","Read warmup status for an explicit workspace. Client workspaces require connection_ref; founder requests retain workspace-only behavior. Read campaign pause separately from warmup eligibility.",WarmupStatus,null,WarmupWorkspaceRequest),
+    warmup_status: operation("GET","/v1/email/warmup","Read warmup status for an explicit workspace. Client workspaces require connection_ref; founder requests retain workspace-only behavior. Warmup eligibility does not imply campaigns are unpaused.",WarmupStatus,null,WarmupWorkspaceRequest),
     warmup_start: operation("POST","/v1/email/warmup/start","Start separate Mailivery setup for the verified connection. Client workspaces require connection_ref and branded Google OAuth; no password fallback. Campaigns stay paused for 21 active days and require explicit operator release.",WarmupStartResult,WarmupWorkspaceRequest),
     ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and client connection_ref. Warmup resume never releases outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),
   },
   campaigns: {
     get: operation("GET", stageRoute("campaigns"), "Read the saved workspace graph, composition policy, current/future audience and preparation state by default. Previews are saved recipient examples. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),
-    post: operation("POST", stageRoute("campaigns"), "Configure a shared_v1 campaign graph, compose modes and outreach overlays; omission of lead_ids covers current and future eligible leads. Read its ready preview, then activate the exact version/digest after informed confirmation. Configuration does not send. Legacy prepare and individual operations remain compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
+    post: operation("POST", stageRoute("campaigns"), "Configure a shared_v1 campaign graph, compose modes and outreach overlays; omission of lead_ids covers current and future eligible leads. Activation requires the exact prepared version/digest and informed confirmation. Configuration does not send. Legacy prepare and individual operations remain compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
     patch: operation("PATCH", stageRoute("campaigns"), "Modify only requested fields using the saved version_ref and digest. Nested channel fields merge; arrays replace; null removes a channel, audience override, start override or template_bank. Material changes pause automatic outreach and require fresh preparation and activation. Legacy prepare remains compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStagePatchSchema),
   },
   notifications: {

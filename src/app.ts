@@ -1,3 +1,4 @@
+import { OnboardingStateSchema, OnboardingSaveSchema, SubmissionOptionsSchema, getOnboardingState, saveOnboardingState, type OnboardingState, type OnboardingSave, type SubmissionOptions } from "./onboarding-state.js";
 import { RunProgressQuerySchema, RunProgressSchema, type RunProgressQuery, type RunProgress } from "./run-progress.js";
 import type { BusinessWebsite, BusinessWebsitePatch } from "./business-website.js";
 import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
@@ -5,6 +6,8 @@ import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
 import { CrmMappingError } from "./crm-mapping.js";
 import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
 import { registerStageRoutes } from "./stage-routes.js";
+import { handleMcpRequest, mcpResourceMetadata, type McpDependencies } from "./mcp.js";
+import { getStageMcpTools, callStageMcpTool } from "./mcp-stage-tools.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { renderConnectionReturnPage } from "./connection-return-page.js";
@@ -149,6 +152,9 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  openAiAppsChallenge?: string;
+  mcp?: McpDependencies;
+  renderOAuthConsentPage?(authorizationId: string): { html: string; scriptNonce: string; connectOrigin: string };
   warmupSetup?: WarmupSetup;
   unipileHostedAuthOrigin: string;
   unipileV2HostedAuthOrigins: string[];
@@ -189,10 +195,13 @@ export interface AppDependencies {
     session: AuthSession,
     input: CreateWorkspaceRequest,
   ): Promise<CreateWorkspaceResult>;
+  getOnboardingState(session: AuthSession): Promise<OnboardingState>;
+  saveOnboardingState(session: AuthSession, input: OnboardingSave): Promise<OnboardingState>;
   submitOnboarding(
     session: AuthSession,
     draft: Record<string, unknown>,
     configuration: LocalOnboardingConfiguration,
+    options?: SubmissionOptions,
   ): Promise<OnboardingSubmission>;
   getOnboardingContext(session: AuthSession): Promise<OnboardingContext>;
   getOnboardingStatus(session: AuthSession): Promise<OnboardingStatus>;
@@ -522,6 +531,18 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       422: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get", path: "/v1/onboarding/state", operationId: "getOnboardingState",
+    security: [{ bearerAuth: [] }], responses: { 200: JsonResponse(OnboardingStateSchema),
+      401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "patch", path: "/v1/onboarding/state", operationId: "saveOnboardingState",
+    security: [{ bearerAuth: [] }], request: { body: { required: true, content: { "application/json": { schema: OnboardingSaveSchema } } } },
+    responses: { 200: JsonResponse(OnboardingStateSchema), 400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 413: JsonResponse(ErrorResponseSchema),
+      422: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
   });
   app.openAPIRegistry.registerPath({
     method: "post",
@@ -1017,6 +1038,8 @@ const defaultDependencies: AppDependencies = {
   createWorkspace: async () => {
     throw new Error("createWorkspace is not configured");
   },
+  getOnboardingState,
+  saveOnboardingState,
   submitOnboarding: async () => {
     throw new Error("submitOnboarding is not configured");
   },
@@ -1156,6 +1179,36 @@ export function createApp(
   });
 
   if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup));
+  if (dependencies.openAiAppsChallenge) {
+    app.get("/.well-known/openai-apps-challenge", context => context.text(dependencies.openAiAppsChallenge!, 200, { "cache-control": "no-store" }));
+  }
+  if (dependencies.mcp) {
+    const mcp = dependencies.mcp;
+    for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"]) {
+      app.get(path, context => context.json(mcpResourceMetadata(mcp), 200, { "cache-control": "no-store" }));
+    }
+    app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp, {
+      tools: getStageMcpTools(),
+      call: (name, args, request) => callStageMcpTool(name, args, request, (route, init) => Promise.resolve(app.request(route, init))),
+    }));
+    app.get("/oauth/consent", context => {
+      const authorizationId = context.req.query("authorization_id") ?? "";
+      if (!/^[A-Za-z0-9_-]{16,128}$/.test(authorizationId)) {
+        return hubspotHtmlResponse(context, 400, "Invalid authorization link", "Connect Lifty again to get a fresh link.");
+      }
+      const page = dependencies.renderOAuthConsentPage?.(authorizationId);
+      if (!page || !/^[A-Za-z0-9_-]{16,128}$/.test(page.scriptNonce)
+        || !/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(page.connectOrigin)) {
+        return hubspotHtmlResponse(context, 503, "Sign-in unavailable", "Try connecting Lifty again in a moment.");
+      }
+      return context.html(page.html, 200, {
+        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+        "content-security-policy": ["default-src 'none'", `script-src 'nonce-${page.scriptNonce}'`,
+          "style-src 'unsafe-inline'", `connect-src ${page.connectOrigin}`, "base-uri 'none'",
+          "form-action 'none'", "frame-ancestors 'none'"].join("; "),
+      });
+    });
+  }
   app.get("/healthz", (context) => context.json({ status: "ok" }));
   app.get("/readyz/crm", async (context) => {
     let ready = false;
@@ -1626,7 +1679,7 @@ export function createApp(
     if (context.req.method !== "POST" || ![
       "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/accounts/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
       "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
-      "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync",
+      "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync",
     ].includes(context.req.path)) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {
@@ -1812,6 +1865,26 @@ export function createApp(
     return context.json(CreateWorkspaceResultSchema.parse(result));
   });
 
+  app.get("/v1/onboarding/state", async context => {
+    context.header("cache-control", "no-store");
+    return context.json(OnboardingStateSchema.parse(await dependencies.getOnboardingState(context.get("authSession"))));
+  });
+  app.patch("/v1/onboarding/state", async context => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, MAX_REQUEST_BYTES);
+    if (!raw.ok) return errorJson(context, 413, "PAYLOAD_TOO_LARGE", "The saved onboarding state exceeds 132 KiB.");
+    let value: unknown;
+    try { value = JSON.parse(raw.text); } catch { value = null; }
+    const input = OnboardingSaveSchema.safeParse(value);
+    if (!input.success) return errorJson(context, 400, "INVALID_REQUEST", "Supply expected_revision, draft, and configuration (or null) using the current state schema.");
+    if (input.data.configuration !== null) {
+      const issues = lintOnboardingDraft(input.data.draft);
+      const lint = lintLocalOnboardingConfiguration(input.data.configuration, input.data.draft, undefined, { requireDiscoveryIntent: true });
+      if (issues.length || !lint.success) return errorJson(context, 422, "ONBOARDING_DRAFT_INVALID", "Save a partial interview with configuration null, or repair the confirmed draft and its bound configuration.", issues.length ? issues : !lint.success ? lint.issues : []);
+    }
+    return context.json(OnboardingStateSchema.parse(await dependencies.saveOnboardingState(context.get("authSession"), input.data)));
+  });
+
   app.post("/v1/onboarding", async (context) => {
     const declaredLength = Number(context.req.header("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
@@ -1844,6 +1917,7 @@ export function createApp(
     const envelope = z.object({
       draft: z.record(z.string(), z.unknown()),
       configuration: z.unknown().optional(),
+      ...SubmissionOptionsSchema.shape,
     }).strict().safeParse(parsedJson);
     if (!envelope.success) {
       return errorJson(context, 400, "INVALID_REQUEST",
@@ -1876,6 +1950,7 @@ export function createApp(
       context.get("authSession"),
       envelope.data.draft,
       lint.configuration,
+      SubmissionOptionsSchema.parse({ ...(envelope.data.idempotency_key === undefined ? {} : { idempotency_key: envelope.data.idempotency_key }), ...(envelope.data.expected_revision === undefined ? {} : { expected_revision: envelope.data.expected_revision }) }),
     );
 
     // An already-imported draft needs no run; anything else gets exactly one.
