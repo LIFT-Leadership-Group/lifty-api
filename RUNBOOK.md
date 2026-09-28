@@ -30,7 +30,9 @@ tokens.
 `GET /cli/auth` is hosted by this same DigitalOcean service. Its browser code
 uses only the Supabase URL and publishable key, keeps session tokens in memory,
 and can POST them only to the exact `127.0.0.1` port supplied by `lifty login`.
-The production CLI embeds the DigitalOcean ingress for both app and API URLs.
+The production CLI embeds the canonical origin `https://api.liftygtm.com` for
+both app and API URLs. The DigitalOcean default ingress keeps serving the same
+app as a non-canonical fallback host.
 
 The database remains responsible for actor identity (`auth.uid()`), RLS,
 validation, idempotency, advisory locking, and atomic provisioning. The service
@@ -45,7 +47,7 @@ The request-scoped Supabase client aborts each database request after 10 seconds
 | `SUPABASE_URL` | Project URL; HTTPS except for loopback development |
 | `SUPABASE_PUBLISHABLE_KEY` | Publishable Data API key used by the scoped client |
 | `SUPABASE_JWKS_URL` | HTTPS JWKS endpoint; alternatively set inline `SUPABASE_JWKS` |
-| `PUBLIC_BASE_URL` | Exact HTTPS DigitalOcean ingress used for OAuth redirects |
+| `PUBLIC_BASE_URL` | Canonical HTTPS origin for OAuth redirects and the MCP resource: `https://api.liftygtm.com` (LIF-1103) |
 | `HUBSPOT_CLIENT_ID` | Client ID for the reviewed HubSpot LIFTY app |
 | `HUBSPOT_CLIENT_SECRET` | Encrypted app-level secret for the HubSpot LIFTY app |
 | `SLACK_CLIENT_ID` | Client ID for the Slack OAuth app |

@@ -388,7 +388,7 @@ The hosted `/cli/auth` login includes **Forgot your password?**, opening a separ
 Configure this single exact Supabase Auth redirect URL for the deployed `PUBLIC_BASE_URL`:
 
 ```text
-https://lifty-api-staging-ox2h9.ondigitalocean.app/auth/password-update
+https://api.liftygtm.com/auth/password-update
 ```
 
 Preserve the existing Site URL, other redirect entries and SMTP configuration. The recovery email template must use Supabase's normal recovery confirmation URL so Auth verifies its one-time recovery token and redirects to the supplied `redirect_to`. A template that hardcodes SiteURL, strips the fragment or converts to PKCE requires a separate configuration correction; this implementation does not accept an arbitrary return URL.
