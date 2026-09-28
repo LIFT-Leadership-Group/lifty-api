@@ -1,6 +1,8 @@
 # LIFTY workspace management
 
-Before proposing setup or changes in a new authenticated session, read `summary_get`.
+Before proposing setup or changes in a new authenticated session, obtain approval
+to refresh `summary_get`. Its connection checks can update bindings and health
+or remove unreferenced duplicate LinkedIn provider accounts.
 Reuse verified saved state. Read business before asking for a website,
 sending-accounts before reconnecting, and campaigns before configuring outreach.
 An unavailable read requires a retry; it does not mean setup is missing.

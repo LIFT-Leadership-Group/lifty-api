@@ -54,6 +54,23 @@ describe("generated MCP stage operations", () => {
     expect(auth.mock.calls.at(-1)![0].headers.get("x-lifty-client-contract")).toBe(STAGE_CLIENT_CONTRACT);
   });
 
+  it("requires write permission for account checks that reconcile or remove provider duplicates", () => {
+    const tools = getStageMcpTools();
+    for (const name of ["summary_get", "sending_accounts_get", "sending_accounts_client_connect_status"]) {
+      expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({
+        readOnlyHint: false, destructiveHint: true, openWorldHint: false,
+      });
+    }
+    for (const name of ["summary_get", "sending_accounts_get"]) {
+      expect(tools.find(tool => tool.name === name)!.description).toContain("remove unreferenced duplicate LinkedIn provider accounts");
+    }
+    for (const name of ["next_step", "crm_get", "notifications_get"]) {
+      expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({
+        readOnlyHint: true, destructiveHint: false, openWorldHint: false,
+      });
+    }
+  });
+
   it("cannot dispatch a campaign write through a read tool or replace the route, query, or identity", async () => {
     const dispatch = vi.fn(async () => Response.json({ state: "read" }));
     expect((await callStageMcpTool("campaigns_post_read", { body: { scope: "workspace", request: { operation: "activate", payload: {} } } }, incoming(), dispatch)).isError).toBe(true);

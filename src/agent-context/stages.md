@@ -24,9 +24,11 @@ Sign in through the current client before private reads. Start onboarding with
 reads saved interview, import and research state and returns the current guide.
 It never starts work, confirms founder acceptance or activates sending.
 
-For an existing workspace task, begin with `summary.get`, then read the guide
+For an existing workspace task, obtain approval to refresh `summary.get`, whose
+connection checks can update bindings and health or remove unreferenced
+duplicate LinkedIn provider accounts. Then read the guide
 for the requested stage. A failed read is unknown, not missing setup. The
 founder's requested task may proceed independently of pending calibration when
 its own prerequisites are satisfied.
 
-The [session summary](/v1/context/summary) describes the existing-workspace read.
+The [session summary](/v1/context/summary) describes the workspace check.

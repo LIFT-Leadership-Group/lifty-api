@@ -1,6 +1,6 @@
 # Sending accounts
 
-For a founder workspace, read `summary_get` before
+For a founder workspace, refresh `summary_get` with approval before
 proposing setup or changes in a new authenticated session. For a named client
 workspace such as `lift`, start with `client_accounts` below using that exact
 workspace. Do not infer a founder workspace from summary or create a founder
@@ -26,6 +26,9 @@ The remaining main GET/POST instructions describe the founder flow.
 GET requires `channel: linkedin` or `channel: email` in the query. It reads
 the current account, health and provider policy. Add `attempt_ref` when
 verifying authorization; ordinary current-account state is insufficient.
+This check can complete previously authorized bindings, update health, and
+remove unreferenced duplicate LinkedIn provider accounts. Obtain approval
+before calling it; it does not authorize outreach.
 
 ## Sender identity
 

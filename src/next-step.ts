@@ -5,8 +5,10 @@ import { OnboardingStateSchema } from "./onboarding-state.js";
 import { NextStepSchema, type NextStep } from "./next-step-contracts.js";
 import { PublicError } from "./errors.js";
 
-// Observation only: no writes, automatic retry, acquisition, connection or send.
-export async function getNextStep(dependencies: AppDependencies, session: AuthSession): Promise<NextStep> {
+// Only the persisted-state readers belong here. Provider connection "status"
+// operations can bind accounts, record health and remove provider duplicates.
+type NextStepReads = Pick<AppDependencies, "getWorkspace" | "getOnboardingState" | "getOnboardingStatus" | "getRunStatus">;
+export async function getNextStep(dependencies: NextStepReads, session: AuthSession): Promise<NextStep> {
   const workspace = WorkspaceStatusSchema.parse(await dependencies.getWorkspace(session));
   const workspaceRef = workspace.workspace?.workspace_ref ?? null;
   const response = (state: NextStep["state"], step: NextStep["step"], reason: string, task: string,

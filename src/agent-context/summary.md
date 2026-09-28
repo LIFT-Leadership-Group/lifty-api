@@ -1,8 +1,11 @@
 # Resume the saved workspace
 
-At the start of every authenticated session, execute `operations.get` before
-asking setup questions or proposing changes. Refresh after reconnecting, an
-edit, a failed read, or a workspace change. This is a read, not authorization.
+Before proposing workspace changes, offer to refresh `operations.get` with the
+founder's approval. Its connection checks can complete previously authorized
+bindings, update health, and remove unreferenced duplicate LinkedIn provider
+accounts. Refresh after reconnecting, an edit, a failed check, or a workspace
+change. This operation never authorizes outreach. Use `next_step` for read-only
+onboarding guidance.
 
 Summarize only what matters to the user's request: saved business, confirmed
 website, connected accounts, and the saved campaign's channels, engine, composition

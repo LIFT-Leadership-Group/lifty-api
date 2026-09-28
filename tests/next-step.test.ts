@@ -4,10 +4,13 @@ import type { OnboardingState } from "../src/onboarding-state.js";
 import type { OnboardingStatus, RunStatus, WorkspaceStatus } from "../src/contracts.js";
 import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
 import { confirmedDraft, localConfiguration } from "./onboarding-fixtures.js";
+import { getNextStep } from "../src/next-step.js";
+import { getOnboardingState } from "../src/onboarding-state.js";
+import { getWorkspaceStatus, getOnboardingStatus, getRunStatus } from "../src/workspace-operations.js";
 
 const workspace = { workspace_ref: "22222222-2222-4222-8222-222222222222", name: "Example" };
 const saved = { state: "saved" as const, revision: 1, workspace_ref: workspace.workspace_ref,
-  draft: confirmedDraft, draft_ready: false, configuration: null, receipt: null, updated_at: "2026-09-28T00:00:00Z" };
+  draft: confirmedDraft, draft_ready: false, configuration: null, idempotency_key: null, receipt: null, updated_at: "2026-09-28T00:00:00Z" };
 const imported = { state: "imported" as const, submission_ref: "receipt", draft_digest: "sha256:abc",
   submitted_at: "2026-09-28T00:00:00Z", workspace, summary: { icp: null, prompt: null } };
 const run = { state: "succeeded" as const, run_ref: "run", requested_leads: 5, leads_discovered: 5,
@@ -24,7 +27,9 @@ describe("server-observed onboarding guidance", () => {
     const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
       getWorkspace: async () => current, getOnboardingState: async () => draft,
       getOnboardingStatus: async () => onboarding, getRunStatus: async () => research,
-      createWorkspace: mutate, submitOnboarding: mutate, startRun: mutate, saveOnboardingState: mutate });
+      createWorkspace: mutate, submitOnboarding: mutate, startRun: mutate, saveOnboardingState: mutate,
+      emailAvailable: true, getEmailConnection: mutate, getLinkedinConnection: mutate,
+      getEmailAccountAttempt: mutate });
     const next = async () => {
       const response = await app.request("/v1/workspace/next-step", { headers });
       expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("no-store");
@@ -50,6 +55,23 @@ describe("server-observed onboarding guidance", () => {
     research = run;
     expect(await next()).toMatchObject({ state: "review", reason: "sample_ready_for_founder_review" });
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("uses the production persisted-state readers without provider calls, reconciliation or job enqueue", async () => {
+    const data: Record<string, unknown> = {
+      get_lifty_workspace_status: { state: "ready_for_connections", workspace, next_action: null },
+      get_lifty_onboarding_state: { state: "none", revision: 0 },
+      get_lifty_onboarding_status: imported,
+      get_lifty_run_status: run,
+    };
+    const rpc = vi.fn(async (name: string) => {
+      if (!Object.hasOwn(data, name)) throw new Error(`Unexpected non-read RPC: ${name}`);
+      return { data: data[name], error: null };
+    });
+    const result = await getNextStep({ getWorkspace: getWorkspaceStatus, getOnboardingState,
+      getOnboardingStatus, getRunStatus }, { userId: "founder", client: { rpc } });
+    expect(result).toMatchObject({ state: "review", reason: "sample_ready_for_founder_review" });
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(Object.keys(data));
   });
 
   it("preserves legacy imported state with no cache and treats import/run failures as blockers", async () => {

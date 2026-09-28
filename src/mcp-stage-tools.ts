@@ -71,6 +71,8 @@ function entries(): Entry[] {
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },
           annotations: { title: label, readOnlyHint: read, destructiveHint: !read && !(stage === "business" && action === "post"),
+            // Connection reconciliation can delete provider duplicates, but is
+            // still confined to the user's private accounts (not open-world).
             openWorldHint: !read && (stage === "sample-review" && action === "post" || stage === "campaigns" && action === "post"
               || stage === "sending-accounts" && ["warmup_start", "warmup_resume"].includes(action)) } } };
     });

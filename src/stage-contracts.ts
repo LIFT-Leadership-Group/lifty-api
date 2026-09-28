@@ -226,9 +226,9 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   summary: {
     next_step: operation("GET", "/v1/workspace/next-step", "Start or resume onboarding here. Reads saved interview, configuration, import and research progress, then returns the next step and full shared stage guide. Follow its guide and recommended tools, then call again after progress. No files or MCP instructions field required. Never starts work or treats a succeeded sample as founder acceptance or permission to send.", NextStepSchema),
     context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for the requested stage before acting. Use next_step to choose an onboarding stage; request another guide when the founder asks for a specific task.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
-    get: operation("GET", stageRoute("summary"), "Read this authenticated workspace at the start of every session. Compact existing business, website, connection and saved campaign state. Unavailable means retry, not missing setup.", WorkspaceSummarySchema),
-    post: unsupported("summary", "POST", "Summary is read-only."),
-    patch: unsupported("summary", "PATCH", "Summary is read-only."),
+    get: { ...operation("GET", stageRoute("summary"), "Refresh this authenticated workspace's business, website, connection and saved campaign state after approval. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema), readOnly: false },
+    post: unsupported("summary", "POST", "Use the summary GET operation; its connection checks can change saved provider state."),
+    patch: unsupported("summary", "PATCH", "Use the summary GET operation; its connection checks can change saved provider state."),
   },
   business: {
     ...onboardingStateOperations,
@@ -264,7 +264,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   },
   "sending-accounts": {
     senders: operation("GET", "/v1/workspace/sending-accounts/senders", "Read named senders and their connections. The first sender defaults to the account creator; later account setup requires a choice of existing or new sender.", SenderRoster),
-    get: operation("GET", stageRoute("sending-accounts"), "Read the selected channel's current account, or verify the exact attempt_ref. A healthy previous account is not a new attempt's success.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema),
+    get: { ...operation("GET", stageRoute("sending-accounts"), "Check the selected channel's current account or exact attempt_ref after approval. This can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. A healthy previous account is not a new attempt's success. Does not authorize outreach.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema), readOnly: false },
     post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. For email, select_account: true opens provider/account selection after an explicit disconnect; omit it to reconnect the saved account.", AuthorizationRequiredSchema, SendingAccountStartSchema),
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
     client_accounts: operation("GET","/v1/email/accounts","Read the explicitly named client workspace's available senders and email connections using member authorization. This does not require or infer a founder workspace.",EmailAccountsResult,null,EmailAccountsRequest),
