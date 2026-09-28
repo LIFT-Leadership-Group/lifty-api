@@ -12,6 +12,7 @@ import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { renderConnectionReturnPage } from "./connection-return-page.js";
 import { renderLiftyPage } from "./lifty-brand.js";
+import { readFileSync } from "node:fs";
 import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
 import type { WarmupSetup } from "./warmup-setup.js";
 import { versionedHostedAuthUrl, parseHostedAuthOrigin, UNIPILE_HOSTED_AUTH_ORIGIN } from "./hosted-auth-branding.js";
@@ -1137,6 +1138,7 @@ export function createApp(
   const app = new OpenAPIHono<AppEnvironment>();
   registerOpenApi(app);
   const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
+  const favicon = readFileSync(new URL("./favicon.ico", import.meta.url));
 
   app.use("*", async (context, next) => {
     const suppliedRequestId = RequestIdSchema.safeParse(
@@ -1152,6 +1154,11 @@ export function createApp(
   });
 
   if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup));
+  app.get("/favicon.ico", (context) => context.body(new Uint8Array(favicon).buffer, 200, {
+    "content-type": "image/x-icon",
+    "cache-control": "public, max-age=3600",
+    "x-content-type-options": "nosniff",
+  }));
   if (dependencies.openAiAppsChallenge) {
     app.get("/.well-known/openai-apps-challenge", context => context.text(dependencies.openAiAppsChallenge!, 200, { "cache-control": "no-store" }));
   }
@@ -1177,7 +1184,7 @@ export function createApp(
       return context.html(page.html, 200, {
         "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
         "content-security-policy": ["default-src 'none'", `script-src 'nonce-${page.scriptNonce}'`,
-          "style-src 'unsafe-inline'", `connect-src ${page.connectOrigin}`, "base-uri 'none'",
+          "style-src 'unsafe-inline'", "img-src 'self'", `connect-src ${page.connectOrigin}`, "base-uri 'none'",
           "form-action 'none'", "frame-ancestors 'none'"].join("; "),
       });
     });
@@ -1261,6 +1268,7 @@ export function createApp(
         "default-src 'none'",
         `script-src 'nonce-${page.scriptNonce}'`,
         "style-src 'unsafe-inline'",
+        "img-src 'self'",
         `connect-src ${connectSources}`,
         "base-uri 'none'",
         "form-action 'none'",

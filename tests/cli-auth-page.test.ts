@@ -18,6 +18,7 @@ describe("DigitalOcean CLI auth page", () => {
     expect(html).toContain("https://project.supabase.test");
     expect(html).toContain("sb_publishable_public");
     expect(html).toContain("http://127.0.0.1:49152/callback");
+    expect(html).toContain('<link rel="icon" href="/favicon.ico"');
     expect(html).toContain(state);
     expect(html).not.toMatch(/client[_-]?secret|service[_-]?role/i);
     expect(html).not.toContain("localhost");
