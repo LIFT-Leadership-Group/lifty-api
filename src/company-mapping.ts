@@ -44,8 +44,10 @@ export class CompanyMappingError extends PublicError {
     super({
       code,
       status,
-      message:
-        "Company configuration could not be verified. Fetch fresh company-mapping context and follow its repair instructions.",
+      message: code === "WORKSPACE_UNSUPPORTED"
+      ? "CRM mapping is available once HubSpot is connected as this workspace's CRM. Connect HubSpot first."
+      : code === "HUBSPOT_NOT_CONNECTED" ? "HubSpot is not connected to this workspace. Connect HubSpot first."
+      : "Company configuration could not be verified. Fetch fresh company-mapping context and follow its repair instructions.",
     });
     this.issues = issues;
   }

@@ -33,7 +33,7 @@ describe("locally generated onboarding", () => {
     const app = createApp({ authenticate, submitOnboarding: submit, enqueueOnboardingImport: enqueue });
     const response = await push(app, { draft, configuration });
     expect(response.status).toBe(422);
-    expect(await response.json()).toMatchObject({ error: { code: "LOCAL_CONFIGURATION_REQUIRED", message: expect.stringContaining("Upgrade LIFTY") } });
+    expect(await response.json()).toMatchObject({ error: { code: "LOCAL_CONFIGURATION_REQUIRED", message: expect.stringContaining("include the generated configuration") } });
     expect(submit).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
   });

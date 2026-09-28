@@ -374,6 +374,15 @@ describe("notification configuration operations", () => {
     ]);
   });
 
+  it("reports a missing Slack grant as a setup step, not a transient failure", async () => {
+    const failing = (status: number, body: unknown) => ({ functions: { invoke: async () => ({ data: null,
+      error: Object.assign(new Error("Edge Function returned a non-2xx status code"), { context: new Response(JSON.stringify(body), { status }) }) }) } });
+    const read = (status: number, body: unknown) => listSlackNotificationChannels({ userId: "founder-123", client: failing(status, body) });
+    await expect(read(409, { error: "slack_not_connected" })).rejects.toMatchObject({ status: 409, code: "SLACK_NOT_CONNECTED" });
+    await expect(read(409, { error: "slack_reconnect_required" })).rejects.toMatchObject({ status: 409, code: "SLACK_RECONNECT_REQUIRED" });
+    await expect(read(500, { error: "channel_list_unavailable" })).rejects.toMatchObject({ status: 502, code: "SLACK_CHANNELS_UNAVAILABLE" });
+  });
+
   it("maps every write to the audited notification RPC contract", async () => {
     const calls: Array<{ name: string; args?: unknown }> = [];
     const client = {

@@ -98,11 +98,11 @@ export class HubspotCallbackError extends Error {
 
 const COMPLETION_FAILURES: ReadonlyArray<[string, string, number, string]> = [
   ["lifty_connect_intent_invalid", "link_invalid", 403,
-    "This connection link is not valid. Ask your terminal for a fresh link with `lifty connect hubspot`."],
+    "This connection link is not valid. Ask Lifty for a new HubSpot connection link."],
   ["lifty_connect_intent_replayed", "link_used", 409,
-    "This connection link was already used. Run `lifty connect hubspot` again for a fresh link."],
+    "This connection link was already used. Ask Lifty for a new HubSpot connection link."],
   ["lifty_connect_intent_expired", "link_expired", 410,
-    "This connection link expired. Run `lifty connect hubspot` again for a fresh link."],
+    "This connection link expired. Ask Lifty for a new HubSpot connection link."],
   ["lifty_portal_already_connected", "portal_taken", 409,
     "That HubSpot account is already connected to another LIFTY workspace."],
 ];
@@ -172,7 +172,7 @@ export function createHubspotConnectOperations(
       intentToken = openHubspotConnectIntent(input.state, settings.clientSecret);
     } catch {
       throw new HubspotCallbackError("link_invalid", 403,
-        "This connection link is not valid. Run `lifty connect hubspot` again.");
+        "This connection link is not valid. Ask Lifty for a new HubSpot connection link.");
     }
     let grant;
     try {
@@ -185,7 +185,7 @@ export function createHubspotConnectOperations(
       });
     } catch {
       throw new HubspotCallbackError("exchange_failed", 502,
-        "HubSpot did not accept the authorization. Run `lifty connect hubspot` again.");
+        "HubSpot did not accept the authorization. Ask Lifty for a new HubSpot connection link.");
     }
 
     if (!scopeSetMatchesExactly(grant.scopes)) {
@@ -199,11 +199,11 @@ export function createHubspotConnectOperations(
       account = await getAccountDetails({ accessToken: grant.accessToken, fetchImpl });
     } catch {
       throw new HubspotCallbackError("account_lookup_failed", 502,
-        "LIFTY could not verify the HubSpot account. Run `lifty connect hubspot` again.");
+        "LIFTY could not verify the HubSpot account. Ask Lifty for a new HubSpot connection link.");
     }
     if (grant.hubId !== null && grant.hubId !== account.portalId) {
       throw new HubspotCallbackError("portal_mismatch", 409,
-        "The HubSpot account could not be verified. Run `lifty connect hubspot` again.");
+        "The HubSpot account could not be verified. Ask Lifty for a new HubSpot connection link.");
     }
 
     let refreshedGrant;
@@ -217,17 +217,17 @@ export function createHubspotConnectOperations(
     } catch {
       throw new HubspotCallbackError("refresh_failed", 502,
         "LIFTY could not verify that the HubSpot connection is refreshable. "
-        + "Run `lifty connect hubspot` again.");
+        + "Ask Lifty for a new HubSpot connection link.");
     }
     if (!scopeSetMatchesExactly(refreshedGrant.scopes)) {
       throw new HubspotCallbackError("scope_mismatch", 403,
         "The refreshed authorization did not preserve every permission LIFTY needs. "
-        + "Run `lifty connect hubspot` again.");
+        + "Ask Lifty for a new HubSpot connection link.");
     }
     if (refreshedGrant.hubId !== null && refreshedGrant.hubId !== account.portalId) {
       throw new HubspotCallbackError("portal_mismatch", 409,
         "The refreshed HubSpot account could not be verified. "
-        + "Run `lifty connect hubspot` again.");
+        + "Ask Lifty for a new HubSpot connection link.");
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000);
@@ -277,7 +277,7 @@ export function createHubspotConnectOperations(
         }
       }
       throw new HubspotCallbackError("store_failed", 502,
-        "LIFTY could not record the connection. Run `lifty connect hubspot` again.");
+        "LIFTY could not record the connection. Ask Lifty for a new HubSpot connection link.");
     }
 
     return { portalId: account.portalId, hubDomain };

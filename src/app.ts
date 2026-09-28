@@ -1898,7 +1898,7 @@ export function createApp(
     }
     if (envelope.data.configuration == null) {
       return errorJson(context, 422, "LOCAL_CONFIGURATION_REQUIRED",
-        "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.");
+        "Read the current onboarding context and include the generated configuration with this submission. CLI users should update LIFTY and its onboarding skill first.");
     }
     const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft, undefined, {
       requireDiscoveryIntent: true,
