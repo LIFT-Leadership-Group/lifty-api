@@ -29,8 +29,12 @@ read other stages only when their full saved values are needed.
 ## Resume and repair
 
 Read server `onboarding_state` and the exact import status after reconnecting or
-a lost response. Preserve the original request and idempotency key. A retry with
-that same key recovers the same submission; changed content must never reuse it.
+a lost response. The saved state's `idempotency_key` belongs to its receipt;
+reuse it with the saved request when recovering a pending import, even from a
+different client. Do not generate a replacement key because the current context
+has advanced. A retry with that same key recovers the same submission; changed
+content must never reuse it. An imported receipt needs only status and targeting
+reads. A failed receipt is a blocker, not permission to enqueue the same request.
 A status error leaves the outcome unknown. Do not delete a receipt to force work.
 
 A definite rejection includes diagnostics. Correct technical errors without
