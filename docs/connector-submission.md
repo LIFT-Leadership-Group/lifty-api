@@ -11,8 +11,8 @@ Record actual receipts on the Linear issue.
   state, and LIF-1100 next-step guidance are deployed and verified together.
 - [x] The owner chose the existing environment on September 28, 2026:
   "usa el mismo workspace, no quiero separar mas ambientes". Rehearse in the
-  existing app and shared GTM project with an internal test workspace and seed
-  data. Do not create another environment. `lifty-api-staging` is the app's
+  existing app, shared GTM project and existing authorized workspace. Use approved
+  test data there; do not create another workspace or environment for rehearsal. `lifty-api-staging` is the app's
   name, not evidence of an isolated staging database. This also preserves the
   [LIF-617](https://linear.app/lift-leadership-group/issue/LIF-617) decision.
 - [ ] Any database change has passed the `lift-supabase-functions`
@@ -36,8 +36,8 @@ Record actual receipts on the Linear issue.
   current session without loosening the existing REST or RLS boundary.
 - [ ] A new conversation and a second client resume the saved onboarding
   state. Duplicate submit attempts produce one receipt and one workspace.
-- [ ] Founder runs in Claude and ChatGPT complete against approved internal
-  workspaces. Seed data contains no real tenant information. Stop before live
+- [ ] Founder runs in Claude and ChatGPT complete against that same authorized
+  workspace. Test data contains no other tenant's information. Stop before live
   outreach. Record exact API/database revisions, client and plan, date, result,
   and cleanup evidence on LIF-1101.
 - [ ] The public installation guide is released with the actual URL and OAuth
@@ -169,8 +169,10 @@ then With MCP. A remote MCP-only plugin does not need custom UI or a skill.
 - [ ] Complete any domain challenge. Serve exactly the portal-provided token
   as the sole response at `/.well-known/openai-apps-challenge` on the MCP
   hostname or an allowed parent origin. Do not invent a token or overwrite an
-  existing plugin's challenge. The endpoint needs a separate implementation
-  and deployment when the portal provides the value.
+  existing plugin's challenge. The API serves the configured
+  `LIFTY_OPENAI_APPS_CHALLENGE` value as plain text at this route. Configure the
+  real portal value and verify the deployed response; no token was invented or
+  installed during source preparation.
 - [ ] Use the exact callback shown by the portal. ChatGPT may use
   `https://chatgpt.com/connector/oauth/{callback_id}`; the stable callback
   applies only under the documented issuer-identification conditions or to
@@ -188,7 +190,7 @@ then With MCP. A remote MCP-only plugin does not need custom UI or a skill.
 
 | Evidence | Current state |
 | --- | --- |
-| Approved rehearsal environment | Existing app and shared GTM, with internal test workspace and seed data, per September 28 owner decision |
+| Approved rehearsal environment | Existing app, shared GTM and same authorized workspace, per September 28 owner decision |
 | Claude founder onboarding receipt | Pending |
 | ChatGPT founder onboarding receipt | Pending |
 | Deployed public guide with final URL | Pending |
