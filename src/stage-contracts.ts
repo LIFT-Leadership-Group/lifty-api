@@ -1,6 +1,7 @@
 import { OnboardingStateSchema, OnboardingSaveSchema } from "./onboarding-state.js";
 import { SenderChoice, SenderRoster } from "./sender-choice.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
+import { NextStepSchema } from "./next-step-contracts.js";
 import { BusinessWebsiteSchema, BusinessWebsitePatchSchema } from "./business-website.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
@@ -215,7 +216,7 @@ const configSupport = {
   onboarding_context: operation("GET", "/v1/onboarding/context", "Read private generation rules and artifact schema before first setup.", OnboardingGenerationContextSchema),
   onboarding_status: operation("GET", "/v1/onboarding", "Read initial configuration import status before confirming setup.", OnboardingStatusSchema),
   update_status: operation("GET", "/v1/config/updates/{submission_ref}", "Read this exact update receipt. A failed read does not mean the update failed.", ConfigUpdateStatusSchema, null, Empty, z.object({ submission_ref: z.string().min(1) }).strict()),
-  resolve_update: operation("POST", "/v1/config/updates/resolve", "Resolve an unchanged original generated edit including its configuration artifact after an uncertain write; direct metadata edits use GET readback and any returned receipt instead.", ConfigUpdateStatusSchema, ConfigUpdateRequestSchema),
+  resolve_update: { ...operation("POST", "/v1/config/updates/resolve", "Resolve an unchanged original generated edit including its configuration artifact after an uncertain write; direct metadata edits use GET readback and any returned receipt instead.", ConfigUpdateStatusSchema, ConfigUpdateRequestSchema), readOnly: true },
 };
 
 // These definitions are also the contracts for the thin authenticated adapters
@@ -223,6 +224,8 @@ const configSupport = {
 // their authorization, validation, jobs and protected-field rules remain owners.
 export const stageOperations: Record<string, Record<string, StageOperation>> = {
   summary: {
+    next_step: operation("GET", "/v1/workspace/next-step", "Start or resume onboarding here. Reads saved interview, configuration, import and research progress, then returns the next step and full shared stage guide. Follow its guide and recommended tools, then call again after progress. No files or MCP instructions field required. Never starts work or treats a succeeded sample as founder acceptance or permission to send.", NextStepSchema),
+    context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for the requested stage before acting. Use next_step to choose an onboarding stage; request another guide when the founder asks for a specific task.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
     get: operation("GET", stageRoute("summary"), "Read this authenticated workspace at the start of every session. Compact existing business, website, connection and saved campaign state. Unavailable means retry, not missing setup.", WorkspaceSummarySchema),
     post: unsupported("summary", "POST", "Summary is read-only."),
     patch: unsupported("summary", "PATCH", "Summary is read-only."),
@@ -266,7 +269,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
     client_accounts: operation("GET","/v1/email/accounts","Read the explicitly named client workspace's available senders and email connections using member authorization. This does not require or infer a founder workspace.",EmailAccountsResult,null,EmailAccountsRequest),
     client_connect: operation("POST","/v1/email/accounts/connect","Create one Unipile authorization link for the selected workspace sender and exact email. Keep the returned attempt_ref and verify this attempt after browser consent; campaigns stay paused.",EmailAccountConnectResult,EmailAccountConnectRequest),
-    client_connect_status: operation("POST","/v1/email/accounts/connect/status","Verify the retained client email attempt in the same explicit workspace. The bounded capability is a POST body, never a query parameter. Only connected with its connection_ref confirms this attempt.",EmailAccountStatusResult,EmailAccountStatusRequest),
+    client_connect_status: { ...operation("POST","/v1/email/accounts/connect/status","Verify the retained client email attempt in the same explicit workspace. The bounded capability is a POST body, never a query parameter. Only connected with its connection_ref confirms this attempt.",EmailAccountStatusResult,EmailAccountStatusRequest), readOnly: true },
     warmup_status: operation("GET","/v1/email/warmup","Read warmup status for an explicit workspace. Client workspaces require connection_ref; founder requests retain workspace-only behavior. Read campaign pause separately from warmup eligibility.",WarmupStatus,null,WarmupWorkspaceRequest),
     warmup_start: operation("POST","/v1/email/warmup/start","Start separate Mailivery setup for the verified connection. Client workspaces require connection_ref and branded Google OAuth; no password fallback. Campaigns stay paused for 21 active days and require explicit operator release.",WarmupStartResult,WarmupWorkspaceRequest),
     ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and client connection_ref. Warmup resume never releases outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),

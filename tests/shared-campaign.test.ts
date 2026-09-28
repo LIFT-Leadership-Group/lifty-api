@@ -1,7 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createApp, type AppDependencies } from "../src/app.js";
 import { getAgentContext } from "../src/agent-context.js";
@@ -74,27 +71,22 @@ describe("shared campaign contracts and saved policy", () => {
   it("executes the documented timing edit against a saved graph without adding a follow-up", () => {
     const guide = getAgentContext("campaign")!.instructions;
     const script = /```javascript\n([\s\S]*?)\n```/.exec(guide)![1]!;
-    const directory = mkdtempSync(join(tmpdir(), "lifty-campaign-guide-"));
-    const file = join(directory, "saved.json");
-    try {
-      writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
-      const missing = spawnSync(process.execPath, ["--input-type=module", "-", file], { input: script, encoding: "utf8" });
-      expect(missing.status).not.toBe(0);
-      expect(missing.stdout).toBe("");
-      const graph = structuredClone(configuration.graph);
-      graph.blocks.splice(3, 0, { key: "send_second_linkedin_message", kind: "provider_action", channel: "linkedin", provider: "unipile", action: "linkedin_message" });
-      graph.transitions[2]!.from = "send_second_linkedin_message";
-      graph.transitions.splice(2, 0, { key: "followup", branch_key: "outreach", from: "send_first_linkedin_message", to: "send_second_linkedin_message",
-        trigger: { type: "time", after: { business_days: 4 }, anchor: "action_completed" } });
-      writeFileSync(file, JSON.stringify({ ...saved, configuration: { ...shared, graph } }));
-      const edited = spawnSync(process.execPath, ["--input-type=module", "-", file], { input: script, encoding: "utf8" });
-      expect(edited.status).toBe(0);
-      const request = CampaignStagePatchSchema.parse(JSON.parse(edited.stdout));
-      expect(request).toMatchObject({ scope: "workspace", request: { operation: "modify", payload: { workspace, version_ref: version, digest } } });
-      const expected = structuredClone(graph);
-      expected.transitions[2]!.trigger = { type: "time", after: { business_days: 2 }, anchor: "action_completed" };
-      expect(JSON.parse(edited.stdout).request.payload.changes).toEqual({ graph: expected });
-    } finally { rmSync(directory, { recursive: true, force: true }); }
+    const timingEdit = new Function("structuredClone", `${script}; return timingEdit;`)(structuredClone) as (input: unknown) => unknown;
+    expect(() => timingEdit(saved)).toThrow("This campaign does not have that timed follow-up.");
+    const graph = structuredClone(configuration.graph);
+    graph.blocks.splice(3, 0, { key: "send_second_linkedin_message", kind: "provider_action", channel: "linkedin", provider: "unipile", action: "linkedin_message" });
+    graph.transitions[2]!.from = "send_second_linkedin_message";
+    graph.transitions.splice(2, 0, { key: "followup", branch_key: "outreach", from: "send_first_linkedin_message", to: "send_second_linkedin_message",
+      trigger: { type: "time", after: { business_days: 4 }, anchor: "action_completed" } });
+    const original = { ...saved, configuration: { ...shared, graph } };
+    const edited = timingEdit(original);
+    const request = CampaignStagePatchSchema.parse(edited);
+    expect(request).toMatchObject({ scope: "workspace", request: { operation: "modify", payload: { workspace, version_ref: version, digest } } });
+    const expected = structuredClone(graph);
+    expected.transitions[2]!.trigger = { type: "time", after: { business_days: 2 }, anchor: "action_completed" };
+    expect(edited).toMatchObject({ request: { payload: { changes: { graph: expected } } } });
+    expect(original.configuration.graph.transitions[2]!.trigger).toEqual({ type: "time", after: { business_days: 4 }, anchor: "action_completed" });
+
   });
 
   it("publishes real graph fields and rejects dangling references, duplicate keys and unsupported transport fields", () => {

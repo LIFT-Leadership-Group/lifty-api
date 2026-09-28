@@ -16,10 +16,11 @@ decisions described by the current draft schema. Read `onboarding_context` and
 generate the configuration locally against its current schema. Stage POST
 uses the existing full onboarding submission (`draft` and `configuration`),
 once for the initial setup; it is not a partial-stage write. Research criteria
-and commercial voice share that initial transaction. Use `lifty submit targeting`
-as described in `references.configuration`: it checks bound artifacts, preserves
-the exact request/receipt, follows `onboarding_status` and GETs saved targeting.
-Resume that receipt with `--resume`; do not repeat the POST per stage.
+and commercial voice share that initial transaction. Follow
+`references.configuration`: save through `onboarding_save`, submit the exact saved
+pair with its revision and stable key, follow `onboarding_status`, then GET
+saved targeting. A lost response reuses the original key and content. Never
+repeat the initial submission per stage.
 
 ## Later edits
 

@@ -1,6 +1,6 @@
 # Sending accounts
 
-For a founder workspace, read `summary.get` using `context summary` before
+For a founder workspace, read `summary_get` before
 proposing setup or changes in a new authenticated session. For a named client
 workspace such as `lift`, start with `client_accounts` below using that exact
 workspace. Do not infer a founder workspace from summary or create a founder
@@ -8,7 +8,9 @@ profile to manage client mailboxes. Reuse verified saved state. Unavailable
 reads require a retry, not assumptions that setup is missing.
 
 Purpose: connect the requested sending channel through hosted Unipile flows.
-Read `references.common` and `references.connections` in full.
+Use `summary_context` with `path: {"task":"sending-accounts"}` to read the
+current operations, `references.common` and `references.connections` in full.
+The shared guide applies in every client; follow each tool's path/query/body schema.
 
 ## Read current state
 
@@ -73,10 +75,6 @@ another account to bypass a conflict. An expired attempt needs a fresh link
 after reading current accounts. These operations use membership in the
 explicit workspace and require no founder onboarding.
 
-The dedicated CLI equivalents are `lifty email accounts --workspace <workspace>`,
-`lifty email connect --workspace <workspace> --sender-ref <sender> --email <address>`,
-and `lifty email connect --workspace <workspace> --attempt-ref <attempt> --status`.
-
 POST selects the channel. For LinkedIn, obtain only missing current-contract
 declarations (`timezone`, personal `account_use`, and no `other_automation`)
 before the hosted LinkedIn account connection. Preserve existing policy limits.
@@ -86,16 +84,15 @@ reconnects with its existing provider. Do not add an email-address or
 mailbox-use questionnaire, ask for a password, or create an artificial address.
 Hosted selection must satisfy the existing provider/policy checks afterward.
 
-Show the actual returned link immediately as “Connect LinkedIn” or “Connect
-your email account” in the founder's language. Keep `attempt_ref` and verify
+Show the actual returned link immediately as "Connect LinkedIn" or "Connect
+your email account" in the founder's language. Keep `attempt_ref` and verify
 with GET using both the same channel and reference after authorization.
 
 ## Email warmup after connection
 
 For client mailboxes, use `warmup_status` and `warmup_start` with both the
 explicit `workspace` and the verified `connection_ref`. GET inputs belong in
-query; POST inputs belong in body. The CLI uses
-`lifty email warmup status|start --workspace <workspace> --connection-ref <connection>`.
+query; POST inputs belong in body.
 Mailivery authorization is a separate Google OAuth step from Unipile. Show
 the returned branded setup link for that exact mailbox; the owner must choose
 the same Google account again. Client setup has no app-password fallback.
@@ -112,13 +109,12 @@ has not enabled campaigns. Never claim sending is enabled just because the
 warmup reaches 21 days.
 
 Use `warmup_pause`, `warmup_resume` or `warmup_remove` with the same two
-selectors when requested. CLI equivalents add `--connection-ref` to those
-warmup commands. Warmup resume never resumes campaigns. Report each mailbox
+selectors when requested. Warmup resume never resumes campaigns. Report each mailbox
 separately; readiness or consent for one cannot satisfy another mailbox.
 
 For the founder flow without `connection_ref`, continue as follows.
-After GET confirms the email account is connected, read
-`lifty email warmup status --workspace <workspace>`. Its `mailbox_use` decides
+After GET confirms the email account is connected, call `warmup_status` with
+the explicit `workspace` in query. Its `mailbox_use` decides
 what to tell the founder. Use the returned `recommended_go_live` message and
 date; do not compute your own.
 
@@ -132,7 +128,7 @@ date; do not compute your own.
   suggest what to prepare meanwhile: targeting, copy and schedule. Campaign
   previews can be prepared and approved now; activation waits for the unlock.
 
-`lifty email warmup start --workspace <workspace>` returns the actual setup
+`warmup_start` with the same `workspace` in body returns the actual setup
 link. When it points to Lifty, show it as "Set up warmup for your mailbox".
 The page shows the mailbox, asks for the name on warmup emails and has one
 "Continue with Google" button. Lifty sets the warmup settings. Google must
@@ -140,24 +136,24 @@ verify that exact address before Lifty sends tokens to Mailivery. Lifty
 forwards those tokens once without storing or logging them. The setup flow
 does not create another email address.
 
-Legacy servers may still return a Mailivery-hosted link. That Google form
-requires a Google App Password, not the regular Google password. Explain this
-before opening it, and do not describe a legacy link as OAuth-enabled.
-Mailivery needs separate mailbox access; Unipile's grant cannot be reused.
-After the founder finishes, check
-`status` again. The state moves from waiting for the Mailivery connection to
-warming after Lifty's next check. If status says Microsoft consent is pending,
-the founder finishes the consent step inside Mailivery; do not run `start` for
-a new link. `start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
+Warmup setup uses Google OAuth only. Never request an App Password or route the
+founder to a legacy password form or Microsoft consent flow. Mailivery needs
+separate mailbox access; Unipile's grant cannot be reused. If the returned link
+or status does not support the current Lifty Google setup, report the actual
+blocker and involve support. Do not create another account or invent a link.
+
+After the founder finishes, read `warmup_status` again. The state moves from
+waiting for the Mailivery connection to warming after Lifty's next check.
+`warmup_start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
 verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
 another Lifty workspace already warms the same mailbox. After a removal,
-status shows `Removed`; `start` can set up a new warmup with a new link only
+status shows `Removed`; `warmup_start` can set up a new warmup with a new link only
 when previous provider creation is resolved. An ambiguous handoff is never
 retried automatically: check status and involve support, rather than trying
 another account or bypassing the setup hold.
 
-Pause, resume and remove only when the founder asks:
-`lifty email warmup pause|resume|remove --workspace <workspace>`. Lifty applies
+Use `warmup_pause`, `warmup_resume` or `warmup_remove` only when the founder
+asks, with the same `workspace` in body. Lifty applies
 the request at its next check. A pending removal wins over pause or resume,
 and resume on a running warmup only cancels a pending pause. For an `outreach`
 account, pausing or removing warmup delays or blocks sending; say so and get
@@ -171,8 +167,11 @@ provider policy and sending enablement are not freely writable settings.
 Use the supported authorization flow to replace consent; do not patch around it.
 
 When the founder explicitly wants to choose another email account or provider,
-use the supported email disconnect command first if the saved account is still
-connected. After the requested disconnect succeeds, POST
+the saved account must first be disconnected if it is still connected.
+Disconnection is not exposed by the current stage operations. Explain that the
+action is unavailable through these tools and preserve the explicit request for
+the supported administrative flow. Do not invent an operation or bypass it.
+After that authorized disconnect is verified, POST
 `{"channel":"email","select_account":true,"sender":{"kind":"existing","sender_ref":"<selected sender>"}}`
 (or the confirmed new-sender choice). This opens a new hosted provider
 selector with Google, Microsoft and IMAP/SMTP and leaves sending disabled.

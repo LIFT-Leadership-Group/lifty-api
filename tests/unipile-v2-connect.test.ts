@@ -163,7 +163,7 @@ it.each(["email","linkedin"] as const)("V2 %s browser return is branded without 
   expect(html).toContain('aria-label="Lifty"');
   expect(html).toContain("<style>");
   expect(html).toContain(channel==="linkedin" ? "Back from LinkedIn" : "Back from your email provider");
-  expect(html).toContain("Ask your agent to verify whether");
+  expect(html).toContain("Ask Lifty to verify whether");
   expect(html).toContain("This page does not confirm that your account is connected.");
   expect(html).not.toMatch(/<script\b|<form\b|<a\s/i);
 });

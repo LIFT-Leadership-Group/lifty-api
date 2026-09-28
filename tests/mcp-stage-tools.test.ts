@@ -12,14 +12,15 @@ describe("generated MCP stage operations", () => {
     const tools = getStageMcpTools();
     expect(new Set(tools.map(tool => tool.name)).size).toBe(tools.length);
     for (const [stage, operations] of Object.entries(stageOperations)) for (const [action, operation] of Object.entries(operations)) {
-      const name = `${stage.replace(/-/g, "_")}_${action}`;
+      const name = stage === "summary" && action === "next_step" ? "next_step" : `${stage.replace(/-/g, "_")}_${action}`;
       const supported = Object.keys(operation.responses).some(status => status.startsWith("2"));
       const matches = tools.filter(tool => tool.name === name || tool.name === `${name}_read` || tool.name === `${name}_write`);
       expect(matches.length, name).toBe(supported ? stage === "campaigns" && action === "post" ? 2 : 1 : 0);
       for (const tool of matches) {
         expect(tool.title.length).toBeGreaterThan(0);
         expect(typeof tool.annotations.readOnlyHint).toBe("boolean");
-        expect(tool.annotations.destructiveHint).toBe(!tool.annotations.readOnlyHint);
+        expect(typeof tool.annotations.destructiveHint).toBe("boolean");
+        if (tool.annotations.readOnlyHint) expect(tool.annotations.destructiveHint).toBe(false);
         expect(tool.inputSchema.properties.path).toEqual(operation.request.path);
         expect(tool.inputSchema.properties.query).toEqual(operation.request.query);
         if (!(stage === "campaigns" && action === "post") && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(operation.request.body);
@@ -28,6 +29,10 @@ describe("generated MCP stage operations", () => {
     expect(tools.find(tool => tool.name === "crm_mapping_sources")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.destructiveHint).toBe(true);
+    expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.openWorldHint).toBe(true);
+    expect(tools.find(tool => tool.name === "summary_get")!.annotations.openWorldHint).toBe(false);
+    expect(tools.find(tool => tool.name === "next_step")!.annotations.openWorldHint).toBe(false);
+    expect(tools.find(tool => tool.name === "sending_accounts_get")!.inputSchema.required).toContain("query");
   });
 
   it("keeps authentication, current contract, validation and the shared mutation limiter in the owning REST route", async () => {

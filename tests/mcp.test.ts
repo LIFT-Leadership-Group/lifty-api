@@ -32,7 +32,9 @@ describe("MCP HTTP boundary", () => {
 
   it("works with the official client without a proprietary header and isolates concurrent founders", async () => {
     const authenticate = vi.fn(authentication);
-    const app = createApp({ mcp: { ...settings, authenticate } });
+    const app = createApp({ mcp: { ...settings, authenticate }, authenticate,
+      getWorkspace: async () => ({ state: "needs_workspace", workspace: null, next_action: "provision_workspace" }),
+      getOnboardingState: async () => ({ state: "none", revision: 0 }) });
     await Promise.all(["founder-1", "founder-2"].map(async userId => {
       const transport = new StreamableHTTPClientTransport(new URL(settings.resourceUrl), {
         requestInit: { headers: { authorization: `Bearer ${userId}` } },
@@ -44,17 +46,30 @@ describe("MCP HTTP boundary", () => {
         // but optional string on Transport; runtime is the SDK's own transport.
         await client.connect(transport as Parameters<Client["connect"]>[0]);
         const list = await client.listTools();
-        expect(list.tools).toHaveLength(1);
+        expect(list.tools.length).toBeGreaterThan(40);
+        expect(list.tools.every(tool => tool.title && typeof tool.annotations?.readOnlyHint === "boolean")).toBe(true);
         expect(list.tools[0]).toMatchObject({ name: "whoami", annotations: { readOnlyHint: true, destructiveHint: false },
           _meta: { securitySchemes: [{ type: "oauth2", scopes: ["openid", "email", "profile"] }] } });
         const result = await client.callTool({ name: "whoami", arguments: {} });
         expect(result.structuredContent).toEqual({ user_id: userId });
+        const next = await client.callTool({ name: "next_step", arguments: {} });
+        expect(next.structuredContent).toMatchObject({ status: 200, data: { step: "business", reason: "workspace_missing", guide: { task: "business" } } });
         expect(JSON.stringify(result)).not.toContain("Bearer");
         expect(transport.sessionId).toBeUndefined();
       } finally { await client.close(); }
     }));
     // Each transport call, including initialization and notifications, authenticates anew.
     expect(authenticate.mock.calls.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("returns a relinking challenge if the REST session is revoked after MCP authentication", async () => {
+    const app = createApp({ mcp: { ...settings, authenticate: authentication }, log: () => {} });
+    const response = await app.request(post("tools/call", { name: "business_get", arguments: {} }));
+    const payload = await response.json();
+    expect(payload.result).toMatchObject({ isError: true, structuredContent: { status: 401 } });
+    expect(payload.result._meta["mcp/www_authenticate"][0]).toContain("resource_metadata");
+    expect(payload.result._meta["mcp/www_authenticate"][0]).toContain('error="invalid_token"');
+    expect(payload.result._meta["mcp/www_authenticate"][0]).toContain('error_description="');
   });
 
   it("rejects unsupported contracts, origins, methods, invalid tools and oversized bodies before execution", async () => {

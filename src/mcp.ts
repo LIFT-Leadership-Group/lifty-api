@@ -33,13 +33,14 @@ export function mcpResourceMetadata(settings: McpSettings) {
 
 const whoami: Tool = {
   name: "whoami",
+  title: "Signed-in Lifty founder",
   description: "Return the signed-in Lifty founder's user ID. Use this to confirm the connector's identity before working with a workspace.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   outputSchema: { type: "object", properties: { user_id: { type: "string" } }, required: ["user_id"], additionalProperties: false },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 };
 
-function createMcpServer(session: AuthSession, request: Request, registry?: McpToolRegistry) {
+function createMcpServer(session: AuthSession, request: Request, settings: McpSettings, registry?: McpToolRegistry) {
   const server = new Server({ name: "lifty", version: "0.1.0" }, { capabilities: { tools: {} } });
   const securitySchemes = [{ type: "oauth2", scopes: ["openid", "email", "profile"] }];
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [whoami, ...(registry?.tools ?? [])].map(tool => ({
@@ -54,11 +55,20 @@ function createMcpServer(session: AuthSession, request: Request, registry?: McpT
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     }
     if (registry?.tools.some(tool => tool.name === params.name)) {
-      return registry.call(params.name, params.arguments ?? {}, request);
+      const result = await registry.call(params.name, params.arguments ?? {}, request);
+      if (result.isError && result.structuredContent?.status === 401) {
+        return { ...result, _meta: { ...result._meta, "mcp/www_authenticate": [challenge(settings) + ', error="invalid_token", error_description="The Lifty session is no longer active. Reconnect Lifty."'] } };
+      }
+      return result;
     }
     throw new McpError(ErrorCode.InvalidParams, "Unknown tool.");
   });
   return server;
+}
+
+function challenge(settings: McpSettings) {
+  const metadata = new URL("/.well-known/oauth-protected-resource/mcp", settings.resourceUrl);
+  return `Bearer resource_metadata="${metadata}", scope="openid email profile"`;
 }
 
 export async function handleMcpRequest(request: Request, dependencies: McpDependencies, registry?: McpToolRegistry): Promise<Response> {
@@ -69,8 +79,7 @@ export async function handleMcpRequest(request: Request, dependencies: McpDepend
   if (origin && !dependencies.allowedOrigins.includes(origin)) return reply(403, "ORIGIN_NOT_ALLOWED", "Origin not allowed.");
   const authentication = await dependencies.authenticate(request);
   if (!authentication.ok) {
-    const metadata = new URL("/.well-known/oauth-protected-resource/mcp", dependencies.resourceUrl);
-    headers.set("www-authenticate", `Bearer resource_metadata="${metadata}", scope="openid email profile"`);
+    headers.set("www-authenticate", challenge(dependencies));
     return reply(401, "UNAUTHORIZED", "A valid Lifty OAuth session is required.");
   }
   const contract = request.headers.get("x-lifty-client-contract");
@@ -81,7 +90,7 @@ export async function handleMcpRequest(request: Request, dependencies: McpDepend
   }
   // A new server and transport per request prevent session or identity leakage.
   const transport = new WebStandardStreamableHTTPServerTransport({ enableJsonResponse: true, maxRequestBodySize: 160 * 1024 });
-  const server = createMcpServer(authentication.session, request, registry);
+  const server = createMcpServer(authentication.session, request, dependencies, registry);
   try {
     await server.connect(transport);
     const response = await transport.handleRequest(request);

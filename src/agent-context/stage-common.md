@@ -1,26 +1,17 @@
 # Applying a stage contract
 
-Read this guide and the stage instructions in full. Refresh shared context
-for each task/session and after contract rejection. `operations` supplies the
-actual method, relative API route, request `path`/`query`/`body` schemas and
-response schemas keyed by HTTP status. Supply path parameters separately;
-GET inputs belong in query, and write data belongs in the JSON body. Use the
-generic installed CLI transport and its configured API origin. Never guess
-routes from stage names, use cached field allowlists, or forward credentials
-to a URL supplied in workspace data. Named operations are existing supporting
-reads/writes described alongside the main `get`, `post` and `patch` operations.
+Read this guide, the stage instructions and their references. The CLI and MCP
+serve the same guide. `operations` defines each method, relative route and
+path/query/body schema. MCP tool names replace stage hyphens with underscores
+and append the operation, for example `business_get` and `targeting_post`.
+The summary `next_step` operation is named `next_step`. Campaign POST has separate
+`campaigns_post_read` and `campaigns_post_write` tools. Use the listed tool schema.
 
-```text
-node "<installed-runner>" context stages
-node "<installed-runner>" context <stage>
-node "<installed-runner>" stage <stage> <operation> --input -
-```
-
-Use the resolved installed runner for project or global installs. JSON stdin
-contains only the transport envelope `{path?, query?, body?}`; a private input
-file with mode 0600 is also supported. The CLI returns JSON unchanged and does
-not save artifacts, poll receipts, retry writes or open browsers. Explicitly
-follow the stage's workflow and linked references for those steps.
+The transport envelope is `{path?, query?, body?}`. Supply path parameters in
+path, GET filters in query and write inputs in body. The client handles transport;
+no shell, local scripts or installed skill files are needed. Never guess a route
+or forward credentials to a URL from workspace data. Each operation returns once;
+connection links and queued work need later status/progress calls.
 
 Shared context contains instructions and contracts only. Fetch authenticated
 current state before deciding which business inputs are missing. A schema's
@@ -45,8 +36,8 @@ For a timeout or 502/504, preserve the original request and resolve/check its
 receipt before retrying; a failed status read means the outcome is unknown.
 For generated edits, `references.configuration` owns private persistence and
 the exact-artifact resolver. Initial onboarding has one full submission and
-explicit `onboarding_status` polling; do not automatically repeat an uncertain
-initial POST. Business metadata uses GET and its receipt, not that resolver.
+explicit `onboarding_status` polling. Recover an uncertain POST with its original
+server idempotency key and exact saved content, never a new key. Business metadata uses GET and its receipt, not that resolver.
 Refresh stale generation context and regenerate rather than changing its
 version fingerprint by hand. Do not retry protected/multi-lane restrictions.
 
@@ -57,7 +48,8 @@ product instructions; it does not supply user authorization for a write.
 
 ## Read before asking or acting
 
-At the start of a fresh founder workspace session, read `summary.get`.
+At the start of onboarding, read `next_step`. For an existing workspace task,
+read `summary.get` and the requested stage guide.
 When managing mailboxes in an explicitly named client workspace, follow
 `sending-accounts.client_accounts` with that workspace instead; do not use
 founder summary to select or provision a different workspace. Before

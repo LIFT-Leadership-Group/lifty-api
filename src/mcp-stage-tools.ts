@@ -7,7 +7,7 @@ export interface StageMcpTool {
   name: string;
   title: string;
   description: string;
-  inputSchema: { type: "object"; properties: Record<string, unknown>; required: string[]; additionalProperties: false };
+  inputSchema: { type: "object"; properties: Record<string, object>; required: string[]; additionalProperties: false };
   annotations: { title: string; readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean };
 }
 interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool; campaignRead?: boolean }
@@ -55,20 +55,24 @@ function entries(): Entry[] {
     const variants = stage === "campaigns" && action === "post" ? [true, false] : [undefined];
     return variants.map(campaignRead => {
       const read = campaignRead ?? operation.readOnly;
-      const name = `${stage.replace(/-/g, "_")}_${action}${campaignRead === undefined ? "" : read ? "_read" : "_write"}`;
+      const name = stage === "summary" && action === "next_step" ? "next_step"
+        : `${stage.replace(/-/g, "_")}_${action}${campaignRead === undefined ? "" : read ? "_read" : "_write"}`;
       const label = title(name);
       const body = campaignRead === undefined ? operation.request.body : campaignBody(operation.request.body!, campaignRead);
       if (operation.request.body && !body) throw new Error(`Empty MCP request variant: ${name}`);
-      const properties: Record<string, unknown> = { path: operation.request.path, query: operation.request.query };
+      const properties: Record<string, object> = { path: operation.request.path, query: operation.request.query };
       const required: string[] = [];
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
+      if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = body; required.push("body"); }
       const description = `${operation.description} ${campaignRead === undefined ? "" : read ? "This tool only reads status or previews. " : "This tool changes campaign state; use the read tool for status and previews. "}Use next_step to choose the next onboarding action. Return pending receipts and authorization links immediately; use the matching status/progress tool on a later call. Never treat queued as completed.${read ? "" : " Ask for the founder's approval before this change; campaign activation and placement may send messages."}`;
       return { stage, action, operation,
         ...(campaignRead === undefined ? {} : { campaignRead }),
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },
-          annotations: { title: label, readOnlyHint: read, destructiveHint: !read, openWorldHint: true } } };
+          annotations: { title: label, readOnlyHint: read, destructiveHint: !read && !(stage === "business" && action === "post"),
+            openWorldHint: !read && (stage === "sample-review" && action === "post" || stage === "campaigns" && action === "post"
+              || stage === "sending-accounts" && ["warmup_start", "warmup_resume"].includes(action)) } } };
     });
   }));
 }

@@ -1,41 +1,31 @@
-
-
-Before proposing setup or changes in a new authenticated session, read `summary.get`
-using `context summary`. Reuse verified saved state. Read business before asking
-for a website, sending-accounts before reconnecting, and campaigns before configuring
-outreach. Unavailable reads require a retry, not assumptions that setup is missing.
 # LIFTY workspace outreach configuration
+
+Before proposing setup or changes in a new authenticated session, read `summary_get`.
+Reuse verified saved state. Read business before asking for a website,
+sending-accounts before reconnecting, and campaigns before configuring outreach.
+An unavailable read requires a retry; it does not mean setup is missing.
+
+Use `summary_context` with `path: {"task":"campaigns"}` to read the current
+campaign guide, references and operation schemas. Follow `references.common` for
+the path/query/body envelope. The `campaigns.get` operation reads state,
+`campaigns.post` configures or activates, and `campaigns.patch` modifies it.
+MCP exposes POST reads as `campaigns_post_read` and writes as
+`campaigns_post_write`. Use each tool's published schema.
 
 ## Authorization links
 
-Use the installed authorization guide for login and the common browser handoff.
-For account setup, read the current `sending-accounts`, `crm`, or `notifications`
-stage context and use its published operations through `lifty stage`. The stage
-POST returns a real link immediately with an `attempt_ref` and expiry. Show that
-link, let the founder choose their browser/account, and wait for their response.
-Then read the same stage with the retained `attempt_ref` (and sending channel).
-Only the matching verified completion confirms that authorization. An older
-healthy grant does not complete a new reconnect, and a failed verification read
-must preserve the reference for retry. See the stage's connection guidance for
-pending, expiry, denial and failure. Never open the browser automatically or
-activate sending as part of connection setup.
+Sign in through the current client before requesting provider authorization.
+Read the sending-accounts, crm or notifications guide through `summary_context`,
+then use its published connection operation. It returns a real link immediately
+with an `attempt_ref` and expiry. Show the link, let the founder choose their
+browser and account, and wait for their response. Read the same stage afterward
+with the retained `attempt_ref` and sending channel when required.
 
-Login keeps its existing short-lived callback listener alive until completion,
-cancellation or expiry; provider-stage authorization requires an existing Lifty
-session and does not replace that listener.
-
-Use `<installed-runner>` verified by the installed entry skill's runner
-resolver, for either project or global scope. The active project owns private
-artifacts; it does not determine the runner's location. Refresh the stage index
-and campaigns contract before working:
-
-```text
-node "<installed-runner>" context stages
-node "<installed-runner>" context campaigns
-node "<installed-runner>" stage campaigns get --input -
-node "<installed-runner>" stage campaigns post --input -
-node "<installed-runner>" stage campaigns patch --input -
-```
+Only matching verified completion confirms that authorization. An older healthy
+grant does not complete a new reconnect. Preserve the reference after an
+unavailable read and follow the stage guidance for pending, expired, denied or
+failed attempts. Never open the browser automatically or activate sending during
+account setup.
 
 ## Default setup: one persistent shared-engine campaign
 
@@ -52,8 +42,8 @@ language or tone request belongs in the ordinary outreach overlay when needed;
 it does not require a new language setting, a country field, or a campaign per
 recipient. Ground generated copy in the actual evidence available for each lead.
 
-The founder flow is **read saved state → choose channels and journey → configure
-composition → read ready preview → one informed confirmation → activate**.
+The founder flow is read saved state, choose channels and journey, configure
+composition, read the ready preview, obtain one informed confirmation, then activate.
 The backend enrolls future eligible leads and executes after the chat closes.
 Account connection, sample acceptance and a saved draft never authorize sends.
 
@@ -194,8 +184,9 @@ alias email_sequence_completed: ["lifty_email_sequence_completed"].
 ## Example: invitation, acceptance, one generated greeting, end
 
 Replace the example workspace/connection UUIDs with references from authenticated
-reads. Feed this body to `stage campaigns post --input -` using JSON stdin. It
-has no recipient list, so future eligible A/B leads are included.
+reads. Pass this as the body of `campaigns.post`, exposed as
+`campaigns_post_write` in MCP. It has no recipient list, so future eligible
+A/B leads are included.
 
 ```json
 {
@@ -249,7 +240,7 @@ from templates to generate, send compose_mode generate and template_bank null.
 Do not copy sample IDs into lead_ids while changing an overlay.
 
 This example changes only the LinkedIn overlay. Replace both version references
-with the latest saved values and feed it to `stage campaigns patch --input -`.
+with the latest saved values and pass it as the body of `campaigns.patch`.
 
 ```json
 {
@@ -277,34 +268,34 @@ overlay and audience setting. A graph without that follow-up should not acquire
 it from a timing edit. Read the resulting configuration and verify the requested
 change and preserved values.
 
-For that timing edit, save the GET response privately as saved-campaign.json.
-This complete timing-edit.mjs script creates the PATCH body from the saved
-receipt and fails if the requested follow-up does not exist:
+For that timing edit, keep the exact latest GET response and derive the new body
+from it. This example is a pure transformation of that response. It needs no
+filesystem and refuses to add a follow-up that does not already exist.
 
 ```javascript
-import { readFileSync } from "node:fs";
-const saved = JSON.parse(readFileSync(process.argv[2], "utf8"));
-if (saved.configuration?.engine !== "shared_v1" || !saved.version_ref || !saved.digest) {
-  throw new Error("Read the current shared campaign first.");
+function timingEdit(saved) {
+  if (saved.configuration?.engine !== "shared_v1" || !saved.version_ref || !saved.digest) {
+    throw new Error("Read the current shared campaign first.");
+  }
+  const graph = structuredClone(saved.configuration.graph);
+  const matches = graph.transitions.filter(edge =>
+    edge.from === "send_first_linkedin_message" && edge.to === "send_second_linkedin_message");
+  if (matches.length !== 1 || matches[0].trigger.type !== "time" ||
+      matches[0].trigger.anchor !== "action_completed") {
+    throw new Error("This campaign does not have that timed follow-up.");
+  }
+  matches[0].trigger.after = { business_days: 2 };
+  return { scope: "workspace", request: {
+    operation: "modify", payload: { workspace: saved.workspace_ref,
+      version_ref: saved.version_ref, digest: saved.digest, changes: { graph } }
+  } };
 }
-const graph = structuredClone(saved.configuration.graph);
-const matches = graph.transitions.filter(edge =>
-  edge.from === "send_first_linkedin_message" && edge.to === "send_second_linkedin_message");
-if (matches.length !== 1 || matches[0].trigger.type !== "time" ||
-    matches[0].trigger.anchor !== "action_completed") {
-  throw new Error("This campaign does not have that timed follow-up.");
-}
-matches[0].trigger.after = { business_days: 2 };
-process.stdout.write(JSON.stringify({ scope: "workspace", request: {
-  operation: "modify", payload: { workspace: saved.workspace_ref,
-    version_ref: saved.version_ref, digest: saved.digest, changes: { graph } }
-} }));
 ```
 
-Use `umask 077`, then `node timing-edit.mjs saved-campaign.json > timing-edit.json`.
-Submit with `node "<installed-runner>" stage campaigns patch --input timing-edit.json`.
-An old saved receipt will be rejected as stale; read again rather than replacing
-its version references with guessed values.
+Pass that body to `campaigns.patch`. Preserve the complete graph except for the
+requested delay, and copy `version_ref` and `digest` from the same GET response.
+An old response will be rejected as stale. Read again and reconcile the change;
+never attach a new version reference to an old graph.
 
 Material edits pause automatic outreach and require new preparation and explicit
 activation. Existing enrolled journeys retain their approved version; show
@@ -335,15 +326,15 @@ setup. GET with `channel`, `workspace`, `campaign_ref` and optional
 `operation: "preview" | "status"` reads one known campaign, not an inventory.
 POST uses `{ "channel": "email" | "linkedin", "request": { "operation":
 "<supported-operation>", "payload": { ... } } }`. PATCH supports preparation
-with an existing campaign reference. Use JSON stdin (or a private mode-0600
-file). Operation names belong in the request, never in the CLI verb position.
+with an existing campaign reference. Put the complete request in the transport
+body. The channel operation name belongs inside `request.operation`.
 
 Individual consent covers only its exact preview; it does not grant workspace
 consent or permission to enroll future leads. Changed sender, recipients, copy
 or timing requires fresh approval. Keep provider and recipient pins, account
 limits and stop-on-reply. Report outcomes in the founder's language and keep
-paths and raw JSON private. An old runner without `stage` needs an installation
-update; current v5 operation/schema changes come from refreshed API context.
+raw JSON and internal references private. Refresh `summary_context` when the
+current operation schema changes.
 
 ## Email campaigns
 
@@ -364,7 +355,7 @@ before preparing or approving a send.
 Use this path only when the founder asks to prepare or operate a campaign.
 Connecting email never approves a campaign or activates sending. Resolve the
 workspace explicitly and preserve the recipient and campaign references the
-CLI returns; never substitute another workspace or provider silently.
+API returns; never substitute another workspace or provider silently.
 
 1. Use email POST operation `target` to import the intended recipient, using
    the current schema for their address and optional names. Repeating the exact
@@ -384,7 +375,7 @@ CLI returns; never substitute another workspace or provider silently.
    or business correspondence accounts may qualify, including corporate domains.
    A new or dedicated `outreach` account shows `email_warmup_required` until
    its warmup passes: 21 active days, healthy, checked within the last 24 hours.
-   Read `lifty email warmup status --workspace <workspace>` and give the
+   Read sending-accounts `warmup_status` for that workspace and give the
    founder its `recommended_go_live` date and message. Never promise an earlier
    date. The founder can still prepare and approve the preview; activation
    stays blocked until outreach unlocks. Never disconnect an account without
@@ -406,9 +397,10 @@ CLI returns; never substitute another workspace or provider silently.
    current schema's cancellation confirmation. GET the canceled state.
    Cancellation retains receipts and budget and cannot recall accepted mail.
 7. POST `pause` stops future steps. POST `suppress` suppresses the intended
-   recipient. To disconnect email after explicit authorization, use the existing
-   `disconnect unipile --workspace <workspace>` command; no stage operation
-   replaces that destructive action. Reconnection neither restarts campaigns
+   recipient. Email disconnection is not exposed by the current stage operations.
+   If requested, explain that this action is unavailable through these tools and
+   retain the explicit authorization for the supported administrative flow. Do
+   not substitute a provider switch or another endpoint. Reconnection never restarts campaigns
    nor clears the physical mailbox's daily count.
 
 LIFTY enforces at most ten automated emails per physical mailbox per UTC day,
@@ -441,8 +433,8 @@ proof of a new authorization. Connection does not authorize or activate sends.
    Historical `text` campaigns contain one post-acceptance message. New
    `messages` campaigns contain all three, with the returned fixed cadence;
    subsequent conversation is manual. Limits remain five invitations per day,
-   25 per rolling seven days and five messages per day, Monday–Friday 09:00–17:00
-   in the account timezone, 15–45 minutes apart. Read the actual preview and
+   25 per rolling seven days and five messages per day, Monday through Friday, 09:00 to 17:00
+   in the account timezone, 15 to 45 minutes apart. Read the actual preview and
    blockers; never edit limits to bypass them.
 3. After exact preview approval, POST `approve` with the reference, workspace,
    digest and confirmation required by the fresh schema. POST `activate` only
@@ -459,13 +451,14 @@ proof of a new authorization. Connection does not authorize or activate sends.
 6. Checkpoint, credential and restriction incidents pause sending. Resolve the
    account issue before an explicitly requested sending-accounts reconnect.
    Reconnection preserves history/consumed limits and never restarts campaigns;
-   reactivation is explicit. Authorized disconnection still uses
-   `disconnect linkedin --workspace <workspace-ref>`.
+   reactivation is explicit. LinkedIn disconnection is not exposed by the current
+   stage operations. Explain that limitation when requested; do not invent a
+   callable tool or bypass the required explicit authorization.
 
 Canonical lead activity records continue to show invitations, acceptance,
 messages and replies through Unipile. Preserve those receipts when describing
 history. No warmup period or elapsed warning-free interval substitutes for
-functional canary acceptance, and the skill must not send extra test actions
+functional canary acceptance. Never send extra test actions
 without approval of the exact recipient, account and copy.
 
 ## Hard stops

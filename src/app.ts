@@ -7,6 +7,7 @@ import { CrmMappingError } from "./crm-mapping.js";
 import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
 import { registerStageRoutes } from "./stage-routes.js";
 import { handleMcpRequest, mcpResourceMetadata, type McpDependencies } from "./mcp.js";
+import { getStageMcpTools, callStageMcpTool } from "./mcp-stage-tools.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { renderConnectionReturnPage } from "./connection-return-page.js";
@@ -1182,7 +1183,10 @@ export function createApp(
     for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"]) {
       app.get(path, context => context.json(mcpResourceMetadata(mcp), 200, { "cache-control": "no-store" }));
     }
-    app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp));
+    app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp, {
+      tools: getStageMcpTools(),
+      call: (name, args, request) => callStageMcpTool(name, args, request, (route, init) => Promise.resolve(app.request(route, init))),
+    }));
     app.get("/oauth/consent", context => {
       const authorizationId = context.req.query("authorization_id") ?? "";
       if (!/^[A-Za-z0-9_-]{16,128}$/.test(authorizationId)) {

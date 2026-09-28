@@ -53,7 +53,6 @@ PATCH is only supported configuration. It never marks an account connected,
 replaces browser consent or enables sending. Providers and policy may remain
 unavailable even when context can be read; report the API's actual result.
 
-Lifty login itself remains the pre-session CLI primitive. Its short-lived
-localhost listener must stay alive after the real link is exposed until
-completion, cancellation or expiry. Provider-stage POST is for an already
-authenticated workspace session; it does not replace that listener lifecycle.
+Lifty sign-in belongs to the current client. Claude and ChatGPT use their
+connector's OAuth flow; the CLI handles its own login. Provider-stage operations
+require an authenticated workspace and do not replace Lifty sign-in.
