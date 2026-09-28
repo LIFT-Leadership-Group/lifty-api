@@ -121,13 +121,13 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
-  if (message.includes("lifty_config_local_required")) return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED", message: "Upgrade LIFTY, fetch /v1/config/context and generate this update locally. Hosted configuration generation is no longer supported.", cause: error });
+  if (message.includes("lifty_config_local_required")) return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED", message: "Generate this update from the current generation context and include its configuration. Hosted configuration generation is no longer supported; CLI users should update LIFTY first.", cause: error });
   if (message.includes("lifty_config_context_stale")) return new PublicError({ status: 409, code: "CONFIG_CONTEXT_STALE", message: "The configuration or Scout base changed. Fetch fresh config context and regenerate the update locally.", cause: error });
   if (message.includes("lifty_config_local_invalid")) return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_INVALID", message: "Repair the update using the configuration schema and generation rules from fresh config context.", cause: error });
   if (message.includes("lifty_config_local_mismatch")) return new PublicError({ status: 409, code: "LOCAL_CONFIGURATION_MISMATCH", message: "The local update differs from its stored receipt. Fetch fresh config context and regenerate.", cause: error });
   if (code === "PT400" && message.includes("lifty_configuration_required")) {
     return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED",
-      message: "Upgrade LIFTY and its onboarding skill, fetch fresh onboarding context, and generate the configuration locally before pushing.", cause: error });
+      message: "Read the current onboarding context and include the generated configuration with this submission. CLI users should update LIFTY and its onboarding skill first.", cause: error });
   }
   if (code === "PT400" && message.startsWith("lifty_configuration_invalid:")) {
     return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_INVALID",
@@ -145,7 +145,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "ONBOARDING_ALREADY_CONFIGURED",
-      message: "This workspace is already configured. Use `lifty update` to change it.",
+      message: "This workspace is already configured. Change it with the stage update operation instead of submitting onboarding again.",
       cause: error,
     });
   }
@@ -163,7 +163,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "RUN_NOT_CONFIGURED",
-      message: "This workspace has no generated configuration yet. Run `lifty push` first.",
+      message: "This workspace has no configuration yet. Submit the onboarding configuration first.",
       cause: error,
     });
   }
@@ -172,7 +172,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "RUN_ALREADY_COMPLETED",
-      message: "The first ICP batch already ran for this workspace. See it with `lifty status`.",
+      message: "The first research run already exists for this workspace. Read its status instead of starting another.",
       cause: error,
     });
   }
@@ -199,7 +199,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "HUBSPOT_NOT_CONNECTED",
-      message: "No usable HubSpot connection. Connect first with `lifty connect hubspot`.",
+      message: "HubSpot is not connected to this workspace. Connect HubSpot first.",
       cause: error,
     });
   }
@@ -217,7 +217,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "RUN_IN_PROGRESS",
-      message: "A lead run is still working. Check it with `lifty status`, then run `lifty sync` again.",
+      message: "A research run is still in progress. Wait for it to finish, then start the CRM sync again.",
       cause: error,
     });
   }
@@ -235,7 +235,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "SYNC_IN_PROGRESS",
-      message: "A CRM sync is still running. Wait for it to finish (`lifty status`), then disconnect.",
+      message: "A CRM sync is still running. Wait for it to finish, then disconnect.",
       cause: error,
     });
   }
@@ -280,7 +280,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "CONFIG_NOT_READY",
-      message: "This workspace has no generated configuration yet. Run `lifty push` first.",
+      message: "This workspace has no configuration yet. Submit the onboarding configuration first.",
       cause: error,
     });
   }
@@ -298,7 +298,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "WORKSPACE_MISSING",
-      message: "This account has no LIFTY workspace yet. Run `lifty login` first.",
+      message: "This account has no Lifty workspace yet. Create the workspace first.",
       cause: error,
     });
   }
@@ -307,7 +307,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "CONFIG_UPDATE_IN_FLIGHT",
-      message: "Another configuration change is still being applied. Check `lifty status` and send this update again once it has landed.",
+      message: "Another configuration change is still being applied. Check its status and send this update again once it has landed.",
       cause: error,
     });
   }
@@ -316,7 +316,7 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({
       status: 409,
       code: "CONFIG_NOT_READY",
-      message: "This workspace has no research prompt yet. Run `lifty push` first.",
+      message: "This workspace has no research prompt yet. Submit the onboarding configuration first.",
       cause: error,
     });
   }
@@ -762,6 +762,19 @@ export async function listSlackNotificationChannels(
     { method: "POST" },
   );
   if (error) {
+    // The function reports a missing or stale Slack grant as 409. That is a
+    // setup step for the founder, not a transient failure to retry.
+    const response = (error as { context?: unknown }).context;
+    let reason: unknown;
+    if (response instanceof Response && response.status === 409) {
+      try { reason = ((await response.clone().json()) as { error?: unknown } | null)?.error; } catch { reason = undefined; }
+    }
+    if (reason === "slack_not_connected") {
+      throw new PublicError({ status: 409, code: "SLACK_NOT_CONNECTED", message: "Slack is not connected to this workspace. Connect Slack first.", cause: error });
+    }
+    if (reason === "slack_reconnect_required") {
+      throw new PublicError({ status: 409, code: "SLACK_RECONNECT_REQUIRED", message: "Reconnect Slack before choosing a notification channel.", cause: error });
+    }
     throw new PublicError({
       status: 502,
       code: "SLACK_CHANNELS_UNAVAILABLE",
