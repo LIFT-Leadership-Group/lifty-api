@@ -11,7 +11,7 @@ const validEnvironment = {
   HUBSPOT_CLIENT_SECRET: "client-secret",
   SLACK_CLIENT_ID: "slack-client-123",
   SLACK_CLIENT_SECRET: "slack-client-secret",
-  PUBLIC_BASE_URL: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
+  PUBLIC_BASE_URL: "https://api.liftygtm.com",
   TRIGGER_SECRET_KEY: "tr_prod_test_key",
 };
 
@@ -83,14 +83,14 @@ describe("service configuration", () => {
     expect(config.hubspot).toEqual({
       clientId: "client-123",
       clientSecret: "client-secret",
-      publicBaseUrl: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
+      publicBaseUrl: "https://api.liftygtm.com",
       supabaseUrl: "https://project.supabase.co",
       publishableKey: "sb_publishable_example",
     });
     expect(config.slack).toEqual({
       clientId: "slack-client-123",
       clientSecret: "slack-client-secret",
-      publicBaseUrl: "https://lifty-api-staging-ox2h9.ondigitalocean.app",
+      publicBaseUrl: "https://api.liftygtm.com",
       supabaseUrl: "https://project.supabase.co",
       publishableKey: "sb_publishable_example",
     });

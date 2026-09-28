@@ -20,7 +20,7 @@ these values. The dashboard's public `/oauth/consent` route forwards only a
 validated `authorization_id` to the API's `/oauth/consent` page. It ignores
 caller-supplied redirect URLs and Host headers. Its server-side `LIFTY_API_URL`
 must match the API's canonical `PUBLIC_BASE_URL`; the current default is
-`https://lifty-api-staging-ox2h9.ondigitalocean.app`. Do not change the shared
+`https://api.liftygtm.com` (LIF-1103). Do not change the shared
 Site URL to the API or put an absolute URL in Authorization Path.
 
 The API's `/oauth/consent?authorization_id=...` uses the same login form and
@@ -43,8 +43,13 @@ Supabase's documented default OAuth token has `aud=authenticated`, which is
 insufficient for MCP resource binding. Functions migration
 `20260928193000_lif1097_oauth_mcp_audience.sql` supplies the custom access-token
 hook `public.lifty_oauth_access_token_hook(jsonb)`. It preserves ordinary login
-claims and stamps OAuth claims with the fixed audience array
-`["authenticated", "https://lifty-api-staging-ox2h9.ondigitalocean.app/mcp"]`.
+claims and stamps OAuth claims with a fixed audience array. Since the LIF-1103
+migration `20260928211500_lif1103_oauth_mcp_audience_api_host.sql` that array is
+`["authenticated", "https://api.liftygtm.com/mcp",
+"https://lifty-api-staging-ox2h9.ondigitalocean.app/mcp"]`: the canonical
+resource plus the legacy DigitalOcean host, which is the same deployment, so
+connectors registered on either URL keep working during the cutover. Drop the
+legacy audience once every connector has been re-added on the canonical URL.
 It never derives an audience from user metadata or a caller-supplied URL.
 Its Auth URI is `pg-functions://postgres/public/lifty_oauth_access_token_hook`.
 The migration installs the hook but does not enable it.
