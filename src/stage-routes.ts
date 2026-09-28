@@ -29,7 +29,7 @@ import {
   AuthorizationRequiredSchema, BusinessStagePatchSchema, BusinessStageSchema,
   CampaignStagePatchSchema, CampaignStageQuerySchema, CampaignStageRequestSchema,
   CapacityStageSchema, ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
-  NotificationStagePatchSchema, ResearchStagePatchSchema, SendingAccountQuerySchema,
+  NotificationStagePatchSchema, ResearchStagePatchSchema, SendingAccountDisconnectSchema, SendingAccountQuerySchema,
   SendingAccountStartSchema, TargetingStagePatchSchema, VoiceStagePatchSchema, stageOperations,
 } from "./stage-contracts.js";
 
@@ -165,6 +165,35 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     context.header("cache-control", "no-store");
     parse(Empty, context.req.query());
     return context.json(await readSenderRoster(context.get("authSession"), await workspace(context)));
+  });
+
+  // Disconnection stays in the existing handlers. These POST adapters exist
+  // because stage operations cannot express DELETE, and they pin the current
+  // workspace instead of accepting one from the caller.
+  for (const [stage, provider] of [["crm", "hubspot"], ["notifications", "slack"]] as const) {
+    app.post(`/v1/workspace/${stage}/disconnect`, async context => {
+      parse(Empty, context.req.query());
+      parse(Empty, await readBody(context));
+      await workspace(context);
+      return forward(context, "DELETE", `/v1/integrations/${provider}`);
+    });
+  }
+  // A customer-owned Apollo key is a secret and stays out of conversation
+  // tools; the CLI reads it from stdin. This route can only select the
+  // platform key, so no request body can carry a key through the connector.
+  app.post("/v1/workspaces/:workspace_ref/integrations/apollo/platform-default", async context => {
+    parse(Empty, context.req.query());
+    parse(Empty, await readBody(context));
+    const workspaceRef = parse(z.uuid(), context.req.param("workspace_ref"));
+    return forward(context, "POST", `/v1/workspaces/${workspaceRef}/integrations/apollo/key-source`, { operation: "platform_default" });
+  });
+  app.post("/v1/workspace/sending-accounts/disconnect", async context => {
+    parse(Empty, context.req.query());
+    const input = parse(SendingAccountDisconnectSchema, await readBody(context));
+    const current = await workspace(context);
+    return input.channel === "email"
+      ? forward(context, "POST", "/v1/email/disconnect", { workspace: current })
+      : forward(context, "POST", "/v1/linkedin/disconnect", { workspace: current, confirm: true });
   });
 
   for (const stage of Object.keys(stageOperations)) {

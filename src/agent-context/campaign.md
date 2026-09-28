@@ -327,7 +327,11 @@ setup. GET with `channel`, `workspace`, `campaign_ref` and optional
 POST uses `{ "channel": "email" | "linkedin", "request": { "operation":
 "<supported-operation>", "payload": { ... } } }`. PATCH supports preparation
 with an existing campaign reference. Put the complete request in the transport
-body. The channel operation name belongs inside `request.operation`.
+body. The channel operation name belongs inside `request.operation`. These
+stage operations accept only the current workspace. For an explicitly named
+client workspace you belong to, `client_email` and `client_linkedin` take the
+channel request itself (`{"operation": ..., "payload": {"workspace": ...}}`)
+with the same previews, digests and approvals.
 
 Individual consent covers only its exact preview; it does not grant workspace
 consent or permission to enroll future leads. Changed sender, recipients, copy
@@ -397,10 +401,9 @@ API returns; never substitute another workspace or provider silently.
    current schema's cancellation confirmation. GET the canceled state.
    Cancellation retains receipts and budget and cannot recall accepted mail.
 7. POST `pause` stops future steps. POST `suppress` suppresses the intended
-   recipient. Email disconnection is not exposed by the current stage operations.
-   If requested, explain that this action is unavailable through these tools and
-   retain the explicit authorization for the supported administrative flow. Do
-   not substitute a provider switch or another endpoint. Reconnection never restarts campaigns
+   recipient. Disconnect the mailbox only with the founder's explicit yes, using
+   the sending-accounts `disconnect` operation for the current workspace. Do not
+   substitute a provider switch or another endpoint. Reconnection never restarts campaigns
    nor clears the physical mailbox's daily count.
 
 LIFTY enforces at most ten automated emails per physical mailbox per UTC day,
@@ -451,9 +454,9 @@ proof of a new authorization. Connection does not authorize or activate sends.
 6. Checkpoint, credential and restriction incidents pause sending. Resolve the
    account issue before an explicitly requested sending-accounts reconnect.
    Reconnection preserves history/consumed limits and never restarts campaigns;
-   reactivation is explicit. LinkedIn disconnection is not exposed by the current
-   stage operations. Explain that limitation when requested; do not invent a
-   callable tool or bypass the required explicit authorization.
+   reactivation is explicit. Disconnect LinkedIn only with the founder's explicit
+   yes, using the sending-accounts `disconnect` operation with
+   `{"channel":"linkedin","confirm":true}`.
 
 Canonical lead activity records continue to show invitations, acceptance,
 messages and replies through Unipile. Preserve those receipts when describing

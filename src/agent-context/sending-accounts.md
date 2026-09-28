@@ -171,9 +171,13 @@ Use the supported authorization flow to replace consent; do not patch around it.
 
 When the founder explicitly wants to choose another email account or provider,
 the saved account must first be disconnected if it is still connected.
-Disconnection is not exposed by the current stage operations. Explain that the
-action is unavailable through these tools and preserve the explicit request for
-the supported administrative flow. Do not invent an operation or bypass it.
+Disconnect only after the founder explicitly confirms in this conversation:
+`disconnect` with `{"channel":"email","confirm":true}` (or `"linkedin"`)
+disconnects the current workspace's account and returns its new state. Future
+campaign steps on that channel stay blocked; history and consumed sending
+limits are kept. For an explicitly named client workspace use
+`client_email_disconnect` or `client_linkedin_disconnect`; check client LinkedIn
+with `client_linkedin_status` and reconnect it with `client_linkedin_connect`.
 After that authorized disconnect is verified, POST
 `{"channel":"email","select_account":true,"sender":{"kind":"existing","sender_ref":"<selected sender>"}}`
 (or the confirmed new-sender choice). This opens a new hosted provider

@@ -35,6 +35,15 @@ After an uncertain edit, GET the saved business values before retrying. If a
 submission receipt was returned, check that exact receipt with update_status.
 The generated-configuration resolve operation does not apply to metadata edits.
 
+## Retire a workspace
+
+`retire` permanently deletes a LIFTY-created workspace. Use it only when the
+founder explicitly asks to delete that workspace and confirms its exact ID,
+slug and name; never retire a workspace to fix an error or restart onboarding.
+Disconnect email and HubSpot first. A workspace with LinkedIn history cannot be
+retired. Mailbox send counters are preserved. After retirement, the founder
+starts again with a new workspace and a new identity.
+
 ## Saved website
 
 GET exposes `website` separately from the legacy configuration. An available

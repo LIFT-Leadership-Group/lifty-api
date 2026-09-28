@@ -17,7 +17,8 @@ group unrelated gates.
 Reuse answers already given. Do not turn each field or researched detail into a
 separate confirmation.
 
-If the founder says `skip`, `no sé`, `avancemos`, or an equivalent:
+If the founder says `skip`, `I don't know`, `let's move on`, or an equivalent
+in any language:
 
 - skip the question immediately when it belongs to sample calibration or
   outreach;

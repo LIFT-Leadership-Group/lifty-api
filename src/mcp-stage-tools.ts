@@ -13,6 +13,13 @@ export interface StageMcpTool {
 interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool; campaignRead?: boolean }
 export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Response>;
 const campaignReads = new Set(["status", "preview", "placement-status", "placement-preview"]);
+// Campaign operations that mix reads and sends become separate read and write
+// tools. The stage POST nests its operation under request; the individual
+// channel routes carry it at the top level.
+const splitCampaigns = new Set(["post", "client_email", "client_linkedin"]);
+// Writes whose effect leaves the user's Lifty workspace and private accounts.
+const openWorld = new Set(["sample-review.post", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
+  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "notifications.test", "capacity.apollo_recovery"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 const title = (value: string) => value.replace(/[-_]/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
 
@@ -52,7 +59,7 @@ function entries(): Entry[] {
   return Object.entries(stageOperations).flatMap(([stage, operations]) => Object.entries(operations).flatMap(([action, operation]) => {
     // Published unsupported REST verbs are not actions a founder can perform.
     if (!Object.keys(operation.responses).some(status => status.startsWith("2"))) return [];
-    const variants = stage === "campaigns" && action === "post" ? [true, false] : [undefined];
+    const variants = stage === "campaigns" && splitCampaigns.has(action) ? [true, false] : [undefined];
     return variants.map(campaignRead => {
       const read = campaignRead ?? operation.readOnly;
       const name = stage === "summary" && action === "next_step" ? "next_step"
@@ -73,8 +80,7 @@ function entries(): Entry[] {
           annotations: { title: label, readOnlyHint: read, destructiveHint: !read && !(stage === "business" && action === "post"),
             // Connection reconciliation can delete provider duplicates, but is
             // still confined to the user's private accounts (not open-world).
-            openWorldHint: !read && (stage === "sample-review" && action === "post" || stage === "campaigns" && action === "post"
-              || stage === "sending-accounts" && ["warmup_start", "warmup_resume"].includes(action)) } } };
+            openWorldHint: !read && openWorld.has(`${stage}.${action}`) } } };
     });
   }));
 }
@@ -112,8 +118,9 @@ export async function callStageMcpTool(name: string, args: unknown, request: Req
   if (Object.keys(input.path).some(key => !pathNames.has(key)) || Object.keys(input.query).some(key => !queryNames.has(key))) return invalid();
   if (!operation.request.body && input.body !== undefined) return invalid();
   if (entry.campaignRead !== undefined) {
-    if (!plainObject(input.body) || !plainObject(input.body.request) || typeof input.body.request.operation !== "string"
-      || campaignReads.has(input.body.request.operation) !== entry.campaignRead) return invalid();
+    const request = plainObject(input.body) && entry.action === "post" ? input.body.request : input.body;
+    if (!plainObject(request) || typeof request.operation !== "string"
+      || campaignReads.has(request.operation) !== entry.campaignRead) return invalid();
   }
   let missingPath = false;
   const route = operation.route.replace(/\{([^}]+)\}/g, (_, key: string) => {
