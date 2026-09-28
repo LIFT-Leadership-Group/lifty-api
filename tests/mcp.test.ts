@@ -1,0 +1,77 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { describe, expect, it, vi } from "vitest";
+import { createApp } from "../src/app.js";
+import { handleMcpRequest } from "../src/mcp.js";
+
+const settings = { resourceUrl: "https://api.lifty.test/mcp", authorizationServer: "https://project.supabase.test/auth/v1", allowedOrigins: ["https://api.lifty.test"] };
+const authentication = async (request: Request) => request.headers.get("authorization")?.startsWith("Bearer founder-")
+  ? { ok: true as const, session: { userId: request.headers.get("authorization")!.slice(7), client: {} } }
+  : { ok: false as const, reason: "invalid_session" as const };
+const post = (method: string, params?: unknown, headers: Record<string, string> = {}) => new Request(settings.resourceUrl, {
+  method: "POST", headers: { authorization: "Bearer founder-1", "content-type": "application/json", accept: "application/json, text/event-stream", ...headers },
+  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, ...(params === undefined ? {} : { params }) }),
+});
+
+describe("MCP HTTP boundary", () => {
+  it("is absent by default; publishes canonical discovery and an authentication challenge only when configured", async () => {
+    expect((await createApp().request("/mcp")).status).toBe(404);
+    expect((await createApp().request("/.well-known/oauth-protected-resource")).status).toBe(404);
+    const authenticate = vi.fn(authentication);
+    const app = createApp({ mcp: { ...settings, authenticate } });
+    for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"]) {
+      const metadata = await app.request(`https://untrusted.test${path}`);
+      expect(await metadata.json()).toMatchObject({ resource: settings.resourceUrl, authorization_servers: [settings.authorizationServer] });
+    }
+    expect(authenticate).not.toHaveBeenCalled();
+    const response = await app.request("/mcp", { method: "POST", body: "garbage" });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toContain('resource_metadata="https://api.lifty.test/.well-known/oauth-protected-resource/mcp"');
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("works with the official client without a proprietary header and isolates concurrent founders", async () => {
+    const authenticate = vi.fn(authentication);
+    const app = createApp({ mcp: { ...settings, authenticate } });
+    await Promise.all(["founder-1", "founder-2"].map(async userId => {
+      const transport = new StreamableHTTPClientTransport(new URL(settings.resourceUrl), {
+        requestInit: { headers: { authorization: `Bearer ${userId}` } },
+        fetch: async (input, init) => app.request(new Request(input, init)),
+      });
+      const client = new Client({ name: "integration-proof", version: "1" });
+      try {
+        // SDK 1.30.1 declares sessionId as string|undefined on this transport
+        // but optional string on Transport; runtime is the SDK's own transport.
+        await client.connect(transport as Parameters<Client["connect"]>[0]);
+        const list = await client.listTools();
+        expect(list.tools).toHaveLength(1);
+        expect(list.tools[0]).toMatchObject({ name: "whoami", annotations: { readOnlyHint: true, destructiveHint: false },
+          _meta: { securitySchemes: [{ type: "oauth2", scopes: ["openid", "email", "profile"] }] } });
+        const result = await client.callTool({ name: "whoami", arguments: {} });
+        expect(result.structuredContent).toEqual({ user_id: userId });
+        expect(JSON.stringify(result)).not.toContain("Bearer");
+        expect(transport.sessionId).toBeUndefined();
+      } finally { await client.close(); }
+    }));
+    // Each transport call, including initialization and notifications, authenticates anew.
+    expect(authenticate.mock.calls.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("rejects unsupported contracts, origins, methods, invalid tools and oversized bodies before execution", async () => {
+    const authenticate = vi.fn(authentication);
+    const dependencies = { ...settings, authenticate };
+    expect((await handleMcpRequest(post("tools/list", undefined, { origin: "https://attacker.test" }), dependencies)).status).toBe(403);
+    expect(authenticate).not.toHaveBeenCalled();
+    expect((await handleMcpRequest(post("tools/list", undefined, { "x-lifty-client-contract": "retired" }), dependencies)).status).toBe(409);
+    for (const method of ["GET", "DELETE"]) {
+      const response = await handleMcpRequest(new Request(settings.resourceUrl, { method, headers: { authorization: "Bearer founder-1" } }), dependencies);
+      expect(response.status).toBe(405); expect(response.headers.get("allow")).toBe("POST");
+    }
+    for (const params of [{ name: "unknown" }, { name: "whoami", arguments: { workspace_id: "foreign" } }]) {
+      const response = await handleMcpRequest(post("tools/call", params), dependencies);
+      expect(await response.json()).toMatchObject({ error: { code: -32602 } });
+    }
+    const oversized = post("tools/call", { name: "whoami", arguments: { data: "x".repeat(161 * 1024) } });
+    expect((await handleMcpRequest(oversized, dependencies)).status).toBe(413);
+  });
+});

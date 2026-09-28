@@ -19,7 +19,7 @@ async function jwtFixture(expiration: string | number | Date = "5m") {
     })
       .setProtectedHeader({ alg: "ES256", kid })
       .setSubject("founder-123")
-      .setAudience(typeof overrides.aud === "string" ? overrides.aud : "authenticated")
+      .setAudience(Array.isArray(overrides.aud) ? overrides.aud as string[] : typeof overrides.aud === "string" ? overrides.aud : "authenticated")
       .setIssuer(typeof overrides.iss === "string" ? overrides.iss : "https://project.supabase.test/auth/v1")
       .setIssuedAt()
       .setExpirationTime(expiresAt)
@@ -36,6 +36,30 @@ async function jwtFixture(expiration: string | number | Date = "5m") {
 }
 
 describe("Supabase authentication boundary", () => {
+  it("requires an OAuth client and both audiences for MCP, then rechecks the actual session RPC each time", async () => {
+    // These are signed fixtures, NOT proof that deployed Supabase issues such tokens.
+    const { jwks, signToken } = await jwtFixture();
+    const resource = "https://api.lifty.test/mcp";
+    const upstream = vi.fn<typeof fetch>(async () => new Response("true", { headers: { "content-type": "application/json" } }));
+    const authenticate = createSupabaseAuthenticator({ supabaseUrl: "https://project.supabase.test", publishableKey: "sb_publishable_test", jwks },
+      { fetch: upstream, oauthResource: resource });
+    const call = async (overrides: Record<string, unknown>) => authenticate(new Request(resource, {
+      headers: { authorization: `Bearer ${await signToken("5m", overrides)}` },
+    }));
+    for (const claims of [
+      { aud: "authenticated", client_id: "oauth-client" },
+      { aud: ["authenticated", "https://other.test/mcp"], client_id: "oauth-client" },
+      { aud: resource, client_id: "oauth-client" },
+      { aud: ["authenticated", resource] },
+    ]) expect((await call(claims)).ok).toBe(false);
+    expect(upstream).not.toHaveBeenCalled();
+    const claims = { aud: ["authenticated", resource], client_id: "oauth-client", session_id: "11111111-1111-4111-8111-111111111111" };
+    expect((await call(claims)).ok).toBe(true);
+    expect(String(upstream.mock.calls[0]?.[0])).toMatch(/\/rest\/v1\/rpc\/lifty_session_active$/);
+    upstream.mockImplementationOnce(async () => new Response("false", { headers: { "content-type": "application/json" } }));
+    expect((await call(claims)).ok).toBe(false);
+    expect(upstream).toHaveBeenCalledTimes(2);
+  });
   it("aborts an upstream request when the Supabase deadline expires", async () => {
     const hangingFetch: typeof fetch = async (_input, init) =>
       await new Promise((_resolve, reject) => {

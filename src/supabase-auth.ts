@@ -32,6 +32,8 @@ export interface SupabaseAuthenticationConfig {
 export interface SupabaseAuthenticatorOptions {
   fetch?: typeof fetch;
   timeoutMs?: number;
+  /** MCP adds resource binding; it never weakens the REST audience/session fence. */
+  oauthResource?: string;
 }
 
 export function createSupabaseReadinessCheck(
@@ -86,6 +88,12 @@ export function createSupabaseAuthenticator(
       || claims.iss !== expectedIssuer
       || !(claims.aud === "authenticated"
         || (Array.isArray(claims.aud) && claims.aud.includes("authenticated")))) {
+      return { ok: false, reason: "invalid_session" };
+    }
+    if (options.oauthResource && (
+      !Array.isArray(claims.aud) || !claims.aud.includes(options.oauthResource)
+      || typeof claims.client_id !== "string" || claims.client_id.length === 0
+    )) {
       return { ok: false, reason: "invalid_session" };
     }
     const client = createContextClient({

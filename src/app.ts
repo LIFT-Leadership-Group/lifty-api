@@ -6,6 +6,7 @@ import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
 import { CrmMappingError } from "./crm-mapping.js";
 import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
 import { registerStageRoutes } from "./stage-routes.js";
+import { handleMcpRequest, mcpResourceMetadata, type McpDependencies } from "./mcp.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { renderConnectionReturnPage } from "./connection-return-page.js";
@@ -150,6 +151,8 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  mcp?: McpDependencies;
+  renderOAuthConsentPage?(authorizationId: string): { html: string; scriptNonce: string; connectOrigin: string };
   warmupSetup?: WarmupSetup;
   unipileHostedAuthOrigin: string;
   unipileV2HostedAuthOrigins: string[];
@@ -1174,6 +1177,30 @@ export function createApp(
   });
 
   if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup));
+  if (dependencies.mcp) {
+    const mcp = dependencies.mcp;
+    for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"]) {
+      app.get(path, context => context.json(mcpResourceMetadata(mcp), 200, { "cache-control": "no-store" }));
+    }
+    app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp));
+    app.get("/oauth/consent", context => {
+      const authorizationId = context.req.query("authorization_id") ?? "";
+      if (!/^[A-Za-z0-9_-]{16,128}$/.test(authorizationId)) {
+        return hubspotHtmlResponse(context, 400, "Invalid authorization link", "Connect Lifty again to get a fresh link.");
+      }
+      const page = dependencies.renderOAuthConsentPage?.(authorizationId);
+      if (!page || !/^[A-Za-z0-9_-]{16,128}$/.test(page.scriptNonce)
+        || !/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/.test(page.connectOrigin)) {
+        return hubspotHtmlResponse(context, 503, "Sign-in unavailable", "Try connecting Lifty again in a moment.");
+      }
+      return context.html(page.html, 200, {
+        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
+        "content-security-policy": ["default-src 'none'", `script-src 'nonce-${page.scriptNonce}'`,
+          "style-src 'unsafe-inline'", `connect-src ${page.connectOrigin}`, "base-uri 'none'",
+          "form-action 'none'", "frame-ancestors 'none'"].join("; "),
+      });
+    });
+  }
   app.get("/healthz", (context) => context.json({ status: "ok" }));
   app.get("/readyz/crm", async (context) => {
     let ready = false;

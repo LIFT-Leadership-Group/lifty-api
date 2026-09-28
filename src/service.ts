@@ -91,6 +91,15 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    ...(config.mcp ? {
+      mcp: { ...config.mcp, authenticate: createSupabaseAuthenticator(config.supabase, { oauthResource: config.mcp.resourceUrl }) },
+      renderOAuthConsentPage: (authorizationId: string) => {
+        const scriptNonce = randomBytes(18).toString("base64url");
+        return { html: renderCliAuthPage({ supabaseUrl: config.supabase.supabaseUrl,
+          publishableKey: config.supabase.publishableKey, authorizationId, scriptNonce }),
+          scriptNonce, connectOrigin: new URL(config.supabase.supabaseUrl).origin };
+      },
+    } : {}),
     getEmailAccounts:emailAccounts.accounts,
     connectEmailAccount:emailAccounts.connect,
     getEmailAccountAttempt:emailAccounts.status,
