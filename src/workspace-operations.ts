@@ -764,16 +764,17 @@ export async function listSlackNotificationChannels(
   if (error) {
     // The function reports a missing or stale Slack grant as 409. That is a
     // setup step for the founder, not a transient failure to retry.
-    const response = (error as { context?: unknown }).context;
-    let reason: unknown;
-    if (response instanceof Response && response.status === 409) {
-      try { reason = ((await response.clone().json()) as { error?: unknown } | null)?.error; } catch { reason = undefined; }
-    }
-    if (reason === "slack_not_connected") {
+    // Read the response structurally: the client's Response may come from a
+    // different fetch implementation, so instanceof is not reliable here.
+    const response = (error as { context?: { status?: unknown; json?: () => Promise<unknown> } }).context;
+    if (response?.status === 409) {
+      let reason: unknown;
+      try { reason = typeof response.json === "function" ? ((await response.json()) as { error?: unknown } | null)?.error : undefined; } catch { reason = undefined; }
+      if (reason === "slack_reconnect_required") {
+        throw new PublicError({ status: 409, code: "SLACK_RECONNECT_REQUIRED", message: "Reconnect Slack before choosing a notification channel.", cause: error });
+      }
+      // Every 409 from this function is a Slack setup state, never a transient failure.
       throw new PublicError({ status: 409, code: "SLACK_NOT_CONNECTED", message: "Slack is not connected to this workspace. Connect Slack first.", cause: error });
-    }
-    if (reason === "slack_reconnect_required") {
-      throw new PublicError({ status: 409, code: "SLACK_RECONNECT_REQUIRED", message: "Reconnect Slack before choosing a notification channel.", cause: error });
     }
     throw new PublicError({
       status: 502,
