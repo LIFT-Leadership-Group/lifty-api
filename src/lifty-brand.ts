@@ -60,11 +60,13 @@ export interface LiftyPageOptions {
   /** Already escaped panel content, rendered below the brand. */
   content: string;
   styles?: string;
+  /** Login pages load the same tab icon as the public Lifty site. */
+  favicon?: boolean;
   /** Complete script elements, appended after the panel. */
   scripts?: string;
 }
 
 /** One branded panel on the public Lifty surface. */
 export function renderLiftyPage(options: LiftyPageOptions): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${options.title}</title><style>${liftyStyles}${options.styles ?? ""}</style></head><body><main class="shell"><div class="panel">${liftyBrand}${options.content}</div></main>${options.scripts ?? ""}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${options.title}</title>${options.favicon ? '<link rel="icon" href="/favicon.ico" sizes="32x32" type="image/x-icon">' : ""}<style>${liftyStyles}${options.styles ?? ""}</style></head><body><main class="shell"><div class="panel">${liftyBrand}${options.content}</div></main>${options.scripts ?? ""}</body></html>`;
 }
