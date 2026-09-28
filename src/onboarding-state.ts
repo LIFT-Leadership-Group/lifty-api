@@ -13,6 +13,8 @@ const Saved = z.object({
   state: z.literal("saved"), revision: z.number().int().positive(), workspace_ref: z.uuid().nullable(),
   draft: z.record(z.string(), z.unknown()), configuration: LocalOnboardingConfigurationSchema.nullable(),
   receipt: OnboardingSubmissionSchema.nullable(), updated_at: z.string().min(1),
+  idempotency_key: z.string().regex(/^[A-Za-z0-9:_-]{1,128}$/).nullable()
+    .describe("The accepted key bound to this exact draft, configuration and receipt. Reuse for pending enqueue recovery across clients; null before submission."),
 }).strict();
 export const OnboardingStateSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("none"), revision: z.literal(0) }).strict(),

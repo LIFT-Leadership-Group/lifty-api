@@ -3,7 +3,7 @@ import { createCurrentClient as createApp } from "./current-client.js";
 import { confirmedDraft, localConfiguration, onboardingContext } from "./onboarding-fixtures.js";
 import { getOnboardingState } from "../src/onboarding-state.js";
 import { stageOperations } from "../src/stage-contracts.js";
-const saved = { state: "saved", revision: 1, workspace_ref: null, draft: { company: { name: "Partial" } }, configuration: null, receipt: null, updated_at: "2026-09-28T00:00:00Z" };
+const saved = { state: "saved", revision: 1, workspace_ref: null, draft: { company: { name: "Partial" } }, configuration: null, receipt: null, idempotency_key: null, updated_at: "2026-09-28T00:00:00Z" };
 const auth = { ok: true as const, session: { userId: "founder", client: {} } };
 const request = (body: unknown) => ({ method: "PATCH", headers: { authorization: "Bearer token", "content-type": "application/json" }, body: JSON.stringify(body) });
 describe("portable onboarding state", () => {
@@ -12,6 +12,19 @@ describe("portable onboarding state", () => {
       const state = await getOnboardingState({ userId: "founder", client: { rpc: async (name: string) => { expect(name).toBe("get_lifty_onboarding_state"); return { data: { ...saved, draft }, error: null }; } } });
       expect(state.state === "saved" && state.draft_ready).toBe(draft === confirmedDraft);
     }
+  });
+  it("preserves the accepted MCP key with its receipt when another client reads server state", async () => {
+    const workspace_ref = "63900000-0000-4000-a000-00000000000a";
+    const accepted = { ...saved, draft: confirmedDraft, configuration: localConfiguration, workspace_ref,
+      idempotency_key: "mcp:accepted-key", receipt: { state: "submitted", submission_ref: "accepted-receipt",
+        draft_digest: "sha256:accepted", import_status: "pending", created: false,
+        workspace: { workspace_ref, name: "Example" } } };
+    const app = createApp({ authenticate: async () => auth,
+      getOnboardingState: session => getOnboardingState({ ...session, client: { rpc: async () => ({ data: accepted, error: null }) } }) });
+    const response = await app.request("/v1/onboarding/state", { headers: { authorization: "Bearer second-client" } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ idempotency_key: "mcp:accepted-key", receipt: accepted.receipt,
+      draft: confirmedDraft, configuration: localConfiguration, draft_ready: true });
   });
   it("requires authentication and saves partial interview without requiring a workspace", async () => {
     let writes = 0;
