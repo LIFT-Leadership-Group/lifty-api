@@ -13,7 +13,7 @@ describe("DigitalOcean CLI auth page", () => {
       scriptNonce: "nonce-for-test",
     });
 
-    expect(html).toContain("Sign in to LIFTY");
+    expect(html).toContain("Sign in to Lifty");
     expect(html).toContain("Create account");
     expect(html).toContain("https://project.supabase.test");
     expect(html).toContain("sb_publishable_public");

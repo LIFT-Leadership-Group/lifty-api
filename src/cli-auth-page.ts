@@ -1,5 +1,18 @@
 import { authBrowserScript } from "./auth-browser.js";
+import { renderLiftyPage } from "./lifty-brand.js";
 import { oauthConsentBrowserScript } from "./oauth-consent-browser.js";
+
+const styles = `
+#auth-form{margin-top:26px}
+#auth-error{margin:0 0 14px;font-size:14px}
+.aside{display:grid;gap:6px;margin-top:22px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+.details{display:grid;gap:8px;margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+.details span{color:var(--ink)}
+#approve-status{margin-top:16px;color:var(--muted);font-size:14px}
+#approve-status.error{color:var(--danger)}
+.actions{display:flex;gap:10px;margin-top:22px}
+.actions button{flex:1}
+`;
 
 export type CliAuthPageOptions = {
   supabaseUrl: string;
@@ -29,62 +42,39 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
     }),
   });
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
-  <title>${oauth ? "Connect LIFTY" : "Authorize the LIFTY CLI"}</title>
-  <style>
-    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
-    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #0b0d10; color: #f4f4f5; }
-    main { width: min(92vw, 420px); }
-    .brand { letter-spacing: .18em; font-size: .82rem; font-weight: 800; margin: 0 0 1.25rem; }
-    .card { border: 1px solid #2a2e35; border-radius: 16px; padding: 1.5rem; background: #14171c; box-shadow: 0 18px 60px #0008; }
-    h1 { margin: 0 0 .5rem; font-size: 1.45rem; }
-    p { color: #a9afb9; line-height: 1.5; }
-    label { display: grid; gap: .45rem; margin: 1rem 0; font-size: .9rem; }
-    input { font: inherit; padding: .75rem; border-radius: 9px; border: 1px solid #373d47; background: #0d1014; color: inherit; }
-    button { font: inherit; font-weight: 700; padding: .72rem 1rem; border-radius: 9px; border: 1px solid #596273; cursor: pointer; }
-    button.primary { background: #f4f4f5; color: #111318; border-color: #f4f4f5; }
-    button.link { border: 0; padding: 0; background: transparent; color: #c7cbd2; text-decoration: underline; }
-    .actions { display: flex; gap: .75rem; margin-top: 1.25rem; }
-    .error { color: #fda4af; }
-    .success { color: #86efac; }
-    [hidden] { display: none !important; }
-  </style>
-</head>
-<body>
-  <main>
-    <p class="brand">LIFTY</p>
-    <section class="card" id="auth-card">
-      <h1 id="auth-title">Sign in to LIFTY</h1>
-      <p id="auth-description">${oauth ? "Sign in to connect Lifty to your app." : "Sign in to authorize the CLI on this machine."}</p>
+  return renderLiftyPage({
+    title: oauth ? "Connect Lifty" : "Authorize the Lifty CLI",
+    styles,
+    content: `
+    <section id="auth-card">
+      <h1 id="auth-title">Sign in to Lifty</h1>
+      <p class="intro" id="auth-description">${oauth ? "Sign in to connect Lifty to your app." : "Sign in to authorize the CLI on this machine."}</p>
       <form id="auth-form">
         <label>Email<input id="email" type="email" autocomplete="email" required></label>
         <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
         <p id="auth-error" class="error" role="alert" hidden></p>
-        <button class="primary" id="submit" type="submit">Sign in</button>
+        <button class="primary block" id="submit" type="submit">Sign in</button>
       </form>
-      <p><a href="/auth/password-reset" target="_blank" rel="noopener noreferrer" style="color:#c7cbd2">Forgot your password?</a></p>
-      <p><span id="mode-prompt">New to LIFTY?</span> <button class="link" id="switch-mode" type="button">Create account</button></p>
+      <div class="aside">
+        <p><a href="/auth/password-reset" target="_blank" rel="noopener noreferrer">Forgot your password?</a></p>
+        <p><span id="mode-prompt">New to Lifty?</span> <button class="link" id="switch-mode" type="button">Create account</button></p>
+      </div>
     </section>
-    <section class="card" id="approve-card" hidden>
-      <h1>${oauth ? 'Connect <span id="client-name"></span> to Lifty' : "Authorize the LIFTY CLI on this machine"}</h1>
-      <p>${oauth ? "This app" : "The CLI"} will act as <strong id="account-email"></strong> until you sign out or revoke access.</p>
-      ${oauth ? '<p>It can access your Lifty workspace and perform the actions your account permits.</p><p>Requested account information: <span id="client-scopes"></span></p><p>Return address: <span id="client-redirect"></span></p>' : ""}
+    <section id="approve-card" hidden>
+      <h1>${oauth ? 'Connect <span id="client-name"></span> to Lifty' : "Authorize the Lifty CLI on this machine"}</h1>
+      <p class="intro">${oauth ? "This app" : "The CLI"} will act as <strong id="account-email"></strong> until you sign out or revoke access.</p>
+      ${oauth ? '<div class="details"><p>It can access your Lifty workspace and perform the actions your account permits.</p><p>Requested account information: <span id="client-scopes"></span></p><p>Return address: <span id="client-redirect"></span></p></div>' : ""}
       <p id="approve-status" role="status"></p>
       <div class="actions">
         <button class="primary" id="approve" type="button">Approve</button>
         <button id="deny" type="button">Deny</button>
       </div>
     </section>
-    <section class="card" id="done-card" hidden>
+    <section id="done-card" hidden>
       <h1 id="done-title"></h1>
-      <p id="done-message"></p>
-    </section>
-  </main>
+      <p class="intro" id="done-message"></p>
+    </section>`,
+    scripts: `
   <script nonce="${options.scriptNonce}">
     "use strict";
     const config = ${configuration};
@@ -101,14 +91,14 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
     function setMode(nextMode) {
       mode = nextMode;
       const creating = mode === "create";
-      byId("auth-title").textContent = creating ? "Create your LIFTY account" : "Sign in to LIFTY";
+      byId("auth-title").textContent = creating ? "Create your Lifty account" : "Sign in to Lifty";
       byId("auth-description").textContent = config.authorizationId
         ? (creating ? "Create an account, then connect Lifty to your app." : "Sign in to connect Lifty to your app.")
         : (creating ? "Create an account, then authorize the CLI on this machine." : "Sign in to authorize the CLI on this machine.");
       byId("submit").textContent = creating ? "Create account" : "Sign in";
       byId("password").autocomplete = creating ? "new-password" : "current-password";
       byId("password").minLength = creating ? 8 : 0;
-      byId("mode-prompt").textContent = creating ? "Already have an account?" : "New to LIFTY?";
+      byId("mode-prompt").textContent = creating ? "Already have an account?" : "New to Lifty?";
       byId("switch-mode").textContent = creating ? "Sign in" : "Create account";
       byId("auth-error").hidden = true;
     }
@@ -194,7 +184,6 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
       byId("done-title").textContent = "Authorization cancelled";
       byId("done-message").textContent = "Nothing was sent. Run lifty login again when you are ready.";
     });
-  </script>
-</body>
-</html>`;
+  </script>`,
+  });
 }

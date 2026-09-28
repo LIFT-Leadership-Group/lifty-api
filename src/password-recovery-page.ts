@@ -1,4 +1,11 @@
 import { authBrowserScript } from "./auth-browser.js";
+import { renderLiftyPage } from "./lifty-brand.js";
+
+const styles = `
+form{margin-top:26px}
+#message{margin-top:16px;font-size:14px}
+.aside{display:grid;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+`;
 
 export type PasswordRecoveryPage = "request" | "update";
 export interface PasswordRecoveryPageOptions {
@@ -20,26 +27,23 @@ export function renderPasswordRecoveryPage(options: PasswordRecoveryPageOptions)
     redirectTo: `${publicUrl.origin}/auth/password-update`,
     page: options.page,
   }).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e").replaceAll("&", "\\u0026");
-  return `<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>Reset your LIFTY password</title>
-<style>
-:root{color-scheme:dark;font-family:ui-sans-serif,system-ui,sans-serif}body{min-height:100vh;margin:0;display:grid;place-items:center;background:#0b0d10;color:#f4f4f5}main{width:min(92vw,420px)}.brand{letter-spacing:.18em;font-size:.82rem;font-weight:800}.card{border:1px solid #2a2e35;border-radius:16px;padding:1.5rem;background:#14171c}h1{font-size:1.45rem}p{color:#a9afb9;line-height:1.5}label{display:grid;gap:.45rem;margin:1rem 0}input,button{font:inherit;padding:.75rem;border-radius:9px;border:1px solid #373d47}input{background:#0d1014;color:inherit}button{cursor:pointer;font-weight:700}button:disabled{opacity:.5;cursor:wait}a{color:#c7cbd2}.error{color:#fda4af}.success{color:#86efac}[hidden]{display:none!important}
-</style></head><body><main><p class="brand">LIFTY</p><section class="card">
-<h1 id="title">${options.page === "request" ? "Forgot your password?" : "Choose a new password"}</h1>
-<p id="description">${options.page === "request" ? "Enter your email to request a password recovery link." : "Checking your recovery link..."}</p>
-<form id="request-form"${options.page === "request" ? "" : " hidden"}>
+  const request = options.page === "request";
+  return renderLiftyPage({
+    title: "Reset your Lifty password",
+    styles,
+    content: `<h1 id="title">${request ? "Forgot your password?" : "Choose a new password"}</h1>
+<p class="intro" id="description">${request ? "Enter your email to request a password recovery link." : "Checking your recovery link..."}</p>
+<form id="request-form"${request ? "" : " hidden"}>
 <label>Email<input id="email" type="email" autocomplete="email" maxlength="254" required></label>
-<button id="request-submit" type="submit">Send recovery email</button></form>
+<button class="primary block" id="request-submit" type="submit">Send recovery email</button></form>
 <form id="update-form" hidden>
 <label>New password<input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required></label>
 <label>Confirm new password<input id="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required></label>
-<button id="update-submit" type="submit" disabled>Change password</button></form>
+<button class="primary block" id="update-submit" type="submit" disabled>Change password</button></form>
 <p id="message" role="status" aria-live="polite" hidden></p>
-<p id="new-link"${options.page === "request" ? " hidden" : ""}><a href="/auth/password-reset">Request a new recovery link</a></p>
-<p id="return-login">Return to your original LIFTY login tab after changing your password. If it has closed or timed out, run <code>lifty login</code> again.</p>
-</section></main><script nonce="${options.scriptNonce}">
+<div class="aside"><p id="new-link"${request ? " hidden" : ""}><a href="/auth/password-reset">Request a new recovery link</a></p>
+<p id="return-login">Return to your original Lifty login tab after changing your password. If it has closed or timed out, run <code>lifty login</code> again.</p></div>`,
+    scripts: `<script nonce="${options.scriptNonce}">
 "use strict";
 const config = ${configuration};
 const byId = id => document.getElementById(id);
@@ -104,7 +108,7 @@ byId("update-form").addEventListener("submit", async event => {
     byId("update-form").hidden = true;
     byId("new-link").hidden = true;
     byId("title").textContent = "Password changed";
-    byId("description").textContent = "Sign in with your new password in the original LIFTY login tab, then approve the CLI normally.";
+    byId("description").textContent = "Sign in with your new password in the original Lifty login tab, then approve the CLI normally.";
     showMessage("Your password was changed. Sign in again to continue.", true);
     // Best effort: revoke only this recovery session, without claiming immediate
     // JWT invalidation or logging out the user's other product sessions.
@@ -149,5 +153,6 @@ async function startRecovery() {
   } finally { busy = false; }
 }
 void startRecovery();
-</script></body></html>`;
+</script>`,
+  });
 }
