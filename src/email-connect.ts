@@ -284,10 +284,14 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     await rpc("declare",{intent_ref:id,mailbox_use:mailboxUse,...(selectedProvider ? {email_provider:selectedProvider} : {})});
     return authorize(state);
   }
-  async function v2Return(state:string):Promise<void> {
-    const intent=await readIntent(open(state));
+  async function v2Return(state:string,providerError=false):Promise<void> {
+    const id=open(state);
+    const intent=await readIntent(id);
     if(intent.transport?.api_version!=="v2" || !["ready","completed"].includes(intent.state))fail("EMAIL_CALLBACK_INVALID",403);
     // A browser-supplied account_id is never persisted or treated as authorization.
+    // A provider error only ends a still-open attempt, so status reports the
+    // failure instead of pending until expiry. It never completes anything.
+    if(providerError && intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
   }
   return {start,status,authorize,callback,disconnect,declare,v2Return};
 }

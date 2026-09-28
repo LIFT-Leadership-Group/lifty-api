@@ -160,8 +160,8 @@ export interface AppDependencies {
   warmupSetup?: WarmupSetup;
   unipileHostedAuthOrigin: string;
   unipileV2HostedAuthOrigins: string[];
-  receiveEmailV2Return: (state:string)=>Promise<void>;
-  receiveLinkedinV2Return: (state:string)=>Promise<void>;
+  receiveEmailV2Return: (state:string,providerError?:boolean)=>Promise<void>;
+  receiveLinkedinV2Return: (state:string,providerError?:boolean)=>Promise<void>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
@@ -1451,12 +1451,16 @@ export function createApp(
       context.header("referrer-policy","no-referrer");
       const receive=channel==="email" ? dependencies.receiveEmailV2Return : dependencies.receiveLinkedinV2Return;
       // Browser result fields are hints only. Signed lifecycle events and later
-      // authenticated polling determine success, including provider-error returns.
-      // A missing, expired or foreign intent still lands on the neutral page: the
-      // page confirms nothing, and nothing from the browser is persisted here.
-      try {await receive(context.req.query("intent") ?? "");}
+      // authenticated polling determine success. A provider error can only end
+      // the still-open attempt, and the page says the connection did not finish.
+      // A missing, expired or foreign intent still lands on a page that confirms
+      // nothing, and no browser-supplied value is persisted here.
+      const errorType=context.req.query("error_type") ?? "";
+      const providerError=errorType!=="" || Boolean(context.req.query("error_title"));
+      try {await receive(context.req.query("intent") ?? "",providerError);}
       catch (error) {if (!(error instanceof PublicError) || error.status < 400 || error.status >= 500) throw error;}
-      return context.html(renderConnectionReturnPage(channel),200,{
+      const failure=!providerError ? null : ["canceled","consent_denied"].includes(errorType) ? "canceled" : "failed";
+      return context.html(renderConnectionReturnPage(channel,failure),200,{
         "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
         "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       });
