@@ -14,8 +14,17 @@ Both `/.well-known/oauth-protected-resource` and the `/mcp` metadata suffix
 advertise the configured Supabase Auth issuer. A rejected bearer token receives
 401 and a `WWW-Authenticate` discovery challenge.
 
-`/oauth/consent?authorization_id=...` uses the same login form and Auth transport
-as `/cli/auth`. It retrieves the requesting client, return URL and scope from
+The shared Supabase Auth Site URL remains `https://liftygtm.com`. Set its OAuth
+Authorization Path to `/oauth/consent`, a relative path: Supabase concatenates
+these values. The dashboard's public `/oauth/consent` route forwards only a
+validated `authorization_id` to the API's `/oauth/consent` page. It ignores
+caller-supplied redirect URLs and Host headers. Its server-side `LIFTY_API_URL`
+must match the API's canonical `PUBLIC_BASE_URL`; the current default is
+`https://lifty-api-staging-ox2h9.ondigitalocean.app`. Do not change the shared
+Site URL to the API or put an absolute URL in Authorization Path.
+
+The API's `/oauth/consent?authorization_id=...` uses the same login form and
+Auth transport as `/cli/auth`. It retrieves the requesting client, return URL and scope from
 Supabase Auth, displays explicit consent, and returns only the Auth-issued
 authorization response to the registered HTTPS callback. It uses the same
 endpoints as `getAuthorizationDetails`, `approveAuthorization` and
@@ -49,14 +58,20 @@ page discloses the app's access to the account's permitted workspace actions.
 
 Before enabling the connector:
 
-1. Deploy the reviewed Functions migration through `production-database`, then
-   this API revision through its owning deployment workflow.
+1. Deploy the reviewed Functions migration through `production-database`, the
+   dashboard consent-forwarding route, and this API revision through their
+   owning deployment workflows before enabling OAuth.
 2. Read back the current Auth hook configuration. Preserve any existing hook;
    if one is active, integrate the policy into it rather than replacing it.
-3. Set the custom access-token hook above and Supabase OAuth server consent URL
-   to the canonical origin plus `/oauth/consent`. Review dynamic registration
-   enablement explicitly: it permits anyone to register a client, while access
-   still requires founder consent. Record that decision in LIF-1097.
+3. Set the custom access-token hook above. Preserve Site URL
+   `https://liftygtm.com` and set OAuth Authorization Path to `/oauth/consent`.
+   Include the exact API origin in Auth's redirect URL allowlist: browser
+   authorization-details and consent requests originate there, and Supabase
+   validates that Origin. Preserve the existing entries. Verify an anonymous
+   dashboard request forwards to the fixed API page and malformed IDs fail.
+   Review dynamic registration enablement explicitly: it permits anyone to
+   register a client, while access still requires founder consent. Record that
+   decision in LIF-1097.
 4. Enable the API feature. Complete a real authorization-code + S256 PKCE grant
    in the approved internal workspace. Verify issued and refreshed JWTs include
    both audiences, a real `client_id`/`session_id`, and pass the unchanged active
@@ -72,6 +87,8 @@ audience or session checks to compensate for an incompatible hosted token.
 ## Sources
 
 - [Supabase OAuth flows](https://supabase.com/docs/guides/auth/oauth-server/oauth-flows)
+- [Supabase OAuth server setup](https://supabase.com/docs/guides/auth/oauth-server/getting-started)
+- [Auth authorization URL construction and Origin validation](https://github.com/supabase/auth/blob/master/internal/api/oauthserver/authorize.go)
 - [Supabase token security](https://supabase.com/docs/guides/auth/oauth-server/token-security)
 - [Custom access-token hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook)
 - [Current Auth token validation source](https://github.com/supabase/auth/blob/master/internal/tokens/service.go)

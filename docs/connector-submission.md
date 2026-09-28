@@ -18,8 +18,14 @@ Record actual receipts on the Linear issue.
 - [ ] Any database change has passed the `lift-supabase-functions`
   `production-database` workflow. Follow the LIF-627 accepted-catalog policy.
 - [ ] Supabase OAuth server settings and the consent URL are configured for
-  the approved environment. DCR changes registration on the shared Auth
-  project. Confirm that effect before enabling it.
+  the approved environment. Preserve Site URL `https://liftygtm.com`; configure
+  the relative OAuth Authorization Path `/oauth/consent`. Deploy the dashboard
+  forwarding route and API consent page first. The dashboard's server-side
+  `LIFTY_API_URL` must match the API's `PUBLIC_BASE_URL`; include that exact API
+  origin in Auth's redirect URL allowlist so browser consent calls pass Origin
+  validation. Keep existing entries. An absolute Authorization Path does not
+  replace Site URL. See [the OAuth rollout guide](mcp-oauth.md). DCR changes
+  registration on the shared Auth project. Confirm that effect before enabling it.
 - [ ] The final public HTTPS MCP URL is chosen. Keep its origin stable:
   OpenAI requires a new plugin if the scheme, hostname, or port changes.
 - [ ] Unauthenticated requests advertise protected-resource metadata and a
