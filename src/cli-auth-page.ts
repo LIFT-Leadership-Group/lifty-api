@@ -44,6 +44,7 @@ export function renderCliAuthPage(options: CliAuthPageOptions): string {
 
   return renderLiftyPage({
     title: oauth ? "Connect Lifty" : "Authorize the Lifty CLI",
+    favicon: true,
     styles,
     content: `
     <section id="auth-card">

@@ -22,6 +22,17 @@ function collectSecretBearingFieldNames(value: unknown): string[] {
 }
 
 describe("LIFTY API", () => {
+  it("serves the Lifty browser icon from the API host", async () => {
+    const response = await createApp().request("/favicon.ico");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("image/x-icon");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=3600");
+    expect(Array.from(bytes.slice(0, 4))).toEqual([0, 0, 1, 0]);
+    expect(bytes.length).toBeGreaterThan(1000);
+  });
+
   it("publishes the versioned REST contract as generated OpenAPI", async () => {
     const app = createApp();
 
@@ -913,6 +924,7 @@ describe("LIFTY API", () => {
     expect(response.headers.get("content-security-policy")).toContain(
       "script-src 'nonce-test-nonce-value'",
     );
+    expect(response.headers.get("content-security-policy")).toContain("img-src 'self'");
     expect(rendered).toEqual([{ state: "s".repeat(43), port: 49152 }]);
   });
 
