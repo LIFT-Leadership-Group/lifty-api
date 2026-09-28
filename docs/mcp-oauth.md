@@ -44,12 +44,13 @@ insufficient for MCP resource binding. Functions migration
 `20260928193000_lif1097_oauth_mcp_audience.sql` supplies the custom access-token
 hook `public.lifty_oauth_access_token_hook(jsonb)`. It preserves ordinary login
 claims and stamps OAuth claims with a fixed audience array. Since the LIF-1103
-migration `20260928211500_lif1103_oauth_mcp_audience_api_host.sql` that array is
-`["authenticated", "https://api.liftygtm.com/mcp",
-"https://lifty-api-staging-ox2h9.ondigitalocean.app/mcp"]`: the canonical
-resource plus the legacy DigitalOcean host, which is the same deployment, so
-connectors registered on either URL keep working during the cutover. Drop the
-legacy audience once every connector has been re-added on the canonical URL.
+cleanup migration `20260928233000_lif1103_drop_legacy_mcp_audience.sql` that
+array is `["authenticated", "https://api.liftygtm.com/mcp"]`. The API accepts
+only this canonical resource on both hosts, so the legacy DigitalOcean audience
+that bridged the cutover (`20260928211500`) is no longer stamped. Connectors
+still registered on the legacy URL keep working: their tokens carry the
+canonical audience. Moving `PUBLIC_BASE_URL` back to the legacy host would also
+require restoring that audience in the hook.
 It never derives an audience from user metadata or a caller-supplied URL.
 Its Auth URI is `pg-functions://postgres/public/lifty_oauth_access_token_hook`.
 The migration installs the hook but does not enable it.
