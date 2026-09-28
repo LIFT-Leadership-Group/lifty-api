@@ -90,7 +90,7 @@ describe("authenticated workspace stage adapters", () => {
     const response = await request(app, stage, "POST", { draft: confirmedDraft, configuration: localConfiguration });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ state: "queued", run_id: "import-job", submission_ref: attemptRef });
-    expect(submit).toHaveBeenCalledWith(session, confirmedDraft, localConfiguration);
+    expect(submit).toHaveBeenCalledWith(session, confirmedDraft, localConfiguration, {});
     expect(enqueue).toHaveBeenCalledOnce();
   });
 

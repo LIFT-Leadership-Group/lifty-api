@@ -1,3 +1,4 @@
+import type { SubmissionOptions } from "./onboarding-state.js";
 import type { AuthSession } from "./app.js";
 import {
   ConfigUpdateContextSchema,
@@ -98,6 +99,10 @@ function mapRpcError(error: unknown): PublicError {
   const code = typeof candidate?.code === "string" ? candidate.code : "";
   const message = typeof candidate?.message === "string" ? candidate.message : "";
 
+  if (code === "PT409" && ["lifty_onboarding_state_stale", "lifty_onboarding_workspace_changed", "lifty_onboarding_key_conflict"].includes(message)) {
+    return new PublicError({ status: 409, code: message === "lifty_onboarding_key_conflict" ? "ONBOARDING_KEY_CONFLICT" : "ONBOARDING_STATE_STALE",
+      message: "Read the latest onboarding state before retrying. An idempotency key must always identify the exact same draft and configuration.", cause: error });
+  }
   if (code === "PT409" && message.includes("lifty_workspace_ambiguous")) {
     return new PublicError({ status: 409, code: "WORKSPACE_AMBIGUOUS",
       message: "Log in with the founder account for this workspace.", cause: error });
@@ -478,10 +483,11 @@ export async function submitOnboarding(
   session: AuthSession,
   draft: Record<string, unknown>,
   configuration: LocalOnboardingConfiguration,
+  options: SubmissionOptions = {},
 ): Promise<OnboardingSubmission> {
   const { data, error } = await getRpcClient(session).rpc<OnboardingSubmission>(
     "submit_lifty_onboarding",
-    { draft, configuration },
+    { draft, configuration, ...options },
   );
 
   if (error) {

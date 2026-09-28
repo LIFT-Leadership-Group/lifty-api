@@ -1,3 +1,4 @@
+import { OnboardingStateSchema, OnboardingSaveSchema, SubmissionOptionsSchema, getOnboardingState, saveOnboardingState, type OnboardingState, type OnboardingSave, type SubmissionOptions } from "./onboarding-state.js";
 import { RunProgressQuerySchema, RunProgressSchema, type RunProgressQuery, type RunProgress } from "./run-progress.js";
 import type { BusinessWebsite, BusinessWebsitePatch } from "./business-website.js";
 import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
@@ -189,10 +190,13 @@ export interface AppDependencies {
     session: AuthSession,
     input: CreateWorkspaceRequest,
   ): Promise<CreateWorkspaceResult>;
+  getOnboardingState(session: AuthSession): Promise<OnboardingState>;
+  saveOnboardingState(session: AuthSession, input: OnboardingSave): Promise<OnboardingState>;
   submitOnboarding(
     session: AuthSession,
     draft: Record<string, unknown>,
     configuration: LocalOnboardingConfiguration,
+    options?: SubmissionOptions,
   ): Promise<OnboardingSubmission>;
   getOnboardingContext(session: AuthSession): Promise<OnboardingContext>;
   getOnboardingStatus(session: AuthSession): Promise<OnboardingStatus>;
@@ -522,6 +526,18 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       422: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "get", path: "/v1/onboarding/state", operationId: "getOnboardingState",
+    security: [{ bearerAuth: [] }], responses: { 200: JsonResponse(OnboardingStateSchema),
+      401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "patch", path: "/v1/onboarding/state", operationId: "saveOnboardingState",
+    security: [{ bearerAuth: [] }], request: { body: { required: true, content: { "application/json": { schema: OnboardingSaveSchema } } } },
+    responses: { 200: JsonResponse(OnboardingStateSchema), 400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 413: JsonResponse(ErrorResponseSchema),
+      422: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
   });
   app.openAPIRegistry.registerPath({
     method: "post",
@@ -1017,6 +1033,8 @@ const defaultDependencies: AppDependencies = {
   createWorkspace: async () => {
     throw new Error("createWorkspace is not configured");
   },
+  getOnboardingState,
+  saveOnboardingState,
   submitOnboarding: async () => {
     throw new Error("submitOnboarding is not configured");
   },
@@ -1812,6 +1830,26 @@ export function createApp(
     return context.json(CreateWorkspaceResultSchema.parse(result));
   });
 
+  app.get("/v1/onboarding/state", async context => {
+    context.header("cache-control", "no-store");
+    return context.json(OnboardingStateSchema.parse(await dependencies.getOnboardingState(context.get("authSession"))));
+  });
+  app.patch("/v1/onboarding/state", async context => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, MAX_REQUEST_BYTES);
+    if (!raw.ok) return errorJson(context, 413, "PAYLOAD_TOO_LARGE", "The saved onboarding state exceeds 132 KiB.");
+    let value: unknown;
+    try { value = JSON.parse(raw.text); } catch { value = null; }
+    const input = OnboardingSaveSchema.safeParse(value);
+    if (!input.success) return errorJson(context, 400, "INVALID_REQUEST", "Supply expected_revision, draft, and configuration (or null) using the current state schema.");
+    if (input.data.configuration !== null) {
+      const issues = lintOnboardingDraft(input.data.draft);
+      const lint = lintLocalOnboardingConfiguration(input.data.configuration, input.data.draft, undefined, { requireDiscoveryIntent: true });
+      if (issues.length || !lint.success) return errorJson(context, 422, "ONBOARDING_DRAFT_INVALID", "Save a partial interview with configuration null, or repair the confirmed draft and its bound configuration.", issues.length ? issues : !lint.success ? lint.issues : []);
+    }
+    return context.json(OnboardingStateSchema.parse(await dependencies.saveOnboardingState(context.get("authSession"), input.data)));
+  });
+
   app.post("/v1/onboarding", async (context) => {
     const declaredLength = Number(context.req.header("content-length"));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
@@ -1844,6 +1882,7 @@ export function createApp(
     const envelope = z.object({
       draft: z.record(z.string(), z.unknown()),
       configuration: z.unknown().optional(),
+      ...SubmissionOptionsSchema.shape,
     }).strict().safeParse(parsedJson);
     if (!envelope.success) {
       return errorJson(context, 400, "INVALID_REQUEST",
@@ -1876,6 +1915,7 @@ export function createApp(
       context.get("authSession"),
       envelope.data.draft,
       lint.configuration,
+      SubmissionOptionsSchema.parse({ ...(envelope.data.idempotency_key === undefined ? {} : { idempotency_key: envelope.data.idempotency_key }), ...(envelope.data.expected_revision === undefined ? {} : { expected_revision: envelope.data.expected_revision }) }),
     );
 
     // An already-imported draft needs no run; anything else gets exactly one.

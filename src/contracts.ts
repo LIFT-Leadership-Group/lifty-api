@@ -63,6 +63,8 @@ export const SubmitOnboardingRequestSchema = z
   .object({
     draft: z.record(z.string(), z.unknown()),
     configuration: LocalOnboardingConfigurationSchema,
+    idempotency_key: z.string().regex(/^[A-Za-z0-9:_-]{1,128}$/).optional(),
+    expected_revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   })
   .strict();
 
