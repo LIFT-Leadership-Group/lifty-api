@@ -91,6 +91,7 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    ...(config.openAiAppsChallenge === undefined ? {} : { openAiAppsChallenge: config.openAiAppsChallenge }),
     ...(config.mcp ? {
       mcp: { ...config.mcp, authenticate: createSupabaseAuthenticator(config.supabase, { oauthResource: config.mcp.resourceUrl }) },
       renderOAuthConsentPage: (authorizationId: string) => {

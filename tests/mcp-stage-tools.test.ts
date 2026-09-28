@@ -27,6 +27,7 @@ describe("generated MCP stage operations", () => {
       }
     }
     expect(tools.find(tool => tool.name === "crm_mapping_sources")!.annotations.readOnlyHint).toBe(true);
+    expect(tools.find(tool => tool.name === "sending_accounts_client_connect_status")!.annotations.readOnlyHint).toBe(false);
     expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.destructiveHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.openWorldHint).toBe(true);

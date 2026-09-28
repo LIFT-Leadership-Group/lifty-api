@@ -16,6 +16,13 @@ const validEnvironment = {
 };
 
 describe("service configuration", () => {
+  it("keeps domain verification absent until a single portal token is configured", () => {
+    expect(loadConfig(validEnvironment).openAiAppsChallenge).toBeUndefined();
+    expect(loadConfig({ ...validEnvironment, LIFTY_OPENAI_APPS_CHALLENGE: "openai-verification=example_token" }).openAiAppsChallenge).toBe("openai-verification=example_token");
+    for (const value of ["", "one\ntwo", " one", "one two", "x".repeat(4097)]) {
+      expect(() => loadConfig({ ...validEnvironment, LIFTY_OPENAI_APPS_CHALLENGE: value })).toThrow(/single exact/);
+    }
+  });
   it("keeps MCP opt-in and pins its resource and browser origins to safe configuration", () => {
     expect(loadConfig(validEnvironment).mcp).toBeNull();
     expect(loadConfig({ ...validEnvironment, LIFTY_MCP_ENABLED: "true" }).mcp).toEqual({

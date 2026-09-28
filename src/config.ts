@@ -14,6 +14,7 @@ import type { McpSettings } from "./mcp.js";
 type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
+  openAiAppsChallenge?: string;
   mcp?: McpSettings | null;
   unipileHostedAuthOrigin?: string;
   unipileV2HostedAuthOrigins?: string[];
@@ -119,6 +120,10 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
     "PUBLIC_BASE_URL",
   );
   const mcpEnabled = environment.LIFTY_MCP_ENABLED === "true";
+  const openAiAppsChallenge = environment.LIFTY_OPENAI_APPS_CHALLENGE;
+  if (openAiAppsChallenge !== undefined && !/^[\x21-\x7e]{1,4096}$/.test(openAiAppsChallenge)) {
+    throw new Error("LIFTY_OPENAI_APPS_CHALLENGE must be the single exact printable verification token.");
+  }
   if (environment.LIFTY_MCP_ENABLED && !["true", "false"].includes(environment.LIFTY_MCP_ENABLED)) {
     throw new Error("LIFTY_MCP_ENABLED must be true or false.");
   }
@@ -186,6 +191,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
     mcp,
+    ...(openAiAppsChallenge === undefined ? {} : { openAiAppsChallenge }),
     unipileHostedAuthOrigin: parseHostedAuthOrigin(environment.UNIPILE_HOSTED_AUTH_ORIGIN),
     ...(v2 ? {unipileV2HostedAuthOrigins:v2.hostedAuthOrigins} : {}),
     crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,

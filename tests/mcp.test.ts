@@ -14,6 +14,14 @@ const post = (method: string, params?: unknown, headers: Record<string, string> 
 });
 
 describe("MCP HTTP boundary", () => {
+  it("serves exactly the configured domain challenge token as public text, without requiring MCP enablement", async () => {
+    expect((await createApp().request("/.well-known/openai-apps-challenge")).status).toBe(404);
+    const app = createApp({ openAiAppsChallenge: "openai-verification=example_token" });
+    const response = await app.request("/.well-known/openai-apps-challenge");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect(await response.text()).toBe("openai-verification=example_token");
+  });
   it("is absent by default; publishes canonical discovery and an authentication challenge only when configured", async () => {
     expect((await createApp().request("/mcp")).status).toBe(404);
     expect((await createApp().request("/.well-known/oauth-protected-resource")).status).toBe(404);

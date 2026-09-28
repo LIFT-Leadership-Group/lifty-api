@@ -152,6 +152,7 @@ export type AuthenticationResult =
 export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
+  openAiAppsChallenge?: string;
   mcp?: McpDependencies;
   renderOAuthConsentPage?(authorizationId: string): { html: string; scriptNonce: string; connectOrigin: string };
   warmupSetup?: WarmupSetup;
@@ -1178,6 +1179,9 @@ export function createApp(
   });
 
   if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup));
+  if (dependencies.openAiAppsChallenge) {
+    app.get("/.well-known/openai-apps-challenge", context => context.text(dependencies.openAiAppsChallenge!, 200, { "cache-control": "no-store" }));
+  }
   if (dependencies.mcp) {
     const mcp = dependencies.mcp;
     for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp"]) {
