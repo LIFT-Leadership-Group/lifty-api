@@ -85,6 +85,18 @@ for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifec
     expect(h.http).toHaveLength(0);
     expect(h.calls.every(c=>["intent","status"].includes(c.operation))).toBe(true);
   });
+  it("ends an open attempt when the provider returns an error",async()=>{
+    const h=harness(channel);
+    await h.ops.v2Return(h.state,true);
+    expect(h.calls.find(c=>c.operation==="fail")?.payload).toEqual({intent_ref:id,failure_code:"provider_unavailable"});
+    expect(h.calls.some(c=>c.operation==="complete")).toBe(false);
+    expect(h.http).toHaveLength(0);
+  });
+  it("never fails a completed attempt on a late provider error",async()=>{
+    const h=harness(channel,{intentState:"completed"});
+    await h.ops.v2Return(h.state,true);
+    expect(h.calls.map(c=>c.operation)).toEqual(["intent"]);
+  });
   it("completes exact pending attempt only with authenticated matching account evidence",async()=>{
     const h=harness(channel,{authorized:true});
     const result=await h.ops.status(h.session,workspace,id);
@@ -183,6 +195,41 @@ it.each(["email","linkedin"] as const)("V2 %s browser return still renders when 
     expect(html).not.toContain("acc_new");
   }
   expect(observed).toEqual(["","expired","foreign"]);
+});
+
+it.each(["email","linkedin"] as const)("V2 %s browser return reports a provider error instead of the neutral page",async channel=>{
+  const observed:{state:string;providerError:boolean|undefined}[]=[];
+  const receive=async(state:string,providerError?:boolean)=>{observed.push({state,providerError});};
+  const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
+  const cases=[
+    {query:"?intent=opaque&error_type=canceled&error_title=Canceled&error_detail=Authentication%20canceled",text:"You stopped before giving access"},
+    {query:"?intent=opaque&error_type=consent_denied&error_title=Consent%20denied",text:"You stopped before giving access"},
+    {query:"?intent=opaque&error_type=api%2Finternal_error&error_title=Internal&error_detail=acc_existing",text:"could not finish the connection"},
+  ];
+  for(const {query,text} of cases){
+    const response=await app.request(`/unipile/v2/${channel}/return${query}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const html=await response.text();
+    expect(html).toContain(channel==="linkedin" ? "Your LinkedIn account did not connect" : "Your email account did not connect");
+    expect(html).toContain(text);
+    expect(html).toContain("ask Lifty for a new connection link");
+    expect(html).not.toContain("acc_existing");
+    expect(html).not.toContain("Back from");
+    expect(html).not.toMatch(/<script\b|<form\b|<a\s/i);
+  }
+  expect(observed).toEqual(cases.map(()=>({state:"opaque",providerError:true})));
+  const success=await app.request(`/unipile/v2/${channel}/return?intent=opaque&account_id=acc_new&provider=google`);
+  expect(await success.text()).toContain("This page does not confirm that your account is connected.");
+  expect(observed.at(-1)).toEqual({state:"opaque",providerError:false});
+});
+
+it.each(["email","linkedin"] as const)("V2 %s browser return shows a provider error even when the intent is rejected",async channel=>{
+  const reject=async()=>{throw new PublicError({status:410,code:"EMAIL_INTENT_EXPIRED",message:"Invalid email connection link."});};
+  const app=createCurrentClient({receiveEmailV2Return:reject,receiveLinkedinV2Return:reject});
+  const response=await app.request(`/unipile/v2/${channel}/return?intent=expired&error_type=canceled`);
+  expect(response.status).toBe(200);
+  expect(await response.text()).toContain("did not connect");
 });
 
 it.each(["email","linkedin"] as const)("V2 %s browser return still surfaces unexpected failures",async channel=>{

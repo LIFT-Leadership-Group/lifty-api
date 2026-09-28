@@ -257,9 +257,12 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     await rpc("disconnect", { workspace, confirm: true }, session);
     return status(session, workspace);
   }
-  async function v2Return(state:string):Promise<void> {
-    const intent=await readIntent(open(state));
+  async function v2Return(state:string,providerError=false):Promise<void> {
+    const id=open(state);
+    const intent=await readIntent(id);
     if(intent.transport?.api_version!=="v2" || !["ready","completed"].includes(intent.state))linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
+    // Same rule as email: a provider error only ends a still-open attempt.
+    if(providerError && intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
   }
   return { start, status, authorize, callback, disconnect, v2Return };
 }

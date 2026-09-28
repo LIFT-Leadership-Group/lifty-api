@@ -43,6 +43,9 @@ availability check. GET without `attempt_ref` reads current connection health.
   link will not fix it: the founder connects a different account here or
   resolves the binding in the workspace that holds it. Lifty already removed
   the duplicate LinkedIn provider account it created; nothing else to clean.
+  `failure_code: provider_unavailable` right after the hosted page means the
+  founder cancelled or the provider refused the connection; nothing connected.
+  Offer a new POST when the founder wants to try again.
   `error_code: attempt_superseded` means a newer attempt replaced this one;
   use its retained newer reference, never an old grant as proof of completion.
 - HTTP/network/status-read error: say the authorization could not yet be
