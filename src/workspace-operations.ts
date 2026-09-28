@@ -547,7 +547,7 @@ export async function startRun(session: AuthSession): Promise<StartRunResult> {
   return parsed.data;
 }
 
-export async function getRunStatus(session: AuthSession, dashboardOrigin = "https://lift-gtm-dashboard.vercel.app"): Promise<RunStatus> {
+export async function getRunStatus(session: AuthSession, dashboardOrigin = "https://liftygtm.com"): Promise<RunStatus> {
   const { data, error } = await getRpcClient(session).rpc<RunStatus>(
     "get_lifty_run_status",
   );

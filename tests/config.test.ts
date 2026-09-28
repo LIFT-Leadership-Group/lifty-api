@@ -56,7 +56,7 @@ describe("service configuration", () => {
     expect(() => loadConfig({...ready, LIFTY_WARMUP_SETUP_ENABLED:"yes"})).toThrow(/true or false/);
   });
   it("defaults to the verified dashboard and accepts another HTTPS origin", () => {
-    expect(loadConfig(validEnvironment).dashboardOrigin).toBe("https://lift-gtm-dashboard.vercel.app");
+    expect(loadConfig(validEnvironment).dashboardOrigin).toBe("https://liftygtm.com");
     expect(loadConfig({...validEnvironment,LIFTY_DASHBOARD_ORIGIN:"https://dashboard.example.com"}).dashboardOrigin).toBe("https://dashboard.example.com");
   });
   it.each(["http://dashboard.example.com","https://user:pass@example.com","https://example.com/path","https://example.com?q=x","https://example.com#x","https://example.com:444"])("rejects unsafe dashboard origin %s", origin => {
