@@ -1626,7 +1626,7 @@ export function createApp(
     if (context.req.method !== "POST" || ![
       "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/accounts/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
       "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
-      "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync",
+      "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync",
     ].includes(context.req.path)) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {
