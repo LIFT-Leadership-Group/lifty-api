@@ -352,6 +352,66 @@ esac
     }
   });
 
+  it.each([
+    ["https://api.canonical.test/mcp", true],
+    ["https://api.example.test/mcp", false],
+  ] as const)("smoke checks the PRIMARY domain advertises its own MCP resource (%s)", (resource, shouldPass) => {
+    const fakeBin = mkdtempSync(join(tmpdir(), "lifty-doctl-test-"));
+    const fakeDoctl = join(fakeBin, "doctl");
+    const fakeCurl = join(fakeBin, "curl");
+    const calls = join(fakeBin, "curl-calls.log");
+    writeFileSync(fakeDoctl, `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$1 $2" == "apps list" ]]; then
+  printf '%s' '[{"id":"app-123","spec":{"name":"lifty-api-staging"}}]'
+elif [[ "$1 $2" == "apps get" ]]; then
+  printf '%s' '[{"id":"app-123","spec":{"name":"lifty-api-staging","domains":[{"domain":"warmup.canonical.test","type":"ALIAS"},{"domain":"api.canonical.test","type":"PRIMARY"}]},"default_ingress":"https://api.example.test","active_deployment":{"id":"dep-456","phase":"ACTIVE"}}]'
+else
+  exit 64
+fi
+`);
+    writeFileSync(fakeCurl, `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "$FAKE_CURL_CALLS"
+url="\${!#}"
+case "$url" in
+  */.well-known/oauth-protected-resource/mcp) printf '%s' '{"resource":"${resource}"}' ;;
+  */healthz) printf '%s' '{"status":"ok"}' ;;
+  */readyz/crm) printf '%s' '{"status":"ready","capability":"lifty-crm-company.v1"}' ;;
+  */readyz/crm-mapping) printf '%s' '{"status":"ready","capability":"lifty-crm-mapping.v1"}' ;;
+  */readyz) printf '%s' '{"status":"ready"}' ;;
+  */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
+  */v1/workspace)
+    output=''
+    while [[ $# -gt 0 ]]; do
+      if [[ "$1" == "--output" ]]; then output="$2"; shift 2; else shift; fi
+    done
+    printf '%s' '{"error":{"code":"UNAUTHORIZED"}}' > "$output"
+    printf '401'
+    ;;
+  *) exit 22 ;;
+esac
+`);
+    chmodSync(fakeDoctl, 0o755);
+    chmodSync(fakeCurl, 0o755);
+    try {
+      const result = spawnSync("bash", [script, "smoke"], { encoding: "utf8",
+        env: { ...process.env, FAKE_CURL_CALLS: calls, PATH: `${fakeBin}:${process.env.PATH ?? ""}` } });
+      const curlCalls = readFileSync(calls, "utf8").trim().split("\n");
+      expect(curlCalls).toHaveLength(8);
+      expect(curlCalls.join("\n")).toContain("https://api.canonical.test/.well-known/oauth-protected-resource/mcp");
+      if (!shouldPass) {
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain("does not advertise https://api.canonical.test/mcp");
+        return;
+      }
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Smoke checks passed: https://api.example.test and https://api.canonical.test");
+    } finally {
+      rmSync(fakeBin, { recursive: true, force: true });
+    }
+  });
+
   it("refuses to deploy when an app-id override does not resolve to staging", () => {
     const fakeBin = mkdtempSync(join(tmpdir(), "lifty-doctl-test-"));
     const fakeDoctl = join(fakeBin, "doctl");

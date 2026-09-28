@@ -176,9 +176,23 @@ run_smoke() {
   jq -e '.error.code == "UNAUTHORIZED"' "$auth_body" >/dev/null \
     || fail "unauthenticated response did not use the UNAUTHORIZED envelope"
 
+  # The default ingress proves the deployment; the PRIMARY domain is what
+  # founders and MCP clients use, and it must advertise its own /mcp resource.
+  local primary
+  primary="$(jq -r '[.[0].spec.domains[]? | select(.type == "PRIMARY") | .domain][0] // empty' <<<"$app_json")"
+  if [[ -n "$primary" ]]; then
+    curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
+      "https://$primary/healthz" \
+      | jq -e '.status == "ok"' >/dev/null
+    curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
+      "https://$primary/.well-known/oauth-protected-resource/mcp" \
+      | jq -e --arg resource "https://$primary/mcp" '.resource == $resource' >/dev/null \
+      || fail "https://$primary does not advertise https://$primary/mcp as its MCP resource"
+  fi
+
   rm -rf -- "$smoke_dir"
   trap - EXIT
-  printf 'Smoke checks passed: %s\n' "$ingress"
+  printf 'Smoke checks passed: %s%s\n' "$ingress" "${primary:+ and https://$primary}"
 }
 
 deploy_app() {
