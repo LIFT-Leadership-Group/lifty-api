@@ -1,43 +1,22 @@
-import { liftyBrand } from "./lifty-brand.js";
+import { renderLiftyPage } from "./lifty-brand.js";
 
 const styles = `
-  :root{color-scheme:light;--ink:#01333f;--muted:#33616d;--sage:#7fa369;--paper:#f6f8f7;--line:#dbe4e2}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
-  .shell{min-height:100svh;display:grid;place-items:center;padding:48px 24px}
-  .panel{width:100%;max-width:520px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:40px;box-shadow:0 12px 48px #01333f08}
-  .brand{display:flex;align-items:center;gap:10px;margin:0 0 32px;font-size:31px;line-height:1;font-weight:750;letter-spacing:-1.2px}
-  .brand svg{width:31px;height:43px;flex:none}
-  h1{font:400 36px/1.15 Georgia,"Times New Roman",serif;letter-spacing:-.8px;margin:0 0 14px;text-wrap:balance}
-  .intro{color:var(--muted);margin:0;max-width:43ch}
   form{margin-top:28px}
   fieldset{border:0;margin:0 0 26px;padding:0;min-width:0}
-  legend{padding:0;margin-bottom:12px;font-size:14px;font-weight:650}
+  legend{padding:0;margin-bottom:12px;font-size:14px;font-weight:600}
   .providers{display:grid;gap:10px}
-  .provider{display:flex;align-items:center;gap:14px;min-height:76px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
-  .provider:hover{border-color:var(--muted);background:#fafcfb}
-  .provider:has(input:checked){border-color:var(--ink);background:#f0f5f2;box-shadow:inset 0 0 0 1px var(--ink)}
-  .provider:has(input:focus-visible){outline:3px solid var(--muted);outline-offset:3px}
+  .provider{display:flex;align-items:center;gap:14px;min-height:76px;margin:0;font-size:16px;font-weight:400;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:hsl(160 12% 6% / .6);cursor:pointer;transition:background-color 160ms,border-color 160ms}
+  .provider:hover{border-color:hsl(140 16% 96% / .28)}
+  .provider:has(input:checked){border-color:hsl(99 34% 65% / .75);background:hsl(99 34% 65% / .08);box-shadow:inset 0 0 0 1px hsl(99 34% 65% / .75)}
+  .provider:has(input:focus-visible){outline:2px solid var(--lime);outline-offset:3px}
+  .provider input:focus-visible{outline:none}
   .provider-icon{width:26px;height:26px;flex:none}
   .provider-copy{flex:1;min-width:0}
-  .provider-name{display:block;font-weight:650;line-height:1.4}
-  .provider-detail{display:block;font-size:13px;color:var(--muted);margin-top:2px}
-  input[type=radio],input[type=checkbox]{accent-color:var(--ink);width:19px;height:19px;flex:none;margin:0;cursor:pointer}
-  input:focus-visible{outline:3px solid var(--muted);outline-offset:3px}
-  .declaration{display:flex;align-items:flex-start;gap:12px;cursor:pointer;color:var(--muted);font-size:14px;line-height:1.6}
-  .declaration input{margin-top:3px}
-  .declaration strong{color:var(--ink);font-weight:600}
-  .declaration-detail{display:block;margin-top:3px}
-  button{display:block;width:100%;min-height:52px;margin-top:26px;padding:13px 16px;border:1px solid var(--ink);border-radius:10px;background:var(--ink);color:#fff;font:600 15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;cursor:pointer}
-  button:hover{background:#174b56}
-  button:focus-visible{outline:3px solid var(--muted);outline-offset:4px}
-  .reassurance{border-top:1px solid var(--line);margin:24px 0 0;padding-top:20px;color:var(--muted);font-size:13px;line-height:1.65}
-  .receipt-symbol{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#eef4eb;color:var(--ink);margin-bottom:22px}
-  .receipt-symbol svg{width:26px;height:26px}
-  .next-step{border-left:3px solid var(--sage);padding-left:16px;margin:26px 0 0;color:var(--muted)}
-  .next-step strong{display:block;color:var(--ink);font-size:15px;margin-bottom:5px}
-  .next-step p{margin:0;font-size:14px}
-  @media(max-width:560px){.shell{padding:24px 16px;align-items:start}.panel{padding:28px 24px;border-radius:16px}.brand{margin-bottom:28px}h1{font-size:32px}.provider{padding:13px 12px;gap:12px}}
+  .provider-name{display:block;font-weight:600;line-height:1.4}
+  .provider-detail{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
+  button[type=submit]{margin-top:26px}
+  @media(max-width:560px){.provider{padding:13px 12px;gap:12px}}
+  @media(prefers-reduced-motion:reduce){.provider{transition:none}}
   @media(forced-colors:active){.provider:has(input:checked){outline:2px solid Highlight;outline-offset:-2px}}
 `;
 
@@ -48,7 +27,7 @@ const providerIcons = {
 };
 
 function page(title: string, content: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Lifty</title><style>${styles}</style></head><body><main class="shell"><section class="panel" aria-labelledby="page-title">${liftyBrand}${content}</section></main></body></html>`;
+  return renderLiftyPage({ title: `${title} · Lifty`, content, styles });
 }
 
 function providerChoices(): string {
@@ -75,19 +54,19 @@ export function renderEmailAuthorizationPage(state: string, chooseProvider = fal
   const escapedState = state.replace(/[&<>"']/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character]!);
-  return page("Connect your email account", `<h1 id="page-title">Connect your email account</h1>
+  return page("Connect your email account", `<h1>Connect your email account</h1>
 <p class="intro">Connect the mailbox Lifty should send from. It can be one you already use or a new account set up for outreach.</p>
 <form method="post" action="/unipile/start"><input type="hidden" name="intent" value="${escapedState}">
 ${chooseProvider ? providerChoices() : ""}
 ${mailboxUseChoices()}
-<button type="submit">Continue to account selection</button></form>
+<button class="primary block" type="submit">Continue to account selection</button></form>
 <p class="reassurance">Connecting your email does not start outreach. You will review and approve your outreach before any email is sent.</p>`);
 }
 
 /** A used single-use link should confirm receipt instead of replaying authorization. */
 export function renderEmailAuthorizationReceivedPage(): string {
-  return page("Email authorization received", `<div class="receipt-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></div>
-<h1 id="page-title">We received your authorization</h1>
+  return page("Email authorization received", `<div class="symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></div>
+<h1>We received your authorization</h1>
 <p class="intro">Return to your agent to check your connection status.</p>
 <div class="next-step"><strong>You can close this tab</strong><p>Your agent will confirm when the connection is ready and help you continue preparing your messages.</p></div>
 <p class="reassurance">Connecting your email does not start outreach.</p>`);

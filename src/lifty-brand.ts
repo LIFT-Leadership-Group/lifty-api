@@ -1,16 +1,70 @@
-// Static LiftyMark/BirdGlyph/PerchedHead geometry from the dashboard landing brand.
-// Keep these paths aligned with components/landing/lifty-mark.tsx and perched-head.tsx.
-export const liftyBrand = `<div class="brand" aria-label="Lifty" role="img"><svg viewBox="18 7 43 60" fill="none" aria-hidden="true" focusable="false">
-<path stroke="hsl(192 26% 86%)" stroke-width="1.3" stroke-linejoin="bevel" d="M39 54 38 60 34 63 33 65 M38 60 42 63 42 65 M46 51 45 59 43 62 42 64 M45 59 50 62 50 64"/>
-<path fill="hsl(140 16% 96%)" stroke="hsl(195 40% 37% / .55)" stroke-width=".55" stroke-linejoin="round" d="M32 42 21 65 27 63 39 46Z"/>
-<path fill="hsl(195 40% 37%)" d="M50 25Q57 27 56 34L52 44 46 50 48 35Z"/>
-<path fill="hsl(196 66% 16% / .22)" d="M54 28 56 32 52 44 46 50 50 41Z"/>
-<path fill="hsl(140 16% 96%)" stroke="hsl(195 40% 37% / .55)" stroke-width=".55" stroke-linejoin="round" d="M33 21 44 19Q52 20 55 27Q54 33 50 39L43 54 38 57 33 53 29 43 29 31Z"/>
-<path fill="hsl(192 26% 86%)" d="M48 22Q53 23 55 27Q54 33 50 39L43 54 38 57 46 39Q53 29 48 22Z"/>
-<g fill="hsl(140 16% 96%)" stroke="hsl(195 40% 37% / .55)" stroke-width=".55" stroke-linejoin="round"><path d="M33 18.5L46 18L50 27L40 29L33 23Z"/><path d="M29 15.5L32 11.5L39 9.5L45 10.5L49 15.5L50 22.5L44 24.5L37 20.5L32 20.5Z"/></g>
-<g fill="hsl(195 40% 37%)"><path d="M27 17.5L31 15.5L35 16.5L32 19.5L26 20.5Z"/><path d="M28 17.5Q23 18.5 25 22.5L28 25.5L27.5 21.5L32 19.5Z"/></g>
-<path fill="hsl(196 66% 16% / .22)" d="M25 20.5L27.5 21.5L28 25.5L25 22.5Z"/>
-<circle fill="hsl(196 66% 16%)" cx="36" cy="16.3" r="4.4"/><circle stroke="hsl(99 34% 65%)" stroke-width=".45" cx="36" cy="16.3" r="3.55"/><circle fill="hsl(99 34% 65%)" cx="36" cy="16.3" r="1.55"/>
-<path fill="hsl(195 40% 37%)" d="M32 25Q37 24 40 28L38 36 32 48 22 62 26 39Q27 30 32 25Z"/>
-<path fill="hsl(196 66% 16% / .22)" d="m37 26 3 2-2 8-6 12-10 14 8-17 5-12Z"/>
-</svg><span aria-hidden="true">lifty</span></div>`;
+// Órbita Fase mark, palette and controls from the dashboard's public brand.
+// Keep aligned with lift-gtm-dashboard components/landing/lifty-mark.tsx,
+// shell.module.css and buttons.module.css.
+// Hosted pages run under `default-src 'none'`: everything stays inline, and
+// Inter is used when installed, falling back to the system sans-serif.
+
+const orbitPaths = `<path d="M216 47C225 47 228 54 221 61C158 78 80 125 64 163C37 226 144 229 236 188C270 173 297 150 311 123L324 147C289 191 224 226 161 244C82 267 23 251 11 220C-10 166 85 89 178 58C193 53 205 49 216 47Z"/><path d="M268 17C311 16 349 41 351 78C352 91 347 104 341 113C334 122 326 113 324 102C316 71 294 50 255 42C251 41 251 37 254 34L264 20Q265 17 268 17Z"/>`;
+
+const liftyMark = `<svg class="mark" viewBox="0 0 400 400" fill="currentColor" aria-hidden="true" focusable="false"><g transform="translate(20 65)">${orbitPaths}</g></svg>`;
+
+export const liftyBrand = `<div class="brand" aria-label="Lifty" role="img">${liftyMark}<span aria-hidden="true">lifty</span></div>`;
+
+export const liftyStyles = `
+:root{color-scheme:dark;--paper:hsl(160 14% 4%);--card:hsl(160 8% 9%);--field:hsl(160 12% 6%);--ink:hsl(140 16% 96%);--muted:hsl(140 16% 96% / .68);--subtle:hsl(140 16% 96% / .5);--line:hsl(140 16% 96% / .1);--lime:hsl(99 34% 65%);--lime-hover:hsl(99 36% 73%);--danger:hsl(351 95% 82%)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;isolation:isolate;background:radial-gradient(ellipse 80% 55% at 50% -10%,hsl(99 34% 65% / .12),transparent 70%),var(--paper);color:var(--ink);font:16px/1.6 Inter,"Inter Variable",ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;z-index:-1;left:calc(50% - 550px);top:58%;width:1100px;height:1100px;border:1px solid hsl(99 34% 65% / .12);border-radius:50%;background:radial-gradient(ellipse at 50% 0%,hsl(99 34% 65% / .1),transparent 60%);box-shadow:0 -24px 100px hsl(99 34% 65% / .035);pointer-events:none}
+.shell{min-height:100svh;display:grid;place-items:center;padding:48px 20px}
+.panel{width:100%;max-width:480px;padding:36px;border:1px solid var(--line);border-radius:20px;background:hsl(160 8% 9% / .82);box-shadow:inset 0 1px 0 hsl(140 16% 96% / .04),0 50px 90px -30px hsl(0 0% 0% / .6);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:8px;margin:0 0 32px;font-size:27px;font-weight:750;line-height:1;letter-spacing:-.06em}
+.brand .mark{width:36px;height:36px;flex:none;color:var(--lime)}
+h1{margin:0 0 12px;font-size:32px;font-weight:600;line-height:1.1;letter-spacing:-.035em;text-wrap:balance}
+p{margin:0}
+.intro{color:var(--muted);max-width:44ch}
+a{color:var(--lime);text-underline-offset:4px}
+strong{font-weight:600;color:var(--ink)}
+code{font:500 .9em ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
+.eyebrow{margin:0 0 12px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--lime)}
+label{display:grid;gap:8px;margin:0 0 16px;font-size:14px;font-weight:500}
+input:not([type=radio]):not([type=checkbox]){width:100%;min-height:48px;padding:11px 14px;border:1px solid hsl(140 16% 96% / .14);border-radius:9px;background:var(--field);color:var(--ink);font:inherit;font-size:16px}
+input:not([type=radio]):not([type=checkbox]):hover{border-color:hsl(140 16% 96% / .28)}
+input:not([type=radio]):not([type=checkbox]):focus{border-color:var(--lime)}
+input[type=radio],input[type=checkbox]{accent-color:var(--lime);width:19px;height:19px;flex:none;margin:0;cursor:pointer}
+button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:12px 26px;border:1px solid hsl(140 16% 96% / .15);border-radius:9px;background:hsl(160 8% 9% / .6);color:var(--ink);font:inherit;font-size:15px;font-weight:600;line-height:1.5;cursor:pointer;transition:background-color 160ms,border-color 160ms}
+button:hover{background:hsl(140 16% 96% / .07);border-color:hsl(140 16% 96% / .8)}
+button.primary{background:var(--lime);border-color:hsl(99 34% 65% / .75);color:var(--paper);box-shadow:inset 0 1px 0 hsl(140 16% 96% / .2),0 0 24px hsl(99 34% 65% / .08)}
+button.primary:hover{background:var(--lime-hover);border-color:var(--lime)}
+button.block{display:flex;width:100%}
+button.link{min-height:0;padding:0;border:0;background:none;box-shadow:none;color:var(--lime);font-size:inherit;font-weight:500;text-decoration:underline;text-underline-offset:4px}
+button:disabled{opacity:.55;cursor:wait}
+:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+.error{color:var(--danger)}
+.success{color:var(--lime)}
+.symbol{display:grid;place-items:center;width:48px;height:48px;margin-bottom:22px;border-radius:50%;background:hsl(99 34% 65% / .12);color:var(--lime)}
+.symbol.error{background:hsl(351 95% 82% / .12)}
+.symbol svg{width:24px;height:24px}
+.next-step{margin:28px 0 0;padding-left:16px;border-left:2px solid var(--lime);color:var(--muted)}
+.next-step strong{display:block;margin-bottom:4px;font-size:15px}
+.next-step p{font-size:14px}
+.reassurance{margin:28px 0 0;padding-top:20px;border-top:1px solid var(--line);color:var(--subtle);font-size:13px;line-height:1.65}
+[hidden]{display:none!important}
+@media(max-width:560px){.shell{place-items:start center;padding:20px 16px}.panel{padding:28px 22px;border-radius:16px}.brand{margin-bottom:28px}h1{font-size:28px}}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+@media(forced-colors:active){button.primary{border-color:ButtonText}}
+`;
+
+export interface LiftyPageOptions {
+  /** Complete, already escaped document title. */
+  title: string;
+  /** Already escaped panel content, rendered below the brand. */
+  content: string;
+  styles?: string;
+  /** Complete script elements, appended after the panel. */
+  scripts?: string;
+}
+
+/** One branded panel on the public Lifty surface. */
+export function renderLiftyPage(options: LiftyPageOptions): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${options.title}</title><style>${liftyStyles}${options.styles ?? ""}</style></head><body><main class="shell"><div class="panel">${liftyBrand}${options.content}</div></main>${options.scripts ?? ""}</body></html>`;
+}
