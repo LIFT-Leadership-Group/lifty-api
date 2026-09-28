@@ -1450,9 +1450,12 @@ export function createApp(
       context.header("cache-control","no-store");
       context.header("referrer-policy","no-referrer");
       const receive=channel==="email" ? dependencies.receiveEmailV2Return : dependencies.receiveLinkedinV2Return;
-      await receive(context.req.query("intent") ?? "");
       // Browser result fields are hints only. Signed lifecycle events and later
       // authenticated polling determine success, including provider-error returns.
+      // A missing, expired or foreign intent still lands on the neutral page: the
+      // page confirms nothing, and nothing from the browser is persisted here.
+      try {await receive(context.req.query("intent") ?? "");}
+      catch (error) {if (!(error instanceof PublicError) || error.status < 400 || error.status >= 500) throw error;}
       return context.html(renderConnectionReturnPage(channel),200,{
         "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
         "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",

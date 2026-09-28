@@ -5,6 +5,7 @@ import { sealEmailIntent,emailCallbackName } from "../src/email-state.js";
 import { sealLinkedinIntent,linkedinCallbackName } from "../src/linkedin-state.js";
 import { unipileV2AuthState } from "../src/unipile-v2-state.js";
 import { createCurrentClient } from "./current-client.js";
+import { PublicError } from "../src/errors.js";
 
 const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8222-222222222222",connection="33333333-3333-4333-8333-333333333333";
 const secret="connection-test-server-key-"+"x".repeat(40),email="founder@example.test";
@@ -166,6 +167,32 @@ it.each(["email","linkedin"] as const)("V2 %s browser return is branded without 
   expect(html).toContain("Ask Lifty to verify whether");
   expect(html).toContain("This page does not confirm that your account is connected.");
   expect(html).not.toMatch(/<script\b|<form\b|<a\s/i);
+});
+
+it.each(["email","linkedin"] as const)("V2 %s browser return still renders when the intent is missing or rejected",async channel=>{
+  const observed:string[]=[];
+  const reject=async(state:string)=>{observed.push(state);throw new PublicError({status:state==="foreign" ? 403 : 410,code:state==="foreign" ? "EMAIL_CALLBACK_INVALID" : "EMAIL_INTENT_EXPIRED",message:"Invalid email connection link."});};
+  const app=createCurrentClient({receiveEmailV2Return:reject,receiveLinkedinV2Return:reject});
+  for(const query of ["","?intent=expired&account_id=acc_new&provider=google&state=lifty-audit","?intent=foreign"]){
+    const response=await app.request(`/unipile/v2/${channel}/return${query}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const html=await response.text();
+    expect(html).toContain(channel==="linkedin" ? "Back from LinkedIn" : "Back from your email provider");
+    expect(html).toContain("This page does not confirm that your account is connected.");
+    expect(html).not.toContain("acc_new");
+  }
+  expect(observed).toEqual(["","expired","foreign"]);
+});
+
+it.each(["email","linkedin"] as const)("V2 %s browser return still surfaces unexpected failures",async channel=>{
+  for(const error of [new Error("database offline"),new PublicError({status:502,code:"EMAIL_CONNECTION_UNAVAILABLE",message:"Connection unavailable."})]){
+    const crash=async()=>{throw error;};
+    const app=createCurrentClient({receiveEmailV2Return:crash,receiveLinkedinV2Return:crash});
+    const response=await app.request(`/unipile/v2/${channel}/return?intent=opaque`);
+    expect(response.status).toBe(error instanceof PublicError ? error.status : 500);
+    expect(await response.text()).not.toContain("Back from");
+  }
 });
 
 it("pins LinkedIn health writes to the exact transport generation read",async()=>{
