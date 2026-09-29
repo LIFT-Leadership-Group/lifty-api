@@ -208,6 +208,13 @@ describe("send gates by workspace owner", () => {
     expect(unknown.campaigns.status.code).toBe("unverified");
   });
 
+  it("does not apply LIFT's placement freshness rule to Lifty inboxes", () => {
+    const lifty = managed("lifty");
+    expect(lifty.placement.evidence).toMatchObject({ max_age_days: null, freshness: "unknown" });
+    expect(lifty.placement.evidence.rule).toMatch(/No placement freshness rule is known/);
+    expect(managed("lift").placement.evidence).toMatchObject({ max_age_days: 10, freshness: "stale" });
+  });
+
   it("keeps optional personal warmup from blocking Lifty inboxes", () => {
     const personal = managed("lifty", item => { item.connections[0]!.mailbox_use = "personal"; item.connections[0]!.holds = []; item.connections[0]!.send_block_reason = null; });
     expect(personal.warmup.sources[0]).toMatchObject({ required_days: null, period_complete: null, outreach_unlocked: null, estimated_completion: null });
