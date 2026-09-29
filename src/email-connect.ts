@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 import { z } from "zod";
 import { throwSenderError, verifySenderChoice } from "./sender-choice.js";
 import { UnipileTransport } from "./unipile-transport.js";
@@ -120,7 +121,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     const free=candidates.filter(id=>!probe.referenced.includes(id));
     return free.length===1 ? free[0]! : null;
   }
-  const fetchImpl = settings.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(settings.fetchImpl ?? fetch);
   async function rpc(operation:string,payload:Record<string,unknown>,session?:AuthSession,name:"lifty_email_connection"|"lifty_email_callback_hint"="lifty_email_connection"):Promise<unknown> {
     const args={p_server_key:settings.serverKey,p_operation:operation,p_payload:payload};
     if(session){
@@ -327,5 +328,5 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
       throw error;
     }
   }
-  return {start,status,authorize,callback,disconnect,declare,v2Return};
+  return {start,status,authorize,callback,disconnect,declare,v2Return,validateReturn:(state:string)=>{open(state);}};
 }

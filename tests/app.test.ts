@@ -975,9 +975,9 @@ describe("LIFTY API", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe("no-store, no-transform");
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
-    expect(html).toContain("HubSpot is connected");
+    expect(html).toContain("Checking your connection");
     expect(html).not.toContain(code);
     expect(html).not.toContain(state);
   });
@@ -994,8 +994,8 @@ describe("LIFTY API", () => {
       `/hubspot/callback?error=access_denied&state=${sealHubspotConnectIntent("c".repeat(64), "test-secret")}`,
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.text()).toContain("HubSpot authorization was not completed");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Checking your connection");
     expect(completed).toBe(false);
   });
 
@@ -1007,7 +1007,7 @@ describe("LIFTY API", () => {
       return { portalId: "123", hubDomain: null };
     }}).request(`/hubspot/callback?error=insufficient_scope&error_description=private-provider-detail&state=${state}`);
     const html = await response.text();
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     expect(html).toContain("super admin");
     expect(html).toContain("Approved apps");
     expect(html).not.toContain("private-provider-detail");
@@ -1015,32 +1015,15 @@ describe("LIFTY API", () => {
     expect(completed).toBe(false);
   });
 
-  it("logs only a safe callback reason when completion fails", async () => {
-    const providerToken = "synthetic-provider-token-never-surface";
-    const logEvents: unknown[] = [];
-    const response = await createApp({
-      completeHubspotCallback: async () => {
-        throw new HubspotCallbackError(
-          "exchange_failed",
-          502,
-          "HubSpot did not accept the authorization.",
-        );
-      },
-      log: (event) => logEvents.push(event),
-    }).request(
-      `/hubspot/callback?code=${providerToken}&state=${sealHubspotConnectIntent("d".repeat(64), "test-secret")}`,
-    );
-    const html = await response.text();
-
-    expect(response.status).toBe(502);
-    expect(html).not.toContain(providerToken);
-    expect(JSON.stringify(logEvents)).not.toContain(providerToken);
-    expect(logEvents).toMatchObject([{
-      error_code: "HUBSPOT_CALLBACK_EXCHANGE_FAILED",
-      method: "GET",
-      path: "/hubspot/callback",
-      status: 502,
-    }]);
+  it("keeps callback processing failures pending and logs no credentials", async () => {
+    const marker="PRIVATE_CODE",state=sealHubspotConnectIntent("d".repeat(64),"secret"),events:unknown[]=[];
+    const app=createApp({connectionCallbacks:{hubspot:{validate:()=>{},status:async()=>({status:"pending"}),
+      process:async()=>{throw new Error(marker);}}},log:event=>events.push(event)});
+    const response=await app.request("https://api.lifty.test/hubspot/callback/process",{method:"POST",
+      headers:{origin:"https://api.lifty.test","content-type":"application/json","x-lifty-connection":"1"},body:JSON.stringify({state,code:marker})});
+    expect(response.status).toBe(202);expect(await response.json()).toEqual({status:"pending"});
+    expect(JSON.stringify(events)).not.toContain(marker);expect(JSON.stringify(events)).not.toContain(state);
+    expect(events).toMatchObject([{event:"connection_confirmation",stage:"process",error_code:"pending"}]);
   });
 
   it("returns a short-lived Slack connection URL for an authenticated founder", async () => {
@@ -1131,39 +1114,14 @@ describe("LIFTY API", () => {
     );
     const html = await response.text();
     expect(response.status).toBe(200);
-    expect(html).toContain("Slack is connected");
+    expect(html).toContain("Checking your connection");
     expect(html).toContain("Invite @Lifty");
     expect(html).not.toContain("terminal");
     expect(html).not.toContain(code);
     expect(html).not.toContain(state);
   });
 
-  it("logs only a safe Slack callback failure reason", async () => {
-    const marker = "synthetic-slack-token-never-surface";
-    const events: unknown[] = [];
-    const response = await createApp({
-      completeSlackCallback: async () => {
-        throw new SlackCallbackError(
-          "exchange_failed",
-          502,
-          "Slack did not accept the authorization.",
-        );
-      },
-      log: (event) => events.push(event),
-    }).request(
-      `/slack/callback?code=${marker}&state=${sealSlackConnectIntent("f".repeat(64), "test-secret")}`,
-    );
-    const html = await response.text();
 
-    expect(response.status).toBe(502);
-    expect(html).not.toContain(marker);
-    expect(JSON.stringify(events)).not.toContain(marker);
-    expect(events).toMatchObject([{
-      error_code: "SLACK_CALLBACK_EXCHANGE_FAILED",
-      path: "/slack/callback",
-      status: 502,
-    }]);
-  });
 });
 
 describe("LIFTY API crm sync endpoints", () => {

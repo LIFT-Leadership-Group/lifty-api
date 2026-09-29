@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 // HubSpot OAuth mechanics for the hosted connect flow. Mirrors the canary
 // module proven in LIF-603 (scripts/lif-603/hubspot-oauth.mjs) on the
 // versioned 2026-03 endpoints; the LIFTY app (id 50910951) is the only client.
@@ -93,9 +94,9 @@ export async function exchangeAuthorizationCode(options: {
   code: string;
   fetchImpl?: typeof fetch;
 }): Promise<HubspotTokenGrant> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(options.fetchImpl ?? fetch);
   const response = await fetchImpl(TOKEN_ENDPOINT, {
-    method: "POST",
+    method: "POST", redirect:"error", signal:AbortSignal.timeout(15000),
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "authorization_code",
@@ -120,9 +121,9 @@ export async function refreshAccessToken(options: {
   refreshToken: string;
   fetchImpl?: typeof fetch;
 }): Promise<HubspotTokenGrant> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(options.fetchImpl ?? fetch);
   const response = await fetchImpl(TOKEN_ENDPOINT, {
-    method: "POST",
+    method: "POST", redirect:"error", signal:AbortSignal.timeout(15000),
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "refresh_token",
@@ -144,9 +145,9 @@ export async function getAccountDetails(options: {
   accessToken: string;
   fetchImpl?: typeof fetch;
 }): Promise<HubspotAccount> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(options.fetchImpl ?? fetch);
   const response = await fetchImpl(ACCOUNT_DETAILS_ENDPOINT, {
-    method: "GET",
+    method: "GET", redirect:"error", signal:AbortSignal.timeout(15000),
     headers: { authorization: `Bearer ${options.accessToken}` },
   });
 

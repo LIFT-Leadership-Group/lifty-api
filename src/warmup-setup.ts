@@ -1,5 +1,6 @@
+import { ConfirmationResult, connectionFetch } from "./connection-confirmation.js";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
+import { createRemoteJWKSet, customFetch, jwtVerify, type JWTVerifyGetKey } from "jose";
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
@@ -50,7 +51,7 @@ const unavailable = () => new PublicError({status:409, code:"WARMUP_SETUP_UNAVAI
 const pending = () => new PublicError({status:502, code:"WARMUP_HANDOFF_PENDING", message:"The handoff to Mailivery needs checking. Lifty will not resend your tokens or create another warmup. Check warmup status or contact support."});
 const googleUnavailable = () => new PublicError({status:502, code:"WARMUP_GOOGLE_UNAVAILABLE", message:"Google authorization could not be verified. No mailbox credentials were sent to Mailivery. Run warmup start to try again."});
 const IdentityClaims = z.object({email:z.email().max(254), email_verified:z.literal(true), nonce:z.string()});
-const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"), {timeoutDuration:10000});
+const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"), {timeoutDuration:10000,[customFetch]:connectionFetch(fetch)});
 
 /** Signature, issuer, audience and nonce are all verified, not just decoded. */
 export async function verifyGoogleWarmupIdentity(idToken:string, clientId:string, nonce:string, keys:JWTVerifyGetKey=googleKeys):Promise<Identity> {
@@ -66,7 +67,7 @@ export async function verifyGoogleWarmupIdentity(idToken:string, clientId:string
  * OAuth responses and provider failures are never returned, logged, persisted or retried. */
 export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rpc?:Rpc;fetchImpl?:typeof fetch;
   verifyIdentity?:(token:string, clientId:string, nonce:string)=>Promise<Identity>}={}) {
-  const fetchImpl = dependencies.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(dependencies.fetchImpl ?? fetch);
   const base = settings.publicBaseUrl.replace(/\/$/, "");
   const redirectUri = `${base}/warmup/google/callback`;
   const mac = (purpose:string, state:string, browser:string) => createHmac("sha256", settings.serverKey)
@@ -96,6 +97,17 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
   };
   return {
     origin:new URL(base).origin,
+    validateCallback(state:string,browser:string) { oauthPayload(state,browser); },
+    async receipt(state:string,browser:string,failure?:"verification"|"provider"|"canceled") {
+      const payload=oauthPayload(state,browser);
+      const response=await fetchImpl(`${settings.supabaseUrl}/rest/v1/rpc/lifty_warmup_browser_receipt`, {
+        method:"POST",redirect:"error",signal:AbortSignal.timeout(8000),
+        headers:{apikey:settings.publishableKey,"content-type":"application/json"},
+        body:JSON.stringify({p_server_key:settings.serverKey,p_oauth_hash:payload.oauth_hash,p_browser_hash:payload.browser_hash,...(failure?{p_failure:failure}:{})}),
+      });
+      if(!response.ok)throw pending();
+      return ConfirmationResult.parse(await response.json());
+    },
     async issue(session:AuthSession, workspace:string, connectionRef?:string) {
       const input = WarmupWorkspaceRequest.parse({workspace, ...(connectionRef === undefined ? {} : {connection_ref:connectionRef})});
       const intent = newSetupSecret();
@@ -155,7 +167,7 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
           method:"POST", redirect:"error", signal:AbortSignal.timeout(15000), headers:{authorization:`Bearer ${settings.mailivery.apiKey}`, accept:"application/json"}, body});
         // Even 2xx is not binding evidence. Jobs verifies email, SMTP, IMAP and both tags.
         // Do not read provider JSON: it can contain mailbox credentials.
-        await response.body?.cancel();
+        await response.body?.cancel().catch(()=>{});
         if (!response.ok) throw new Error();
       } catch { throw pending(); }
     },

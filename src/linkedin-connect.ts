@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 import { z } from "zod";
 import { verifySenderChoice } from "./sender-choice.js";
 import { UnipileTransport, type VerifiedTransport } from "./unipile-transport.js";
@@ -53,7 +54,7 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
       throw error;
     }
   }
-  const fetchImpl = settings.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(settings.fetchImpl ?? fetch);
   async function rpc(operation: string, payload: Record<string, unknown>, session?: AuthSession, name: "lifty_linkedin_connection" | "lifty_linkedin_callback_hint" = "lifty_linkedin_connection"): Promise<unknown> {
     const args = { p_server_key: settings.serverKey, p_operation: operation, p_payload: payload };
     try {
@@ -298,5 +299,5 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
       throw error;
     }
   }
-  return { start, status, authorize, callback, disconnect, v2Return };
+  return { start, status, authorize, callback, disconnect, v2Return, validateReturn:(state:string)=>{open(state);} };
 }

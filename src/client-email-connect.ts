@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
@@ -54,7 +55,7 @@ export function createClientEmailOperations(settings:EmailConnectSettings) {
   if(settings.serverKey.length<32)throw Error("Invalid client email server key");
   const legacy=createEmailAccountOperations(settings),v1=createUnipileProvider(settings);
   const v2=settings.v2 ? createUnipileV2Provider({...settings.v2,...(settings.fetchImpl ? {fetchImpl:settings.fetchImpl} : {})}) : null;
-  const fetchImpl=settings.fetchImpl ?? fetch;
+  const fetchImpl=connectionFetch(settings.fetchImpl ?? fetch);
   async function rpc(operation:string,payload:Record<string,unknown>,session?:AuthSession):Promise<unknown>{
     const args={p_server_key:settings.serverKey,p_operation:operation,p_payload:payload};
     if(session){const {data,error}=await (session.client as RpcClient).rpc("lifty_client_email_connection",args);if(error)rpcError(error);return data;}
@@ -172,5 +173,5 @@ export function createClientEmailOperations(settings:EmailConnectSettings) {
     try{return await complete(row) ? {status:"connected",account:row.email} : {status:"pending"};}
     catch(error){if(error instanceof PublicError && ["UNIPILE_IDENTITY_MISMATCH","UNIPILE_MAILBOX_UNVERIFIABLE","EMAIL_ACCOUNT_TAKEN"].includes(error.code))return {status:"failed",reason:"verification"};throw error;}
   }
-  return {accounts:legacy.accounts,connect,status,authorize,v2Return};
+  return {accounts:legacy.accounts,connect,status,authorize,v2Return,validateReturn:(state:string)=>{open(state);}};
 }

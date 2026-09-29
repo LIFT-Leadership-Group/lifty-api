@@ -1,3 +1,6 @@
+import { createOAuthConfirmation } from "./oauth-confirmation.js";
+import { openHubspotConnectIntent } from "./hubspot-state.js";
+import { openSlackConnectIntent } from "./slack-state.js";
 import { createRunProgressReader } from "./run-progress.js";
 import { getBusinessWebsite, setBusinessWebsite } from "./business-website.js";
 import { createWorkspaceCampaignOperations } from "./workspace-campaign.js";
@@ -94,6 +97,16 @@ export function createProductionApp(config: ServiceConfig) {
     });
   };
   return createApp({
+    connectionCallbacks:{
+      hubspot:createOAuthConfirmation({provider:"hubspot",origin:new URL(config.hubspot.publicBaseUrl).origin,...config.supabase,
+        open:state=>openHubspotConnectIntent(state,config.hubspot.clientSecret),complete:hubspot.completeCallback}),
+      ...(slack && slackSettings ? {slack:createOAuthConfirmation({provider:"slack",origin:new URL(slackSettings.publicBaseUrl).origin,...config.supabase,
+        open:state=>openSlackConnectIntent(state,slackSettings.clientSecret),complete:slack.completeCallback})} : {}),
+    },
+    validateConnectionReturn:(flow,state)=>{
+      const operation=flow==="email"?email:flow==="linkedin"?linkedin:clientEmail;
+      if(!operation)throw new SyntaxError("unavailable");operation.validateReturn(state);
+    },
     ...(config.openAiAppsChallenge === undefined ? {} : { openAiAppsChallenge: config.openAiAppsChallenge }),
     ...(config.mcp ? {
       mcp: { ...config.mcp, authenticate: createSupabaseAuthenticator(config.supabase, { oauthResource: config.mcp.resourceUrl }) },

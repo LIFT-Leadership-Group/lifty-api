@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 import { z } from "zod";
 import { PublicError } from "./errors.js";
 import { parseHostedAuthOrigin } from "./hosted-auth-branding.js";
@@ -31,7 +32,7 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
   if (!settings.accessToken.trim() || !ProviderIdentifier.safeParse(settings.applicationId).success) throw new Error("Invalid Unipile V2 configuration.");
   const origins = settings.hostedAuthOrigins.map(origin => parseHostedAuthOrigin(origin));
   if (!origins.length || origins.includes("https://account.unipile.com")) throw new Error("Invalid Unipile V2 hosted origin.");
-  const fetchImpl = settings.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(settings.fetchImpl ?? fetch);
   const timeoutMs = settings.timeoutMs ?? 15_000;
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30_000) throw new Error("Invalid Unipile V2 timeout.");
   function fail(code = "UNIPILE_UNAVAILABLE", status = 502): never {
