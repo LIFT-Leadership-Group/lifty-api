@@ -12,6 +12,7 @@ import { getApolloAllowance } from "./apollo-allowance.js";
 import { apolloCredentials } from "./apollo-credentials.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { deleteOwnLogin } from "./login-deletion.js";
+import { listMemberWorkspaces } from "./member-workspaces.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
 import { createEmailAccountOperations } from "./email-accounts.js";
@@ -146,6 +147,7 @@ export function createProductionApp(config: ServiceConfig) {
     } : {}),
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,
+    listMemberWorkspaces,
     createWorkspace,
     submitOnboarding,
     getOnboardingContext,

@@ -24,6 +24,10 @@ Sign in through the current client before private reads. Start onboarding with
 reads saved interview, import and research state and returns the current guide.
 It never starts work, confirms founder acceptance or activates sending.
 
+Call `whoami` before private reads. If it lists several workspaces and the
+user has not named one, ask which workspace first; `references.common`
+explains how to continue.
+
 For an existing workspace task, obtain approval to refresh `summary.get`, whose
 connection checks can update bindings and health or remove unreferenced
 duplicate LinkedIn provider accounts. Then read the guide

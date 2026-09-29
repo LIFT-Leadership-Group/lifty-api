@@ -23,6 +23,15 @@ describe("runtime stage context", () => {
       expect(input).toMatchObject({properties:{workspace:expect.any(Object),connection_ref:expect.any(Object)}});
     }
     expect(context.instructions).toContain("Do not infer a founder workspace");
+    // LIF-1134: several workspaces and none named means ask, not a founder read.
+    expect(context.instructions).toContain("Start with `whoami`");
+    expect(context.instructions).toContain("Do not try `summary_get` or GET to find out");
+    expect(context.instructions).toContain("`WORKSPACE_AMBIGUOUS` from a founder read means the same");
+    expect(context.references.common).toContain("Call `whoami` first");
+    expect(context.references.common).toContain("act only on the workspace `whoami`\nmarks `founder_default`");
+    expect(context.references.common).toContain("never fall back to\nan operation without a workspace");
+    expect(context.references.common).toContain("`summary.get` takes\n`workspace`");
+    expect(context.instructions).toContain("never use the founder\noperations for it");
     expect(context.instructions).toContain("One sender can own");
     expect(context.instructions).toContain("Warmup resume never resumes campaigns");
     expect(context.instructions).toContain("21\nactive warmup days");

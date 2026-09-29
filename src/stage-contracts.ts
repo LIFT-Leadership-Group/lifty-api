@@ -22,7 +22,6 @@ import {
   SlackNotificationChannelsSchema, StartRunResultSchema, SubmitOnboardingRequestSchema,
   UpsertNotificationDestinationRequestSchema, WorkspaceConfigSchema, WorkspaceStatusSchema,
   StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema,
-  WorkspaceOverviewSchema,
 } from "./contracts.js";
 import { ApolloCredentialResult } from "./apollo-credentials.js";
 import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult } from "./acquisition-recovery.js";
@@ -84,6 +83,8 @@ export const StageErrorSchema = z.object({
   request_id: z.string(),
 });
 const Empty = z.object({}).strict();
+// LIF-1138: one of the caller's own workspaces, by slug or reference.
+export const SummaryQuerySchema = z.object({ workspace: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/).optional() }).strict();
 const AttemptRef = z.uuid();
 export const AuthorizationRequiredSchema = z.object({
   status: z.literal("authorization_required"),
@@ -241,8 +242,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   summary: {
     next_step: operation("GET", "/v1/workspace/next-step", "Read the next onboarding step when starting or resuming setup. Returns saved interview, configuration, import and research progress together with the complete stage guide. Does not start work, accept a sample or authorize sending.", NextStepSchema),
     context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for a specific requested Lifty stage.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
-    get: { ...operation("GET", stageRoute("summary"), "Refresh this authenticated workspace's business, website, connection and saved campaign state after approval. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema), readOnly: false },
-    status: { ...operation("GET", "/v1/status", "Read the workspace overview: onboarding import, first research run, live ICP version, the latest configuration update, HubSpot connection with its last sync, and email connection. The email check can update saved connection health. Does not start work or authorize outreach.", WorkspaceOverviewSchema), readOnly: false },
+    get: { ...operation("GET", stageRoute("summary"), "Refresh a workspace's complete state after approval: business, website, saved setup and ICP version, onboarding import, first research run, pending configuration update, HubSpot and its last sync, email (or the mailbox list of a LIFT-managed client workspace), LinkedIn and the saved campaign. Without workspace it describes the caller's default; pass one of the caller's own workspaces by slug or reference to read that one instead. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema, null, SummaryQuerySchema), readOnly: false },
     post: unsupported("summary", "POST", "Use the summary GET operation; its connection checks can change saved provider state."),
     patch: unsupported("summary", "PATCH", "Use the summary GET operation; its connection checks can change saved provider state."),
   },

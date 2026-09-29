@@ -35,6 +35,8 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { DeleteLoginRequest, DeleteLoginResult, type DeleteLoginInput, type DeleteLoginOutput } from "./login-deletion.js";
+import { MemberWorkspacesResult, type MemberWorkspacesOutput } from "./member-workspaces.js";
+import { hubspotOverview, onboardingOverview, runOverview } from "./workspace-summary.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
@@ -200,6 +202,7 @@ export interface AppDependencies {
   getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
   setBusinessWebsite(session: AuthSession, input: BusinessWebsitePatch): Promise<BusinessWebsite>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
+  listMemberWorkspaces(session: AuthSession): Promise<MemberWorkspacesOutput>;
   createWorkspace(
     session: AuthSession,
     input: CreateWorkspaceRequest,
@@ -409,6 +412,8 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/me/workspaces",operationId:"listMemberWorkspaces",security:[{bearerAuth:[]}],
+    responses:{200:JsonResponse(MemberWorkspacesResult),401:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/me/delete",operationId:"deleteOwnLogin",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:DeleteLoginRequest}}}},
     responses:{200:JsonResponse(DeleteLoginResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),404:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -1022,6 +1027,7 @@ const defaultDependencies: AppDependencies = {
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
   },
+  listMemberWorkspaces: async () => { throw new PublicError({status:503,code:"WORKSPACES_UNAVAILABLE",message:"Workspace listing is not configured yet."}); },
   createWorkspace: async () => {
     throw new Error("createWorkspace is not configured");
   },
@@ -1183,6 +1189,7 @@ export function createApp(
     app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp, {
       tools: getStageMcpTools(),
       call: (name, args, request) => callStageMcpTool(name, args, request, (route, init) => Promise.resolve(app.request(route, init))),
+      workspaces: session => dependencies.listMemberWorkspaces(session),
     }));
     app.get("/oauth/consent", context => {
       const authorizationId = context.req.query("authorization_id") ?? "";
@@ -1731,9 +1738,8 @@ export function createApp(
 
   registerStageRoutes(app, dependencies);
 
-  // One aggregate read so `lifty status` answers "is my HubSpot OK?" without
-  // ever touching OAuth: workspace, onboarding import, first run, the latest
-  // live ICP version, config update, and per-provider connection + last sync.
+  // Retained for CLI versions before LIF-1137, whose `lifty status` reads this
+  // overview. Current clients read the workspace summary, which includes it.
   app.get("/v1/status", async (context) => {
     const session = context.get("authSession");
     const workspace = await dependencies.getWorkspace(session);
@@ -1788,52 +1794,12 @@ export function createApp(
           workspace_ref: workspace.workspace.workspace_ref,
           name: workspace.workspace.name,
         },
-        onboarding: onboarding.state === "none"
-          ? { state: "none" }
-          : {
-              state: onboarding.state,
-              submission_ref: onboarding.submission_ref,
-              submitted_at: onboarding.submitted_at,
-              error_code: onboarding.error_code ?? null,
-            },
+        onboarding: onboardingOverview(onboarding),
         configuration: config,
-        run: run.state === "none"
-          ? { state: "none" }
-          : {
-              state: run.state,
-              run_ref: run.run_ref,
-              requested_leads: run.requested_leads,
-              leads_discovered: run.leads_discovered,
-              leads_researched: run.leads_researched,
-              error_code: run.error_code,
-              started_at: run.started_at,
-              completed_at: run.completed_at,
-            },
+        run: runOverview(run),
         config_update: configUpdate,
         integrations: {
-          hubspot: {
-            available: true,
-            connected: hubspot.status === "connected",
-            portal_id: hubspot.status === "connected" ? hubspot.portal_id : null,
-            hub_domain: hubspot.status === "connected" ? hubspot.hub_domain : null,
-            connected_at: hubspot.status === "connected" ? hubspot.connected_at : null,
-            reconnect_required: hubspot.status === "connected"
-              ? hubspot.reconnect_required
-              : false,
-            sync_pending: sync.state === "queued" || sync.state === "running",
-            last_sync_at: sync.state === "none" ? null : sync.completed_at,
-            last_sync: sync.state === "none"
-              ? { state: "none" }
-              : {
-                  state: sync.state,
-                  run_ref: sync.run_ref,
-                  requested_leads: sync.requested_leads,
-                  leads_synced: sync.leads_synced,
-                  error_code: sync.error_code,
-                  started_at: sync.started_at,
-                  completed_at: sync.completed_at,
-                },
-          },
+          hubspot: hubspotOverview(hubspot, sync),
           unipile: { available: dependencies.emailAvailable, connected: email?.status === "connected" },
         },
       }),
@@ -2467,6 +2433,12 @@ export function createApp(
     const input = confirmation.success ? RetireWorkspaceRequest.safeParse({...confirmation.data,workspace_ref:context.req.param("workspace_ref")}) : null;
     if (!input?.success) return errorJson(context, 400, "INVALID_REQUEST", "Confirm the exact workspace ID, slug and name.");
     return context.json(RetireWorkspaceResult.parse(await dependencies.retireWorkspace(context.get("authSession"), input.data)));
+  });
+
+  // Lists only the signed-in caller's own workspace memberships.
+  app.get("/v1/me/workspaces", async (context) => {
+    context.header("cache-control", "no-store");
+    return context.json(MemberWorkspacesResult.parse(await dependencies.listMemberWorkspaces(context.get("authSession"))));
   });
 
   // Deletes only the signed-in caller's own login, after they type its email.

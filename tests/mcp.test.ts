@@ -59,7 +59,7 @@ describe("MCP HTTP boundary", () => {
         expect(list.tools[0]).toMatchObject({ name: "whoami", annotations: { readOnlyHint: true, destructiveHint: false },
           _meta: { securitySchemes: [{ type: "oauth2", scopes: ["openid", "email", "profile"] }] } });
         const result = await client.callTool({ name: "whoami", arguments: {} });
-        expect(result.structuredContent).toEqual({ user_id: userId });
+        expect(result.structuredContent).toEqual({ user_id: userId, workspaces: null });
         const next = await client.callTool({ name: "next_step", arguments: {} });
         expect(next.structuredContent).toMatchObject({ status: 200, data: { step: "business", reason: "workspace_missing", guide: { task: "business" } } });
         expect(JSON.stringify(result)).not.toContain("Bearer");
@@ -68,6 +68,20 @@ describe("MCP HTTP boundary", () => {
     }));
     // Each transport call, including initialization and notifications, authenticates anew.
     expect(authenticate.mock.calls.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("whoami lists only the caller's workspaces and reports an unreadable list as unknown", async () => {
+    const lift = { workspace_ref: "22222222-2222-4222-8222-222222222222", slug: "lift", name: "LIFT", active: true, founder_default: true, self_service: true };
+    const listMemberWorkspaces = vi.fn(async (session: { userId: string }) => {
+      if (session.userId === "founder-broken") throw new Error("database unavailable");
+      return { workspaces: session.userId === "founder-1" ? [lift, { ...lift, workspace_ref: "33333333-3333-4333-8333-333333333333", slug: "acme", name: "Acme", founder_default: false }] : [lift] };
+    });
+    const app = createApp({ mcp: { ...settings, authenticate: authentication }, listMemberWorkspaces, log: () => {} });
+    const whoami = async (userId: string) => (await (await app.request(post("tools/call", { name: "whoami", arguments: {} }, { authorization: `Bearer ${userId}` }))).json()).result.structuredContent;
+    expect((await whoami("founder-1")).workspaces.map((workspace: { slug: string }) => workspace.slug)).toEqual(["lift", "acme"]);
+    expect(await whoami("founder-2")).toEqual({ user_id: "founder-2", workspaces: [lift] });
+    expect(await whoami("founder-broken")).toEqual({ user_id: "founder-broken", workspaces: null });
+    expect(listMemberWorkspaces.mock.calls.map(([session]) => session.userId)).toEqual(["founder-1", "founder-2", "founder-broken"]);
   });
 
   it("returns a relinking challenge if the REST session is revoked after MCP authentication", async () => {
