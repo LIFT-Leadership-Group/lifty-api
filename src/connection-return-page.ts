@@ -30,7 +30,9 @@ export function renderConnectionReturnPage(channel: "email" | "linkedin", view: 
     });
   }
   if (view.kind === "connected") {
-    const who = view.account ? ` as <strong>${escape(view.account)}</strong>` : "";
+    // Cloudflare rewrites visible addresses into a script-decoded placeholder,
+    // and this page allows no script, so the account opts out of that rewrite.
+    const who = view.account ? ` as <strong><!--email_off-->${escape(view.account)}<!--/email_off--></strong>` : "";
     return renderLiftyPage({
       title: "Connected",
       content: `<h1>Your ${account} is connected</h1><p class="intro">Lifty verified the connection${who}.</p><div class="next-step"><strong>Continue in Lifty</strong><p>Return to the conversation where you started, in Claude, ChatGPT or your Lifty app. Nothing is sent until you approve a campaign there.</p></div><p class="reassurance">You can close this tab.</p>`,
