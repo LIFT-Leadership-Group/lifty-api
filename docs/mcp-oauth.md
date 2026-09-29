@@ -9,7 +9,9 @@ enable the Supabase OAuth server or dynamic registration.
 
 The endpoint provides stateless Streamable HTTP using the official MCP SDK,
 with JSON responses and no server session IDs. It authenticates every request
-before interpreting JSON-RPC. `whoami` returns only `user_id` and is read-only.
+before interpreting JSON-RPC. `whoami` is read-only. It returns `user_id` and
+the caller's own workspace memberships (`GET /v1/me/workspaces`), or
+`workspaces: null` when that list cannot be read.
 Both `/.well-known/oauth-protected-resource` and the `/mcp` metadata suffix
 advertise the configured Supabase Auth issuer. A rejected bearer token receives
 401 and a `WWW-Authenticate` discovery challenge.

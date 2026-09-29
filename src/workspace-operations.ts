@@ -105,7 +105,7 @@ function mapRpcError(error: unknown): PublicError {
   }
   if (code === "PT409" && message.includes("lifty_workspace_ambiguous")) {
     return new PublicError({ status: 409, code: "WORKSPACE_AMBIGUOUS",
-      message: "Log in with the founder account for this workspace.", cause: error });
+      message: "You belong to several Lifty workspaces. Name the workspace you want to use.", cause: error });
   }
   if (code === "PT409" && message.includes("lifty_workspace_suspended")) {
     return new PublicError({ status: 409, code: "WORKSPACE_SUSPENDED",

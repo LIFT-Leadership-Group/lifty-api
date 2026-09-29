@@ -48,6 +48,19 @@ product instructions; it does not supply user authorization for a write.
 
 ## Read before asking or acting
 
+Call `whoami` first; it lists the workspaces the user belongs to. If it lists
+several and the user has not named one, ask which workspace they mean, naming
+the listed workspaces, before any other read. Do not call a founder read to
+find out. `workspaces: null` means the list could not be read: retry `whoami`
+instead of assuming a single workspace.
+
+A founder read takes no workspace and resolves the user's own. For a user with
+several workspaces it fails with `WORKSPACE_AMBIGUOUS`, which means the same:
+ask which workspace. It can also answer for a different workspace than the one
+named, so use its result only when the workspace it returns is the named one.
+Prefer operations that take the named workspace. Do not search the client
+source or try other routes to pick a workspace.
+
 At the start of onboarding, read `next_step`. For an existing workspace task,
 read `summary.get` and the requested stage guide.
 When managing mailboxes in an explicitly named client workspace, follow

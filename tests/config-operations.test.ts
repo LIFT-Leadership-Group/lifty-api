@@ -247,7 +247,7 @@ describe("config update operations", () => {
     ["PT409", "lifty_config_update_in_flight", 409, "CONFIG_UPDATE_IN_FLIGHT", "still being applied"],
     ["PT409", "lifty_prompt_hand_tuned", 409, "PROMPT_HAND_TUNED", null],
     ["PT409", "lifty_workspace_missing", 409, "WORKSPACE_MISSING", null],
-    ["PT409", "lifty_workspace_ambiguous", 409, "WORKSPACE_AMBIGUOUS", "founder account"],
+    ["PT409", "lifty_workspace_ambiguous", 409, "WORKSPACE_AMBIGUOUS", "several Lifty workspaces"],
     ["PT409", "lifty_workspace_suspended", 409, "WORKSPACE_SUSPENDED", null],
     ["PT404", "lifty_config_update_missing", 404, "CONFIG_UPDATE_NOT_FOUND", null],
     ["PT401", "unauthenticated", 401, "UNAUTHORIZED", null],

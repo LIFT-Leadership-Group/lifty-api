@@ -35,6 +35,7 @@ import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { DeleteLoginRequest, DeleteLoginResult, type DeleteLoginInput, type DeleteLoginOutput } from "./login-deletion.js";
+import { MemberWorkspacesResult, type MemberWorkspacesOutput } from "./member-workspaces.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
@@ -200,6 +201,7 @@ export interface AppDependencies {
   getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
   setBusinessWebsite(session: AuthSession, input: BusinessWebsitePatch): Promise<BusinessWebsite>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
+  listMemberWorkspaces(session: AuthSession): Promise<MemberWorkspacesOutput>;
   createWorkspace(
     session: AuthSession,
     input: CreateWorkspaceRequest,
@@ -409,6 +411,8 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/me/workspaces",operationId:"listMemberWorkspaces",security:[{bearerAuth:[]}],
+    responses:{200:JsonResponse(MemberWorkspacesResult),401:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/me/delete",operationId:"deleteOwnLogin",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:DeleteLoginRequest}}}},
     responses:{200:JsonResponse(DeleteLoginResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),404:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -1022,6 +1026,7 @@ const defaultDependencies: AppDependencies = {
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
   },
+  listMemberWorkspaces: async () => { throw new PublicError({status:503,code:"WORKSPACES_UNAVAILABLE",message:"Workspace listing is not configured yet."}); },
   createWorkspace: async () => {
     throw new Error("createWorkspace is not configured");
   },
@@ -1183,6 +1188,7 @@ export function createApp(
     app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp, {
       tools: getStageMcpTools(),
       call: (name, args, request) => callStageMcpTool(name, args, request, (route, init) => Promise.resolve(app.request(route, init))),
+      workspaces: session => dependencies.listMemberWorkspaces(session),
     }));
     app.get("/oauth/consent", context => {
       const authorizationId = context.req.query("authorization_id") ?? "";
@@ -2467,6 +2473,12 @@ export function createApp(
     const input = confirmation.success ? RetireWorkspaceRequest.safeParse({...confirmation.data,workspace_ref:context.req.param("workspace_ref")}) : null;
     if (!input?.success) return errorJson(context, 400, "INVALID_REQUEST", "Confirm the exact workspace ID, slug and name.");
     return context.json(RetireWorkspaceResult.parse(await dependencies.retireWorkspace(context.get("authSession"), input.data)));
+  });
+
+  // Lists only the signed-in caller's own workspace memberships.
+  app.get("/v1/me/workspaces", async (context) => {
+    context.header("cache-control", "no-store");
+    return context.json(MemberWorkspacesResult.parse(await dependencies.listMemberWorkspaces(context.get("authSession"))));
   });
 
   // Deletes only the signed-in caller's own login, after they type its email.

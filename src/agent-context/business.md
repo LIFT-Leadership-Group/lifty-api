@@ -29,8 +29,9 @@ business stage and confirm the saved text.
 Explain what the business does and what changed, not its internal identifiers.
 The daily discovery target displayed in workspace configuration is read-only;
 use the capacity stage to inspect it. Do not patch capacity, workspace ownership,
-suspension or membership. For ambiguous/suspended workspace responses, stop
-and explain the account/workspace restriction; do not choose another tenant.
+suspension or membership. For `WORKSPACE_AMBIGUOUS`, ask which workspace the
+user means; never choose one yourself. For a suspended workspace, stop and
+explain the restriction; do not choose another tenant.
 After an uncertain edit, GET the saved business values before retrying. If a
 submission receipt was returned, check that exact receipt with update_status.
 The generated-configuration resolve operation does not apply to metadata edits.

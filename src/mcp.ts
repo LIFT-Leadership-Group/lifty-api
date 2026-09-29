@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthSession, AuthenticationResult } from "./app.js";
+import type { MemberWorkspacesOutput } from "./member-workspaces.js";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT } from "./agent-context.js";
 
 export interface McpSettings {
@@ -19,6 +20,8 @@ export interface McpDependencies extends McpSettings {
 export interface McpToolRegistry {
   tools: Tool[];
   call(name: string, args: Record<string, unknown>, request: Request): Promise<CallToolResult>;
+  /** The caller's own workspace memberships, reported by whoami. */
+  workspaces?(session: AuthSession): Promise<MemberWorkspacesOutput>;
 }
 
 export function mcpResourceMetadata(settings: McpSettings) {
@@ -33,10 +36,15 @@ export function mcpResourceMetadata(settings: McpSettings) {
 
 const whoami: Tool = {
   name: "whoami",
-  title: "Signed-in Lifty founder",
-  description: "Return the signed-in Lifty founder's user ID. Use this to confirm the connector's identity before working with a workspace.",
+  title: "Signed-in Lifty user",
+  description: "Return the signed-in Lifty user's ID and the workspaces they belong to. Call this first. With several workspaces and none named, ask which one before reading workspace state. workspaces is null when the list could not be read; retry instead of assuming one workspace.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  outputSchema: { type: "object", properties: { user_id: { type: "string" } }, required: ["user_id"], additionalProperties: false },
+  outputSchema: { type: "object", properties: {
+    user_id: { type: "string" },
+    workspaces: { type: ["array", "null"], items: { type: "object", properties: {
+      workspace_ref: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, active: { type: "boolean" },
+    }, required: ["workspace_ref", "slug", "name", "active"], additionalProperties: false } },
+  }, required: ["user_id", "workspaces"], additionalProperties: false },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 };
 
@@ -51,7 +59,9 @@ function createMcpServer(session: AuthSession, request: Request, settings: McpSe
       if (params.arguments && Object.keys(params.arguments).length !== 0) {
         throw new McpError(ErrorCode.InvalidParams, "whoami accepts no arguments.");
       }
-      const result = { user_id: session.userId };
+      // A failed list is unknown, never an empty or single-workspace answer.
+      const workspaces = await registry?.workspaces?.(session).then(value => value.workspaces, () => null) ?? null;
+      const result = { user_id: session.userId, workspaces };
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     }
     if (registry?.tools.some(tool => tool.name === params.name)) {
