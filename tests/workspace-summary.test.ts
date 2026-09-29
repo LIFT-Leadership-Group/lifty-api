@@ -31,6 +31,46 @@ function request(app: ReturnType<typeof createApp>, path = "summary", method = "
   return app.request(`/v1/workspace/${path}`, { method, headers: { authorization: "Bearer test", "x-lifty-client-contract": "lifty-cli-context.v5", "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 describe("authenticated workspace resumption", () => {
+  // LIF-1137: the summary is the only state read; it carries what status reported.
+  const progress: Partial<AppDependencies> = {
+    getOnboardingStatus: async () => ({ state: "imported", submission_ref: "11111111-1111-4111-8111-111111111111", draft_digest: `sha256:${"a".repeat(64)}`,
+      submitted_at: "2026-09-01T21:00:00Z", error_code: null, workspace: { workspace_ref: id, name: "Lifty" }, summary: { icp: null, prompt: null } }),
+    getRunStatus: async () => ({ state: "succeeded", run_ref: other, requested_leads: 5, leads_discovered: 5, leads_researched: 4, error_code: null,
+      started_at: "2026-09-01T21:00:00Z", completed_at: "2026-09-01T21:20:00Z", workspace: { workspace_ref: id, name: "Lifty" }, leads: [] }),
+    getCrmSyncStatus: async () => ({ state: "running", run_ref: other, requested_leads: 4, leads_synced: 1, error_code: null, portal_id: "149239526",
+      started_at: "2026-09-02T14:00:00Z", completed_at: null, workspace: { workspace_ref: id, name: "Lifty" } }),
+    getHubspotConnection: async () => ({ provider: "hubspot", status: "connected", portal_id: "149239526", hub_domain: "example.hubspot.com",
+      granted_scopes: ["oauth"], connected_at: "2026-09-02T10:00:00Z", reconnect_required: false }),
+    getConfigUpdateStatus: async () => ({ state: "none" }),
+  };
+  it("includes onboarding, the research run, a pending update and HubSpot with its sync", async () => {
+    const summary = await (await request(createApp({ ...base, ...progress }))).json();
+    expect(summary.onboarding.value).toEqual({ state: "imported", submission_ref: "11111111-1111-4111-8111-111111111111", submitted_at: "2026-09-01T21:00:00Z", error_code: null });
+    expect(summary.run.value).toMatchObject({ state: "succeeded", leads_discovered: 5, leads_researched: 4 });
+    expect(summary.config_update.value).toEqual({ state: "none" });
+    expect(summary.crm.value).toMatchObject({ connected: true, portal_id: "149239526", sync_pending: true, last_sync: { state: "running", leads_synced: 1 } });
+    expect(summary.setup.value).toMatchObject({ icp_version: null, targeting_managed_externally: false });
+    expect(JSON.stringify(summary)).not.toContain("Ada");
+  });
+  it("reports multi-lane targeting as managed elsewhere and still reads business, research and voice", async () => {
+    const sections: unknown[] = [];
+    const getConfig: AppDependencies["getConfig"] = async (_session, section) => {
+      sections.push(section);
+      if (section === null) throw new PublicError({ status: 409, code: "MULTI_LANE_CONFIG_UNSUPPORTED", message: "Managed outside Lifty." });
+      return { workspace_ref: id, config: section === "workspace" ? { workspace: { version, name: "Lifty", description: "Saved business", daily_discovery_target: 10 } }
+        : section === "tone" ? { tone: { version, values: { voice: "Direct" } } } : { prompt: null } };
+    };
+    const summary = await (await request(createApp({ ...base, ...progress, getConfig }))).json();
+    expect(summary.business).toEqual({ status: "available", value: { name: "Lifty", description: "Saved business" } });
+    expect(summary.setup).toEqual({ status: "available", value: { targeting_saved: true, research_saved: false, voice_saved: true, icp_version: null, targeting_managed_externally: true } });
+    expect(sections.sort()).toEqual([null, "prompt", "tone", "workspace"].sort());
+  });
+  it("keeps each new part independent: one failed read is unavailable, the rest still report", async () => {
+    const summary = await (await request(createApp({ ...base, ...progress, getRunStatus: async () => { throw new Error("secret run failure"); } }))).json();
+    expect(summary.run).toEqual({ status: "unavailable", next_action: "retry_read" });
+    expect(summary.crm.status).toBe("available");
+    expect(JSON.stringify(summary)).not.toContain("secret");
+  });
   it("recovers connected email, saved templates and research URL candidates without any write or copying full templates", async () => {
     const sequence = vi.fn(base.workspaceCampaign!);
     const write = vi.fn(async () => { throw new Error("No writes allowed"); });

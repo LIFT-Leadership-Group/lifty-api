@@ -36,6 +36,7 @@ import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialIn
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { DeleteLoginRequest, DeleteLoginResult, type DeleteLoginInput, type DeleteLoginOutput } from "./login-deletion.js";
 import { MemberWorkspacesResult, type MemberWorkspacesOutput } from "./member-workspaces.js";
+import { hubspotOverview, onboardingOverview, runOverview } from "./workspace-summary.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
@@ -1737,9 +1738,8 @@ export function createApp(
 
   registerStageRoutes(app, dependencies);
 
-  // One aggregate read so `lifty status` answers "is my HubSpot OK?" without
-  // ever touching OAuth: workspace, onboarding import, first run, the latest
-  // live ICP version, config update, and per-provider connection + last sync.
+  // Retained for CLI versions before LIF-1137, whose `lifty status` reads this
+  // overview. Current clients read the workspace summary, which includes it.
   app.get("/v1/status", async (context) => {
     const session = context.get("authSession");
     const workspace = await dependencies.getWorkspace(session);
@@ -1794,52 +1794,12 @@ export function createApp(
           workspace_ref: workspace.workspace.workspace_ref,
           name: workspace.workspace.name,
         },
-        onboarding: onboarding.state === "none"
-          ? { state: "none" }
-          : {
-              state: onboarding.state,
-              submission_ref: onboarding.submission_ref,
-              submitted_at: onboarding.submitted_at,
-              error_code: onboarding.error_code ?? null,
-            },
+        onboarding: onboardingOverview(onboarding),
         configuration: config,
-        run: run.state === "none"
-          ? { state: "none" }
-          : {
-              state: run.state,
-              run_ref: run.run_ref,
-              requested_leads: run.requested_leads,
-              leads_discovered: run.leads_discovered,
-              leads_researched: run.leads_researched,
-              error_code: run.error_code,
-              started_at: run.started_at,
-              completed_at: run.completed_at,
-            },
+        run: runOverview(run),
         config_update: configUpdate,
         integrations: {
-          hubspot: {
-            available: true,
-            connected: hubspot.status === "connected",
-            portal_id: hubspot.status === "connected" ? hubspot.portal_id : null,
-            hub_domain: hubspot.status === "connected" ? hubspot.hub_domain : null,
-            connected_at: hubspot.status === "connected" ? hubspot.connected_at : null,
-            reconnect_required: hubspot.status === "connected"
-              ? hubspot.reconnect_required
-              : false,
-            sync_pending: sync.state === "queued" || sync.state === "running",
-            last_sync_at: sync.state === "none" ? null : sync.completed_at,
-            last_sync: sync.state === "none"
-              ? { state: "none" }
-              : {
-                  state: sync.state,
-                  run_ref: sync.run_ref,
-                  requested_leads: sync.requested_leads,
-                  leads_synced: sync.leads_synced,
-                  error_code: sync.error_code,
-                  started_at: sync.started_at,
-                  completed_at: sync.completed_at,
-                },
-          },
+          hubspot: hubspotOverview(hubspot, sync),
           unipile: { available: dependencies.emailAvailable, connected: email?.status === "connected" },
         },
       }),

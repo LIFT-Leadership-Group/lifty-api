@@ -104,7 +104,8 @@ describe("generated MCP stage operations", () => {
     // CLI command -> [tool, method, route]. Commands that only touch local files
     // (install, login loopback, artifacts) have no connector equivalent.
     const cli: Record<string, [string, string, string]> = {
-      "status": ["summary_status", "GET", "/v1/status"],
+      // LIF-1137: status and summary are one read.
+      "status | get summary": ["summary_get", "GET", "/v1/workspace/summary"],
       "disconnect hubspot": ["crm_disconnect", "POST", "/v1/workspace/crm/disconnect"],
       "disconnect slack": ["notifications_disconnect", "POST", "/v1/workspace/notifications/disconnect"],
       "disconnect unipile": ["sending_accounts_disconnect", "POST", "/v1/workspace/sending-accounts/disconnect"],
@@ -143,7 +144,8 @@ describe("generated MCP stage operations", () => {
       expect(annotations(name), name).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     }
     // Both GETs check provider connections and can update saved health.
-    for (const name of ["summary_status", "sending_accounts_client_linkedin_status"]) expect(annotations(name).readOnlyHint, name).toBe(false);
+    for (const name of ["summary_get", "sending_accounts_client_linkedin_status"]) expect(annotations(name).readOnlyHint, name).toBe(false);
+    expect(tools.has("summary_status")).toBe(false);
     // A customer-owned Apollo key is a secret and never enters a chat tool.
     expect(JSON.stringify(tools.get("capacity_apollo_platform_default")!.inputSchema)).not.toContain("api_key");
     expect(JSON.stringify(tools.get("capacity_apollo_recovery")!.inputSchema)).not.toContain("\"status\"");
