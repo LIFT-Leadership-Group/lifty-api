@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const NextStepSchema = z.object({
-  state: z.enum(["action_required", "pending", "blocked", "review"]),
-  step: z.enum(["business", "interview", "configuration", "submission", "import", "sample-review"]),
+  state: z.enum(["action_required", "pending", "blocked", "review", "complete"]),
+  step: z.enum(["business", "interview", "configuration", "submission", "import", "sample-review", "campaign"]),
   reason: z.string().min(1),
   workspace_ref: z.string().nullable(),
   recommended_tools: z.array(z.string()).max(6),

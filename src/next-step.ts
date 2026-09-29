@@ -3,11 +3,13 @@ import { getAgentContext } from "./agent-context.js";
 import { WorkspaceStatusSchema, OnboardingStatusSchema, RunStatusSchema } from "./contracts.js";
 import { OnboardingStateSchema } from "./onboarding-state.js";
 import { NextStepSchema, type NextStep } from "./next-step-contracts.js";
+import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { PublicError } from "./errors.js";
 
 // Only the persisted-state readers belong here. Provider connection "status"
 // operations can bind accounts, record health and remove provider duplicates.
-type NextStepReads = Pick<AppDependencies, "getWorkspace" | "getOnboardingState" | "getOnboardingStatus" | "getRunStatus">;
+// Campaign "status" is a stable database read (no preparation or activation).
+type NextStepReads = Pick<AppDependencies, "getWorkspace" | "getOnboardingState" | "getOnboardingStatus" | "getRunStatus" | "workspaceCampaign">;
 export async function getNextStep(dependencies: NextStepReads, session: AuthSession): Promise<NextStep> {
   const workspace = WorkspaceStatusSchema.parse(await dependencies.getWorkspace(session));
   const workspaceRef = workspace.workspace?.workspace_ref ?? null;
@@ -36,7 +38,21 @@ export async function getNextStep(dependencies: NextStepReads, session: AuthSess
     if (run.state === "none") return response("action_required", "sample-review", "sample_not_started", "sample-review", ["capacity_get", "sample_review_post"], saved, onboarding);
     if (run.state === "queued" || run.state === "running") return response("pending", "sample-review", "sample_pending", "sample-review", ["sample_review_progress"], saved, run);
     if (run.state === "failed") return response("blocked", "sample-review", "sample_failed", "sample-review", ["sample_review_get"], saved, run);
-    return response("review", "sample-review", "sample_ready_for_founder_review", "sample-review", ["sample_review_get"], saved, run);
+    // Sample acceptance is not persisted. A saved campaign is the evidence that
+    // the founder moved past the sample; without one the sample is the resting
+    // point, which is also where a lead-only founder stays.
+    if (workspaceRef === null) throw new Error("Missing workspace reference");
+    const campaign = WorkspaceCampaignResult.parse(await dependencies.workspaceCampaign(session, { operation: "status", payload: { workspace: workspaceRef } }));
+    requireWorkspace(campaign.workspace_ref);
+    if (campaign.state === "unconfigured") return response("review", "sample-review", "sample_ready_for_founder_review", "sample-review", ["sample_review_get"], saved, run);
+    const receipt = { state: campaign.state, outreach_enabled: campaign.outreach_enabled, version_ref: campaign.version_ref,
+      preparation: campaign.preparation?.state ?? null, blockers: campaign.blockers };
+    const tools = ["campaigns_get"];
+    if (campaign.state === "active") return response("complete", "campaign", "campaign_active", "campaigns", tools, saved, receipt);
+    if (campaign.state === "paused") return response("action_required", "campaign", "campaign_paused", "campaigns", tools, saved, receipt);
+    if (campaign.preparation?.state === "pending") return response("pending", "campaign", "campaign_preparing", "campaigns", tools, saved, receipt);
+    if (campaign.preparation?.state === "failed") return response("blocked", "campaign", "campaign_preparation_failed", "campaigns", tools, saved, receipt);
+    return response("action_required", "campaign", "campaign_draft", "campaigns", tools, saved, receipt);
   }
   if (saved.state === "none" || !saved.draft_ready) return response("action_required", "interview", "confirmed_interview_needed", "onboarding", ["business_onboarding_state", "business_onboarding_save"], saved);
   if (!saved.configuration) return response("action_required", "configuration", "configuration_needed", "targeting", ["targeting_onboarding_context", "targeting_onboarding_save"], saved);

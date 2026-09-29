@@ -68,3 +68,8 @@ missing, offer LinkedIn, email, both, or not right now and wait. Do not recommen
 email simply because a mailbox is connected. Follow the campaign context to
 explain the chosen sequence before configuring outreach. Reuse explicit choices;
 never turn sample acceptance into campaign activation consent.
+
+In a later session `next_step` returns this stage while no campaign is saved.
+The saved cohort is ready to use: do not present it as new work or ask for a
+second review unless the founder wants one. A "not right now" answer about
+outreach is not saved, so ask about it at most once per session and accept it.
