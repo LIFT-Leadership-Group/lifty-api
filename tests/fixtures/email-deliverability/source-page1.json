@@ -27,7 +27,7 @@
    }
   ]
  },
- "generated_at": "2026-09-29T19:34:39.159861+00:00",
+ "generated_at": "2026-09-29T19:52:58.34923+00:00",
  "mailboxes": [
   {
    "availability": {
@@ -45,12 +45,12 @@
        "capture_paused": false,
        "scope_key": "global",
        "send_paused": true,
-       "updated_at": "2026-09-29T19:34:31.156554+00:00"
+       "updated_at": "2026-09-29T19:52:50.441847+00:00"
       }
      ],
-     "created_at": "2026-09-26T19:34:39.159861+00:00",
+     "created_at": "2026-09-26T19:52:58.34923+00:00",
      "daily_send_limit": null,
-     "health_checked_at": "2026-09-29T19:34:39.159861+00:00",
+     "health_checked_at": "2026-09-29T19:52:58.34923+00:00",
      "holds": [],
      "lifty_mailbox_ref": "10395000-0000-4000-8000-000000000002",
      "mailbox_ready": false,
@@ -59,7 +59,7 @@
      "send_block_reason": "send_paused:global",
      "sender_ref": "10392000-0000-4000-8000-000000000002",
      "status": "connected",
-     "updated_at": "2026-09-29T19:34:39.159861+00:00"
+     "updated_at": "2026-09-29T19:52:58.34923+00:00"
     },
     {
      "connection_ref": "10393000-0000-4000-8000-000000000003",
@@ -68,10 +68,10 @@
        "capture_paused": false,
        "scope_key": "global",
        "send_paused": true,
-       "updated_at": "2026-09-29T19:34:31.156554+00:00"
+       "updated_at": "2026-09-29T19:52:50.441847+00:00"
       }
      ],
-     "created_at": "2026-09-09T19:34:39.159861+00:00",
+     "created_at": "2026-09-09T19:52:58.34923+00:00",
      "daily_send_limit": null,
      "health_checked_at": null,
      "holds": [],
@@ -82,7 +82,7 @@
      "send_block_reason": "connection_unavailable",
      "sender_ref": "10392000-0000-4000-8000-000000000002",
      "status": "disconnected",
-     "updated_at": "2026-09-29T19:34:39.159861+00:00"
+     "updated_at": "2026-09-29T19:52:58.34923+00:00"
     }
    ],
    "domain": "a.test",
@@ -115,7 +115,7 @@
      "provider_test_ref": "900023",
      "source": "smartlead_result",
      "test_ref": "smartlead:900023",
-     "tested_at": "2026-09-25T19:34:39+00:00"
+     "tested_at": "2026-09-25T19:52:58+00:00"
     },
     "latest_completed_test_ref": "smartlead:900023",
     "latest_test_ref": "smartlead:900023",
@@ -141,7 +141,7 @@
       "provider_test_ref": "900023",
       "source": "smartlead_result",
       "test_ref": "smartlead:900023",
-      "tested_at": "2026-09-25T19:34:39+00:00"
+      "tested_at": "2026-09-25T19:52:58+00:00"
      },
      {
       "completed_at": null,
@@ -164,7 +164,7 @@
       "provider_test_ref": "900022",
       "source": "smartlead_result",
       "test_ref": "smartlead:900022",
-      "tested_at": "2026-09-23T19:34:39+00:00"
+      "tested_at": "2026-09-23T19:52:58+00:00"
      },
      {
       "completed_at": null,
@@ -187,7 +187,7 @@
       "provider_test_ref": "900021",
       "source": "smartlead_result",
       "test_ref": "smartlead:900021",
-      "tested_at": "2026-09-19T19:34:39+00:00"
+      "tested_at": "2026-09-19T19:52:58+00:00"
      }
     ],
     "test_count": 3
@@ -208,8 +208,8 @@
     "approved_at": null,
     "approved_by": null,
     "approved_for_outbound": false,
-    "cold_eligible_at": "2026-10-06T19:34:39.159861+00:00",
-    "created_at": "2026-09-29T19:34:39.159861+00:00",
+    "cold_eligible_at": "2026-10-06T19:52:58.34923+00:00",
+    "created_at": "2026-09-29T19:52:58.34923+00:00",
     "is_eligible": false,
     "mitigation_paused_at": null,
     "mitigation_reason": "placement_failed",
@@ -219,18 +219,18 @@
     "placement_gate_passed_at": null,
     "placement_hold_reason": "operator review",
     "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:34:39.159861+00:00",
+    "updated_at": "2026-09-29T19:52:58.34923+00:00",
     "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-09-14T19:34:39.159861+00:00"
+    "warmup_started_at": "2026-09-14T19:52:58.34923+00:00"
    },
    "warmup": {
     "mailivery": [],
     "smartlead": {
-     "active_since": "2026-09-15T19:34:39.159861+00:00",
+     "active_since": "2026-09-15T19:52:58.34923+00:00",
      "detail": "12 observed warmup sends/7d (minimum 20)",
      "health": "pending",
-     "last_sent_at": "2026-09-28T19:34:39.159861+00:00",
-     "observed_at": "2026-09-29T16:34:39.159861+00:00",
+     "last_sent_at": "2026-09-28T19:52:58.34923+00:00",
+     "observed_at": "2026-09-29T16:52:58.34923+00:00",
      "reputation_pct": 98.0,
      "sent_7d": 12,
      "spam_count": 0,
@@ -240,6 +240,7 @@
     },
     "smartlead_daily": []
    },
+   "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
   },
   {
@@ -252,7 +253,7 @@
    "campaigns": [
     {
      "campaign_ref": "10394200-0000-4000-8000-000000000002",
-     "created_at": "2026-09-24T19:34:39.159861+00:00",
+     "created_at": "2026-09-24T19:52:58.34923+00:00",
      "drift_detected_at": null,
      "last_synced_at": null,
      "name": "A paused campaign",
@@ -262,7 +263,7 @@
      "sender_ref": "10392000-0000-4000-8000-000000000001",
      "source": "smartlead_campaign",
      "status": "paused",
-     "updated_at": "2026-09-29T19:34:39.159861+00:00"
+     "updated_at": "2026-09-29T19:52:58.34923+00:00"
     }
    ],
    "connections": [],
@@ -296,7 +297,7 @@
      "provider_test_ref": "900011",
      "source": "smartlead_result",
      "test_ref": "smartlead:900011",
-     "tested_at": "2026-09-24T19:34:39+00:00"
+     "tested_at": "2026-09-24T19:52:58+00:00"
     },
     "latest_completed_test_ref": "smartlead:900011",
     "latest_test_ref": "smartlead:900011",
@@ -322,7 +323,7 @@
       "provider_test_ref": "900011",
       "source": "smartlead_result",
       "test_ref": "smartlead:900011",
-      "tested_at": "2026-09-24T19:34:39+00:00"
+      "tested_at": "2026-09-24T19:52:58+00:00"
      }
     ],
     "test_count": 1
@@ -351,7 +352,7 @@
     "approved_by": null,
     "approved_for_outbound": false,
     "cold_eligible_at": null,
-    "created_at": "2026-09-29T19:34:39.159861+00:00",
+    "created_at": "2026-09-29T19:52:58.34923+00:00",
     "is_eligible": false,
     "mitigation_paused_at": null,
     "mitigation_reason": null,
@@ -361,15 +362,16 @@
     "placement_gate_passed_at": null,
     "placement_hold_reason": null,
     "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:34:39.159861+00:00",
+    "updated_at": "2026-09-29T19:52:58.34923+00:00",
     "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-08-30T19:34:39.159861+00:00"
+    "warmup_started_at": "2026-08-30T19:52:58.34923+00:00"
    },
    "warmup": {
     "mailivery": [],
     "smartlead": null,
     "smartlead_daily": []
    },
+   "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
   }
  ],
@@ -392,7 +394,7 @@
    "is_active": true,
    "name": "Fixture A",
    "posture": {
-    "captured_at": "2026-09-29T18:34:39.159861+00:00",
+    "captured_at": "2026-09-29T18:52:58.34923+00:00",
     "client_label": "Fixture A",
     "metrics": {
      "reasons": [

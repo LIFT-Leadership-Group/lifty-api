@@ -27,7 +27,7 @@
    }
   ]
  },
- "generated_at": "2026-09-29T19:34:38.924346+00:00",
+ "generated_at": "2026-09-29T19:52:58.138404+00:00",
  "mailboxes": [
   {
    "availability": {
@@ -45,12 +45,12 @@
        "capture_paused": false,
        "scope_key": "global",
        "send_paused": true,
-       "updated_at": "2026-09-29T19:34:31.156554+00:00"
+       "updated_at": "2026-09-29T19:52:50.441847+00:00"
       }
      ],
-     "created_at": "2026-09-26T19:34:38.924346+00:00",
+     "created_at": "2026-09-26T19:52:58.138404+00:00",
      "daily_send_limit": null,
-     "health_checked_at": "2026-09-29T19:34:38.924346+00:00",
+     "health_checked_at": "2026-09-29T19:52:58.138404+00:00",
      "holds": [],
      "lifty_mailbox_ref": "10395000-0000-4000-8000-000000000002",
      "mailbox_ready": false,
@@ -59,7 +59,7 @@
      "send_block_reason": "send_paused:global",
      "sender_ref": "10392000-0000-4000-8000-000000000002",
      "status": "connected",
-     "updated_at": "2026-09-29T19:34:38.924346+00:00"
+     "updated_at": "2026-09-29T19:52:58.138404+00:00"
     },
     {
      "connection_ref": "10393000-0000-4000-8000-000000000003",
@@ -68,10 +68,10 @@
        "capture_paused": false,
        "scope_key": "global",
        "send_paused": true,
-       "updated_at": "2026-09-29T19:34:31.156554+00:00"
+       "updated_at": "2026-09-29T19:52:50.441847+00:00"
       }
      ],
-     "created_at": "2026-09-09T19:34:38.924346+00:00",
+     "created_at": "2026-09-09T19:52:58.138404+00:00",
      "daily_send_limit": null,
      "health_checked_at": null,
      "holds": [],
@@ -82,7 +82,7 @@
      "send_block_reason": "connection_unavailable",
      "sender_ref": "10392000-0000-4000-8000-000000000002",
      "status": "disconnected",
-     "updated_at": "2026-09-29T19:34:38.924346+00:00"
+     "updated_at": "2026-09-29T19:52:58.138404+00:00"
     }
    ],
    "domain": "a.test",
@@ -115,7 +115,7 @@
      "provider_test_ref": "900023",
      "source": "smartlead_result",
      "test_ref": "smartlead:900023",
-     "tested_at": "2026-09-25T19:34:38+00:00"
+     "tested_at": "2026-09-25T19:52:58+00:00"
     },
     "latest_completed_test_ref": "smartlead:900023",
     "latest_test_ref": "smartlead:900023",
@@ -141,7 +141,7 @@
       "provider_test_ref": "900023",
       "source": "smartlead_result",
       "test_ref": "smartlead:900023",
-      "tested_at": "2026-09-25T19:34:38+00:00"
+      "tested_at": "2026-09-25T19:52:58+00:00"
      },
      {
       "completed_at": null,
@@ -164,7 +164,7 @@
       "provider_test_ref": "900022",
       "source": "smartlead_result",
       "test_ref": "smartlead:900022",
-      "tested_at": "2026-09-23T19:34:38+00:00"
+      "tested_at": "2026-09-23T19:52:58+00:00"
      },
      {
       "completed_at": null,
@@ -187,7 +187,7 @@
       "provider_test_ref": "900021",
       "source": "smartlead_result",
       "test_ref": "smartlead:900021",
-      "tested_at": "2026-09-19T19:34:38+00:00"
+      "tested_at": "2026-09-19T19:52:58+00:00"
      }
     ],
     "test_count": 3
@@ -208,8 +208,8 @@
     "approved_at": null,
     "approved_by": null,
     "approved_for_outbound": false,
-    "cold_eligible_at": "2026-10-06T19:34:38.924346+00:00",
-    "created_at": "2026-09-29T19:34:38.924346+00:00",
+    "cold_eligible_at": "2026-10-06T19:52:58.138404+00:00",
+    "created_at": "2026-09-29T19:52:58.138404+00:00",
     "is_eligible": false,
     "mitigation_paused_at": null,
     "mitigation_reason": "placement_failed",
@@ -219,18 +219,18 @@
     "placement_gate_passed_at": null,
     "placement_hold_reason": "operator review",
     "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:34:38.924346+00:00",
+    "updated_at": "2026-09-29T19:52:58.138404+00:00",
     "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-09-14T19:34:38.924346+00:00"
+    "warmup_started_at": "2026-09-14T19:52:58.138404+00:00"
    },
    "warmup": {
     "mailivery": [],
     "smartlead": {
-     "active_since": "2026-09-15T19:34:38.924346+00:00",
+     "active_since": "2026-09-15T19:52:58.138404+00:00",
      "detail": "12 observed warmup sends/7d (minimum 20)",
      "health": "pending",
-     "last_sent_at": "2026-09-28T19:34:38.924346+00:00",
-     "observed_at": "2026-09-29T16:34:38.924346+00:00",
+     "last_sent_at": "2026-09-28T19:52:58.138404+00:00",
+     "observed_at": "2026-09-29T16:52:58.138404+00:00",
      "reputation_pct": 98.0,
      "sent_7d": 12,
      "spam_count": 0,
@@ -240,6 +240,7 @@
     },
     "smartlead_daily": []
    },
+   "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
   },
   {
@@ -252,7 +253,7 @@
    "campaigns": [
     {
      "campaign_ref": "10394200-0000-4000-8000-000000000002",
-     "created_at": "2026-09-24T19:34:38.924346+00:00",
+     "created_at": "2026-09-24T19:52:58.138404+00:00",
      "drift_detected_at": null,
      "last_synced_at": null,
      "name": "A paused campaign",
@@ -262,7 +263,7 @@
      "sender_ref": "10392000-0000-4000-8000-000000000001",
      "source": "smartlead_campaign",
      "status": "paused",
-     "updated_at": "2026-09-29T19:34:38.924346+00:00"
+     "updated_at": "2026-09-29T19:52:58.138404+00:00"
     }
    ],
    "connections": [],
@@ -296,7 +297,7 @@
      "provider_test_ref": "900011",
      "source": "smartlead_result",
      "test_ref": "smartlead:900011",
-     "tested_at": "2026-09-24T19:34:38+00:00"
+     "tested_at": "2026-09-24T19:52:58+00:00"
     },
     "latest_completed_test_ref": "smartlead:900011",
     "latest_test_ref": "smartlead:900011",
@@ -322,7 +323,7 @@
       "provider_test_ref": "900011",
       "source": "smartlead_result",
       "test_ref": "smartlead:900011",
-      "tested_at": "2026-09-24T19:34:38+00:00"
+      "tested_at": "2026-09-24T19:52:58+00:00"
      }
     ],
     "test_count": 1
@@ -351,7 +352,7 @@
     "approved_by": null,
     "approved_for_outbound": false,
     "cold_eligible_at": null,
-    "created_at": "2026-09-29T19:34:38.924346+00:00",
+    "created_at": "2026-09-29T19:52:58.138404+00:00",
     "is_eligible": false,
     "mitigation_paused_at": null,
     "mitigation_reason": null,
@@ -361,15 +362,16 @@
     "placement_gate_passed_at": null,
     "placement_hold_reason": null,
     "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:34:38.924346+00:00",
+    "updated_at": "2026-09-29T19:52:58.138404+00:00",
     "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-08-30T19:34:38.924346+00:00"
+    "warmup_started_at": "2026-08-30T19:52:58.138404+00:00"
    },
    "warmup": {
     "mailivery": [],
     "smartlead": null,
     "smartlead_daily": []
    },
+   "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
   },
   {
@@ -382,7 +384,7 @@
    "campaigns": [
     {
      "campaign_ref": "10394200-0000-4000-8000-000000000001",
-     "created_at": "2026-09-19T19:34:38.924346+00:00",
+     "created_at": "2026-09-19T19:52:58.138404+00:00",
      "drift_detected_at": null,
      "last_synced_at": null,
      "name": "A active campaign",
@@ -392,11 +394,11 @@
      "sender_ref": "10392000-0000-4000-8000-000000000001",
      "source": "smartlead_campaign",
      "status": "active",
-     "updated_at": "2026-09-29T19:34:38.924346+00:00"
+     "updated_at": "2026-09-29T19:52:58.138404+00:00"
     },
     {
      "campaign_ref": "10394200-0000-4000-8000-000000000002",
-     "created_at": "2026-09-24T19:34:38.924346+00:00",
+     "created_at": "2026-09-24T19:52:58.138404+00:00",
      "drift_detected_at": null,
      "last_synced_at": null,
      "name": "A paused campaign",
@@ -406,7 +408,7 @@
      "sender_ref": "10392000-0000-4000-8000-000000000001",
      "source": "smartlead_campaign",
      "status": "paused",
-     "updated_at": "2026-09-29T19:34:38.924346+00:00"
+     "updated_at": "2026-09-29T19:52:58.138404+00:00"
     }
    ],
    "connections": [],
@@ -440,7 +442,7 @@
      "provider_test_ref": "900004",
      "source": "smartlead_result",
      "test_ref": "smartlead:900004",
-     "tested_at": "2026-09-27T19:34:38+00:00"
+     "tested_at": "2026-09-27T19:52:58+00:00"
     },
     "latest_completed_test_ref": "smartlead:900004",
     "latest_test_ref": "smartlead:900004",
@@ -466,7 +468,7 @@
       "provider_test_ref": "900004",
       "source": "smartlead_result",
       "test_ref": "smartlead:900004",
-      "tested_at": "2026-09-27T19:34:38+00:00"
+      "tested_at": "2026-09-27T19:52:58+00:00"
      },
      {
       "completed_at": null,
@@ -489,7 +491,7 @@
       "provider_test_ref": "900003",
       "source": "smartlead_result",
       "test_ref": "smartlead:900003",
-      "tested_at": "2026-09-27T19:34:38+00:00"
+      "tested_at": "2026-09-27T19:52:58+00:00"
      },
      {
       "completed_at": null,
@@ -512,7 +514,7 @@
       "provider_test_ref": "900002",
       "source": "smartlead_result",
       "test_ref": "smartlead:900002",
-      "tested_at": "2026-09-09T19:34:38+00:00"
+      "tested_at": "2026-09-09T19:52:58+00:00"
      }
     ],
     "test_count": 4
@@ -529,32 +531,32 @@
    ],
    "smartlead": {
     "account_id": 103901,
-    "approved_at": "2026-09-28T19:34:38.924346+00:00",
+    "approved_at": "2026-09-28T19:52:58.138404+00:00",
     "approved_by": "fixture-operator",
     "approved_for_outbound": true,
-    "cold_eligible_at": "2026-09-10T19:34:38.924346+00:00",
-    "created_at": "2026-09-29T19:34:38.924346+00:00",
+    "cold_eligible_at": "2026-09-10T19:52:58.138404+00:00",
+    "created_at": "2026-09-29T19:52:58.138404+00:00",
     "is_eligible": true,
     "mitigation_paused_at": null,
     "mitigation_reason": null,
     "mitigation_resumed_at": null,
     "mitigation_state": "none",
     "notes": "A human note",
-    "placement_gate_passed_at": "2026-09-27T19:34:38+00:00",
+    "placement_gate_passed_at": "2026-09-27T19:52:58+00:00",
     "placement_hold_reason": null,
     "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:34:38.924346+00:00",
+    "updated_at": "2026-09-29T19:52:58.138404+00:00",
     "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-08-20T19:34:38.924346+00:00"
+    "warmup_started_at": "2026-08-20T19:52:58.138404+00:00"
    },
    "warmup": {
     "mailivery": [],
     "smartlead": {
-     "active_since": "2026-08-25T19:34:38.924346+00:00",
+     "active_since": "2026-08-25T19:52:58.138404+00:00",
      "detail": "reputation 100% \u00b7 warmup spam 0% of 40",
      "health": "pass",
-     "last_sent_at": "2026-09-29T18:34:38.924346+00:00",
-     "observed_at": "2026-09-29T19:34:38.924346+00:00",
+     "last_sent_at": "2026-09-29T18:52:58.138404+00:00",
+     "observed_at": "2026-09-29T19:52:58.138404+00:00",
      "reputation_pct": 100.0,
      "sent_7d": 30,
      "spam_count": 0,
@@ -566,7 +568,7 @@
      {
       "day": "2026-08-31",
       "health": "pass",
-      "observed_at": "2026-08-31T19:34:38.924346+00:00",
+      "observed_at": "2026-08-31T19:52:58.138404+00:00",
       "reputation_pct": 71.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -577,7 +579,7 @@
      {
       "day": "2026-09-01",
       "health": "pass",
-      "observed_at": "2026-09-01T19:34:38.924346+00:00",
+      "observed_at": "2026-09-01T19:52:58.138404+00:00",
       "reputation_pct": 72.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -588,7 +590,7 @@
      {
       "day": "2026-09-02",
       "health": "pass",
-      "observed_at": "2026-09-02T19:34:38.924346+00:00",
+      "observed_at": "2026-09-02T19:52:58.138404+00:00",
       "reputation_pct": 73.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -599,7 +601,7 @@
      {
       "day": "2026-09-03",
       "health": "pass",
-      "observed_at": "2026-09-03T19:34:38.924346+00:00",
+      "observed_at": "2026-09-03T19:52:58.138404+00:00",
       "reputation_pct": 74.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -610,7 +612,7 @@
      {
       "day": "2026-09-04",
       "health": "pass",
-      "observed_at": "2026-09-04T19:34:38.924346+00:00",
+      "observed_at": "2026-09-04T19:52:58.138404+00:00",
       "reputation_pct": 75.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -621,7 +623,7 @@
      {
       "day": "2026-09-05",
       "health": "pass",
-      "observed_at": "2026-09-05T19:34:38.924346+00:00",
+      "observed_at": "2026-09-05T19:52:58.138404+00:00",
       "reputation_pct": 76.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -632,7 +634,7 @@
      {
       "day": "2026-09-06",
       "health": "pass",
-      "observed_at": "2026-09-06T19:34:38.924346+00:00",
+      "observed_at": "2026-09-06T19:52:58.138404+00:00",
       "reputation_pct": 77.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -643,7 +645,7 @@
      {
       "day": "2026-09-07",
       "health": "pass",
-      "observed_at": "2026-09-07T19:34:38.924346+00:00",
+      "observed_at": "2026-09-07T19:52:58.138404+00:00",
       "reputation_pct": 78.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -654,7 +656,7 @@
      {
       "day": "2026-09-08",
       "health": "pass",
-      "observed_at": "2026-09-08T19:34:38.924346+00:00",
+      "observed_at": "2026-09-08T19:52:58.138404+00:00",
       "reputation_pct": 79.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -665,7 +667,7 @@
      {
       "day": "2026-09-09",
       "health": "pass",
-      "observed_at": "2026-09-09T19:34:38.924346+00:00",
+      "observed_at": "2026-09-09T19:52:58.138404+00:00",
       "reputation_pct": 80.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -676,7 +678,7 @@
      {
       "day": "2026-09-10",
       "health": "pass",
-      "observed_at": "2026-09-10T19:34:38.924346+00:00",
+      "observed_at": "2026-09-10T19:52:58.138404+00:00",
       "reputation_pct": 81.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -687,7 +689,7 @@
      {
       "day": "2026-09-11",
       "health": "pass",
-      "observed_at": "2026-09-11T19:34:38.924346+00:00",
+      "observed_at": "2026-09-11T19:52:58.138404+00:00",
       "reputation_pct": 82.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -698,7 +700,7 @@
      {
       "day": "2026-09-12",
       "health": "pass",
-      "observed_at": "2026-09-12T19:34:38.924346+00:00",
+      "observed_at": "2026-09-12T19:52:58.138404+00:00",
       "reputation_pct": 83.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -709,7 +711,7 @@
      {
       "day": "2026-09-13",
       "health": "pass",
-      "observed_at": "2026-09-13T19:34:38.924346+00:00",
+      "observed_at": "2026-09-13T19:52:58.138404+00:00",
       "reputation_pct": 84.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -720,7 +722,7 @@
      {
       "day": "2026-09-14",
       "health": "pass",
-      "observed_at": "2026-09-14T19:34:38.924346+00:00",
+      "observed_at": "2026-09-14T19:52:58.138404+00:00",
       "reputation_pct": 85.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -731,7 +733,7 @@
      {
       "day": "2026-09-15",
       "health": "pass",
-      "observed_at": "2026-09-15T19:34:38.924346+00:00",
+      "observed_at": "2026-09-15T19:52:58.138404+00:00",
       "reputation_pct": 86.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -742,7 +744,7 @@
      {
       "day": "2026-09-16",
       "health": "pass",
-      "observed_at": "2026-09-16T19:34:38.924346+00:00",
+      "observed_at": "2026-09-16T19:52:58.138404+00:00",
       "reputation_pct": 87.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -753,7 +755,7 @@
      {
       "day": "2026-09-17",
       "health": "pass",
-      "observed_at": "2026-09-17T19:34:38.924346+00:00",
+      "observed_at": "2026-09-17T19:52:58.138404+00:00",
       "reputation_pct": 88.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -764,7 +766,7 @@
      {
       "day": "2026-09-18",
       "health": "pass",
-      "observed_at": "2026-09-18T19:34:38.924346+00:00",
+      "observed_at": "2026-09-18T19:52:58.138404+00:00",
       "reputation_pct": 89.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -775,7 +777,7 @@
      {
       "day": "2026-09-19",
       "health": "pass",
-      "observed_at": "2026-09-19T19:34:38.924346+00:00",
+      "observed_at": "2026-09-19T19:52:58.138404+00:00",
       "reputation_pct": 90.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -786,7 +788,7 @@
      {
       "day": "2026-09-20",
       "health": "pass",
-      "observed_at": "2026-09-20T19:34:38.924346+00:00",
+      "observed_at": "2026-09-20T19:52:58.138404+00:00",
       "reputation_pct": 91.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -797,7 +799,7 @@
      {
       "day": "2026-09-21",
       "health": "pass",
-      "observed_at": "2026-09-21T19:34:38.924346+00:00",
+      "observed_at": "2026-09-21T19:52:58.138404+00:00",
       "reputation_pct": 92.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -808,7 +810,7 @@
      {
       "day": "2026-09-22",
       "health": "pass",
-      "observed_at": "2026-09-22T19:34:38.924346+00:00",
+      "observed_at": "2026-09-22T19:52:58.138404+00:00",
       "reputation_pct": 93.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -819,7 +821,7 @@
      {
       "day": "2026-09-23",
       "health": "pass",
-      "observed_at": "2026-09-23T19:34:38.924346+00:00",
+      "observed_at": "2026-09-23T19:52:58.138404+00:00",
       "reputation_pct": 94.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -830,7 +832,7 @@
      {
       "day": "2026-09-24",
       "health": "pass",
-      "observed_at": "2026-09-24T19:34:38.924346+00:00",
+      "observed_at": "2026-09-24T19:52:58.138404+00:00",
       "reputation_pct": 95.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -841,7 +843,7 @@
      {
       "day": "2026-09-25",
       "health": "pass",
-      "observed_at": "2026-09-25T19:34:38.924346+00:00",
+      "observed_at": "2026-09-25T19:52:58.138404+00:00",
       "reputation_pct": 96.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -852,7 +854,7 @@
      {
       "day": "2026-09-26",
       "health": "pass",
-      "observed_at": "2026-09-26T19:34:38.924346+00:00",
+      "observed_at": "2026-09-26T19:52:58.138404+00:00",
       "reputation_pct": 97.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -863,7 +865,7 @@
      {
       "day": "2026-09-27",
       "health": "pass",
-      "observed_at": "2026-09-27T19:34:38.924346+00:00",
+      "observed_at": "2026-09-27T19:52:58.138404+00:00",
       "reputation_pct": 98.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -874,7 +876,7 @@
      {
       "day": "2026-09-28",
       "health": "pass",
-      "observed_at": "2026-09-28T19:34:38.924346+00:00",
+      "observed_at": "2026-09-28T19:52:58.138404+00:00",
       "reputation_pct": 99.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -885,7 +887,7 @@
      {
       "day": "2026-09-29",
       "health": "pass",
-      "observed_at": "2026-09-29T19:34:38.924346+00:00",
+      "observed_at": "2026-09-29T19:52:58.138404+00:00",
       "reputation_pct": 100.0,
       "sent_7d": 30,
       "spam_count": 0,
@@ -895,6 +897,7 @@
      }
     ]
    },
+   "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
   },
   {
@@ -928,7 +931,7 @@
     "approved_by": null,
     "approved_for_outbound": false,
     "cold_eligible_at": null,
-    "created_at": "2026-09-29T19:34:38.924346+00:00",
+    "created_at": "2026-09-29T19:52:58.138404+00:00",
     "is_eligible": false,
     "mitigation_paused_at": null,
     "mitigation_reason": null,
@@ -938,15 +941,16 @@
     "placement_gate_passed_at": null,
     "placement_hold_reason": null,
     "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:34:38.924346+00:00",
+    "updated_at": "2026-09-29T19:52:58.138404+00:00",
     "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-09-27T19:34:38.924346+00:00"
+    "warmup_started_at": "2026-09-27T19:52:58.138404+00:00"
    },
    "warmup": {
     "mailivery": [],
     "smartlead": null,
     "smartlead_daily": []
    },
+   "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
   },
   {
@@ -960,7 +964,7 @@
     {
      "campaign_count": 2,
      "connection_ref": "10393000-0000-4000-8000-000000000001",
-     "latest_created_at": "2026-09-25T19:34:38.924346+00:00",
+     "latest_created_at": "2026-09-25T19:52:58.138404+00:00",
      "source": "lifty_direct_email",
      "states": {
       "active": 1,
@@ -976,23 +980,23 @@
        "capture_paused": false,
        "scope_key": "10391000-0000-4000-8000-000000000001:email:sender:10392000-0000-4000-8000-000000000001:connection:10393000-0000-4000-8000-000000000001",
        "send_paused": true,
-       "updated_at": "2026-09-29T19:34:38.940706+00:00"
+       "updated_at": "2026-09-29T19:52:58.152313+00:00"
       },
       {
        "capture_paused": false,
        "scope_key": "global",
        "send_paused": true,
-       "updated_at": "2026-09-29T19:34:31.156554+00:00"
+       "updated_at": "2026-09-29T19:52:50.441847+00:00"
       }
      ],
-     "created_at": "2026-08-30T19:34:38.924346+00:00",
+     "created_at": "2026-08-30T19:52:58.138404+00:00",
      "daily_send_limit": null,
-     "health_checked_at": "2026-09-29T19:34:38.924346+00:00",
+     "health_checked_at": "2026-09-29T19:52:58.138404+00:00",
      "holds": [
       {
        "reason": "operator_hold",
        "source_ref": "fixture-review",
-       "updated_at": "2026-09-29T19:34:38.940923+00:00"
+       "updated_at": "2026-09-29T19:52:58.152503+00:00"
       }
      ],
      "lifty_mailbox_ref": "10395000-0000-4000-8000-000000000001",
@@ -1002,7 +1006,7 @@
      "send_block_reason": "send_paused:global",
      "sender_ref": "10392000-0000-4000-8000-000000000001",
      "status": "connected",
-     "updated_at": "2026-09-29T19:34:38.924346+00:00"
+     "updated_at": "2026-09-29T19:52:58.138404+00:00"
     }
    ],
    "domain": "a.test",
@@ -1015,7 +1019,7 @@
    "mailbox_ref": "0c342394-ee33-ff78-570e-1179a0b4941b",
    "placement": {
     "latest_completed_test": {
-     "completed_at": "2026-09-10T19:34:38.924346+00:00",
+     "completed_at": "2026-09-10T19:52:58.138404+00:00",
      "connection_ref": "10393000-0000-4000-8000-000000000001",
      "counts": {
       "inbox": 4,
@@ -1051,7 +1055,7 @@
      "provider_test_ref": "7001",
      "source": "lifty_request",
      "test_ref": "mailivery:7001",
-     "tested_at": "2026-09-09T19:34:38.924346+00:00"
+     "tested_at": "2026-09-09T19:52:58.138404+00:00"
     },
     "latest_completed_test_ref": "mailivery:7001",
     "latest_test_ref": "lifty-request:10397000-0000-4000-8000-000000000004",
@@ -1071,7 +1075,7 @@
       "provider_test_ref": null,
       "source": "lifty_request",
       "test_ref": "lifty-request:10397000-0000-4000-8000-000000000004",
-      "tested_at": "2026-09-28T19:34:38.924346+00:00"
+      "tested_at": "2026-09-28T19:52:58.138404+00:00"
      },
      {
       "completed_at": null,
@@ -1088,7 +1092,7 @@
       "provider_test_ref": "7003",
       "source": "lifty_request",
       "test_ref": "mailivery:7003",
-      "tested_at": "2026-09-27T19:34:38.924346+00:00"
+      "tested_at": "2026-09-27T19:52:58.138404+00:00"
      },
      {
       "completed_at": null,
@@ -1105,7 +1109,7 @@
       "provider_test_ref": "7002",
       "source": "lifty_request",
       "test_ref": "mailivery:7002",
-      "tested_at": "2026-09-26T19:34:38.924346+00:00"
+      "tested_at": "2026-09-26T19:52:58.138404+00:00"
      }
     ],
     "test_count": 5
@@ -1127,24 +1131,24 @@
       "binding": {
        "binding_ref": "10396000-0000-4000-8000-000000000001",
        "blocking_reason": null,
-       "created_at": "2026-09-17T19:34:38.924346+00:00",
-       "last_readback_at": "2026-09-29T19:34:38.924346+00:00",
+       "created_at": "2026-09-17T19:52:58.138404+00:00",
+       "last_readback_at": "2026-09-29T19:52:58.138404+00:00",
        "provider_campaign_bound": true,
        "removed_at": null,
        "requested_action": null,
        "snapshot": null,
        "state": "warming",
-       "updated_at": "2026-09-29T19:34:38.924346+00:00"
+       "updated_at": "2026-09-29T19:52:58.138404+00:00"
       },
       "connection_ref": "10393000-0000-4000-8000-000000000001",
       "evidence": {
        "active_duration_days": 10,
        "healthy": true,
-       "observed_at": "2026-09-29T19:34:38.924346+00:00",
+       "observed_at": "2026-09-29T19:52:58.138404+00:00",
        "passed": false,
        "policy_version": "mailivery.active-duration.v1",
-       "recorded_at": "2026-09-29T19:34:38.938462+00:00",
-       "started_at": "2026-09-18T19:34:38.924346+00:00"
+       "recorded_at": "2026-09-29T19:52:58.149989+00:00",
+       "started_at": "2026-09-18T19:52:58.138404+00:00"
       },
       "outreach_unlocked": false
      }
@@ -1152,6 +1156,7 @@
     "smartlead": null,
     "smartlead_daily": []
    },
+   "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
   }
  ],
@@ -1174,7 +1179,7 @@
    "is_active": true,
    "name": "Fixture A",
    "posture": {
-    "captured_at": "2026-09-29T18:34:38.924346+00:00",
+    "captured_at": "2026-09-29T18:52:58.138404+00:00",
     "client_label": "Fixture A",
     "metrics": {
      "reasons": [

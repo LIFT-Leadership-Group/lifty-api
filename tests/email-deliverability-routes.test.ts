@@ -5,7 +5,7 @@ import { DeliverabilitySource, type PlacementDetail, type SourceTest } from "../
 import { createApp } from "../src/app.js";
 import { createCurrentClient } from "./current-client.js";
 
-const now = new Date("2026-09-29T19:34:39Z");
+const now = new Date("2026-09-29T19:52:59Z");
 const fixture = (name: string): Record<string, unknown> => JSON.parse(readFileSync(new URL(`./fixtures/email-deliverability/${name}`, import.meta.url), "utf8"));
 const memberA = fixture("source-member-a.json");
 const fleet = fixture("source-fleet-fixtures.json");

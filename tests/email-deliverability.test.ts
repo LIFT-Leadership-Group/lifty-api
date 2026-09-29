@@ -8,7 +8,7 @@ import {
 
 // Sources are real deliverability_read output for the LIF-1041 two-tenant
 // fixture, captured at this instant (see tests/fixtures/email-deliverability).
-const now = new Date("2026-09-29T19:34:39Z");
+const now = new Date("2026-09-29T19:52:59Z");
 const fixture = (name: string): unknown => JSON.parse(readFileSync(new URL(`./fixtures/email-deliverability/${name}`, import.meta.url), "utf8"));
 const source = (name = "source-member-a.json"): Source => DeliverabilitySource.parse(fixture(name));
 const inbox = (response: { mailboxes: DeliverabilityMailbox[] }, email: string, slug = "fixture-a") => {
@@ -193,6 +193,7 @@ describe("send gates by workspace owner", () => {
     inbox(present(withInbox("uni-only@a.test", item => { item.workspace_managed_by = by; edit(item); })), "uni-only@a.test");
 
   it("treats LIFT send controls as the canonical Unipile gate", () => {
+    expect(inbox(present(), "uni-only@a.test").readiness.paths).toEqual([expect.objectContaining({ gate: "lift_send_controls", state: expect.objectContaining({ code: "blocked" }) })]);
     const allowed = managed("lift", item => { item.connections[0]!.send_block_reason = null; });
     expect(allowed.readiness).toMatchObject({ code: "ready", paths: [{ gate: "lift_send_controls", state: { code: "allowed" } }] });
     expect(allowed.campaigns.status.code).toBe("in_campaign_enabled");
@@ -201,7 +202,8 @@ describe("send gates by workspace owner", () => {
   });
 
   it("does not claim readiness when the governing gate is unknown", () => {
-    const unknown = inbox(present(withInbox("uni-only@a.test", item => { item.connections[0]!.send_block_reason = null; })), "uni-only@a.test");
+    // The first deliverability-source.v1 release had no workspace_managed_by.
+    const unknown = inbox(present(withInbox("uni-only@a.test", item => { delete item.workspace_managed_by; item.connections[0]!.send_block_reason = null; })), "uni-only@a.test");
     expect(unknown.readiness.code).toBe("unknown");
     expect(unknown.campaigns.status.code).toBe("unverified");
   });

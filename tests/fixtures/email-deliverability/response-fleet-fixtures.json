@@ -1,6 +1,6 @@
 {
  "schema_version": "email-deliverability.v1",
- "generated_at": "2026-09-29T19:34:39.005Z",
+ "generated_at": "2026-09-29T19:52:58.221Z",
  "scope": {
   "kind": "fleet",
   "workspace_ref": null,
@@ -71,7 +71,7 @@
      }
     ]
    },
-   "captured_at": "2026-09-29T18:34:39.005Z",
+   "captured_at": "2026-09-29T18:52:58.221Z",
    "source": "breach_sweep",
    "components": {
     "placement": null,
@@ -103,7 +103,7 @@
      }
     ]
    },
-   "captured_at": "2026-09-29T19:34:39.005Z",
+   "captured_at": "2026-09-29T19:52:58.221Z",
    "source": "breach_sweep",
    "components": {
     "placement": null,
@@ -230,12 +230,12 @@
      {
       "provider": "unipile",
       "connection_ref": "10393000-0000-4000-8000-000000000002",
-      "gate": "unknown",
+      "gate": "lift_send_controls",
       "state": {
        "code": "blocked",
        "label": "Blocked",
        "tone": "bad",
-       "description": "A send control blocks this connection.",
+       "description": "LIFT's send controls block this connection.",
        "reasons": [
         {
          "code": "send_paused",
@@ -275,21 +275,21 @@
         }
        ]
       },
-      "started_at": "2026-09-15T19:34:39.005Z",
+      "started_at": "2026-09-15T19:52:58.221Z",
       "started_at_basis": "observed_activity",
       "active_days": 13,
       "required_days": 21,
       "period_complete": false,
       "estimated_completion": {
-       "at": "2026-10-06T19:34:39.005Z",
+       "at": "2026-10-06T19:52:58.221Z",
        "on": null,
        "basis": "Estimated: continuous warmup activity since 2026-09-15 plus 21 days. A gap in activity restarts the count."
       },
       "outreach_unlocked": null,
       "last_check": {
-       "observed_at": "2026-09-29T16:34:39.005Z",
+       "observed_at": "2026-09-29T16:52:58.221Z",
        "freshness": "fresh",
-       "fresh_until": "2026-09-30T18:34:39.005Z"
+       "fresh_until": "2026-09-30T18:52:58.221Z"
       },
       "metrics": {
        "reputation_pct": 98,
@@ -297,7 +297,7 @@
        "spam_sample_sent": 20,
        "spam_count": 0,
        "sent_7d": 12,
-       "last_sent_at": "2026-09-28T19:34:39.005Z",
+       "last_sent_at": "2026-09-28T19:52:58.221Z",
        "warmup_emails_today": null,
        "ramp_target": null
       },
@@ -340,9 +340,9 @@
      "reasons": []
     },
     "evidence": {
-     "observed_at": "2026-09-25T19:34:39.000Z",
+     "observed_at": "2026-09-25T19:52:58.000Z",
      "freshness": "fresh",
-     "fresh_until": "2026-10-05T19:34:39.000Z",
+     "fresh_until": "2026-10-05T19:52:58.000Z",
      "max_age_days": 10,
      "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
     },
@@ -358,7 +358,7 @@
      "execution_reason": null,
      "verdict": "fail",
      "label": "Failed · 5/10 inbox",
-     "tested_at": "2026-09-25T19:34:39.000Z",
+     "tested_at": "2026-09-25T19:52:58.000Z",
      "completed_at": null,
      "age_days": 4,
      "policy_version": null,
@@ -382,7 +382,7 @@
       "execution_reason": null,
       "verdict": "fail",
       "label": "Failed · 5/10 inbox",
-      "tested_at": "2026-09-25T19:34:39.000Z",
+      "tested_at": "2026-09-25T19:52:58.000Z",
       "completed_at": null,
       "age_days": 4,
       "policy_version": null,
@@ -405,7 +405,7 @@
       "execution_reason": null,
       "verdict": "fail",
       "label": "Failed · 4/10 inbox",
-      "tested_at": "2026-09-23T19:34:39.000Z",
+      "tested_at": "2026-09-23T19:52:58.000Z",
       "completed_at": null,
       "age_days": 6,
       "policy_version": null,
@@ -428,7 +428,7 @@
       "execution_reason": null,
       "verdict": "pass",
       "label": "Passed · 10/10 inbox",
-      "tested_at": "2026-09-19T19:34:39.000Z",
+      "tested_at": "2026-09-19T19:52:58.000Z",
       "completed_at": null,
       "age_days": 10,
       "policy_version": null,
@@ -473,7 +473,7 @@
     "approved_at": null,
     "approved_by": null,
     "placement_gate_passed_at": null,
-    "cold_eligible_at": "2026-10-06T19:34:39.005Z",
+    "cold_eligible_at": "2026-10-06T19:52:58.221Z",
     "hold": {
      "reason": "operator review",
      "review_at": null
@@ -490,13 +490,13 @@
      "sender_ref": "10392000-0000-4000-8000-000000000002",
      "mailbox_use": null,
      "daily_send_limit": null,
-     "health_checked_at": "2026-09-29T19:34:39.005Z",
-     "created_at": "2026-09-26T19:34:39.005Z",
+     "health_checked_at": "2026-09-29T19:52:58.221Z",
+     "created_at": "2026-09-26T19:52:58.221Z",
      "send_gate": {
       "code": "blocked",
       "label": "Blocked",
       "tone": "bad",
-      "description": "A send control blocks this connection.",
+      "description": "LIFT's send controls block this connection.",
       "reasons": [
        {
         "code": "send_paused",
@@ -509,7 +509,7 @@
        "scope": "global",
        "send_paused": true,
        "capture_paused": false,
-       "updated_at": "2026-09-29T19:34:31.156Z"
+       "updated_at": "2026-09-29T19:52:50.441Z"
       }
      ],
      "holds": []
@@ -522,12 +522,12 @@
      "mailbox_use": null,
      "daily_send_limit": null,
      "health_checked_at": null,
-     "created_at": "2026-09-09T19:34:39.005Z",
+     "created_at": "2026-09-09T19:52:58.221Z",
      "send_gate": {
       "code": "blocked",
       "label": "Blocked",
       "tone": "bad",
-      "description": "A send control blocks this connection.",
+      "description": "LIFT's send controls block this connection.",
       "reasons": [
        {
         "code": "connection_unavailable",
@@ -540,7 +540,7 @@
        "scope": "global",
        "send_paused": true,
        "capture_paused": false,
-       "updated_at": "2026-09-29T19:34:31.156Z"
+       "updated_at": "2026-09-29T19:52:50.441Z"
       }
      ],
      "holds": []
@@ -704,7 +704,7 @@
        "reasons": []
       },
       "provider_status": "PAUSED",
-      "created_at": "2026-09-24T19:34:39.005Z",
+      "created_at": "2026-09-24T19:52:58.221Z",
       "last_synced_at": null,
       "drift_detected_at": null
      }
@@ -719,9 +719,9 @@
      "reasons": []
     },
     "evidence": {
-     "observed_at": "2026-09-24T19:34:39.000Z",
+     "observed_at": "2026-09-24T19:52:58.000Z",
      "freshness": "fresh",
-     "fresh_until": "2026-10-04T19:34:39.000Z",
+     "fresh_until": "2026-10-04T19:52:58.000Z",
      "max_age_days": 10,
      "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
     },
@@ -737,7 +737,7 @@
      "execution_reason": null,
      "verdict": "fail",
      "label": "Failed · 7/12 inbox",
-     "tested_at": "2026-09-24T19:34:39.000Z",
+     "tested_at": "2026-09-24T19:52:58.000Z",
      "completed_at": null,
      "age_days": 5,
      "policy_version": null,
@@ -761,7 +761,7 @@
       "execution_reason": null,
       "verdict": "fail",
       "label": "Failed · 7/12 inbox",
-      "tested_at": "2026-09-24T19:34:39.000Z",
+      "tested_at": "2026-09-24T19:52:58.000Z",
       "completed_at": null,
       "age_days": 5,
       "policy_version": null,
@@ -893,7 +893,7 @@
        "description": "Smartlead warmup is running and its latest check passed.",
        "reasons": []
       },
-      "started_at": "2026-08-25T19:34:39.005Z",
+      "started_at": "2026-08-25T19:52:58.221Z",
       "started_at_basis": "observed_activity",
       "active_days": 35,
       "required_days": 21,
@@ -901,9 +901,9 @@
       "estimated_completion": null,
       "outreach_unlocked": null,
       "last_check": {
-       "observed_at": "2026-09-29T19:34:39.005Z",
+       "observed_at": "2026-09-29T19:52:58.221Z",
        "freshness": "fresh",
-       "fresh_until": "2026-09-30T21:34:39.005Z"
+       "fresh_until": "2026-09-30T21:52:58.221Z"
       },
       "metrics": {
        "reputation_pct": 100,
@@ -911,7 +911,7 @@
        "spam_sample_sent": 40,
        "spam_count": 0,
        "sent_7d": 30,
-       "last_sent_at": "2026-09-29T18:34:39.005Z",
+       "last_sent_at": "2026-09-29T18:52:58.221Z",
        "warmup_emails_today": null,
        "ramp_target": null
       },
@@ -925,7 +925,7 @@
      "days": [
       {
        "day": "2026-08-31",
-       "observed_at": "2026-08-31T19:34:39.005Z",
+       "observed_at": "2026-08-31T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 71,
@@ -935,7 +935,7 @@
       },
       {
        "day": "2026-09-01",
-       "observed_at": "2026-09-01T19:34:39.005Z",
+       "observed_at": "2026-09-01T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 72,
@@ -945,7 +945,7 @@
       },
       {
        "day": "2026-09-02",
-       "observed_at": "2026-09-02T19:34:39.005Z",
+       "observed_at": "2026-09-02T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 73,
@@ -955,7 +955,7 @@
       },
       {
        "day": "2026-09-03",
-       "observed_at": "2026-09-03T19:34:39.005Z",
+       "observed_at": "2026-09-03T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 74,
@@ -965,7 +965,7 @@
       },
       {
        "day": "2026-09-04",
-       "observed_at": "2026-09-04T19:34:39.005Z",
+       "observed_at": "2026-09-04T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 75,
@@ -975,7 +975,7 @@
       },
       {
        "day": "2026-09-05",
-       "observed_at": "2026-09-05T19:34:39.005Z",
+       "observed_at": "2026-09-05T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 76,
@@ -985,7 +985,7 @@
       },
       {
        "day": "2026-09-06",
-       "observed_at": "2026-09-06T19:34:39.005Z",
+       "observed_at": "2026-09-06T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 77,
@@ -995,7 +995,7 @@
       },
       {
        "day": "2026-09-07",
-       "observed_at": "2026-09-07T19:34:39.005Z",
+       "observed_at": "2026-09-07T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 78,
@@ -1005,7 +1005,7 @@
       },
       {
        "day": "2026-09-08",
-       "observed_at": "2026-09-08T19:34:39.005Z",
+       "observed_at": "2026-09-08T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 79,
@@ -1015,7 +1015,7 @@
       },
       {
        "day": "2026-09-09",
-       "observed_at": "2026-09-09T19:34:39.005Z",
+       "observed_at": "2026-09-09T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 80,
@@ -1025,7 +1025,7 @@
       },
       {
        "day": "2026-09-10",
-       "observed_at": "2026-09-10T19:34:39.005Z",
+       "observed_at": "2026-09-10T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 81,
@@ -1035,7 +1035,7 @@
       },
       {
        "day": "2026-09-11",
-       "observed_at": "2026-09-11T19:34:39.005Z",
+       "observed_at": "2026-09-11T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 82,
@@ -1045,7 +1045,7 @@
       },
       {
        "day": "2026-09-12",
-       "observed_at": "2026-09-12T19:34:39.005Z",
+       "observed_at": "2026-09-12T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 83,
@@ -1055,7 +1055,7 @@
       },
       {
        "day": "2026-09-13",
-       "observed_at": "2026-09-13T19:34:39.005Z",
+       "observed_at": "2026-09-13T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 84,
@@ -1065,7 +1065,7 @@
       },
       {
        "day": "2026-09-14",
-       "observed_at": "2026-09-14T19:34:39.005Z",
+       "observed_at": "2026-09-14T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 85,
@@ -1075,7 +1075,7 @@
       },
       {
        "day": "2026-09-15",
-       "observed_at": "2026-09-15T19:34:39.005Z",
+       "observed_at": "2026-09-15T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 86,
@@ -1085,7 +1085,7 @@
       },
       {
        "day": "2026-09-16",
-       "observed_at": "2026-09-16T19:34:39.005Z",
+       "observed_at": "2026-09-16T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 87,
@@ -1095,7 +1095,7 @@
       },
       {
        "day": "2026-09-17",
-       "observed_at": "2026-09-17T19:34:39.005Z",
+       "observed_at": "2026-09-17T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 88,
@@ -1105,7 +1105,7 @@
       },
       {
        "day": "2026-09-18",
-       "observed_at": "2026-09-18T19:34:39.005Z",
+       "observed_at": "2026-09-18T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 89,
@@ -1115,7 +1115,7 @@
       },
       {
        "day": "2026-09-19",
-       "observed_at": "2026-09-19T19:34:39.005Z",
+       "observed_at": "2026-09-19T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 90,
@@ -1125,7 +1125,7 @@
       },
       {
        "day": "2026-09-20",
-       "observed_at": "2026-09-20T19:34:39.005Z",
+       "observed_at": "2026-09-20T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 91,
@@ -1135,7 +1135,7 @@
       },
       {
        "day": "2026-09-21",
-       "observed_at": "2026-09-21T19:34:39.005Z",
+       "observed_at": "2026-09-21T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 92,
@@ -1145,7 +1145,7 @@
       },
       {
        "day": "2026-09-22",
-       "observed_at": "2026-09-22T19:34:39.005Z",
+       "observed_at": "2026-09-22T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 93,
@@ -1155,7 +1155,7 @@
       },
       {
        "day": "2026-09-23",
-       "observed_at": "2026-09-23T19:34:39.005Z",
+       "observed_at": "2026-09-23T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 94,
@@ -1165,7 +1165,7 @@
       },
       {
        "day": "2026-09-24",
-       "observed_at": "2026-09-24T19:34:39.005Z",
+       "observed_at": "2026-09-24T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 95,
@@ -1175,7 +1175,7 @@
       },
       {
        "day": "2026-09-25",
-       "observed_at": "2026-09-25T19:34:39.005Z",
+       "observed_at": "2026-09-25T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 96,
@@ -1185,7 +1185,7 @@
       },
       {
        "day": "2026-09-26",
-       "observed_at": "2026-09-26T19:34:39.005Z",
+       "observed_at": "2026-09-26T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 97,
@@ -1195,7 +1195,7 @@
       },
       {
        "day": "2026-09-27",
-       "observed_at": "2026-09-27T19:34:39.005Z",
+       "observed_at": "2026-09-27T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 98,
@@ -1205,7 +1205,7 @@
       },
       {
        "day": "2026-09-28",
-       "observed_at": "2026-09-28T19:34:39.005Z",
+       "observed_at": "2026-09-28T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 99,
@@ -1215,7 +1215,7 @@
       },
       {
        "day": "2026-09-29",
-       "observed_at": "2026-09-29T19:34:39.005Z",
+       "observed_at": "2026-09-29T19:52:58.221Z",
        "status": "active",
        "health": "pass",
        "reputation_pct": 100,
@@ -1262,7 +1262,7 @@
        "reasons": []
       },
       "provider_status": "ACTIVE",
-      "created_at": "2026-09-19T19:34:39.005Z",
+      "created_at": "2026-09-19T19:52:58.221Z",
       "last_synced_at": null,
       "drift_detected_at": null
      },
@@ -1292,7 +1292,7 @@
        "reasons": []
       },
       "provider_status": "PAUSED",
-      "created_at": "2026-09-24T19:34:39.005Z",
+      "created_at": "2026-09-24T19:52:58.221Z",
       "last_synced_at": null,
       "drift_detected_at": null
      }
@@ -1307,9 +1307,9 @@
      "reasons": []
     },
     "evidence": {
-     "observed_at": "2026-09-27T19:34:39.000Z",
+     "observed_at": "2026-09-27T19:52:58.000Z",
      "freshness": "fresh",
-     "fresh_until": "2026-10-07T19:34:39.000Z",
+     "fresh_until": "2026-10-07T19:52:58.000Z",
      "max_age_days": 10,
      "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
     },
@@ -1325,7 +1325,7 @@
      "execution_reason": null,
      "verdict": "pass",
      "label": "Passed · 12/12 inbox",
-     "tested_at": "2026-09-27T19:34:39.000Z",
+     "tested_at": "2026-09-27T19:52:58.000Z",
      "completed_at": null,
      "age_days": 2,
      "policy_version": null,
@@ -1349,7 +1349,7 @@
       "execution_reason": null,
       "verdict": "pass",
       "label": "Passed · 12/12 inbox",
-      "tested_at": "2026-09-27T19:34:39.000Z",
+      "tested_at": "2026-09-27T19:52:58.000Z",
       "completed_at": null,
       "age_days": 2,
       "policy_version": null,
@@ -1372,7 +1372,7 @@
       "execution_reason": null,
       "verdict": "pass",
       "label": "Passed · 12/12 inbox",
-      "tested_at": "2026-09-27T19:34:39.000Z",
+      "tested_at": "2026-09-27T19:52:58.000Z",
       "completed_at": null,
       "age_days": 2,
       "policy_version": null,
@@ -1395,7 +1395,7 @@
       "execution_reason": null,
       "verdict": "pass",
       "label": "Passed · 10/10 inbox",
-      "tested_at": "2026-09-09T19:34:39.000Z",
+      "tested_at": "2026-09-09T19:52:58.000Z",
       "completed_at": null,
       "age_days": 20,
       "policy_version": null,
@@ -1420,10 +1420,10 @@
      "description": "Approved for outbound on 2026-09-28 by fixture-operator. Approval alone doesn't enable sending; the other checks still apply.",
      "reasons": []
     },
-    "approved_at": "2026-09-28T19:34:39.005Z",
+    "approved_at": "2026-09-28T19:52:58.221Z",
     "approved_by": "fixture-operator",
-    "placement_gate_passed_at": "2026-09-27T19:34:39.000Z",
-    "cold_eligible_at": "2026-09-10T19:34:39.005Z",
+    "placement_gate_passed_at": "2026-09-27T19:52:58.000Z",
+    "cold_eligible_at": "2026-09-10T19:52:58.221Z",
     "hold": null
    },
    "notes": {
@@ -1683,12 +1683,12 @@
      {
       "provider": "unipile",
       "connection_ref": "10393000-0000-4000-8000-000000000001",
-      "gate": "unknown",
+      "gate": "lift_send_controls",
       "state": {
        "code": "blocked",
        "label": "Blocked",
        "tone": "bad",
-       "description": "A send control blocks this connection.",
+       "description": "LIFT's send controls block this connection.",
        "reasons": [
         {
          "code": "send_paused",
@@ -1718,7 +1718,7 @@
        "description": "Mailivery is warming this inbox.",
        "reasons": []
       },
-      "started_at": "2026-09-18T19:34:39.005Z",
+      "started_at": "2026-09-18T19:52:58.221Z",
       "started_at_basis": "provider_evidence",
       "active_days": 10,
       "required_days": 21,
@@ -1730,9 +1730,9 @@
       },
       "outreach_unlocked": false,
       "last_check": {
-       "observed_at": "2026-09-29T19:34:39.005Z",
+       "observed_at": "2026-09-29T19:52:58.221Z",
        "freshness": "fresh",
-       "fresh_until": "2026-09-30T19:34:39.005Z"
+       "fresh_until": "2026-09-30T19:52:58.221Z"
       },
       "metrics": {
        "reputation_pct": null,
@@ -1801,7 +1801,7 @@
        ]
       },
       "provider_status": null,
-      "created_at": "2026-09-25T19:34:39.005Z",
+      "created_at": "2026-09-25T19:52:58.221Z",
       "last_synced_at": null,
       "drift_detected_at": null
      }
@@ -1821,9 +1821,9 @@
      ]
     },
     "evidence": {
-     "observed_at": "2026-09-10T19:34:39.005Z",
+     "observed_at": "2026-09-10T19:52:58.221Z",
      "freshness": "stale",
-     "fresh_until": "2026-09-20T19:34:39.005Z",
+     "fresh_until": "2026-09-20T19:52:58.221Z",
      "max_age_days": 10,
      "rule": "This inbox's send check needs a passing placement test from the last 10 days."
     },
@@ -1839,9 +1839,9 @@
      "execution_reason": null,
      "verdict": "pass",
      "label": "Passed · 4/4 inbox",
-     "tested_at": "2026-09-09T19:34:39.005Z",
-     "completed_at": "2026-09-10T19:34:39.005Z",
-     "age_days": 18,
+     "tested_at": "2026-09-09T19:52:58.221Z",
+     "completed_at": "2026-09-10T19:52:58.221Z",
+     "age_days": 19,
      "policy_version": "strict.v1",
      "counts": {
       "inbox": 4,
@@ -1878,9 +1878,9 @@
       "execution_reason": null,
       "verdict": "unknown",
       "label": "Pending",
-      "tested_at": "2026-09-28T19:34:39.005Z",
+      "tested_at": "2026-09-28T19:52:58.221Z",
       "completed_at": null,
-      "age_days": 0,
+      "age_days": 1,
       "policy_version": null,
       "counts": null,
       "families": null,
@@ -1895,9 +1895,9 @@
       "execution_reason": null,
       "verdict": "unknown",
       "label": "Running",
-      "tested_at": "2026-09-27T19:34:39.005Z",
+      "tested_at": "2026-09-27T19:52:58.221Z",
       "completed_at": null,
-      "age_days": 1,
+      "age_days": 2,
       "policy_version": null,
       "counts": null,
       "families": null,
@@ -1915,9 +1915,9 @@
       },
       "verdict": "unknown",
       "label": "Did not run",
-      "tested_at": "2026-09-26T19:34:39.005Z",
+      "tested_at": "2026-09-26T19:52:58.221Z",
       "completed_at": null,
-      "age_days": 2,
+      "age_days": 3,
       "policy_version": null,
       "counts": null,
       "families": null,
@@ -1951,13 +1951,13 @@
      "sender_ref": "10392000-0000-4000-8000-000000000001",
      "mailbox_use": null,
      "daily_send_limit": null,
-     "health_checked_at": "2026-09-29T19:34:39.005Z",
-     "created_at": "2026-08-30T19:34:39.005Z",
+     "health_checked_at": "2026-09-29T19:52:58.221Z",
+     "created_at": "2026-08-30T19:52:58.221Z",
      "send_gate": {
       "code": "blocked",
       "label": "Blocked",
       "tone": "bad",
-      "description": "A send control blocks this connection.",
+      "description": "LIFT's send controls block this connection.",
       "reasons": [
        {
         "code": "send_paused",
@@ -1970,19 +1970,19 @@
        "scope": "connection",
        "send_paused": true,
        "capture_paused": false,
-       "updated_at": "2026-09-29T19:34:39.015Z"
+       "updated_at": "2026-09-29T19:52:58.232Z"
       },
       {
        "scope": "global",
        "send_paused": true,
        "capture_paused": false,
-       "updated_at": "2026-09-29T19:34:31.156Z"
+       "updated_at": "2026-09-29T19:52:50.441Z"
       }
      ],
      "holds": [
       {
        "reason": "operator_hold",
-       "updated_at": "2026-09-29T19:34:39.015Z"
+       "updated_at": "2026-09-29T19:52:58.232Z"
       }
      ]
     }
@@ -2111,7 +2111,7 @@
         }
        ]
       },
-      "started_at": "2026-08-15T19:34:39.005Z",
+      "started_at": "2026-08-15T19:52:58.221Z",
       "started_at_basis": "observed_activity",
       "active_days": 45,
       "required_days": 21,
@@ -2119,9 +2119,9 @@
       "estimated_completion": null,
       "outreach_unlocked": null,
       "last_check": {
-       "observed_at": "2026-09-29T19:34:39.005Z",
+       "observed_at": "2026-09-29T19:52:58.221Z",
        "freshness": "fresh",
-       "fresh_until": "2026-09-30T21:34:39.005Z"
+       "fresh_until": "2026-09-30T21:52:58.221Z"
       },
       "metrics": {
        "reputation_pct": 60,
@@ -2129,7 +2129,7 @@
        "spam_sample_sent": 100,
        "spam_count": 30,
        "sent_7d": 50,
-       "last_sent_at": "2026-09-29T19:34:39.005Z",
+       "last_sent_at": "2026-09-29T19:52:58.221Z",
        "warmup_emails_today": null,
        "ramp_target": null
       },
@@ -2143,7 +2143,7 @@
      "days": [
       {
        "day": "2026-09-29",
-       "observed_at": "2026-09-29T19:34:39.005Z",
+       "observed_at": "2026-09-29T19:52:58.221Z",
        "status": "active",
        "health": "fail",
        "reputation_pct": 60,
@@ -2216,7 +2216,7 @@
        ]
       },
       "provider_status": "ACTIVE",
-      "created_at": "2026-09-28T19:34:39.005Z",
+      "created_at": "2026-09-28T19:52:58.221Z",
       "last_synced_at": null,
       "drift_detected_at": null
      }
@@ -2231,9 +2231,9 @@
      "reasons": []
     },
     "evidence": {
-     "observed_at": "2026-09-28T19:34:39.000Z",
+     "observed_at": "2026-09-28T19:52:58.000Z",
      "freshness": "fresh",
-     "fresh_until": "2026-10-08T19:34:39.000Z",
+     "fresh_until": "2026-10-08T19:52:58.000Z",
      "max_age_days": 10,
      "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
     },
@@ -2249,7 +2249,7 @@
      "execution_reason": null,
      "verdict": "fail",
      "label": "Failed · 1/10 inbox",
-     "tested_at": "2026-09-28T19:34:39.000Z",
+     "tested_at": "2026-09-28T19:52:58.000Z",
      "completed_at": null,
      "age_days": 1,
      "policy_version": null,
@@ -2273,7 +2273,7 @@
       "execution_reason": null,
       "verdict": "fail",
       "label": "Failed · 1/10 inbox",
-      "tested_at": "2026-09-28T19:34:39.000Z",
+      "tested_at": "2026-09-28T19:52:58.000Z",
       "completed_at": null,
       "age_days": 1,
       "policy_version": null,
@@ -2306,7 +2306,7 @@
     "approved_at": null,
     "approved_by": null,
     "placement_gate_passed_at": null,
-    "cold_eligible_at": "2026-09-05T19:34:39.005Z",
+    "cold_eligible_at": "2026-09-05T19:52:58.221Z",
     "hold": null
    },
    "notes": {
@@ -2356,26 +2356,41 @@
     "code": "not_ready",
     "label": "Not ready yet",
     "tone": "muted",
-    "description": "At least one sending path couldn't be evaluated from the stored data.",
-    "reasons": []
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "mailbox_use_required",
+      "message": "Unipile connection: Say whether this is a mailbox you already use or a new outreach account before sending. Reconnect the email account to answer."
+     }
+    ]
    },
    "readiness": {
-    "code": "unknown",
-    "label": "Readiness unknown",
-    "tone": "warn",
-    "description": "At least one sending path couldn't be evaluated from the stored data.",
-    "reasons": [],
+    "code": "blocked",
+    "label": "Not ready to send",
+    "tone": "bad",
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "mailbox_use_required",
+      "message": "Unipile connection: Say whether this is a mailbox you already use or a new outreach account before sending. Reconnect the email account to answer."
+     }
+    ],
     "paths": [
      {
       "provider": "unipile",
       "connection_ref": "10393000-0000-4000-8000-000000000011",
-      "gate": "unknown",
+      "gate": "lifty_campaign_checks",
       "state": {
-       "code": "unknown",
-       "label": "Send checks unknown",
-       "tone": "warn",
-       "description": "This server's data doesn't say which send checks govern this connection.",
-       "reasons": []
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "Lifty's send checks block this connection.",
+       "reasons": [
+        {
+         "code": "mailbox_use_required",
+         "message": "Say whether this is a mailbox you already use or a new outreach account before sending. Reconnect the email account to answer."
+        }
+       ]
       }
      }
     ]
@@ -2440,7 +2455,7 @@
       "execution_reason": null,
       "verdict": "unknown",
       "label": "Pending",
-      "tested_at": "2026-09-29T18:34:39.005Z",
+      "tested_at": "2026-09-29T18:52:58.221Z",
       "completed_at": null,
       "age_days": 0,
       "policy_version": null,
@@ -2476,21 +2491,26 @@
      "sender_ref": "10392000-0000-4000-8000-000000000003",
      "mailbox_use": null,
      "daily_send_limit": null,
-     "health_checked_at": "2026-09-29T19:34:39.005Z",
-     "created_at": "2026-09-25T19:34:39.005Z",
+     "health_checked_at": "2026-09-29T19:52:58.221Z",
+     "created_at": "2026-09-25T19:52:58.221Z",
      "send_gate": {
-      "code": "unknown",
-      "label": "Send checks unknown",
-      "tone": "warn",
-      "description": "This server's data doesn't say which send checks govern this connection.",
-      "reasons": []
+      "code": "blocked",
+      "label": "Blocked",
+      "tone": "bad",
+      "description": "Lifty's send checks block this connection.",
+      "reasons": [
+       {
+        "code": "mailbox_use_required",
+        "message": "Say whether this is a mailbox you already use or a new outreach account before sending. Reconnect the email account to answer."
+       }
+      ]
      },
      "controls": [
       {
        "scope": "global",
        "send_paused": true,
        "capture_paused": false,
-       "updated_at": "2026-09-29T19:34:31.156Z"
+       "updated_at": "2026-09-29T19:52:50.441Z"
       }
      ],
      "holds": []
