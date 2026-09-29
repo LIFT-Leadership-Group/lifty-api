@@ -116,7 +116,9 @@ function presentTest(test: SourceTest, now: Date): PlacementTest {
 function placementRule(mailbox: SourceMailbox): { maxAgeDays: number | null; rule: string; applies: boolean; disabled: boolean } {
   if (mailbox.smartlead) return { maxAgeDays: PLACEMENT_FRESH_DAYS, applies: true, disabled: false,
     rule: `LIFT's deliverability policy treats a placement result as current for ${PLACEMENT_FRESH_DAYS} days.` };
-  if (mailbox.warmup.mailivery.some(item => item.binding)) return { maxAgeDays: PLACEMENT_FRESH_DAYS, applies: true, disabled: false,
+  // outreach_email_mailbox_ready governs LIFT-managed Unipile inboxes only;
+  // Lifty workspaces follow their own email policy, which the source doesn't carry.
+  if (mailbox.workspace_managed_by !== "lifty" && mailbox.warmup.mailivery.some(item => item.binding)) return { maxAgeDays: PLACEMENT_FRESH_DAYS, applies: true, disabled: false,
     rule: `This inbox's send check needs a passing placement test from the last ${PLACEMENT_FRESH_DAYS} days.` };
   const beta = [...mailbox.placement.recent_tests, mailbox.placement.latest_completed_test]
     .some(test => test?.failure_code && LIFTY_BETA_POLICY.test(test.failure_code));
