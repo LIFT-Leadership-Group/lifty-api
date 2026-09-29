@@ -28,6 +28,7 @@ describe("generated MCP stage operations", () => {
       }
     }
     expect(tools.find(tool => tool.name === "crm_mapping_sources")!.annotations.readOnlyHint).toBe(true);
+    expect(tools.find(tool => tool.name === "sending_accounts_deliverability")!.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     expect(tools.find(tool => tool.name === "sending_accounts_client_connect_status")!.annotations.readOnlyHint).toBe(false);
     expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.destructiveHint).toBe(true);
@@ -113,6 +114,7 @@ describe("generated MCP stage operations", () => {
       "disconnect linkedin --workspace": ["sending_accounts_client_linkedin_disconnect", "POST", "/v1/linkedin/disconnect"],
       "connect linkedin --workspace": ["sending_accounts_client_linkedin_connect", "POST", "/v1/linkedin/connect"],
       "connect linkedin --workspace --status": ["sending_accounts_client_linkedin_status", "GET", "/v1/linkedin"],
+      "email deliverability --workspace": ["sending_accounts_deliverability", "GET", "/v1/email/deliverability"],
       "notifications test": ["notifications_test", "POST", "/v1/notifications/destinations/{destination_ref}/test"],
       "get allowance --workspace": ["capacity_allowance", "GET", "/v1/workspaces/{workspace_ref}/apollo/allowance"],
       "apollo status": ["capacity_apollo_key_status", "GET", "/v1/workspaces/{workspace_ref}/integrations/apollo/key-source"],
