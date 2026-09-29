@@ -5,6 +5,7 @@ import { createUnipileV2Provider } from "./unipile-v2-provider.js";
 import { unipileV2AuthState } from "./unipile-v2-state.js";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
+import { HostedReturnError, hostedReturnReason } from "./hosted-return-error.js";
 import { LINKEDIN_POLICY, LinkedinConnectRequest, LinkedinConnectResult, LinkedinConnectionStatus, LinkedinFailureCode, LinkedinHealthStatus, LinkedinProfileId, LinkedinProfileUrl, LinkedinTimezone, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
 import { createLinkedinProvider, type LinkedinIdentity, type LinkedinHealth } from "./linkedin-provider.js";
 import type { UnipileProviderSettings } from "./unipile-provider.js";
@@ -30,6 +31,7 @@ const Stored = z.object({
 });
 const Intent = z.object({
   transport: UnipileTransport.optional(), authorization_account_id: z.string().nullish(), authorization_received: z.boolean().optional(),
+  return_error: HostedReturnError.nullish(),
   state: z.enum(["pending", "issuing", "ready", "completed", "failed"]), intent_ref: z.uuid(), workspace_ref: z.uuid(),
   expires_at: z.string(), account_id: LinkedinProfileId.nullable(), profile_id: LinkedinProfileId.nullable(),
   hosted_url: z.url().nullable(), timezone: LinkedinTimezone,
@@ -151,9 +153,13 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
   async function status(session: AuthSession, workspace: string, attemptRef?: string): Promise<LinkedinStatus> {
     let value = await readStored(session, workspace);
     let completed = false;
+    let returnError: HostedReturnError | null = null;
     if (value.state === "pending" && value.intent_ref && (!attemptRef || value.intent_ref === attemptRef)) {
       const pendingIntent=value.transport?.api_version==="v2" ? await readIntent(value.intent_ref) : null;
       if(pendingIntent && (pendingIntent.workspace_ref!==value.workspace_ref || pendingIntent.transport?.api_version!=="v2"))linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
+      // Unipile's browser-reported error explains why no signed authorization
+      // arrived. It stays a hint: verified authorization below still binds.
+      if (pendingIntent && !pendingIntent.authorization_received) returnError = pendingIntent.return_error ?? null;
       const hint=pendingIntent ? {account_id:pendingIntent.authorization_received ? pendingIntent.authorization_account_id ?? null : null}
         : z.object({ workspace_ref: z.literal(value.workspace_ref), intent_ref: z.literal(value.intent_ref), account_id: LinkedinProfileId.nullable() })
           .parse(await rpc("read", { workspace_ref: value.workspace_ref, intent_ref: value.intent_ref }, session, "lifty_linkedin_callback_hint"));
@@ -178,6 +184,7 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     if (value.state === "connected" && !completed) value = await refreshHealth(session, workspace, value);
     if (value.state === "not_connected") return LinkedinConnectionStatus.parse({ provider: "unipile", channel: "linkedin", workspace_ref: value.workspace_ref, status: "not_connected" });
     const state = value.state === "revoked" || value.state === "connecting" || (value.state === "connected" && value.health_status !== "running") ? "disconnected" : value.state;
+    if (state === "pending" && returnError) return LinkedinConnectionStatus.parse({ ...profile(value), status: "failed", connection_ref: value.connection_ref ?? null, intent_ref: value.intent_ref ?? null, failure_code: returnError });
     return LinkedinConnectionStatus.parse({ ...profile(value), status: state, connection_ref: value.connection_ref ?? null, intent_ref: value.intent_ref ?? null, failure_code: value.failure_code ?? null });
   }
   async function start(session: AuthSession, input: LinkedinConnectInput): Promise<LinkedinStart> {
@@ -258,16 +265,17 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     await rpc("disconnect", { workspace, confirm: true }, session);
     return status(session, workspace);
   }
-  async function v2Return(state:string,providerError=false):Promise<ConnectionReturnResult> {
+  async function v2Return(state:string,returnError:HostedReturnError|null=null):Promise<ConnectionReturnResult> {
     const id=open(state);
     const intent=await readIntent(id);
     if(intent.transport?.api_version!=="v2" || !["ready","completed","failed"].includes(intent.state))linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
-    // Same rule as email: a provider error only ends a still-open attempt.
-    if(providerError){
-      if(intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
-      return {status:"failed",reason:"provider"};
-    }
     if(intent.state==="completed")return {status:"connected",account:null};
+    // Same rule as email: a reported provider error is only a hint and never
+    // ends the attempt; verified authorization still wins.
+    if(returnError && !intent.authorization_received){
+      if(intent.state==="ready")await rpc("return_error",{intent_ref:id,return_error:returnError});
+      return {status:"failed",reason:hostedReturnReason[returnError]};
+    }
     if(intent.state==="failed")return {status:"failed",reason:"ended"};
     if(!intent.authorization_received || !intent.authorization_account_id)return {status:"pending"};
     try {

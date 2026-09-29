@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SenderChoice } from "./sender-choice.js";
+import { HostedReturnError } from "./hosted-return-error.js";
 
 export const HostedEmailProvider = z.enum(["google", "outlook", "imap"]);
 export type HostedEmailProvider = z.infer<typeof HostedEmailProvider>;
@@ -31,7 +32,7 @@ export const EmailConnectionStatus = z.discriminatedUnion("status", [
   z.object({ provider: z.literal("unipile"), channel: z.literal("email"), workspace_ref: z.uuid(), status: z.literal("not_connected") }).strict(),
   z.object({ ...profile, status: z.enum(["pending", "connected", "disconnected", "failed"]),
     connection_ref: z.uuid().nullable(), intent_ref: z.uuid().nullable(),
-    failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed","account_taken"]).nullable(),
+    failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed","account_taken",...HostedReturnError.options]).nullable(),
   }).strict(),
 ]);
 export const EmailConnectResult = z.discriminatedUnion("status", [

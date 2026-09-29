@@ -45,9 +45,18 @@ not; it uses the same server checks, but still verify with GET before continuing
   link will not fix it: the founder connects a different account here or
   resolves the binding in the workspace that holds it. Lifty never binds the
   duplicate LinkedIn provider account it created; nothing else to clean.
-  `failure_code: provider_unavailable` right after the hosted page means the
-  founder cancelled or the provider refused the connection; nothing connected.
-  Offer a new POST when the founder wants to try again.
+  `authorization_cancelled`, `account_exists` and `provider_rejected` repeat
+  the error the provider reported when it sent the founder back; no signed
+  authorization arrived. After `authorization_cancelled`, offer a fresh POST
+  when the founder is ready. After `provider_rejected`, offer one fresh POST
+  and ask for operator review if it fails again. `account_exists` means the
+  mailbox or LinkedIn profile is still linked at the provider from an earlier
+  setup, so another link fails the same way: if it is the account this
+  workspace already saved, reconnect it with an ordinary POST (no
+  `select_account`); otherwise it needs operator review. Never disconnect or
+  delete another account to get around it. These codes come from the
+  founder's browser, not a verified outcome: a later `connected` for the same
+  attempt means they finished in another tab, and that result wins.
   `error_code: attempt_superseded` means a newer attempt replaced this one;
   use its retained newer reference, never an old grant as proof of completion.
 - HTTP/network/status-read error: say the authorization could not yet be
