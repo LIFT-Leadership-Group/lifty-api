@@ -39,7 +39,7 @@ const rpcMessages: Record<string, { status: number; message: string }> = {
   email_warmup_setup_unavailable: { status: 409, message: "This warmup setup is already submitted or needs review. Check warmup status before trying again." },
 };
 
-const blockingMessages: Record<string, string> = {
+export const blockingMessages: Record<string, string> = {
   identity_mismatch: "The mailbox connected in Mailivery is not the one connected to Lifty. Remove warmup and connect the same address.",
   connection_problem: "Mailivery lost access to the mailbox. Warmup days stop counting until the mailbox is reconnected in Mailivery.",
   dns_invalid: "SPF, DMARC or MX for this domain is not valid. Warmup days don't count until all three pass.",
@@ -80,12 +80,12 @@ function mapRpcError(error: unknown): never {
   throw new PublicError({ status: known.status, code: message.toUpperCase(), message: known.message });
 }
 
-function checkValue(value: string | null | undefined): "valid" | "not_valid" | "unknown" {
+export function checkValue(value: string | null | undefined): "valid" | "not_valid" | "unknown" {
   if (value === null || value === undefined || value === "") return "unknown";
   return value.toLowerCase() === "valid" ? "valid" : "not_valid";
 }
 
-function addUtcDays(now: Date, days: number): string {
+export function addUtcDays(now: Date, days: number): string {
   const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days));
   return date.toISOString().slice(0, 10);
 }

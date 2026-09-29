@@ -312,6 +312,41 @@ warmup links. API verification covers request propagation and response
 contracts; the database release owns workspace isolation and persistent
 campaign holds.
 
+## Shared deliverability read (LIF-1042)
+
+`GET /v1/email/deliverability` is the single read behind the Deliverability
+page and `lifty email deliverability`. It returns `email-deliverability.v1`:
+one row per inbox (an address inside one workspace) with its senders, warmup
+per provider, placement history, campaigns, approval, human notes and send
+controls. Every state carries `code`, `label`, `tone`, `description` and
+`reasons`, computed once here, so the page tooltip and the agent read the same
+text. Workspace health is returned separately and is never an inbox result.
+
+```text
+GET /v1/email/deliverability?workspace=<slug-or-id>[&sender=<sender_ref>|unassigned]
+    [&mailbox=<mailbox_ref-or-address>][&history_limit=1..8][&limit=1..100][&cursor=...]
+GET /v1/email/deliverability?workspace=<slug-or-id>&mailbox=<mailbox_ref>&detail=placement
+GET /v1/email/deliverability?scope=fleet            # LIFT admins only
+```
+
+The API calls `public.deliverability_read` (LIF-1041) with the caller's
+session. The database authorizes the workspace, fleet scope, sender, mailbox
+and cursor; omitting `workspace` never grants the fleet. `detail=placement`
+reads stored provider reports for at most the three newest completed tests of
+the one authorized inbox. It never creates tests, sends seeds or changes
+sending. Set `SMARTLEAD_API_KEY` to read SmartDelivery reports; without it the
+detail reports `not_configured`. A report that times out becomes a warning and
+the rest of the inbox is still returned.
+
+The presentation keeps the canonical rules separate: warmup running is not
+the same as a completed warmup period, which is not the same as being allowed
+to send; a configured campaign is never reported as proof of sending; a test
+that did not run is an execution error, not a placement failure; and missing or
+stale evidence is never shown as healthy. Placement results count as current
+for 10 days where a rule applies. Sample sources and responses live in
+`tests/fixtures/email-deliverability/`; the sources are real
+`deliverability_read` output for the LIF-1041 two-tenant fixture.
+
 ### Google OAuth setup (LIF-995)
 
 OAuth-enabled servers return a one-hour, single-use Lifty `/warmup/setup`

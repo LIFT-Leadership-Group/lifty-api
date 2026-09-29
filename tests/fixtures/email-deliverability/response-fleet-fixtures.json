@@ -1,0 +1,2510 @@
+{
+ "schema_version": "email-deliverability.v1",
+ "generated_at": "2026-09-29T19:34:39.005Z",
+ "scope": {
+  "kind": "fleet",
+  "workspace_ref": null,
+  "workspace_slug": null
+ },
+ "query": {
+  "sender": null,
+  "mailbox": null,
+  "history_limit": 3,
+  "limit": 50,
+  "detail": null
+ },
+ "filters": {
+  "workspaces": [
+   {
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "slug": "fixture-a",
+    "name": "Fixture A",
+    "is_active": true
+   },
+   {
+    "workspace_ref": "10391000-0000-4000-8000-000000000002",
+    "slug": "fixture-b",
+    "name": "Fixture B",
+    "is_active": true
+   }
+  ],
+  "senders": [
+   {
+    "sender_ref": "10392000-0000-4000-8000-000000000001",
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "name": "Dana Smith",
+    "is_active": true,
+    "mailbox_count": 3
+   },
+   {
+    "sender_ref": "10392000-0000-4000-8000-000000000003",
+    "workspace_ref": "10391000-0000-4000-8000-000000000002",
+    "name": "Dana Smith",
+    "is_active": true,
+    "mailbox_count": 2
+   },
+   {
+    "sender_ref": "10392000-0000-4000-8000-000000000002",
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "name": "Lee Park",
+    "is_active": true,
+    "mailbox_count": 2
+   }
+  ],
+  "unassigned_count": 1
+ },
+ "workspace_health": [
+  {
+   "workspace_ref": "10391000-0000-4000-8000-000000000001",
+   "slug": "fixture-a",
+   "name": "Fixture A",
+   "scope_note": "Fixture A-wide. This is workspace context, not a result for any one inbox.",
+   "status": {
+    "code": "watch",
+    "label": "Needs watching",
+    "tone": "watch",
+    "description": "Workspace health from the breach_sweep snapshot of 2026-09-29. It covers the whole workspace, not one inbox.",
+    "reasons": [
+     {
+      "code": "workspace_reason",
+      "message": "weekend warmup gap"
+     }
+    ]
+   },
+   "captured_at": "2026-09-29T18:34:39.005Z",
+   "source": "breach_sweep",
+   "components": {
+    "placement": null,
+    "live": null,
+    "lifecycle": null
+   },
+   "placement": {
+    "gmail_inbox_pct": null,
+    "office365_inbox_pct": null,
+    "overall_spam_pct": null,
+    "tested_at": null
+   },
+   "sends": null
+  },
+  {
+   "workspace_ref": "10391000-0000-4000-8000-000000000002",
+   "slug": "fixture-b",
+   "name": "Fixture B",
+   "scope_note": "B secret label-wide. This is workspace context, not a result for any one inbox.",
+   "status": {
+    "code": "critical",
+    "label": "Critical",
+    "tone": "bad",
+    "description": "Workspace health from the breach_sweep snapshot of 2026-09-29. It covers the whole workspace, not one inbox.",
+    "reasons": [
+     {
+      "code": "workspace_reason",
+      "message": "B secret reason"
+     }
+    ]
+   },
+   "captured_at": "2026-09-29T19:34:39.005Z",
+   "source": "breach_sweep",
+   "components": {
+    "placement": null,
+    "live": null,
+    "lifecycle": null
+   },
+   "placement": {
+    "gmail_inbox_pct": null,
+    "office365_inbox_pct": null,
+    "overall_spam_pct": null,
+    "tested_at": null
+   },
+   "sends": null
+  }
+ ],
+ "mailboxes": [
+  {
+   "mailbox_ref": "6170c056-3dab-cbb8-9213-9440fa809c62",
+   "workspace": {
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "slug": "fixture-a",
+    "name": "Fixture A"
+   },
+   "email": "mixed@a.test",
+   "domain": "a.test",
+   "senders": [
+    {
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "name": "Lee Park",
+     "is_active": true
+    }
+   ],
+   "identity": {
+    "code": "resolved",
+    "label": "Lee Park",
+    "tone": "ok",
+    "description": "This inbox belongs to Lee Park.",
+    "reasons": []
+   },
+   "providers": {
+    "sending": [
+     "smartlead",
+     "unipile"
+    ],
+    "warmup": [
+     "smartlead"
+    ],
+    "placement": [
+     "smartlead"
+    ]
+   },
+   "status": {
+    "code": "paused",
+    "label": "Paused · recovering",
+    "tone": "bad",
+    "description": "Paused after placement failed. Warmup keeps running; after at least 14 days a clean placement test can resume sending. Approval is kept separately.",
+    "reasons": []
+   },
+   "readiness": {
+    "code": "blocked",
+    "label": "Not ready to send",
+    "tone": "bad",
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "mitigation_paused",
+      "message": "Smartlead: Paused by deliverability mitigation (placement failed)."
+     },
+     {
+      "code": "not_approved",
+      "message": "Smartlead: Not approved for outbound yet."
+     },
+     {
+      "code": "placement_gate_not_passed",
+      "message": "Smartlead: Hasn't passed the placement gate."
+     },
+     {
+      "code": "warmup_period_incomplete",
+      "message": "Smartlead: The registry's 21-day warmup period ends 2026-10-05."
+     },
+     {
+      "code": "warmup_activity_low",
+      "message": "Smartlead: Warmup activity is below the minimum: 12 observed warmup sends/7d (minimum 20)"
+     },
+     {
+      "code": "send_paused",
+      "message": "Unipile connection: Sending is paused for all LIFT email."
+     }
+    ],
+    "paths": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "gate": "smartlead_eligibility",
+      "state": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "Doesn't meet the Smartlead eligibility rules yet.",
+       "reasons": [
+        {
+         "code": "mitigation_paused",
+         "message": "Paused by deliverability mitigation (placement failed)."
+        },
+        {
+         "code": "not_approved",
+         "message": "Not approved for outbound yet."
+        },
+        {
+         "code": "placement_gate_not_passed",
+         "message": "Hasn't passed the placement gate."
+        },
+        {
+         "code": "warmup_period_incomplete",
+         "message": "The registry's 21-day warmup period ends 2026-10-05."
+        },
+        {
+         "code": "warmup_activity_low",
+         "message": "Warmup activity is below the minimum: 12 observed warmup sends/7d (minimum 20)"
+        }
+       ]
+      }
+     },
+     {
+      "provider": "unipile",
+      "connection_ref": "10393000-0000-4000-8000-000000000002",
+      "gate": "unknown",
+      "state": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "A send control blocks this connection.",
+       "reasons": [
+        {
+         "code": "send_paused",
+         "message": "Sending is paused for all LIFT email."
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "warmup": {
+    "status": {
+     "code": "active",
+     "label": "Warming · low activity · day 13 of 21",
+     "tone": "watch",
+     "description": "Smartlead warmup is running, but recent warmup activity is below the minimum for a passing check.",
+     "reasons": [
+      {
+       "code": "warmup_activity_low",
+       "message": "Warmup activity is below the minimum. 12 observed warmup sends/7d (minimum 20)"
+      }
+     ]
+    },
+    "sources": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "state": {
+       "code": "active",
+       "label": "Warming · low activity",
+       "tone": "watch",
+       "description": "Smartlead warmup is running, but recent warmup activity is below the minimum for a passing check.",
+       "reasons": [
+        {
+         "code": "warmup_activity_low",
+         "message": "Warmup activity is below the minimum. 12 observed warmup sends/7d (minimum 20)"
+        }
+       ]
+      },
+      "started_at": "2026-09-15T19:34:39.005Z",
+      "started_at_basis": "observed_activity",
+      "active_days": 13,
+      "required_days": 21,
+      "period_complete": false,
+      "estimated_completion": {
+       "at": "2026-10-06T19:34:39.005Z",
+       "on": null,
+       "basis": "Estimated: continuous warmup activity since 2026-09-15 plus 21 days. A gap in activity restarts the count."
+      },
+      "outreach_unlocked": null,
+      "last_check": {
+       "observed_at": "2026-09-29T16:34:39.005Z",
+       "freshness": "fresh",
+       "fresh_until": "2026-09-30T18:34:39.005Z"
+      },
+      "metrics": {
+       "reputation_pct": 98,
+       "spam_pct": 1.5,
+       "spam_sample_sent": 20,
+       "spam_count": 0,
+       "sent_7d": 12,
+       "last_sent_at": "2026-09-28T19:34:39.005Z",
+       "warmup_emails_today": null,
+       "ramp_target": null
+      },
+      "checks": null,
+      "provider_detail": "12 observed warmup sends/7d (minimum 20)"
+     }
+    ],
+    "trend": {
+     "window_start": "2026-08-31",
+     "window_end": "2026-09-29",
+     "days": []
+    }
+   },
+   "recovery": {
+    "state": "paused",
+    "reason": "placement_failed",
+    "paused_at": null,
+    "resumed_at": null,
+    "rewarm_days": 14,
+    "day": null,
+    "rewarm_complete_at": null,
+    "description": "Paused after placement failed. Warmup keeps running; after at least 14 days a clean placement test can resume sending. Approval is kept separately."
+   },
+   "campaigns": {
+    "status": {
+     "code": "no_campaign",
+     "label": "No campaign",
+     "tone": "muted",
+     "description": "This inbox isn't configured on any campaign.",
+     "reasons": []
+    },
+    "items": []
+   },
+   "placement": {
+    "status": {
+     "code": "failed",
+     "label": "Failed placement · 2026-09-25",
+     "tone": "bad",
+     "description": "The latest completed test failed: Failed · 5/10 inbox.",
+     "reasons": []
+    },
+    "evidence": {
+     "observed_at": "2026-09-25T19:34:39.000Z",
+     "freshness": "fresh",
+     "fresh_until": "2026-10-05T19:34:39.000Z",
+     "max_age_days": 10,
+     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+    },
+    "test_count": 3,
+    "latest_test_ref": "smartlead:900023",
+    "latest_completed_test_ref": "smartlead:900023",
+    "latest_completed_test": {
+     "test_ref": "smartlead:900023",
+     "provider": "smartlead",
+     "source": "smartlead_result",
+     "name": "LIFTY mixed 3",
+     "execution_status": "completed",
+     "execution_reason": null,
+     "verdict": "fail",
+     "label": "Failed · 5/10 inbox",
+     "tested_at": "2026-09-25T19:34:39.000Z",
+     "completed_at": null,
+     "age_days": 4,
+     "policy_version": null,
+     "counts": {
+      "inbox": 5,
+      "spam": 5,
+      "other": 0,
+      "missing": 0,
+      "total": 10
+     },
+     "families": null,
+     "detail_available": true
+    },
+    "recent_tests": [
+     {
+      "test_ref": "smartlead:900023",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "LIFTY mixed 3",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "fail",
+      "label": "Failed · 5/10 inbox",
+      "tested_at": "2026-09-25T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 4,
+      "policy_version": null,
+      "counts": {
+       "inbox": 5,
+       "spam": 5,
+       "other": 0,
+       "missing": 0,
+       "total": 10
+      },
+      "families": null,
+      "detail_available": true
+     },
+     {
+      "test_ref": "smartlead:900022",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "LIFTY mixed 2",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "fail",
+      "label": "Failed · 4/10 inbox",
+      "tested_at": "2026-09-23T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 6,
+      "policy_version": null,
+      "counts": {
+       "inbox": 4,
+       "spam": 6,
+       "other": 0,
+       "missing": 0,
+       "total": 10
+      },
+      "families": null,
+      "detail_available": true
+     },
+     {
+      "test_ref": "smartlead:900021",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "LIFTY mixed 1",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "pass",
+      "label": "Passed · 10/10 inbox",
+      "tested_at": "2026-09-19T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 10,
+      "policy_version": null,
+      "counts": {
+       "inbox": 10,
+       "spam": 0,
+       "other": 0,
+       "missing": 0,
+       "total": 10
+      },
+      "families": null,
+      "detail_available": true
+     }
+    ],
+    "detail": null
+   },
+   "approval": {
+    "status": {
+     "code": "not_approved",
+     "label": "Not approved",
+     "tone": "muted",
+     "description": "Not approved for outbound yet.",
+     "reasons": [
+      {
+       "code": "placement_hold",
+       "message": "Placement testing is on hold: operator review."
+      },
+      {
+       "code": "warmup_period_incomplete",
+       "message": "The warmup period ends 2026-10-06 (estimated)."
+      },
+      {
+       "code": "placement_gate_not_passed",
+       "message": "Hasn't passed the placement gate."
+      },
+      {
+       "code": "mitigation_paused",
+       "message": "Paused by deliverability mitigation."
+      }
+     ]
+    },
+    "approved_at": null,
+    "approved_by": null,
+    "placement_gate_passed_at": null,
+    "cold_eligible_at": "2026-10-06T19:34:39.005Z",
+    "hold": {
+     "reason": "operator review",
+     "review_at": null
+    }
+   },
+   "notes": {
+    "human": null
+   },
+   "connections": [
+    {
+     "connection_ref": "10393000-0000-4000-8000-000000000002",
+     "provider": "unipile",
+     "status": "connected",
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "mailbox_use": null,
+     "daily_send_limit": null,
+     "health_checked_at": "2026-09-29T19:34:39.005Z",
+     "created_at": "2026-09-26T19:34:39.005Z",
+     "send_gate": {
+      "code": "blocked",
+      "label": "Blocked",
+      "tone": "bad",
+      "description": "A send control blocks this connection.",
+      "reasons": [
+       {
+        "code": "send_paused",
+        "message": "Sending is paused for all LIFT email."
+       }
+      ]
+     },
+     "controls": [
+      {
+       "scope": "global",
+       "send_paused": true,
+       "capture_paused": false,
+       "updated_at": "2026-09-29T19:34:31.156Z"
+      }
+     ],
+     "holds": []
+    },
+    {
+     "connection_ref": "10393000-0000-4000-8000-000000000003",
+     "provider": "unipile",
+     "status": "disconnected",
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "mailbox_use": null,
+     "daily_send_limit": null,
+     "health_checked_at": null,
+     "created_at": "2026-09-09T19:34:39.005Z",
+     "send_gate": {
+      "code": "blocked",
+      "label": "Blocked",
+      "tone": "bad",
+      "description": "A send control blocks this connection.",
+      "reasons": [
+       {
+        "code": "connection_unavailable",
+        "message": "The connection is not connected."
+       }
+      ]
+     },
+     "controls": [
+      {
+       "scope": "global",
+       "send_paused": true,
+       "capture_paused": false,
+       "updated_at": "2026-09-29T19:34:31.156Z"
+      }
+     ],
+     "holds": []
+    }
+   ],
+   "availability": {
+    "smartlead_registry": true,
+    "smartlead_warmup": true,
+    "mailivery_warmup": false,
+    "placement_tests": true
+   }
+  },
+  {
+   "mailbox_ref": "f19a5b78-437d-6cdf-5759-280b1426e711",
+   "workspace": {
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "slug": "fixture-a",
+    "name": "Fixture A"
+   },
+   "email": "shared@a.test",
+   "domain": "a.test",
+   "senders": [
+    {
+     "sender_ref": "10392000-0000-4000-8000-000000000001",
+     "name": "Dana Smith",
+     "is_active": true
+    },
+    {
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "name": "Lee Park",
+     "is_active": true
+    }
+   ],
+   "identity": {
+    "code": "ambiguous_owner",
+    "label": "Owner unclear",
+    "tone": "warn",
+    "description": "More than one sender claims this inbox. Nothing merges them automatically.",
+    "reasons": [
+     {
+      "code": "claimed_by",
+      "message": "Dana Smith (10392000-0000-4000-8000-000000000001)"
+     },
+     {
+      "code": "claimed_by",
+      "message": "Lee Park (10392000-0000-4000-8000-000000000002)"
+     }
+    ]
+   },
+   "providers": {
+    "sending": [
+     "smartlead"
+    ],
+    "warmup": [],
+    "placement": [
+     "smartlead"
+    ]
+   },
+   "status": {
+    "code": "placement_failed",
+    "label": "Failed placement · 2026-09-24",
+    "tone": "bad",
+    "description": "The latest completed test failed: Failed · 7/12 inbox.",
+    "reasons": []
+   },
+   "readiness": {
+    "code": "blocked",
+    "label": "Not ready to send",
+    "tone": "bad",
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "not_approved",
+      "message": "Smartlead: Not approved for outbound yet."
+     },
+     {
+      "code": "placement_gate_not_passed",
+      "message": "Smartlead: Hasn't passed the placement gate."
+     },
+     {
+      "code": "warmup_check_missing",
+      "message": "Smartlead: No Smartlead warmup check is recorded."
+     }
+    ],
+    "paths": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "gate": "smartlead_eligibility",
+      "state": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "Doesn't meet the Smartlead eligibility rules yet.",
+       "reasons": [
+        {
+         "code": "not_approved",
+         "message": "Not approved for outbound yet."
+        },
+        {
+         "code": "placement_gate_not_passed",
+         "message": "Hasn't passed the placement gate."
+        },
+        {
+         "code": "warmup_check_missing",
+         "message": "No Smartlead warmup check is recorded."
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "warmup": {
+    "status": {
+     "code": "none",
+     "label": "No warmup evidence",
+     "tone": "muted",
+     "description": "No warmup provider has reported on this inbox. Missing evidence is not a healthy result.",
+     "reasons": []
+    },
+    "sources": [],
+    "trend": {
+     "window_start": "2026-08-31",
+     "window_end": "2026-09-29",
+     "days": []
+    }
+   },
+   "recovery": null,
+   "campaigns": {
+    "status": {
+     "code": "campaign_paused",
+     "label": "Campaign paused",
+     "tone": "warn",
+     "description": "Every campaign using this inbox is paused.",
+     "reasons": []
+    },
+    "items": [
+     {
+      "source": "smartlead_campaign",
+      "campaign_ref": "10394200-0000-4000-8000-000000000002",
+      "connection_ref": null,
+      "provider": "smartlead",
+      "name": "A paused campaign",
+      "sender_ref": "10392000-0000-4000-8000-000000000001",
+      "campaign_count": 1,
+      "states": {
+       "paused": 1
+      },
+      "status": {
+       "code": "paused",
+       "label": "Paused",
+       "tone": "warn",
+       "description": "The campaign record says paused (provider: PAUSED). This is LIFT's configuration, not a live provider readback.",
+       "reasons": []
+      },
+      "sending": {
+       "code": "not_active",
+       "label": "Not active",
+       "tone": "muted",
+       "description": "The campaign isn't active, so this inbox doesn't send for it.",
+       "reasons": []
+      },
+      "provider_status": "PAUSED",
+      "created_at": "2026-09-24T19:34:39.005Z",
+      "last_synced_at": null,
+      "drift_detected_at": null
+     }
+    ]
+   },
+   "placement": {
+    "status": {
+     "code": "failed",
+     "label": "Failed placement · 2026-09-24",
+     "tone": "bad",
+     "description": "The latest completed test failed: Failed · 7/12 inbox.",
+     "reasons": []
+    },
+    "evidence": {
+     "observed_at": "2026-09-24T19:34:39.000Z",
+     "freshness": "fresh",
+     "fresh_until": "2026-10-04T19:34:39.000Z",
+     "max_age_days": 10,
+     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+    },
+    "test_count": 1,
+    "latest_test_ref": "smartlead:900011",
+    "latest_completed_test_ref": "smartlead:900011",
+    "latest_completed_test": {
+     "test_ref": "smartlead:900011",
+     "provider": "smartlead",
+     "source": "smartlead_result",
+     "name": "LIFTY shared",
+     "execution_status": "completed",
+     "execution_reason": null,
+     "verdict": "fail",
+     "label": "Failed · 7/12 inbox",
+     "tested_at": "2026-09-24T19:34:39.000Z",
+     "completed_at": null,
+     "age_days": 5,
+     "policy_version": null,
+     "counts": {
+      "inbox": 7,
+      "spam": 3,
+      "other": 1,
+      "missing": 1,
+      "total": 12
+     },
+     "families": null,
+     "detail_available": true
+    },
+    "recent_tests": [
+     {
+      "test_ref": "smartlead:900011",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "LIFTY shared",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "fail",
+      "label": "Failed · 7/12 inbox",
+      "tested_at": "2026-09-24T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 5,
+      "policy_version": null,
+      "counts": {
+       "inbox": 7,
+       "spam": 3,
+       "other": 1,
+       "missing": 1,
+       "total": 12
+      },
+      "families": null,
+      "detail_available": true
+     }
+    ],
+    "detail": null
+   },
+   "approval": {
+    "status": {
+     "code": "not_approved",
+     "label": "Not approved",
+     "tone": "muted",
+     "description": "Not approved for outbound yet.",
+     "reasons": [
+      {
+       "code": "warmup_period_incomplete",
+       "message": "The warmup period hasn't started counting."
+      },
+      {
+       "code": "placement_gate_not_passed",
+       "message": "Hasn't passed the placement gate."
+      }
+     ]
+    },
+    "approved_at": null,
+    "approved_by": null,
+    "placement_gate_passed_at": null,
+    "cold_eligible_at": null,
+    "hold": null
+   },
+   "notes": {
+    "human": null
+   },
+   "connections": [],
+   "availability": {
+    "smartlead_registry": true,
+    "smartlead_warmup": false,
+    "mailivery_warmup": false,
+    "placement_tests": true
+   }
+  },
+  {
+   "mailbox_ref": "963de4a2-7be5-5cf2-cd2d-f979e1a10f7f",
+   "workspace": {
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "slug": "fixture-a",
+    "name": "Fixture A"
+   },
+   "email": "sl-only@a.test",
+   "domain": "a.test",
+   "senders": [
+    {
+     "sender_ref": "10392000-0000-4000-8000-000000000001",
+     "name": "Dana Smith",
+     "is_active": true
+    }
+   ],
+   "identity": {
+    "code": "resolved",
+    "label": "Dana Smith",
+    "tone": "ok",
+    "description": "This inbox belongs to Dana Smith.",
+    "reasons": []
+   },
+   "providers": {
+    "sending": [
+     "smartlead"
+    ],
+    "warmup": [
+     "smartlead"
+    ],
+    "placement": [
+     "smartlead"
+    ]
+   },
+   "status": {
+    "code": "in_campaign",
+    "label": "In campaign",
+    "tone": "ok",
+    "description": "Configured on an active campaign and passing its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.",
+    "reasons": []
+   },
+   "readiness": {
+    "code": "ready",
+    "label": "Ready to send",
+    "tone": "ok",
+    "description": "Allowed to send through Smartlead. Being allowed doesn't mean it is sending; see campaigns.",
+    "reasons": [],
+    "paths": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "gate": "smartlead_eligibility",
+      "state": {
+       "code": "allowed",
+       "label": "Allowed to send",
+       "tone": "ok",
+       "description": "Passes the Smartlead eligibility rules: approved, warmed, placement-gated, live warmup and no mitigation.",
+       "reasons": []
+      }
+     }
+    ]
+   },
+   "warmup": {
+    "status": {
+     "code": "active",
+     "label": "Warming · initial period complete",
+     "tone": "ok",
+     "description": "Smartlead warmup is running and its latest check passed. The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns.",
+     "reasons": []
+    },
+    "sources": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "state": {
+       "code": "active",
+       "label": "Warming",
+       "tone": "ok",
+       "description": "Smartlead warmup is running and its latest check passed.",
+       "reasons": []
+      },
+      "started_at": "2026-08-25T19:34:39.005Z",
+      "started_at_basis": "observed_activity",
+      "active_days": 35,
+      "required_days": 21,
+      "period_complete": true,
+      "estimated_completion": null,
+      "outreach_unlocked": null,
+      "last_check": {
+       "observed_at": "2026-09-29T19:34:39.005Z",
+       "freshness": "fresh",
+       "fresh_until": "2026-09-30T21:34:39.005Z"
+      },
+      "metrics": {
+       "reputation_pct": 100,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "spam_count": 0,
+       "sent_7d": 30,
+       "last_sent_at": "2026-09-29T18:34:39.005Z",
+       "warmup_emails_today": null,
+       "ramp_target": null
+      },
+      "checks": null,
+      "provider_detail": "reputation 100% · warmup spam 0% of 40"
+     }
+    ],
+    "trend": {
+     "window_start": "2026-08-31",
+     "window_end": "2026-09-29",
+     "days": [
+      {
+       "day": "2026-08-31",
+       "observed_at": "2026-08-31T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 71,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-01",
+       "observed_at": "2026-09-01T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 72,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-02",
+       "observed_at": "2026-09-02T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 73,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-03",
+       "observed_at": "2026-09-03T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 74,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-04",
+       "observed_at": "2026-09-04T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 75,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-05",
+       "observed_at": "2026-09-05T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 76,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-06",
+       "observed_at": "2026-09-06T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 77,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-07",
+       "observed_at": "2026-09-07T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 78,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-08",
+       "observed_at": "2026-09-08T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 79,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-09",
+       "observed_at": "2026-09-09T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 80,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-10",
+       "observed_at": "2026-09-10T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 81,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-11",
+       "observed_at": "2026-09-11T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 82,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-12",
+       "observed_at": "2026-09-12T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 83,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-13",
+       "observed_at": "2026-09-13T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 84,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-14",
+       "observed_at": "2026-09-14T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 85,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-15",
+       "observed_at": "2026-09-15T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 86,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-16",
+       "observed_at": "2026-09-16T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 87,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-17",
+       "observed_at": "2026-09-17T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 88,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-18",
+       "observed_at": "2026-09-18T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 89,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-19",
+       "observed_at": "2026-09-19T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 90,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-20",
+       "observed_at": "2026-09-20T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 91,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-21",
+       "observed_at": "2026-09-21T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 92,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-22",
+       "observed_at": "2026-09-22T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 93,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-23",
+       "observed_at": "2026-09-23T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 94,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-24",
+       "observed_at": "2026-09-24T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 95,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-25",
+       "observed_at": "2026-09-25T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 96,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-26",
+       "observed_at": "2026-09-26T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 97,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-27",
+       "observed_at": "2026-09-27T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 98,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-28",
+       "observed_at": "2026-09-28T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 99,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      },
+      {
+       "day": "2026-09-29",
+       "observed_at": "2026-09-29T19:34:39.005Z",
+       "status": "active",
+       "health": "pass",
+       "reputation_pct": 100,
+       "spam_pct": 0,
+       "spam_sample_sent": 40,
+       "sent_7d": 30
+      }
+     ]
+    }
+   },
+   "recovery": null,
+   "campaigns": {
+    "status": {
+     "code": "in_campaign_enabled",
+     "label": "In 1 active campaign · allowed",
+     "tone": "ok",
+     "description": "Configured on an active campaign and passing its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.",
+     "reasons": []
+    },
+    "items": [
+     {
+      "source": "smartlead_campaign",
+      "campaign_ref": "10394200-0000-4000-8000-000000000001",
+      "connection_ref": null,
+      "provider": "smartlead",
+      "name": "A active campaign",
+      "sender_ref": "10392000-0000-4000-8000-000000000001",
+      "campaign_count": 1,
+      "states": {
+       "active": 1
+      },
+      "status": {
+       "code": "active",
+       "label": "Active",
+       "tone": "ok",
+       "description": "The campaign record says active (provider: ACTIVE). This is LIFT's configuration, not a live provider readback.",
+       "reasons": []
+      },
+      "sending": {
+       "code": "enabled",
+       "label": "Allowed to send",
+       "tone": "ok",
+       "description": "The campaign is active and this inbox passes its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.",
+       "reasons": []
+      },
+      "provider_status": "ACTIVE",
+      "created_at": "2026-09-19T19:34:39.005Z",
+      "last_synced_at": null,
+      "drift_detected_at": null
+     },
+     {
+      "source": "smartlead_campaign",
+      "campaign_ref": "10394200-0000-4000-8000-000000000002",
+      "connection_ref": null,
+      "provider": "smartlead",
+      "name": "A paused campaign",
+      "sender_ref": "10392000-0000-4000-8000-000000000001",
+      "campaign_count": 1,
+      "states": {
+       "paused": 1
+      },
+      "status": {
+       "code": "paused",
+       "label": "Paused",
+       "tone": "warn",
+       "description": "The campaign record says paused (provider: PAUSED). This is LIFT's configuration, not a live provider readback.",
+       "reasons": []
+      },
+      "sending": {
+       "code": "not_active",
+       "label": "Not active",
+       "tone": "muted",
+       "description": "The campaign isn't active, so this inbox doesn't send for it.",
+       "reasons": []
+      },
+      "provider_status": "PAUSED",
+      "created_at": "2026-09-24T19:34:39.005Z",
+      "last_synced_at": null,
+      "drift_detected_at": null
+     }
+    ]
+   },
+   "placement": {
+    "status": {
+     "code": "passed",
+     "label": "Passed · 2026-09-27",
+     "tone": "ok",
+     "description": "The latest completed test passed: Passed · 12/12 inbox. LIFT's deliverability policy treats a placement result as current for 10 days.",
+     "reasons": []
+    },
+    "evidence": {
+     "observed_at": "2026-09-27T19:34:39.000Z",
+     "freshness": "fresh",
+     "fresh_until": "2026-10-07T19:34:39.000Z",
+     "max_age_days": 10,
+     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+    },
+    "test_count": 4,
+    "latest_test_ref": "smartlead:900004",
+    "latest_completed_test_ref": "smartlead:900004",
+    "latest_completed_test": {
+     "test_ref": "smartlead:900004",
+     "provider": "smartlead",
+     "source": "smartlead_result",
+     "name": "LIFTY tie high",
+     "execution_status": "completed",
+     "execution_reason": null,
+     "verdict": "pass",
+     "label": "Passed · 12/12 inbox",
+     "tested_at": "2026-09-27T19:34:39.000Z",
+     "completed_at": null,
+     "age_days": 2,
+     "policy_version": null,
+     "counts": {
+      "inbox": 12,
+      "spam": 0,
+      "other": 0,
+      "missing": 0,
+      "total": 12
+     },
+     "families": null,
+     "detail_available": true
+    },
+    "recent_tests": [
+     {
+      "test_ref": "smartlead:900004",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "LIFTY tie high",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "pass",
+      "label": "Passed · 12/12 inbox",
+      "tested_at": "2026-09-27T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 2,
+      "policy_version": null,
+      "counts": {
+       "inbox": 12,
+       "spam": 0,
+       "other": 0,
+       "missing": 0,
+       "total": 12
+      },
+      "families": null,
+      "detail_available": true
+     },
+     {
+      "test_ref": "smartlead:900003",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "LIFTY tie low",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "pass",
+      "label": "Passed · 12/12 inbox",
+      "tested_at": "2026-09-27T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 2,
+      "policy_version": null,
+      "counts": {
+       "inbox": 12,
+       "spam": 0,
+       "other": 0,
+       "missing": 0,
+       "total": 12
+      },
+      "families": null,
+      "detail_available": true
+     },
+     {
+      "test_ref": "smartlead:900002",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "LIFTY second",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "pass",
+      "label": "Passed · 10/10 inbox",
+      "tested_at": "2026-09-09T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 20,
+      "policy_version": null,
+      "counts": {
+       "inbox": 10,
+       "spam": 0,
+       "other": 0,
+       "missing": 0,
+       "total": 10
+      },
+      "families": null,
+      "detail_available": true
+     }
+    ],
+    "detail": null
+   },
+   "approval": {
+    "status": {
+     "code": "approved",
+     "label": "Approved",
+     "tone": "ok",
+     "description": "Approved for outbound on 2026-09-28 by fixture-operator. Approval alone doesn't enable sending; the other checks still apply.",
+     "reasons": []
+    },
+    "approved_at": "2026-09-28T19:34:39.005Z",
+    "approved_by": "fixture-operator",
+    "placement_gate_passed_at": "2026-09-27T19:34:39.000Z",
+    "cold_eligible_at": "2026-09-10T19:34:39.005Z",
+    "hold": null
+   },
+   "notes": {
+    "human": "A human note"
+   },
+   "connections": [],
+   "availability": {
+    "smartlead_registry": true,
+    "smartlead_warmup": true,
+    "mailivery_warmup": false,
+    "placement_tests": true
+   }
+  },
+  {
+   "mailbox_ref": "0864bf84-7189-09c2-ad3c-ec41fe2f5a55",
+   "workspace": {
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "slug": "fixture-a",
+    "name": "Fixture A"
+   },
+   "email": "unassigned@a.test",
+   "domain": "a.test",
+   "senders": [],
+   "identity": {
+    "code": "unassigned",
+    "label": "No sender",
+    "tone": "muted",
+    "description": "No sender is assigned to this inbox.",
+    "reasons": []
+   },
+   "providers": {
+    "sending": [
+     "smartlead"
+    ],
+    "warmup": [],
+    "placement": []
+   },
+   "status": {
+    "code": "not_ready",
+    "label": "Not ready yet",
+    "tone": "muted",
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "not_approved",
+      "message": "Smartlead: Not approved for outbound yet."
+     },
+     {
+      "code": "placement_gate_not_passed",
+      "message": "Smartlead: Hasn't passed the placement gate."
+     },
+     {
+      "code": "warmup_period_incomplete",
+      "message": "Smartlead: The registry's 21-day warmup period ends 2026-10-18."
+     },
+     {
+      "code": "warmup_check_missing",
+      "message": "Smartlead: No Smartlead warmup check is recorded."
+     }
+    ]
+   },
+   "readiness": {
+    "code": "blocked",
+    "label": "Not ready to send",
+    "tone": "bad",
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "not_approved",
+      "message": "Smartlead: Not approved for outbound yet."
+     },
+     {
+      "code": "placement_gate_not_passed",
+      "message": "Smartlead: Hasn't passed the placement gate."
+     },
+     {
+      "code": "warmup_period_incomplete",
+      "message": "Smartlead: The registry's 21-day warmup period ends 2026-10-18."
+     },
+     {
+      "code": "warmup_check_missing",
+      "message": "Smartlead: No Smartlead warmup check is recorded."
+     }
+    ],
+    "paths": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "gate": "smartlead_eligibility",
+      "state": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "Doesn't meet the Smartlead eligibility rules yet.",
+       "reasons": [
+        {
+         "code": "not_approved",
+         "message": "Not approved for outbound yet."
+        },
+        {
+         "code": "placement_gate_not_passed",
+         "message": "Hasn't passed the placement gate."
+        },
+        {
+         "code": "warmup_period_incomplete",
+         "message": "The registry's 21-day warmup period ends 2026-10-18."
+        },
+        {
+         "code": "warmup_check_missing",
+         "message": "No Smartlead warmup check is recorded."
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "warmup": {
+    "status": {
+     "code": "none",
+     "label": "No warmup evidence",
+     "tone": "muted",
+     "description": "No warmup provider has reported on this inbox. Missing evidence is not a healthy result.",
+     "reasons": []
+    },
+    "sources": [],
+    "trend": {
+     "window_start": "2026-08-31",
+     "window_end": "2026-09-29",
+     "days": []
+    }
+   },
+   "recovery": null,
+   "campaigns": {
+    "status": {
+     "code": "no_campaign",
+     "label": "No campaign",
+     "tone": "muted",
+     "description": "This inbox isn't configured on any campaign.",
+     "reasons": []
+    },
+    "items": []
+   },
+   "placement": {
+    "status": {
+     "code": "no_tests",
+     "label": "No placement test yet",
+     "tone": "warn",
+     "description": "No placement test has been recorded for this inbox. Missing evidence is not a passing result.",
+     "reasons": []
+    },
+    "evidence": {
+     "observed_at": null,
+     "freshness": "unknown",
+     "fresh_until": null,
+     "max_age_days": 10,
+     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+    },
+    "test_count": 0,
+    "latest_test_ref": null,
+    "latest_completed_test_ref": null,
+    "latest_completed_test": null,
+    "recent_tests": [],
+    "detail": null
+   },
+   "approval": {
+    "status": {
+     "code": "not_approved",
+     "label": "Not approved",
+     "tone": "muted",
+     "description": "Not approved for outbound yet.",
+     "reasons": [
+      {
+       "code": "warmup_period_incomplete",
+       "message": "The warmup period hasn't started counting."
+      },
+      {
+       "code": "placement_gate_not_passed",
+       "message": "Hasn't passed the placement gate."
+      }
+     ]
+    },
+    "approved_at": null,
+    "approved_by": null,
+    "placement_gate_passed_at": null,
+    "cold_eligible_at": null,
+    "hold": null
+   },
+   "notes": {
+    "human": null
+   },
+   "connections": [],
+   "availability": {
+    "smartlead_registry": true,
+    "smartlead_warmup": false,
+    "mailivery_warmup": false,
+    "placement_tests": false
+   }
+  },
+  {
+   "mailbox_ref": "0c342394-ee33-ff78-570e-1179a0b4941b",
+   "workspace": {
+    "workspace_ref": "10391000-0000-4000-8000-000000000001",
+    "slug": "fixture-a",
+    "name": "Fixture A"
+   },
+   "email": "uni-only@a.test",
+   "domain": "a.test",
+   "senders": [
+    {
+     "sender_ref": "10392000-0000-4000-8000-000000000001",
+     "name": "Dana Smith",
+     "is_active": true
+    }
+   ],
+   "identity": {
+    "code": "resolved",
+    "label": "Dana Smith",
+    "tone": "ok",
+    "description": "This inbox belongs to Dana Smith.",
+    "reasons": []
+   },
+   "providers": {
+    "sending": [
+     "unipile"
+    ],
+    "warmup": [
+     "mailivery"
+    ],
+    "placement": [
+     "mailivery"
+    ]
+   },
+   "status": {
+    "code": "blocked_in_campaign",
+    "label": "In campaign · blocked",
+    "tone": "bad",
+    "description": "Configured on an active campaign, but this inbox is blocked from sending.",
+    "reasons": [
+     {
+      "code": "send_paused",
+      "message": "Sending is paused for all LIFT email."
+     }
+    ]
+   },
+   "readiness": {
+    "code": "blocked",
+    "label": "Not ready to send",
+    "tone": "bad",
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "send_paused",
+      "message": "Unipile connection: Sending is paused for all LIFT email."
+     }
+    ],
+    "paths": [
+     {
+      "provider": "unipile",
+      "connection_ref": "10393000-0000-4000-8000-000000000001",
+      "gate": "unknown",
+      "state": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "A send control blocks this connection.",
+       "reasons": [
+        {
+         "code": "send_paused",
+         "message": "Sending is paused for all LIFT email."
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "warmup": {
+    "status": {
+     "code": "active",
+     "label": "Warming · day 10 of 21",
+     "tone": "ok",
+     "description": "Mailivery is warming this inbox.",
+     "reasons": []
+    },
+    "sources": [
+     {
+      "provider": "mailivery",
+      "connection_ref": "10393000-0000-4000-8000-000000000001",
+      "state": {
+       "code": "active",
+       "label": "Warming",
+       "tone": "ok",
+       "description": "Mailivery is warming this inbox.",
+       "reasons": []
+      },
+      "started_at": "2026-09-18T19:34:39.005Z",
+      "started_at_basis": "provider_evidence",
+      "active_days": 10,
+      "required_days": 21,
+      "period_complete": false,
+      "estimated_completion": {
+       "at": null,
+       "on": "2026-10-10",
+       "basis": "Estimated if warmup runs every day from today. Paused days and days with a problem don't count, so the date moves later if warmup stops."
+      },
+      "outreach_unlocked": false,
+      "last_check": {
+       "observed_at": "2026-09-29T19:34:39.005Z",
+       "freshness": "fresh",
+       "fresh_until": "2026-09-30T19:34:39.005Z"
+      },
+      "metrics": {
+       "reputation_pct": null,
+       "spam_pct": null,
+       "spam_sample_sent": null,
+       "spam_count": null,
+       "sent_7d": null,
+       "last_sent_at": null,
+       "warmup_emails_today": null,
+       "ramp_target": null
+      },
+      "checks": null,
+      "provider_detail": null
+     }
+    ],
+    "trend": {
+     "window_start": "2026-08-31",
+     "window_end": "2026-09-29",
+     "days": []
+    }
+   },
+   "recovery": null,
+   "campaigns": {
+    "status": {
+     "code": "in_campaign_blocked",
+     "label": "In 1 active campaign · blocked",
+     "tone": "bad",
+     "description": "Configured on an active campaign, but this inbox is blocked from sending.",
+     "reasons": [
+      {
+       "code": "send_paused",
+       "message": "Sending is paused for all LIFT email."
+      }
+     ]
+    },
+    "items": [
+     {
+      "source": "lifty_direct_email",
+      "campaign_ref": null,
+      "connection_ref": "10393000-0000-4000-8000-000000000001",
+      "provider": "unipile",
+      "name": null,
+      "sender_ref": null,
+      "campaign_count": 2,
+      "states": {
+       "active": 1,
+       "paused": 1
+      },
+      "status": {
+       "code": "active",
+       "label": "Active",
+       "tone": "ok",
+       "description": "2 direct Lifty campaigns use this connection: 1 active, 1 paused.",
+       "reasons": []
+      },
+      "sending": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "The campaign is active, but this inbox is blocked from sending.",
+       "reasons": [
+        {
+         "code": "send_paused",
+         "message": "Sending is paused for all LIFT email."
+        }
+       ]
+      },
+      "provider_status": null,
+      "created_at": "2026-09-25T19:34:39.005Z",
+      "last_synced_at": null,
+      "drift_detected_at": null
+     }
+    ]
+   },
+   "placement": {
+    "status": {
+     "code": "stale",
+     "label": "Passed 2026-09-10 · out of date",
+     "tone": "warn",
+     "description": "The latest completed test passed, but it is older than 10 days, so it no longer counts as current evidence.",
+     "reasons": [
+      {
+       "code": "newer_test_in_progress",
+       "message": "A newer test from 2026-09-28 is pending; the result below is the latest completed one."
+      }
+     ]
+    },
+    "evidence": {
+     "observed_at": "2026-09-10T19:34:39.005Z",
+     "freshness": "stale",
+     "fresh_until": "2026-09-20T19:34:39.005Z",
+     "max_age_days": 10,
+     "rule": "This inbox's send check needs a passing placement test from the last 10 days."
+    },
+    "test_count": 5,
+    "latest_test_ref": "lifty-request:10397000-0000-4000-8000-000000000004",
+    "latest_completed_test_ref": "mailivery:7001",
+    "latest_completed_test": {
+     "test_ref": "mailivery:7001",
+     "provider": "mailivery",
+     "source": "lifty_request",
+     "name": "LIFTY r1",
+     "execution_status": "completed",
+     "execution_reason": null,
+     "verdict": "pass",
+     "label": "Passed · 4/4 inbox",
+     "tested_at": "2026-09-09T19:34:39.005Z",
+     "completed_at": "2026-09-10T19:34:39.005Z",
+     "age_days": 18,
+     "policy_version": "strict.v1",
+     "counts": {
+      "inbox": 4,
+      "spam": 0,
+      "other": null,
+      "missing": null,
+      "total": 4
+     },
+     "families": {
+      "gmail": {
+       "inbox": 2,
+       "spam": 0,
+       "other": null,
+       "missing": 0,
+       "total": 2
+      },
+      "outlook": {
+       "inbox": 2,
+       "spam": 0,
+       "other": null,
+       "missing": 0,
+       "total": 2
+      }
+     },
+     "detail_available": true
+    },
+    "recent_tests": [
+     {
+      "test_ref": "lifty-request:10397000-0000-4000-8000-000000000004",
+      "provider": "mailivery",
+      "source": "lifty_request",
+      "name": "LIFTY r4",
+      "execution_status": "pending",
+      "execution_reason": null,
+      "verdict": "unknown",
+      "label": "Pending",
+      "tested_at": "2026-09-28T19:34:39.005Z",
+      "completed_at": null,
+      "age_days": 0,
+      "policy_version": null,
+      "counts": null,
+      "families": null,
+      "detail_available": false
+     },
+     {
+      "test_ref": "mailivery:7003",
+      "provider": "mailivery",
+      "source": "lifty_request",
+      "name": "LIFTY r3",
+      "execution_status": "running",
+      "execution_reason": null,
+      "verdict": "unknown",
+      "label": "Running",
+      "tested_at": "2026-09-27T19:34:39.005Z",
+      "completed_at": null,
+      "age_days": 1,
+      "policy_version": null,
+      "counts": null,
+      "families": null,
+      "detail_available": false
+     },
+     {
+      "test_ref": "mailivery:7002",
+      "provider": "mailivery",
+      "source": "lifty_request",
+      "name": "LIFTY r2",
+      "execution_status": "error",
+      "execution_reason": {
+       "code": "provider_error",
+       "message": "The test did not complete (provider_error). This is not a placement result."
+      },
+      "verdict": "unknown",
+      "label": "Did not run",
+      "tested_at": "2026-09-26T19:34:39.005Z",
+      "completed_at": null,
+      "age_days": 2,
+      "policy_version": null,
+      "counts": null,
+      "families": null,
+      "detail_available": false
+     }
+    ],
+    "detail": null
+   },
+   "approval": {
+    "status": {
+     "code": "not_applicable",
+     "label": "No approval record",
+     "tone": "muted",
+     "description": "This inbox has no LIFT approval record. Its send controls decide whether it may send.",
+     "reasons": []
+    },
+    "approved_at": null,
+    "approved_by": null,
+    "placement_gate_passed_at": null,
+    "cold_eligible_at": null,
+    "hold": null
+   },
+   "notes": {
+    "human": null
+   },
+   "connections": [
+    {
+     "connection_ref": "10393000-0000-4000-8000-000000000001",
+     "provider": "unipile",
+     "status": "connected",
+     "sender_ref": "10392000-0000-4000-8000-000000000001",
+     "mailbox_use": null,
+     "daily_send_limit": null,
+     "health_checked_at": "2026-09-29T19:34:39.005Z",
+     "created_at": "2026-08-30T19:34:39.005Z",
+     "send_gate": {
+      "code": "blocked",
+      "label": "Blocked",
+      "tone": "bad",
+      "description": "A send control blocks this connection.",
+      "reasons": [
+       {
+        "code": "send_paused",
+        "message": "Sending is paused for all LIFT email."
+       }
+      ]
+     },
+     "controls": [
+      {
+       "scope": "connection",
+       "send_paused": true,
+       "capture_paused": false,
+       "updated_at": "2026-09-29T19:34:39.015Z"
+      },
+      {
+       "scope": "global",
+       "send_paused": true,
+       "capture_paused": false,
+       "updated_at": "2026-09-29T19:34:31.156Z"
+      }
+     ],
+     "holds": [
+      {
+       "reason": "operator_hold",
+       "updated_at": "2026-09-29T19:34:39.015Z"
+      }
+     ]
+    }
+   ],
+   "availability": {
+    "smartlead_registry": false,
+    "smartlead_warmup": false,
+    "mailivery_warmup": true,
+    "placement_tests": true
+   }
+  },
+  {
+   "mailbox_ref": "dd83a07c-bb23-babd-4f30-b9524b8ca9b3",
+   "workspace": {
+    "workspace_ref": "10391000-0000-4000-8000-000000000002",
+    "slug": "fixture-b",
+    "name": "Fixture B"
+   },
+   "email": "b-sl@b.test",
+   "domain": "b.test",
+   "senders": [
+    {
+     "sender_ref": "10392000-0000-4000-8000-000000000003",
+     "name": "Dana Smith",
+     "is_active": true
+    }
+   ],
+   "identity": {
+    "code": "resolved",
+    "label": "Dana Smith",
+    "tone": "ok",
+    "description": "This inbox belongs to Dana Smith.",
+    "reasons": []
+   },
+   "providers": {
+    "sending": [
+     "smartlead"
+    ],
+    "warmup": [
+     "smartlead"
+    ],
+    "placement": [
+     "smartlead"
+    ]
+   },
+   "status": {
+    "code": "placement_failed",
+    "label": "Failed placement · 2026-09-28",
+    "tone": "bad",
+    "description": "The latest completed test failed: Failed · 1/10 inbox.",
+    "reasons": []
+   },
+   "readiness": {
+    "code": "blocked",
+    "label": "Not ready to send",
+    "tone": "bad",
+    "description": "Every sending path for this inbox is blocked.",
+    "reasons": [
+     {
+      "code": "not_approved",
+      "message": "Smartlead: Not approved for outbound yet."
+     },
+     {
+      "code": "placement_gate_not_passed",
+      "message": "Smartlead: Hasn't passed the placement gate."
+     },
+     {
+      "code": "warmup_health_failed",
+      "message": "Smartlead: Warmup health is fail: B warmup secret"
+     }
+    ],
+    "paths": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "gate": "smartlead_eligibility",
+      "state": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "Doesn't meet the Smartlead eligibility rules yet.",
+       "reasons": [
+        {
+         "code": "not_approved",
+         "message": "Not approved for outbound yet."
+        },
+        {
+         "code": "placement_gate_not_passed",
+         "message": "Hasn't passed the placement gate."
+        },
+        {
+         "code": "warmup_health_failed",
+         "message": "Warmup health is fail: B warmup secret"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "warmup": {
+    "status": {
+     "code": "problem",
+     "label": "Warmup failing",
+     "tone": "bad",
+     "description": "Smartlead warmup is running, but its latest check failed. The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns.",
+     "reasons": [
+      {
+       "code": "warmup_health_failed",
+       "message": "The latest warmup check failed. B warmup secret"
+      }
+     ]
+    },
+    "sources": [
+     {
+      "provider": "smartlead",
+      "connection_ref": null,
+      "state": {
+       "code": "problem",
+       "label": "Warmup failing",
+       "tone": "bad",
+       "description": "Smartlead warmup is running, but its latest check failed.",
+       "reasons": [
+        {
+         "code": "warmup_health_failed",
+         "message": "The latest warmup check failed. B warmup secret"
+        }
+       ]
+      },
+      "started_at": "2026-08-15T19:34:39.005Z",
+      "started_at_basis": "observed_activity",
+      "active_days": 45,
+      "required_days": 21,
+      "period_complete": true,
+      "estimated_completion": null,
+      "outreach_unlocked": null,
+      "last_check": {
+       "observed_at": "2026-09-29T19:34:39.005Z",
+       "freshness": "fresh",
+       "fresh_until": "2026-09-30T21:34:39.005Z"
+      },
+      "metrics": {
+       "reputation_pct": 60,
+       "spam_pct": 30,
+       "spam_sample_sent": 100,
+       "spam_count": 30,
+       "sent_7d": 50,
+       "last_sent_at": "2026-09-29T19:34:39.005Z",
+       "warmup_emails_today": null,
+       "ramp_target": null
+      },
+      "checks": null,
+      "provider_detail": "B warmup secret"
+     }
+    ],
+    "trend": {
+     "window_start": "2026-08-31",
+     "window_end": "2026-09-29",
+     "days": [
+      {
+       "day": "2026-09-29",
+       "observed_at": "2026-09-29T19:34:39.005Z",
+       "status": "active",
+       "health": "fail",
+       "reputation_pct": 60,
+       "spam_pct": 30,
+       "spam_sample_sent": 100,
+       "sent_7d": 50
+      }
+     ]
+    }
+   },
+   "recovery": null,
+   "campaigns": {
+    "status": {
+     "code": "in_campaign_blocked",
+     "label": "In 1 active campaign · blocked",
+     "tone": "bad",
+     "description": "Configured on an active campaign, but this inbox is blocked from sending.",
+     "reasons": [
+      {
+       "code": "not_approved",
+       "message": "Not approved for outbound yet."
+      },
+      {
+       "code": "placement_gate_not_passed",
+       "message": "Hasn't passed the placement gate."
+      },
+      {
+       "code": "warmup_health_failed",
+       "message": "Warmup health is fail: B warmup secret"
+      }
+     ]
+    },
+    "items": [
+     {
+      "source": "smartlead_campaign",
+      "campaign_ref": "10394200-0000-4000-8000-000000000003",
+      "connection_ref": null,
+      "provider": "smartlead",
+      "name": "B secret campaign",
+      "sender_ref": "10392000-0000-4000-8000-000000000003",
+      "campaign_count": 1,
+      "states": {
+       "active": 1
+      },
+      "status": {
+       "code": "active",
+       "label": "Active",
+       "tone": "ok",
+       "description": "The campaign record says active (provider: ACTIVE). This is LIFT's configuration, not a live provider readback.",
+       "reasons": []
+      },
+      "sending": {
+       "code": "blocked",
+       "label": "Blocked",
+       "tone": "bad",
+       "description": "The campaign is active, but this inbox is blocked from sending.",
+       "reasons": [
+        {
+         "code": "not_approved",
+         "message": "Not approved for outbound yet."
+        },
+        {
+         "code": "placement_gate_not_passed",
+         "message": "Hasn't passed the placement gate."
+        },
+        {
+         "code": "warmup_health_failed",
+         "message": "Warmup health is fail: B warmup secret"
+        }
+       ]
+      },
+      "provider_status": "ACTIVE",
+      "created_at": "2026-09-28T19:34:39.005Z",
+      "last_synced_at": null,
+      "drift_detected_at": null
+     }
+    ]
+   },
+   "placement": {
+    "status": {
+     "code": "failed",
+     "label": "Failed placement · 2026-09-28",
+     "tone": "bad",
+     "description": "The latest completed test failed: Failed · 1/10 inbox.",
+     "reasons": []
+    },
+    "evidence": {
+     "observed_at": "2026-09-28T19:34:39.000Z",
+     "freshness": "fresh",
+     "fresh_until": "2026-10-08T19:34:39.000Z",
+     "max_age_days": 10,
+     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+    },
+    "test_count": 1,
+    "latest_test_ref": "smartlead:900101",
+    "latest_completed_test_ref": "smartlead:900101",
+    "latest_completed_test": {
+     "test_ref": "smartlead:900101",
+     "provider": "smartlead",
+     "source": "smartlead_result",
+     "name": "B secret test",
+     "execution_status": "completed",
+     "execution_reason": null,
+     "verdict": "fail",
+     "label": "Failed · 1/10 inbox",
+     "tested_at": "2026-09-28T19:34:39.000Z",
+     "completed_at": null,
+     "age_days": 1,
+     "policy_version": null,
+     "counts": {
+      "inbox": 1,
+      "spam": 9,
+      "other": 0,
+      "missing": 0,
+      "total": 10
+     },
+     "families": null,
+     "detail_available": true
+    },
+    "recent_tests": [
+     {
+      "test_ref": "smartlead:900101",
+      "provider": "smartlead",
+      "source": "smartlead_result",
+      "name": "B secret test",
+      "execution_status": "completed",
+      "execution_reason": null,
+      "verdict": "fail",
+      "label": "Failed · 1/10 inbox",
+      "tested_at": "2026-09-28T19:34:39.000Z",
+      "completed_at": null,
+      "age_days": 1,
+      "policy_version": null,
+      "counts": {
+       "inbox": 1,
+       "spam": 9,
+       "other": 0,
+       "missing": 0,
+       "total": 10
+      },
+      "families": null,
+      "detail_available": true
+     }
+    ],
+    "detail": null
+   },
+   "approval": {
+    "status": {
+     "code": "not_approved",
+     "label": "Not approved",
+     "tone": "muted",
+     "description": "Not approved for outbound yet.",
+     "reasons": [
+      {
+       "code": "placement_gate_not_passed",
+       "message": "Hasn't passed the placement gate."
+      }
+     ]
+    },
+    "approved_at": null,
+    "approved_by": null,
+    "placement_gate_passed_at": null,
+    "cold_eligible_at": "2026-09-05T19:34:39.005Z",
+    "hold": null
+   },
+   "notes": {
+    "human": "B secret note"
+   },
+   "connections": [],
+   "availability": {
+    "smartlead_registry": true,
+    "smartlead_warmup": true,
+    "mailivery_warmup": false,
+    "placement_tests": true
+   }
+  },
+  {
+   "mailbox_ref": "75b639c1-5819-90ae-3179-dce8de65ad7d",
+   "workspace": {
+    "workspace_ref": "10391000-0000-4000-8000-000000000002",
+    "slug": "fixture-b",
+    "name": "Fixture B"
+   },
+   "email": "mixed@a.test",
+   "domain": "a.test",
+   "senders": [
+    {
+     "sender_ref": "10392000-0000-4000-8000-000000000003",
+     "name": "Dana Smith",
+     "is_active": true
+    }
+   ],
+   "identity": {
+    "code": "resolved",
+    "label": "Dana Smith",
+    "tone": "ok",
+    "description": "This inbox belongs to Dana Smith.",
+    "reasons": []
+   },
+   "providers": {
+    "sending": [
+     "unipile"
+    ],
+    "warmup": [],
+    "placement": [
+     "mailivery"
+    ]
+   },
+   "status": {
+    "code": "not_ready",
+    "label": "Not ready yet",
+    "tone": "muted",
+    "description": "At least one sending path couldn't be evaluated from the stored data.",
+    "reasons": []
+   },
+   "readiness": {
+    "code": "unknown",
+    "label": "Readiness unknown",
+    "tone": "warn",
+    "description": "At least one sending path couldn't be evaluated from the stored data.",
+    "reasons": [],
+    "paths": [
+     {
+      "provider": "unipile",
+      "connection_ref": "10393000-0000-4000-8000-000000000011",
+      "gate": "unknown",
+      "state": {
+       "code": "unknown",
+       "label": "Send checks unknown",
+       "tone": "warn",
+       "description": "This server's data doesn't say which send checks govern this connection.",
+       "reasons": []
+      }
+     }
+    ]
+   },
+   "warmup": {
+    "status": {
+     "code": "none",
+     "label": "No warmup evidence",
+     "tone": "muted",
+     "description": "No warmup provider has reported on this inbox. Missing evidence is not a healthy result.",
+     "reasons": []
+    },
+    "sources": [],
+    "trend": {
+     "window_start": "2026-08-31",
+     "window_end": "2026-09-29",
+     "days": []
+    }
+   },
+   "recovery": null,
+   "campaigns": {
+    "status": {
+     "code": "no_campaign",
+     "label": "No campaign",
+     "tone": "muted",
+     "description": "This inbox isn't configured on any campaign.",
+     "reasons": []
+    },
+    "items": []
+   },
+   "placement": {
+    "status": {
+     "code": "no_result",
+     "label": "No placement result yet",
+     "tone": "warn",
+     "description": "Tests were attempted, but none has completed with a result. A pending or failed run is not a placement verdict.",
+     "reasons": [
+      {
+       "code": "newer_test_in_progress",
+       "message": "A newer test from 2026-09-29 is pending; the result below is the latest completed one."
+      }
+     ]
+    },
+    "evidence": {
+     "observed_at": null,
+     "freshness": "unknown",
+     "fresh_until": null,
+     "max_age_days": null,
+     "rule": "No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency."
+    },
+    "test_count": 1,
+    "latest_test_ref": "lifty-request:10397000-0000-4000-8000-000000000011",
+    "latest_completed_test_ref": null,
+    "latest_completed_test": null,
+    "recent_tests": [
+     {
+      "test_ref": "lifty-request:10397000-0000-4000-8000-000000000011",
+      "provider": "mailivery",
+      "source": "lifty_request",
+      "name": "LIFTY B secret",
+      "execution_status": "pending",
+      "execution_reason": null,
+      "verdict": "unknown",
+      "label": "Pending",
+      "tested_at": "2026-09-29T18:34:39.005Z",
+      "completed_at": null,
+      "age_days": 0,
+      "policy_version": null,
+      "counts": null,
+      "families": null,
+      "detail_available": false
+     }
+    ],
+    "detail": null
+   },
+   "approval": {
+    "status": {
+     "code": "not_applicable",
+     "label": "No approval record",
+     "tone": "muted",
+     "description": "This inbox has no LIFT approval record. Its send controls decide whether it may send.",
+     "reasons": []
+    },
+    "approved_at": null,
+    "approved_by": null,
+    "placement_gate_passed_at": null,
+    "cold_eligible_at": null,
+    "hold": null
+   },
+   "notes": {
+    "human": null
+   },
+   "connections": [
+    {
+     "connection_ref": "10393000-0000-4000-8000-000000000011",
+     "provider": "unipile",
+     "status": "connected",
+     "sender_ref": "10392000-0000-4000-8000-000000000003",
+     "mailbox_use": null,
+     "daily_send_limit": null,
+     "health_checked_at": "2026-09-29T19:34:39.005Z",
+     "created_at": "2026-09-25T19:34:39.005Z",
+     "send_gate": {
+      "code": "unknown",
+      "label": "Send checks unknown",
+      "tone": "warn",
+      "description": "This server's data doesn't say which send checks govern this connection.",
+      "reasons": []
+     },
+     "controls": [
+      {
+       "scope": "global",
+       "send_paused": true,
+       "capture_paused": false,
+       "updated_at": "2026-09-29T19:34:31.156Z"
+      }
+     ],
+     "holds": []
+    }
+   ],
+   "availability": {
+    "smartlead_registry": false,
+    "smartlead_warmup": false,
+    "mailivery_warmup": false,
+    "placement_tests": true
+   }
+  }
+ ],
+ "total_count": 7,
+ "next_cursor": null,
+ "warnings": []
+}

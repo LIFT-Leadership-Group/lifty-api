@@ -1,0 +1,409 @@
+{
+ "contract": "deliverability-source.v1",
+ "filters": {
+  "senders": [
+   {
+    "is_active": true,
+    "mailbox_count": 3,
+    "name": "Dana Smith",
+    "sender_ref": "10392000-0000-4000-8000-000000000001",
+    "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   },
+   {
+    "is_active": true,
+    "mailbox_count": 2,
+    "name": "Lee Park",
+    "sender_ref": "10392000-0000-4000-8000-000000000002",
+    "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   }
+  ],
+  "unassigned_count": 1,
+  "workspaces": [
+   {
+    "is_active": true,
+    "name": "Fixture A",
+    "slug": "fixture-a",
+    "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   }
+  ]
+ },
+ "generated_at": "2026-09-29T19:34:39.159861+00:00",
+ "mailboxes": [
+  {
+   "availability": {
+    "mailivery_warmup": false,
+    "placement_tests": true,
+    "smartlead_registry": true,
+    "smartlead_warmup": true
+   },
+   "campaigns": [],
+   "connections": [
+    {
+     "connection_ref": "10393000-0000-4000-8000-000000000002",
+     "controls": [
+      {
+       "capture_paused": false,
+       "scope_key": "global",
+       "send_paused": true,
+       "updated_at": "2026-09-29T19:34:31.156554+00:00"
+      }
+     ],
+     "created_at": "2026-09-26T19:34:39.159861+00:00",
+     "daily_send_limit": null,
+     "health_checked_at": "2026-09-29T19:34:39.159861+00:00",
+     "holds": [],
+     "lifty_mailbox_ref": "10395000-0000-4000-8000-000000000002",
+     "mailbox_ready": false,
+     "mailbox_use": null,
+     "provider": "unipile",
+     "send_block_reason": "send_paused:global",
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "status": "connected",
+     "updated_at": "2026-09-29T19:34:39.159861+00:00"
+    },
+    {
+     "connection_ref": "10393000-0000-4000-8000-000000000003",
+     "controls": [
+      {
+       "capture_paused": false,
+       "scope_key": "global",
+       "send_paused": true,
+       "updated_at": "2026-09-29T19:34:31.156554+00:00"
+      }
+     ],
+     "created_at": "2026-09-09T19:34:39.159861+00:00",
+     "daily_send_limit": null,
+     "health_checked_at": null,
+     "holds": [],
+     "lifty_mailbox_ref": null,
+     "mailbox_ready": false,
+     "mailbox_use": null,
+     "provider": "unipile",
+     "send_block_reason": "connection_unavailable",
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "status": "disconnected",
+     "updated_at": "2026-09-29T19:34:39.159861+00:00"
+    }
+   ],
+   "domain": "a.test",
+   "email": "mixed@a.test",
+   "identity": {
+    "lifty_mailbox_ref": "10395000-0000-4000-8000-000000000002",
+    "smartlead_account_id": 103902,
+    "status": "resolved"
+   },
+   "mailbox_ref": "6170c056-3dab-cbb8-9213-9440fa809c62",
+   "placement": {
+    "latest_completed_test": {
+     "completed_at": null,
+     "connection_ref": null,
+     "counts": {
+      "inbox": 5,
+      "missing": 0,
+      "other": 0,
+      "spam": 5,
+      "total": 10
+     },
+     "execution_status": "completed",
+     "failure_code": null,
+     "families": null,
+     "name": "LIFTY mixed 3",
+     "passed": false,
+     "placement_ref": null,
+     "policy_version": null,
+     "provider": "smartlead",
+     "provider_test_ref": "900023",
+     "source": "smartlead_result",
+     "test_ref": "smartlead:900023",
+     "tested_at": "2026-09-25T19:34:39+00:00"
+    },
+    "latest_completed_test_ref": "smartlead:900023",
+    "latest_test_ref": "smartlead:900023",
+    "recent_tests": [
+     {
+      "completed_at": null,
+      "connection_ref": null,
+      "counts": {
+       "inbox": 5,
+       "missing": 0,
+       "other": 0,
+       "spam": 5,
+       "total": 10
+      },
+      "execution_status": "completed",
+      "failure_code": null,
+      "families": null,
+      "name": "LIFTY mixed 3",
+      "passed": false,
+      "placement_ref": null,
+      "policy_version": null,
+      "provider": "smartlead",
+      "provider_test_ref": "900023",
+      "source": "smartlead_result",
+      "test_ref": "smartlead:900023",
+      "tested_at": "2026-09-25T19:34:39+00:00"
+     },
+     {
+      "completed_at": null,
+      "connection_ref": null,
+      "counts": {
+       "inbox": 4,
+       "missing": 0,
+       "other": 0,
+       "spam": 6,
+       "total": 10
+      },
+      "execution_status": "completed",
+      "failure_code": null,
+      "families": null,
+      "name": "LIFTY mixed 2",
+      "passed": false,
+      "placement_ref": null,
+      "policy_version": null,
+      "provider": "smartlead",
+      "provider_test_ref": "900022",
+      "source": "smartlead_result",
+      "test_ref": "smartlead:900022",
+      "tested_at": "2026-09-23T19:34:39+00:00"
+     },
+     {
+      "completed_at": null,
+      "connection_ref": null,
+      "counts": {
+       "inbox": 10,
+       "missing": 0,
+       "other": 0,
+       "spam": 0,
+       "total": 10
+      },
+      "execution_status": "completed",
+      "failure_code": null,
+      "families": null,
+      "name": "LIFTY mixed 1",
+      "passed": true,
+      "placement_ref": null,
+      "policy_version": null,
+      "provider": "smartlead",
+      "provider_test_ref": "900021",
+      "source": "smartlead_result",
+      "test_ref": "smartlead:900021",
+      "tested_at": "2026-09-19T19:34:39+00:00"
+     }
+    ],
+    "test_count": 3
+   },
+   "senders": [
+    {
+     "is_active": true,
+     "name": "Lee Park",
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "sources": [
+      "connection",
+      "smartlead_owner"
+     ]
+    }
+   ],
+   "smartlead": {
+    "account_id": 103902,
+    "approved_at": null,
+    "approved_by": null,
+    "approved_for_outbound": false,
+    "cold_eligible_at": "2026-10-06T19:34:39.159861+00:00",
+    "created_at": "2026-09-29T19:34:39.159861+00:00",
+    "is_eligible": false,
+    "mitigation_paused_at": null,
+    "mitigation_reason": "placement_failed",
+    "mitigation_resumed_at": null,
+    "mitigation_state": "paused",
+    "notes": null,
+    "placement_gate_passed_at": null,
+    "placement_hold_reason": "operator review",
+    "placement_hold_review_at": null,
+    "updated_at": "2026-09-29T19:34:39.159861+00:00",
+    "warmup_activity_grace_until": null,
+    "warmup_started_at": "2026-09-14T19:34:39.159861+00:00"
+   },
+   "warmup": {
+    "mailivery": [],
+    "smartlead": {
+     "active_since": "2026-09-15T19:34:39.159861+00:00",
+     "detail": "12 observed warmup sends/7d (minimum 20)",
+     "health": "pending",
+     "last_sent_at": "2026-09-28T19:34:39.159861+00:00",
+     "observed_at": "2026-09-29T16:34:39.159861+00:00",
+     "reputation_pct": 98.0,
+     "sent_7d": 12,
+     "spam_count": 0,
+     "spam_pct": 1.5,
+     "spam_sample_sent": 20,
+     "status": "active"
+    },
+    "smartlead_daily": []
+   },
+   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+  },
+  {
+   "availability": {
+    "mailivery_warmup": false,
+    "placement_tests": true,
+    "smartlead_registry": true,
+    "smartlead_warmup": false
+   },
+   "campaigns": [
+    {
+     "campaign_ref": "10394200-0000-4000-8000-000000000002",
+     "created_at": "2026-09-24T19:34:39.159861+00:00",
+     "drift_detected_at": null,
+     "last_synced_at": null,
+     "name": "A paused campaign",
+     "provider": "smartlead",
+     "provider_campaign_id": "3902",
+     "provider_status": "PAUSED",
+     "sender_ref": "10392000-0000-4000-8000-000000000001",
+     "source": "smartlead_campaign",
+     "status": "paused",
+     "updated_at": "2026-09-29T19:34:39.159861+00:00"
+    }
+   ],
+   "connections": [],
+   "domain": "a.test",
+   "email": "shared@a.test",
+   "identity": {
+    "lifty_mailbox_ref": null,
+    "smartlead_account_id": 103903,
+    "status": "ambiguous_owner"
+   },
+   "mailbox_ref": "f19a5b78-437d-6cdf-5759-280b1426e711",
+   "placement": {
+    "latest_completed_test": {
+     "completed_at": null,
+     "connection_ref": null,
+     "counts": {
+      "inbox": 7,
+      "missing": 1,
+      "other": 1,
+      "spam": 3,
+      "total": 12
+     },
+     "execution_status": "completed",
+     "failure_code": null,
+     "families": null,
+     "name": "LIFTY shared",
+     "passed": false,
+     "placement_ref": null,
+     "policy_version": null,
+     "provider": "smartlead",
+     "provider_test_ref": "900011",
+     "source": "smartlead_result",
+     "test_ref": "smartlead:900011",
+     "tested_at": "2026-09-24T19:34:39+00:00"
+    },
+    "latest_completed_test_ref": "smartlead:900011",
+    "latest_test_ref": "smartlead:900011",
+    "recent_tests": [
+     {
+      "completed_at": null,
+      "connection_ref": null,
+      "counts": {
+       "inbox": 7,
+       "missing": 1,
+       "other": 1,
+       "spam": 3,
+       "total": 12
+      },
+      "execution_status": "completed",
+      "failure_code": null,
+      "families": null,
+      "name": "LIFTY shared",
+      "passed": false,
+      "placement_ref": null,
+      "policy_version": null,
+      "provider": "smartlead",
+      "provider_test_ref": "900011",
+      "source": "smartlead_result",
+      "test_ref": "smartlead:900011",
+      "tested_at": "2026-09-24T19:34:39+00:00"
+     }
+    ],
+    "test_count": 1
+   },
+   "senders": [
+    {
+     "is_active": true,
+     "name": "Dana Smith",
+     "sender_ref": "10392000-0000-4000-8000-000000000001",
+     "sources": [
+      "smartlead_owner"
+     ]
+    },
+    {
+     "is_active": true,
+     "name": "Lee Park",
+     "sender_ref": "10392000-0000-4000-8000-000000000002",
+     "sources": [
+      "smartlead_owner"
+     ]
+    }
+   ],
+   "smartlead": {
+    "account_id": 103903,
+    "approved_at": null,
+    "approved_by": null,
+    "approved_for_outbound": false,
+    "cold_eligible_at": null,
+    "created_at": "2026-09-29T19:34:39.159861+00:00",
+    "is_eligible": false,
+    "mitigation_paused_at": null,
+    "mitigation_reason": null,
+    "mitigation_resumed_at": null,
+    "mitigation_state": "none",
+    "notes": null,
+    "placement_gate_passed_at": null,
+    "placement_hold_reason": null,
+    "placement_hold_review_at": null,
+    "updated_at": "2026-09-29T19:34:39.159861+00:00",
+    "warmup_activity_grace_until": null,
+    "warmup_started_at": "2026-08-30T19:34:39.159861+00:00"
+   },
+   "warmup": {
+    "mailivery": [],
+    "smartlead": null,
+    "smartlead_daily": []
+   },
+   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+  }
+ ],
+ "next_cursor": "WyJmaXh0dXJlLWEiLCAic2hhcmVkQGEudGVzdCIsICJmMTlhNWI3OC00MzdkLTZjZGYtNTc1OS0yODBiMTQyNmU3MTEiXQ",
+ "query": {
+  "history_limit": 3,
+  "limit": 2,
+  "mailbox": null,
+  "sender": null
+ },
+ "scope": {
+  "actor_is_admin": false,
+  "kind": "workspace",
+  "workspace_ref": "10391000-0000-4000-8000-000000000001",
+  "workspace_slug": "fixture-a"
+ },
+ "total_count": 5,
+ "workspace_health": [
+  {
+   "is_active": true,
+   "name": "Fixture A",
+   "posture": {
+    "captured_at": "2026-09-29T18:34:39.159861+00:00",
+    "client_label": "Fixture A",
+    "metrics": {
+     "reasons": [
+      "weekend warmup gap"
+     ]
+    },
+    "source": "breach_sweep",
+    "status": "watch"
+   },
+   "slug": "fixture-a",
+   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+  }
+ ]
+}
