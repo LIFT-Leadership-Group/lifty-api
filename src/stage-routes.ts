@@ -18,6 +18,7 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppDependencies, AppEnvironment } from "./app.js";
 import type { ConnectionProvider } from "./connection-attempt.js";
 import { PublicError } from "./errors.js";
+import { HostedReturnError } from "./hosted-return-error.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
 import { EmailConnectionStatus } from "./email-contracts.js";
 import { LinkedinConnectionStatus } from "./linkedin-contracts.js";
@@ -97,9 +98,13 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     if ((provider === "email" || provider === "linkedin") && result.status === "pending") {
       // Reconcile a callback hint/read provider health without mistaking the old
       // grant for this attempt. A read failure throws and never invents a state.
-      if (provider === "email") await dependencies.getEmailConnection(session, workspaceRef, ref);
-      else await dependencies.getLinkedinConnection(session, workspaceRef, ref);
+      const current = provider === "email" ? await dependencies.getEmailConnection(session, workspaceRef, ref)
+        : await dependencies.getLinkedinConnection(session, workspaceRef, ref);
       result = await dependencies.getConnectionAttempt(session, provider, ref, workspaceRef);
+      // A provider error reported on the hosted return page stays a hint and
+      // leaves the stored attempt open; the channel status carries its category.
+      const hint = current.status === "failed" && current.intent_ref === ref ? HostedReturnError.safeParse(current.failure_code) : null;
+      if (result.status === "pending" && hint?.success) result = { status: "failed", attempt_ref: ref, error_code: hint.data };
     }
     if (result.attempt_ref !== ref) throw new PublicError({ status: 502, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization could not be verified. Retry the same attempt." });
     return context.json(ConnectionAttemptStatusSchema.parse(result));
