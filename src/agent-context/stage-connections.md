@@ -29,6 +29,8 @@ This rule also applies when reconnecting an account whose old grant still works.
 The verified receipt proves completion of that authorization and its binding to
 the current stored healthy grant; it does not claim a fresh independent provider
 availability check. GET without `attempt_ref` reads current connection health.
+Lifty's return page may already tell the founder the account connected or did
+not; it uses the same server checks, but still verify with GET before continuing.
 
 - `pending`: keep the same attempt and recheck no sooner than the returned
   `retry_after_seconds`. Do not create another attempt just to recover its URL.
@@ -41,8 +43,8 @@ availability check. GET without `attempt_ref` reads current connection health.
   A sending-account `failure_code: account_taken` means the authorized
   LinkedIn profile or mailbox is already bound to another workspace. Another
   link will not fix it: the founder connects a different account here or
-  resolves the binding in the workspace that holds it. Lifty already removed
-  the duplicate LinkedIn provider account it created; nothing else to clean.
+  resolves the binding in the workspace that holds it. Lifty never binds the
+  duplicate LinkedIn provider account it created; nothing else to clean.
   `failure_code: provider_unavailable` right after the hosted page means the
   founder cancelled or the provider refused the connection; nothing connected.
   Offer a new POST when the founder wants to try again.

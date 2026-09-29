@@ -92,6 +92,32 @@ for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifec
     expect(h.calls.some(c=>c.operation==="complete")).toBe(false);
     expect(h.http).toHaveLength(0);
   });
+  it("confirms from the return page with signed authorization and a server identity read",async()=>{
+    const h=harness(channel,{authorized:true});
+    expect(await h.ops.v2Return(h.state)).toEqual({status:"connected",account:channel==="email"?email:"Founder"});
+    const complete=h.calls.find(c=>c.operation==="complete");
+    expect(complete?.payload).toMatchObject({intent_ref:id,verified_transport:{api_version:"v2",account_id:"acc_test",application_id:"app_test"}});
+    expect(complete?.caller).toBe(false);
+    expect(h.deleted).toEqual([]);
+  });
+  it("keeps the return page pending until Unipile's signed authorization arrives",async()=>{
+    const h=harness(channel);
+    expect(await h.ops.v2Return(h.state)).toEqual({status:"pending"});
+    expect(h.http).toHaveLength(0);
+  });
+  it("reports final attempt states without provider reads",async()=>{
+    for(const [intentState,expected] of [["completed",{status:"connected",account:channel==="email"?email:null}],["failed",{status:"failed",reason:"ended"}]] as const){
+      const h=harness(channel,{intentState});
+      expect(await h.ops.v2Return(h.state)).toEqual(expected);
+      expect(h.http).toHaveLength(0);
+    }
+  });
+  it("never deletes a provider account when the return page hits an account-taken refusal",async()=>{
+    const h=harness(channel,{authorized:true,completeTaken:true,fresh:true});
+    expect(await h.ops.v2Return(h.state)).toEqual({status:"failed",reason:"verification"});
+    expect(h.calls.some(c=>c.operation==="fail" && c.payload.failure_code==="account_taken")).toBe(true);
+    expect(h.deleted).toEqual([]);
+  });
   it("never fails a completed attempt on a late provider error",async()=>{
     const h=harness(channel,{intentState:"completed"});
     await h.ops.v2Return(h.state,true);
@@ -222,6 +248,40 @@ it.each(["email","linkedin"] as const)("V2 %s browser return reports a provider 
   const success=await app.request(`/unipile/v2/${channel}/return?intent=opaque&account_id=acc_new&provider=google`);
   expect(await success.text()).toContain("This page does not confirm that your account is connected.");
   expect(observed.at(-1)).toEqual({state:"opaque",providerError:false});
+});
+
+it.each(["email","linkedin"] as const)("V2 %s return page confirms, refreshes while pending and stops after a minute",async channel=>{
+  const results:Record<string,unknown>={
+    ok:{status:"connected",account:"founder<b>@example.test"},
+    denied:{status:"failed",reason:"verification"},
+    wait:{status:"pending"},
+  };
+  const receive=async(state:string)=>results[state] as never;
+  const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
+  const account=channel==="linkedin" ? "LinkedIn account" : "email account";
+
+  const connected=await (await app.request(`/unipile/v2/${channel}/return?intent=ok&account_id=acc_forged`)).text();
+  expect(connected).toContain(`Your ${account} is connected`);
+  expect(connected).toContain("founder&lt;b&gt;@example.test");
+  expect(connected).not.toContain("acc_forged");
+  expect(connected).not.toMatch(/http-equiv="refresh"|<script\b/i);
+
+  const failed=await (await app.request(`/unipile/v2/${channel}/return?intent=denied`)).text();
+  expect(failed).toContain(`Your ${account} did not connect`);
+  expect(failed).toContain("Lifty could not verify the account you chose");
+
+  const pending=await app.request(`/unipile/v2/${channel}/return?intent=wait&account_id=acc_forged&check=4`);
+  expect(pending.headers.get("content-security-policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
+  const pendingHtml=await pending.text();
+  expect(pendingHtml).toContain(`Confirming your ${account}`);
+  expect(pendingHtml).toContain(`<meta http-equiv="refresh" content="3;url=/unipile/v2/${channel}/return?intent=wait&amp;check=5">`);
+  expect(pendingHtml).not.toMatch(/acc_forged|<script\b/i);
+
+  const expired=await (await app.request(`/unipile/v2/${channel}/return?intent=wait&check=20`)).text();
+  expect(expired).toContain("This page does not confirm that your account is connected.");
+  expect(expired).not.toContain("http-equiv");
+  const tampered=await (await app.request(`/unipile/v2/${channel}/return?intent=wait&check=-9`)).text();
+  expect(tampered).toContain("check=1\"");
 });
 
 it.each(["email","linkedin"] as const)("V2 %s browser return shows a provider error even when the intent is rejected",async channel=>{
