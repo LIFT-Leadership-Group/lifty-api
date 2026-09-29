@@ -10,7 +10,7 @@ import { handleMcpRequest, mcpResourceMetadata, type McpDependencies } from "./m
 import { getStageMcpTools, callStageMcpTool } from "./mcp-stage-tools.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
-import { renderConnectionReturnPage } from "./connection-return-page.js";
+import { renderConnectionReturnPage, type ConnectionReturnResult, type ConnectionReturnView } from "./connection-return-page.js";
 import { renderLiftyPage } from "./lifty-brand.js";
 import { readFileSync } from "node:fs";
 import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
@@ -136,6 +136,8 @@ import { EmailAccountsRequest, EmailAccountsResult, EmailAccountConnectRequest, 
   type EmailAccountConnectInput, type EmailAccountConnectOutput, type EmailAccountStatusInput, type EmailAccountStatusOutput } from "./email-accounts-contracts.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
+/** About one minute of three-second page refreshes while a return is confirmed. */
+const RETURN_CONFIRMATION_CHECKS = 20;
 // The create-workspace body carries only a bounded name and description.
 const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
 const RequestIdSchema = z.uuid();
@@ -160,8 +162,8 @@ export interface AppDependencies {
   warmupSetup?: WarmupSetup;
   unipileHostedAuthOrigin: string;
   unipileV2HostedAuthOrigins: string[];
-  receiveEmailV2Return: (state:string,providerError?:boolean)=>Promise<void>;
-  receiveLinkedinV2Return: (state:string,providerError?:boolean)=>Promise<void>;
+  receiveEmailV2Return: (state:string,providerError?:boolean)=>Promise<ConnectionReturnResult|void>;
+  receiveLinkedinV2Return: (state:string,providerError?:boolean)=>Promise<ConnectionReturnResult|void>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
@@ -1450,17 +1452,28 @@ export function createApp(
       context.header("cache-control","no-store");
       context.header("referrer-policy","no-referrer");
       const receive=channel==="email" ? dependencies.receiveEmailV2Return : dependencies.receiveLinkedinV2Return;
-      // Browser result fields are hints only. Signed lifecycle events and later
-      // authenticated polling determine success. A provider error can only end
-      // the still-open attempt, and the page says the connection did not finish.
-      // A missing, expired or foreign intent still lands on a page that confirms
-      // nothing, and no browser-supplied value is persisted here.
+      // Browser result fields (account_id, provider, state) are never trusted.
+      // The signed intent lets the server confirm the attempt with the same
+      // evidence as authenticated status: Unipile's signed authorization plus a
+      // server-side identity read. A provider error only ends a still-open
+      // attempt. While confirmation is pending the page refreshes itself (no
+      // script) for about a minute, then falls back to the neutral page. A
+      // missing, expired or foreign intent lands on the neutral page.
+      const intent=context.req.query("intent") ?? "";
       const errorType=context.req.query("error_type") ?? "";
       const providerError=errorType!=="" || Boolean(context.req.query("error_title"));
-      try {await receive(context.req.query("intent") ?? "",providerError);}
+      const check=Math.min(Math.max(Number.parseInt(context.req.query("check") ?? "0",10) || 0,0),RETURN_CONFIRMATION_CHECKS);
+      let result:ConnectionReturnResult|null=null;
+      try {result=(await receive(intent,providerError)) ?? null;}
       catch (error) {if (!(error instanceof PublicError) || error.status < 400 || error.status >= 500) throw error;}
-      const failure=!providerError ? null : ["canceled","consent_denied"].includes(errorType) ? "canceled" : "failed";
-      return context.html(renderConnectionReturnPage(channel,failure),200,{
+      const view:ConnectionReturnView=providerError
+        ? {kind:"failed",reason:["canceled","consent_denied"].includes(errorType) ? "canceled" : "provider"}
+        : result?.status==="connected" ? {kind:"connected",account:result.account}
+          : result?.status==="failed" ? {kind:"failed",reason:result.reason}
+            : result?.status==="pending" && check<RETURN_CONFIRMATION_CHECKS
+              ? {kind:"confirming",refreshUrl:`/unipile/v2/${channel}/return?intent=${encodeURIComponent(intent)}&check=${check+1}`}
+              : {kind:"neutral"};
+      return context.html(renderConnectionReturnPage(channel,view),200,{
         "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
         "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       });

@@ -8,6 +8,7 @@ import { PublicError } from "./errors.js";
 import { HostedEmailProvider, EmailPolicy, EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 import { createUnipileProvider, type UnipileProviderSettings } from "./unipile-provider.js";
 import { sealEmailIntent, openEmailIntent, emailCallbackName, validEmailCallbackName } from "./email-state.js";
+import type { ConnectionReturnResult } from "./connection-return-page.js";
 
 export interface EmailConnectSettings extends UnipileProviderSettings {
   serverKey: string;
@@ -284,14 +285,37 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     await rpc("declare",{intent_ref:id,mailbox_use:mailboxUse,...(selectedProvider ? {email_provider:selectedProvider} : {})});
     return authorize(state);
   }
-  async function v2Return(state:string,providerError=false):Promise<void> {
+  async function v2Return(state:string,providerError=false):Promise<ConnectionReturnResult> {
     const id=open(state);
     const intent=await readIntent(id);
-    if(intent.transport?.api_version!=="v2" || !["ready","completed"].includes(intent.state))fail("EMAIL_CALLBACK_INVALID",403);
+    if(intent.transport?.api_version!=="v2" || !["ready","completed","failed"].includes(intent.state))fail("EMAIL_CALLBACK_INVALID",403);
     // A browser-supplied account_id is never persisted or treated as authorization.
     // A provider error only ends a still-open attempt, so status reports the
     // failure instead of pending until expiry. It never completes anything.
-    if(providerError && intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
+    if(providerError){
+      if(intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
+      return {status:"failed",reason:"provider"};
+    }
+    if(intent.state==="completed")return {status:"connected",account:intent.email};
+    if(intent.state==="failed")return {status:"failed",reason:"ended"};
+    // The page confirms with the same evidence as authenticated status: the
+    // signed Unipile authorization plus a server-side identity read.
+    if(!intent.authorization_received || !intent.authorization_account_id)return {status:"pending"};
+    try {
+      if(intent.transport.account_id && intent.transport.account_id!==intent.authorization_account_id)fail("UNIPILE_IDENTITY_MISMATCH");
+      const identity=await readIdentity(intent.authorization_account_id,intent.email,intent.transport,intent.email_provider);
+      if(!identity.healthy)return {status:"pending"};
+      await bind(id,identity,intent.email_provider);
+      return {status:"connected",account:identity.email};
+    }catch(error){
+      if(error instanceof PublicError && ["UNIPILE_IDENTITY_MISMATCH","UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code)){
+        await rpc("fail",{intent_ref:id,failure_code:"identity_mismatch"});
+        return {status:"failed",reason:"verification"};
+      }
+      if(error instanceof PublicError && error.code==="EMAIL_ACCOUNT_TAKEN")return {status:"failed",reason:"verification"};
+      if(error instanceof PublicError && ["UNIPILE_UNAVAILABLE","UNIPILE_ACCOUNT_NOT_FOUND"].includes(error.code))return {status:"pending"};
+      throw error;
+    }
   }
   return {start,status,authorize,callback,disconnect,declare,v2Return};
 }

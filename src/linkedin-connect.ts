@@ -10,6 +10,7 @@ import { createLinkedinProvider, type LinkedinIdentity, type LinkedinHealth } fr
 import type { UnipileProviderSettings } from "./unipile-provider.js";
 import { sealLinkedinIntent, openLinkedinIntent, linkedinCallbackName, validLinkedinCallbackName } from "./linkedin-state.js";
 import { linkedinFailure, mapLinkedinRpcError } from "./linkedin-errors.js";
+import type { ConnectionReturnResult } from "./connection-return-page.js";
 
 export interface LinkedinConnectSettings extends UnipileProviderSettings {
   serverKey: string;
@@ -257,12 +258,37 @@ export function createLinkedinConnectOperations(settings: LinkedinConnectSetting
     await rpc("disconnect", { workspace, confirm: true }, session);
     return status(session, workspace);
   }
-  async function v2Return(state:string,providerError=false):Promise<void> {
+  async function v2Return(state:string,providerError=false):Promise<ConnectionReturnResult> {
     const id=open(state);
     const intent=await readIntent(id);
-    if(intent.transport?.api_version!=="v2" || !["ready","completed"].includes(intent.state))linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
+    if(intent.transport?.api_version!=="v2" || !["ready","completed","failed"].includes(intent.state))linkedinFailure("LINKEDIN_CALLBACK_INVALID",403);
     // Same rule as email: a provider error only ends a still-open attempt.
-    if(providerError && intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
+    if(providerError){
+      if(intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
+      return {status:"failed",reason:"provider"};
+    }
+    if(intent.state==="completed")return {status:"connected",account:null};
+    if(intent.state==="failed")return {status:"failed",reason:"ended"};
+    if(!intent.authorization_received || !intent.authorization_account_id)return {status:"pending"};
+    try {
+      if(intent.transport.account_id && intent.transport.account_id!==intent.authorization_account_id)linkedinFailure("LINKEDIN_IDENTITY_MISMATCH",409);
+      const identity=await readIdentity(intent.authorization_account_id,intent.profile_id,intent.transport);
+      if(!identity.healthy)return {status:"pending"};
+      // An explicit reconnect target means an account-taken refusal never deletes
+      // a provider account from this page; the authenticated status path, which
+      // knows the stored profile account, keeps that cleanup. Success keeps the
+      // usual duplicate cleanup, as in the V1 callback.
+      await bind(id,identity,intent.transport,intent.transport.account_id ?? intent.account_id ?? identity.accountId);
+      return {status:"connected",account:identity.displayName};
+    }catch(error){
+      if(identityMismatch(error)){
+        await rpc("fail",{intent_ref:id,failure_code:"identity_mismatch"});
+        return {status:"failed",reason:"verification"};
+      }
+      if(error instanceof PublicError && error.code==="LINKEDIN_ACCOUNT_TAKEN")return {status:"failed",reason:"verification"};
+      if(providerPending(error) || (error instanceof PublicError && error.code==="UNIPILE_LINKEDIN_UNAVAILABLE"))return {status:"pending"};
+      throw error;
+    }
   }
   return { start, status, authorize, callback, disconnect, v2Return };
 }
