@@ -12,7 +12,7 @@ import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { renderConnectionReturnPage, type ConnectionReturnResult, type ConnectionReturnView } from "./connection-return-page.js";
 import { hostedReturnError, hostedReturnReason, type HostedReturnError } from "./hosted-return-error.js";
-import { renderLiftyPage } from "./lifty-brand.js";
+import { PENDING_SUBMIT_SCRIPT_HASH, renderLiftyPage } from "./lifty-brand.js";
 import { readFileSync } from "node:fs";
 import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
 import type { WarmupSetup } from "./warmup-setup.js";
@@ -1137,7 +1137,7 @@ export function createApp(
   const hostedAuthOrigin = parseHostedAuthOrigin(dependencies.unipileHostedAuthOrigin);
   const v2HostedAuthOrigins=dependencies.unipileV2HostedAuthOrigins.map(origin=>parseHostedAuthOrigin(origin));
   if(v2HostedAuthOrigins.includes(UNIPILE_HOSTED_AUTH_ORIGIN))throw new Error("V2 hosted origins cannot include V1.");
-  const emailAuthorizationCsp = `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${[hostedAuthOrigin,...v2HostedAuthOrigins].join(" ")}; base-uri 'none'; frame-ancestors 'none'`;
+  const emailAuthorizationCsp = `default-src 'none'; style-src 'unsafe-inline'; script-src '${PENDING_SUBMIT_SCRIPT_HASH}'; form-action 'self' ${[hostedAuthOrigin,...v2HostedAuthOrigins].join(" ")}; base-uri 'none'; frame-ancestors 'none'`;
   const app = new OpenAPIHono<AppEnvironment>();
   registerOpenApi(app);
   const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
@@ -1461,19 +1461,26 @@ export function createApp(
       // attempt, so verified evidence still wins. While confirmation is pending
       // the page refreshes itself (no script) for about a minute, then falls
       // back to the neutral page. A missing, expired or foreign intent lands on
-      // the neutral page, or on the reported category's page.
+      // the neutral page, or on the reported category's page. The first check
+      // can take seconds, so the arrival from the provider answers at once with
+      // the confirming page, which moves straight on to that check.
       const intent=context.req.query("intent") ?? "";
       const returnError=hostedReturnError(context.req.query("error_type")) ?? (context.req.query("error_title") ? "provider_rejected" : null);
+      const refreshUrl=(next:number)=>`/unipile/v2/${channel}/return?intent=${encodeURIComponent(intent)}&check=${next}`;
+      const arriving=context.req.query("check")===undefined && intent!=="" && !returnError;
       const check=Math.min(Math.max(Number.parseInt(context.req.query("check") ?? "0",10) || 0,0),RETURN_CONFIRMATION_CHECKS);
       let result:ConnectionReturnResult|null=null;
-      try {result=(await receive(intent,returnError)) ?? null;}
-      catch (error) {if (!(error instanceof PublicError) || error.status < 400 || error.status >= 500) throw error;}
-      const view:ConnectionReturnView=result?.status==="connected" ? {kind:"connected",account:result.account}
-        : result?.status==="failed" ? {kind:"failed",reason:result.reason}
-          : returnError ? {kind:"failed",reason:hostedReturnReason[returnError]}
-            : result?.status==="pending" && check<RETURN_CONFIRMATION_CHECKS
-              ? {kind:"confirming",refreshUrl:`/unipile/v2/${channel}/return?intent=${encodeURIComponent(intent)}&check=${check+1}`}
-              : {kind:"neutral"};
+      if(!arriving){
+        try {result=(await receive(intent,returnError)) ?? null;}
+        catch (error) {if (!(error instanceof PublicError) || error.status < 400 || error.status >= 500) throw error;}
+      }
+      const view:ConnectionReturnView=arriving ? {kind:"confirming",refreshUrl:refreshUrl(1),refreshSeconds:0}
+        : result?.status==="connected" ? {kind:"connected",account:result.account}
+          : result?.status==="failed" ? {kind:"failed",reason:result.reason}
+            : returnError ? {kind:"failed",reason:hostedReturnReason[returnError]}
+              : result?.status==="pending" && check<RETURN_CONFIRMATION_CHECKS
+                ? {kind:"confirming",refreshUrl:refreshUrl(check+1),refreshSeconds:3}
+                : {kind:"neutral"};
       return context.html(renderConnectionReturnPage(channel,view),200,{
         "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
         "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",

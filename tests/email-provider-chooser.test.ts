@@ -1,4 +1,5 @@
 import {describe,it,expect} from "vitest";
+import {createHash} from "node:crypto";
 import {createEmailConnectOperations} from "../src/email-connect.js";
 import {sealEmailIntent,emailCallbackName} from "../src/email-state.js";
 import {createCurrentClient} from "./current-client.js";
@@ -102,6 +103,8 @@ describe("fresh hosted email provider choice",()=>{
     const h=harness(),response=await h.app.request(`/unipile/start?intent=${state}`),html=await response.text();
     expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-security-policy")).toContain("form-action 'self' https://account.unipile.com https://auth.lifty.test");
+    const script=html.match(/<script>([^<]*)<\/script>/)?.[1];
+    expect(response.headers.get("content-security-policy")).toContain(`script-src 'sha256-${createHash("sha256").update(script ?? "").digest("base64")}';`);
     for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","A new account for outreach"])expect(html).toContain(label);
     expect(html).toContain('class="brand" aria-label="Lifty"');
     // Opaque intent values can randomly contain V1/V2; branding is visible copy.

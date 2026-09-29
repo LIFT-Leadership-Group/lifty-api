@@ -1,4 +1,4 @@
-import { renderLiftyPage } from "./lifty-brand.js";
+import { pendingSubmitScript, renderLiftyPage } from "./lifty-brand.js";
 
 const styles = `
   form{margin-top:28px}
@@ -15,6 +15,7 @@ const styles = `
   .provider-name{display:block;font-weight:600;line-height:1.4}
   .provider-detail{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
   button[type=submit]{margin-top:26px}
+  form[aria-busy=true] fieldset{opacity:.55;pointer-events:none}
   @media(max-width:560px){.provider{padding:13px 12px;gap:12px}}
   @media(prefers-reduced-motion:reduce){.provider{transition:none}}
   @media(forced-colors:active){.provider:has(input:checked){outline:2px solid Highlight;outline-offset:-2px}}
@@ -26,8 +27,8 @@ const providerIcons = {
   imap: `<svg class="provider-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 7 9-7"/></svg>`,
 };
 
-function page(title: string, content: string): string {
-  return renderLiftyPage({ title: `${title} · Lifty`, content, styles });
+function page(title: string, content: string, scripts = ""): string {
+  return renderLiftyPage({ title: `${title} · Lifty`, content, styles, scripts });
 }
 
 function providerChoices(): string {
@@ -56,11 +57,11 @@ export function renderEmailAuthorizationPage(state: string, chooseProvider = fal
   })[character]!);
   return page("Connect your email account", `<h1>Connect your email account</h1>
 <p class="intro">Connect the mailbox Lifty should send from. It can be one you already use or a new account set up for outreach.</p>
-<form method="post" action="/unipile/start"><input type="hidden" name="intent" value="${escapedState}">
+<form method="post" action="/unipile/start" data-pending="Opening account selection…"><input type="hidden" name="intent" value="${escapedState}">
 ${chooseProvider ? providerChoices() : ""}
 ${mailboxUseChoices()}
 <button class="primary block" type="submit">Continue to account selection</button></form>
-<p class="reassurance">Connecting your email does not start outreach. You will review and approve your outreach before any email is sent.</p>`);
+<p class="reassurance">Connecting your email does not start outreach. You will review and approve your outreach before any email is sent.</p>`, pendingSubmitScript);
 }
 
 /** A used single-use link should confirm receipt instead of replaying authorization. */

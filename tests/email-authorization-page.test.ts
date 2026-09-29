@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "../src/email-authorization-page.js";
+import { pendingSubmitScript } from "../src/lifty-brand.js";
 
 describe("email authorization renderer", () => {
   it.each([false, true])("escapes signed state without changing the form contract (chooser=%s)", chooseProvider => {
-    const html = renderEmailAuthorizationPage('state\"\'><script>alert(1)</script>&', chooseProvider);
-    expect(html).toContain('<form method="post" action="/unipile/start">');
+    const page = renderEmailAuthorizationPage('state\"\'><script>alert(1)</script>&', chooseProvider);
+    // The shared pending-submit script is the page's only script.
+    expect(page.split(pendingSubmitScript)).toHaveLength(2);
+    const html = page.replace(pendingSubmitScript, "");
+    expect(html).toContain('<form method="post" action="/unipile/start" data-pending="Opening account selection…">');
     expect(html).toContain('name="intent" value="state&quot;&#39;&gt;&lt;script&gt;alert(1)&lt;/script&gt;&amp;"');
     expect(html).not.toContain("<script>");
     expect(html).toMatch(/<input type="radio" name="mailbox_use" value="personal" aria-label="[^"]+" checked required>/);
