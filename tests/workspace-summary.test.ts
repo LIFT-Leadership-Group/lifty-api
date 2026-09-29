@@ -3,6 +3,7 @@ import { createApp, type AppDependencies, type AuthSession } from "../src/app.js
 import { PublicError } from "../src/errors.js";
 import { getBusinessWebsite, projectWebsite, setBusinessWebsite } from "../src/business-website.js";
 import { createWorkspace } from "../src/workspace-operations.js";
+import { selectWorkspace } from "../src/workspace-selection.js";
 
 const id = "22222222-2222-4222-8222-222222222222";
 const other = "33333333-3333-4333-8333-333333333333";
@@ -30,6 +31,69 @@ const base: Partial<AppDependencies> = {
 function request(app: ReturnType<typeof createApp>, path = "summary", method = "GET", body?: unknown) {
   return app.request(`/v1/workspace/${path}`, { method, headers: { authorization: "Bearer test", "x-lifty-client-contract": "lifty-cli-context.v5", "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
+describe("summary for a selected workspace (LIF-1138)", () => {
+  const lift = { workspace_ref: other, slug: "lift", name: "LIFT", active: true, founder_default: false, self_service: false };
+  const own = { workspace_ref: id, slug: "lifty", name: "Lifty", active: true, founder_default: true, self_service: true };
+  const liftState = { state: "ready_for_connections" as const, workspace: { workspace_ref: other, name: "LIFT" }, next_action: null };
+  const sender = "44444444-4444-4444-8444-444444444444";
+  const roster = { workspace_ref: other, workspace_slug: "lift", senders: [{ sender_ref: sender, display_name: "David" }],
+    accounts: [{ connection_ref: "55555555-5555-4555-8555-555555555555", sender_ref: sender, email: "david@lift.example", status: "connected" as const, campaign_send_paused: true }],
+    campaign_release_required: true as const, required_active_days: 21 as const };
+  it("reads a client workspace through the selected session and lists its mailboxes instead of one founder email", async () => {
+    const implicit: AuthSession[] = [];
+    const explicit: AuthSession[] = [];
+    const track = <T,>(list: AuthSession[], value: T) => async (s: AuthSession) => { list.push(s); return value; };
+    const app = createApp({ ...base,
+      listMemberWorkspaces: async () => ({ workspaces: [lift, own] }),
+      getWorkspace: track(implicit, liftState),
+      getConfig: async (s) => { implicit.push(s); return { workspace_ref: other, config: { workspace: { version, name: "LIFT", description: "Leadership", daily_discovery_target: 10 } } }; },
+      getBusinessWebsite: async (s) => { implicit.push(s); return { ...website, workspace_ref: other }; },
+      getEmailConnection: async (s) => { explicit.push(s); throw new Error("founder email must not be read for a client workspace"); },
+      getLinkedinConnection: async (s, workspace) => { explicit.push(s); expect(workspace).toBe(other); return { provider: "unipile", channel: "linkedin", workspace_ref: other, status: "not_connected" }; },
+      workspaceCampaign: async (s, input) => { explicit.push(s); expect(input.payload.workspace).toBe(other); return { ...structuredClone(campaign), workspace_ref: other }; },
+      getEmailAccounts: async (s, input) => { explicit.push(s); expect(input).toEqual({ workspace: other }); return roster; },
+    });
+    const response = await request(app, "summary?workspace=lift");
+    expect(response.status).toBe(200);
+    const summary = await response.json();
+    expect(summary).toMatchObject({ self_service: false, email: null, workspace: { workspace: { workspace_ref: other } },
+      mailboxes: { status: "available", value: { senders: 1, accounts: [{ email: "david@lift.example", status: "connected", campaign_send_paused: true, sender_name: "David" }] } } });
+    expect(summary.linkedin.status).toBe("available");
+    // Implicit reads carry the selection; explicit ones keep the caller's own session.
+    expect(implicit.length).toBeGreaterThan(0);
+    expect(implicit.every(s => s !== session && s.userId === session.userId)).toBe(true);
+    expect(explicit.every(s => s === session)).toBe(true);
+  });
+  it("keeps the founder email for a selected self-service workspace", async () => {
+    const summary = await (await request(createApp({ ...base, listMemberWorkspaces: async () => ({ workspaces: [lift, own] }) }), "summary?workspace=lifty")).json();
+    expect(summary).toMatchObject({ self_service: true, mailboxes: null, email: { status: "available" } });
+  });
+  it("refuses a workspace the caller does not belong to before any read", async () => {
+    const read = vi.fn(async () => state);
+    const response = await request(createApp({ ...base, getWorkspace: read, listMemberWorkspaces: async () => ({ workspaces: [own] }) }), "summary?workspace=lift");
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe("WORKSPACE_FORBIDDEN");
+    expect(read).not.toHaveBeenCalled();
+  });
+  it("describes the default workspace without a selection and rejects malformed selections", async () => {
+    const list = vi.fn();
+    const summary = await (await request(createApp({ ...base, listMemberWorkspaces: list }))).json();
+    expect(summary.self_service).toBeNull();
+    expect(list).not.toHaveBeenCalled();
+    expect((await request(createApp(base), "summary?workspace=bad%20slug")).status).toBe(400);
+    expect((await request(createApp(base), "summary?other=1")).status).toBe(400);
+  });
+  it("sends the selection as a read-only GET header on every RPC", async () => {
+    const setHeader = vi.fn(() => Promise.resolve({ data: 1, error: null }));
+    const rpc = vi.fn(() => ({ setHeader }));
+    const selected = selectWorkspace({ userId: "u", client: { rpc } }, other);
+    await (selected.client as { rpc(name: string, args?: Record<string, unknown>): Promise<unknown> }).rpc("get_lifty_config", { section: "workspace" });
+    await (selected.client as { rpc(name: string): Promise<unknown> }).rpc("get_lifty_run_status");
+    expect(rpc.mock.calls).toEqual([["get_lifty_config", { section: "workspace" }, { get: true }], ["get_lifty_run_status", {}, { get: true }]]);
+    expect(setHeader.mock.calls).toEqual([["x-lifty-workspace", other], ["x-lifty-workspace", other]]);
+  });
+});
+
 describe("authenticated workspace resumption", () => {
   // LIF-1137: the summary is the only state read; it carries what status reported.
   const progress: Partial<AppDependencies> = {

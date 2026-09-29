@@ -11,6 +11,13 @@ the first research run, any pending configuration update, and HubSpot with its
 last sync. `targeting_managed_externally` means the targeting has several lanes
 maintained outside Lifty: report it as managed there, not as missing or unread.
 
+Without `workspace` the summary describes the `founder_default` workspace. Pass
+`workspace` (a slug or reference that `whoami` lists) to read another of the
+user's workspaces. `self_service: false` marks a LIFT-managed client workspace:
+`email` is null there and `mailboxes` lists each sender's mailboxes with their
+campaign pause. Its targeting and outreach can run outside Lifty, so an absent
+Lifty research run or sequence there is not missing setup.
+
 Summarize only what matters to the user's request: saved business, confirmed
 website, connected accounts, research progress, CRM sync, and the saved
 campaign's channels, engine, composition modes and current state. Zero legacy templates is normal for shared generated

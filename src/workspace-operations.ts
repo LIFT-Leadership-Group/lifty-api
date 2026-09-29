@@ -107,6 +107,14 @@ function mapRpcError(error: unknown): PublicError {
     return new PublicError({ status: 409, code: "WORKSPACE_AMBIGUOUS",
       message: "You belong to several Lifty workspaces. Name the workspace you want to use.", cause: error });
   }
+  if (code === "PT403" && message.includes("lifty_workspace_forbidden")) {
+    return new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN",
+      message: "You don't belong to that workspace. Run whoami to list yours.", cause: error });
+  }
+  if (code === "PT409" && message.includes("lifty_workspace_selection_read_only")) {
+    return new PublicError({ status: 409, code: "WORKSPACE_SELECTION_READ_ONLY",
+      message: "A selected workspace can only be read. Use an operation that takes the workspace to change it.", cause: error });
+  }
   if (code === "PT409" && message.includes("lifty_workspace_suspended")) {
     return new PublicError({ status: 409, code: "WORKSPACE_SUSPENDED",
       message: "This workspace is suspended. Contact LIFT support.", cause: error });

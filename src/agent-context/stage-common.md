@@ -57,7 +57,8 @@ instead of assuming a single workspace.
 Operations without a workspace parameter act only on the workspace `whoami`
 marks `founder_default`. If none is marked, they fail with
 `WORKSPACE_AMBIGUOUS`, which means the same: ask which workspace. For any other
-chosen workspace, use only operations that take it. If a stage has none, say
+chosen workspace, use only operations that take it; `summary.get` takes
+`workspace`, so read that workspace's state with it. If a stage has none, say
 that stage cannot be changed from here for that workspace; never fall back to
 an operation without a workspace. Check that each result's workspace is the
 chosen one. Do not search the client source or try other routes to pick a

@@ -30,6 +30,7 @@ describe("runtime stage context", () => {
     expect(context.references.common).toContain("Call `whoami` first");
     expect(context.references.common).toContain("act only on the workspace `whoami`\nmarks `founder_default`");
     expect(context.references.common).toContain("never fall back to\nan operation without a workspace");
+    expect(context.references.common).toContain("`summary.get` takes\n`workspace`");
     expect(context.instructions).toContain("never use the founder\noperations for it");
     expect(context.instructions).toContain("One sender can own");
     expect(context.instructions).toContain("Warmup resume never resumes campaigns");

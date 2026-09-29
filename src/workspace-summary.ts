@@ -6,6 +6,9 @@ import { EmailConnectionStatus } from "./email-contracts.js";
 import { LinkedinConnectionStatus } from "./linkedin-contracts.js";
 import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { PublicError } from "./errors.js";
+import { EmailAccountsResult } from "./email-accounts-contracts.js";
+import type { MemberWorkspacesOutput } from "./member-workspaces.js";
+import { selectWorkspace } from "./workspace-selection.js";
 
 export const readResult = <T extends z.ZodType>(schema: T) => z.discriminatedUnion("status", [
   z.object({ status: z.literal("available"), value: schema }).strict(),
@@ -74,8 +77,17 @@ async function readConfig(deps: AppDependencies, session: AuthSession, current: 
   }
 }
 
+// Client (LIFT-managed) workspaces hold several mailboxes per sender.
+const Mailboxes = z.object({
+  senders: z.number().int().nonnegative(),
+  accounts: z.array(EmailAccountsResult.shape.accounts.element.omit({ sender_ref: true }).extend({ sender_name: z.string().nullable() }).strict()).max(10000),
+}).strict();
+
 export const WorkspaceSummarySchema = z.object({
   observed_at: z.iso.datetime(), workspace: WorkspaceStatusSchema,
+  // true for a Lifty-created workspace, false for a LIFT-managed client one,
+  // null when the summary describes the caller's default without a selection.
+  self_service: z.boolean().nullable(), mailboxes: readResult(Mailboxes).nullable(),
   business: readResult(z.object({ name: z.string(), description: z.string().nullable() }).strict()).nullable(),
   website: readResult(BusinessWebsiteSchema).nullable(),
   setup: readResult(z.object({ targeting_saved: z.boolean(), research_saved: z.boolean(), voice_saved: z.boolean(),
@@ -88,19 +100,33 @@ export const WorkspaceSummarySchema = z.object({
     linkedin: z.literal("sending-accounts.get channel=linkedin"), campaign: z.literal("campaigns.get"),
     targeting: z.literal("targeting.get"), voice: z.literal("commercial-voice.get") }).strict(),
 }).strict();
-export async function getWorkspaceSummary(deps: AppDependencies, session: AuthSession) {
-  const state = WorkspaceStatusSchema.parse(await deps.getWorkspace(session));
+type MemberWorkspace = MemberWorkspacesOutput["workspaces"][number];
+export async function getWorkspaceSummary(deps: AppDependencies, session: AuthSession, selection?: string) {
+  // LIF-1138: a selected membership is read through the database's read-only
+  // selection. Reads that take the workspace explicitly keep the plain session.
+  let target: MemberWorkspace | null = null;
+  if (selection !== undefined) {
+    target = (await deps.listMemberWorkspaces(session)).workspaces
+      .find(workspace => workspace.workspace_ref === selection || workspace.slug === selection) ?? null;
+    if (!target) throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "You don't belong to that workspace. Run whoami to list yours." });
+  }
+  const reads = target ? selectWorkspace(session, target.workspace_ref) : session;
+  const client = target !== null && !target.self_service;
+  const self_service = target?.self_service ?? null;
+  const state = WorkspaceStatusSchema.parse(await deps.getWorkspace(reads));
   const detail_operations = { business: "business.get", email: "sending-accounts.get channel=email", linkedin: "sending-accounts.get channel=linkedin",
     campaign: "campaigns.get", targeting: "targeting.get", voice: "commercial-voice.get" } as const;
   if (state.state === "needs_workspace" || state.state === "suspended") return WorkspaceSummarySchema.parse({
-    observed_at: new Date().toISOString(), workspace: state, business: null, website: null, setup: null, email: null, linkedin: null, campaign: null,
+    observed_at: new Date().toISOString(), workspace: state, self_service, mailboxes: null, business: null, website: null, setup: null, email: null, linkedin: null, campaign: null,
     onboarding: null, run: null, config_update: null, crm: null, detail_operations,
   });
   const current = state.workspace.workspace_ref;
-  const [config, website, email, linkedin, campaign, onboarding, run, config_update, crm] = await Promise.all([
-    readComponent(() => readConfig(deps, session, current)),
-    readComponent(async () => scoped(BusinessWebsiteSchema.parse(await deps.getBusinessWebsite(session)), current)),
-    readComponent(async () => {
+  if (target && current !== target.workspace_ref) throw new PublicError({ status: 409, code: "WORKSPACE_CHANGED", message: "The selected workspace changed while reading. Retry the summary." });
+  const [config, website, email, linkedin, campaign, onboarding, run, config_update, crm, mailboxes] = await Promise.all([
+    readComponent(() => readConfig(deps, reads, current)),
+    readComponent(async () => scoped(BusinessWebsiteSchema.parse(await deps.getBusinessWebsite(reads)), current)),
+    // A client workspace has no single founder mailbox; its accounts are in mailboxes.
+    client ? Promise.resolve(null) : readComponent(async () => {
       const v = scoped(EmailConnectionStatus.parse(await deps.getEmailConnection(session, current)), current);
       return { connection_status: v.status, identity: v.status === "not_connected" ? null : v.email,
         sending_enabled: v.status === "not_connected" ? null : v.sending_enabled,
@@ -127,16 +153,22 @@ export async function getWorkspaceSummary(deps: AppDependencies, session: AuthSe
         audience: cfg ? (cfg.audience.lead_ids ? "explicit_leads" as const : "qualified_ab" as const) : null,
         progress: v.progress, blockers: v.blockers, continuing_version_count: v.continuing_versions.length };
     }),
-    readComponent(async () => onboardingOverview(await deps.getOnboardingStatus(session))),
-    readComponent(async () => runOverview(await deps.getRunStatus(session))),
-    readComponent(async () => ConfigUpdateStatusSchema.parse(await deps.getConfigUpdateStatus(session, null))),
+    readComponent(async () => onboardingOverview(await deps.getOnboardingStatus(reads))),
+    readComponent(async () => runOverview(await deps.getRunStatus(reads))),
+    readComponent(async () => ConfigUpdateStatusSchema.parse(await deps.getConfigUpdateStatus(reads, null))),
     readComponent(async () => {
-      const [hubspot, sync] = await Promise.all([deps.getHubspotConnection(session), deps.getCrmSyncStatus(session)]);
+      const [hubspot, sync] = await Promise.all([deps.getHubspotConnection(reads), deps.getCrmSyncStatus(reads)]);
       return hubspotOverview(hubspot, sync);
     }),
+    client ? readComponent(async () => {
+      const roster = EmailAccountsResult.parse(await deps.getEmailAccounts(session, { workspace: current }));
+      if (roster.workspace_ref !== current) throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Workspace state changed. Read the current workspace again." });
+      const names = new Map(roster.senders.map(sender => [sender.sender_ref, sender.display_name]));
+      return { senders: roster.senders.length, accounts: roster.accounts.map(({ sender_ref, ...account }) => ({ ...account, sender_name: names.get(sender_ref) ?? null })) };
+    }) : Promise.resolve(null),
   ]);
   // Independently scoped RPCs must still refer to the same current membership.
-  const after = WorkspaceStatusSchema.parse(await deps.getWorkspace(session));
+  const after = WorkspaceStatusSchema.parse(await deps.getWorkspace(reads));
   if (after.state === "needs_workspace" || after.state === "suspended" || after.workspace.workspace_ref !== current)
     throw new PublicError({ status: 409, code: "WORKSPACE_CHANGED", message: "The current workspace changed while reading. Retry the summary." });
   const unavailable = { status: "unavailable", next_action: "retry_read" } as const;
@@ -147,6 +179,6 @@ export async function getWorkspaceSummary(deps: AppDependencies, session: AuthSe
     targeting_saved: config.value.external || !!saved.icp, research_saved: !!saved.prompt, voice_saved: !!saved.tone && Object.keys(saved.tone.values).length > 0,
     icp_version: saved.icp?.version ?? null, targeting_managed_externally: config.value.external,
   } } : unavailable;
-  return WorkspaceSummarySchema.parse({ observed_at: new Date().toISOString(), workspace: after, business, website, setup, email, linkedin, campaign,
+  return WorkspaceSummarySchema.parse({ observed_at: new Date().toISOString(), workspace: after, self_service, mailboxes, business, website, setup, email, linkedin, campaign,
     onboarding, run, config_update, crm, detail_operations });
 }

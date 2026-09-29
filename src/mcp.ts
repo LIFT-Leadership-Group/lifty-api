@@ -37,13 +37,13 @@ export function mcpResourceMetadata(settings: McpSettings) {
 const whoami: Tool = {
   name: "whoami",
   title: "Signed-in Lifty user",
-  description: "Return the signed-in Lifty user's ID and the workspaces they belong to. Call this first. With several workspaces and none named, ask which one before reading workspace state. Tools without a workspace parameter act only on the workspace marked founder_default; for any other workspace use tools that take it. workspaces is null when the list could not be read; retry instead of assuming one workspace.",
+  description: "Return the signed-in Lifty user's ID and the workspaces they belong to. Call this first. With several workspaces and none named, ask which one before reading workspace state. Tools without a workspace parameter act only on the workspace marked founder_default; for any other workspace use tools that take it, such as summary_get with workspace. workspaces is null when the list could not be read; retry instead of assuming one workspace.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   outputSchema: { type: "object", properties: {
     user_id: { type: "string" },
     workspaces: { type: ["array", "null"], items: { type: "object", properties: {
-      workspace_ref: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, active: { type: "boolean" }, founder_default: { type: "boolean" },
-    }, required: ["workspace_ref", "slug", "name", "active", "founder_default"], additionalProperties: false } },
+      workspace_ref: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, active: { type: "boolean" }, founder_default: { type: "boolean" }, self_service: { type: "boolean" },
+    }, required: ["workspace_ref", "slug", "name", "active", "founder_default", "self_service"], additionalProperties: false } },
   }, required: ["user_id", "workspaces"], additionalProperties: false },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 };

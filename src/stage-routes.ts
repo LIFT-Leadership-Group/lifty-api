@@ -31,7 +31,7 @@ import {
   CampaignStagePatchSchema, CampaignStageQuerySchema, CampaignStageRequestSchema,
   CapacityStageSchema, ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
   NotificationStagePatchSchema, ResearchStagePatchSchema, SendingAccountDisconnectSchema, SendingAccountQuerySchema,
-  SendingAccountStartSchema, TargetingStagePatchSchema, VoiceStagePatchSchema, stageOperations,
+  SendingAccountStartSchema, SummaryQuerySchema, TargetingStagePatchSchema, VoiceStagePatchSchema, stageOperations,
 } from "./stage-contracts.js";
 
 const Empty = z.object({}).strict();
@@ -206,8 +206,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       context.header("cache-control", "no-store");
       const session = context.get("authSession");
       if (stage === "summary") {
-        parse(Empty, context.req.query());
-        return context.json(await getWorkspaceSummary(dependencies, session));
+        const query = parse(SummaryQuerySchema, context.req.query());
+        return context.json(await getWorkspaceSummary(dependencies, session, query.workspace));
       }
       if (stage === "business") {
         parse(Empty, context.req.query());
