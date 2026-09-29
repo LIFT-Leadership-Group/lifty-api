@@ -34,6 +34,7 @@ import {
 import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.js";
 import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
+import { DeleteLoginRequest, DeleteLoginResult, type DeleteLoginInput, type DeleteLoginOutput } from "./login-deletion.js";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
@@ -170,6 +171,7 @@ export interface AppDependencies {
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
   apolloCredentials(session: AuthSession, workspace: string, input: ApolloCredentialInput): Promise<ApolloCredentialOutput>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
+  deleteOwnLogin(session: AuthSession, input: DeleteLoginInput): Promise<DeleteLoginOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
   workspaceCampaign(session: AuthSession, input: WorkspaceCampaignInput): Promise<WorkspaceCampaignOutput>;
   linkedinCampaign(session: AuthSession, input: LinkedinCampaignInput): Promise<LinkedinCampaignOutput>;
@@ -405,6 +407,9 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"post",path:"/v1/me/delete",operationId:"deleteOwnLogin",security:[{bearerAuth:[]}],
+    request:{body:{required:true,content:{"application/json":{schema:DeleteLoginRequest}}}},
+    responses:{200:JsonResponse(DeleteLoginResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),404:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/connect", operationId: "startLinkedinConnect", security: [{ bearerAuth: [] }],
     request: { body: { required: true, content: { "application/json": { schema: LinkedinConnectRequest } } } },
     responses: { 200: JsonResponse(LegacyLinkedinConnectResult), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 429: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
@@ -987,6 +992,7 @@ const defaultDependencies: AppDependencies = {
   },
   apolloCredentials: async () => { throw new PublicError({status:503,code:"APOLLO_CREDENTIAL_UNAVAILABLE",message:"Apollo credential configuration is unavailable."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
+  deleteOwnLogin: async () => { throw new PublicError({status:503,code:"LOGIN_DELETION_UNAVAILABLE",message:"Login deletion is not configured yet."}); },
   workspaceCampaign: async () => { throw new PublicError({ status: 503, code: "WORKSPACE_CAMPAIGN_NOT_CONFIGURED", message: "Workspace sequences are not configured yet." }); },
   linkedinCampaign: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn campaigns are not configured yet." }); },
   startLinkedinConnect: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
@@ -2445,6 +2451,18 @@ export function createApp(
     const input = confirmation.success ? RetireWorkspaceRequest.safeParse({...confirmation.data,workspace_ref:context.req.param("workspace_ref")}) : null;
     if (!input?.success) return errorJson(context, 400, "INVALID_REQUEST", "Confirm the exact workspace ID, slug and name.");
     return context.json(RetireWorkspaceResult.parse(await dependencies.retireWorkspace(context.get("authSession"), input.data)));
+  });
+
+  // Deletes only the signed-in caller's own login, after they type its email.
+  app.post("/v1/me/delete", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Login deletion request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Confirm the email of the login you are signed in with."); }
+    const input = DeleteLoginRequest.safeParse(body);
+    if (!input.success) return errorJson(context, 400, "INVALID_REQUEST", "Confirm the email of the login you are signed in with.");
+    return context.json(DeleteLoginResult.parse(await dependencies.deleteOwnLogin(context.get("authSession"), input.data)));
   });
 
   app.get("/v1/email/campaign/placement/preview", async (context) => {

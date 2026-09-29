@@ -11,6 +11,7 @@ import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
 import { getApolloAllowance } from "./apollo-allowance.js";
 import { apolloCredentials } from "./apollo-credentials.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
+import { deleteOwnLogin } from "./login-deletion.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
 import { createEmailAccountOperations } from "./email-accounts.js";
@@ -128,6 +129,7 @@ export function createProductionApp(config: ServiceConfig) {
       emailAuthorizationOrigin: new URL(config.email!.publicBaseUrl).origin,
       emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
       retireWorkspace: createWorkspaceRetirement(config.email!.serverKey),
+      deleteOwnLogin,
       startEmailConnect: email.start,
       getEmailConnection: email.status,
       disconnectEmail: email.disconnect,

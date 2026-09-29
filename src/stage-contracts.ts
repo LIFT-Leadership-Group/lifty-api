@@ -27,6 +27,7 @@ import {
 import { ApolloCredentialResult } from "./apollo-credentials.js";
 import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult } from "./acquisition-recovery.js";
 import { RetireWorkspaceConfirmation, RetireWorkspaceResult } from "./workspace-retirement.js";
+import { DeleteLoginRequest, DeleteLoginResult } from "./login-deletion.js";
 import { ApolloAllowanceSchema } from "./apollo-allowance.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
@@ -251,6 +252,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     post: operation("POST", stageRoute("business"), "Provision the authenticated founder's workspace using the existing create operation.", CreateWorkspaceResultSchema, CreateWorkspaceRequestSchema),
     patch: operation("PATCH", stageRoute("business"), "Update name/description with section=workspace, or the confirmed primary website with section=website and its current expected_version. Website updates are immediate; read back after uncertain writes. No campaign changes.", z.union([ConfigUpdateResultSchema, BusinessWebsiteSchema]), BusinessStagePatchSchema),
     update_status: configSupport.update_status,
+    delete_login: operation("POST", "/v1/me/delete", "Permanently delete your own Lifty login. Requires the exact email of the signed-in login and no remaining workspace membership: retire or leave every workspace first. Deletes nobody else. Irreversible.", DeleteLoginResult, DeleteLoginRequest),
     retire: operation("POST", "/v1/workspaces/{workspace_ref}/retire", "Permanently delete a LIFTY-created workspace you belong to. Requires its exact ID, slug and name. Disconnect email and HubSpot first; a workspace with LinkedIn history cannot be retired. Mailbox send counters are preserved. Irreversible.", RetireWorkspaceResult, RetireWorkspaceConfirmation, Empty, WorkspaceRefPath),
   },
   targeting: { get: configRead("targeting", "Read saved ICP/personas; versions and lane allocation are read-only."), post: initialSetup("targeting"), patch: configWrite("targeting", "icp", TargetingStagePatchSchema), ...configSupport },
