@@ -6,6 +6,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { newSetupSecret, type WarmupSetup } from "./warmup-setup.js";
 import { renderWarmupReceipt, renderWarmupSetupPage, WARMUP_SETUP_SCRIPT_HASH } from "./warmup-setup-page.js";
 import { PublicError } from "./errors.js";
+import { PENDING_SUBMIT_SCRIPT_HASH } from "./lifty-brand.js";
 
 export function createWarmupSetupRouter(setup:WarmupSetup) {
   const app = new Hono();
@@ -14,7 +15,7 @@ export function createWarmupSetupRouter(setup:WarmupSetup) {
   const error = (c:Context, status:ContentfulStatusCode, message:string) => c.html(renderWarmupReceipt("Setup needs attention", message), status);
   app.use("*", async(c,next)=>{
     c.header("cache-control","no-store, no-transform"); c.header("referrer-policy","no-referrer"); c.header("x-content-type-options","nosniff");
-    c.header("content-security-policy",`default-src 'none'; style-src 'unsafe-inline'; script-src '${WARMUP_SETUP_SCRIPT_HASH}'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'`);
+    c.header("content-security-policy",`default-src 'none'; style-src 'unsafe-inline'; script-src '${WARMUP_SETUP_SCRIPT_HASH}' '${PENDING_SUBMIT_SCRIPT_HASH}'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'`);
     await next();
   });
   // Deliberately no exception, query, request body or OAuth response logging.

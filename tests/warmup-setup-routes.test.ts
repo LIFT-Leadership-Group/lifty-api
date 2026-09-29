@@ -4,6 +4,7 @@ import { createApp } from "../src/app.js";
 import { createWarmupSetupRouter } from "../src/warmup-setup-routes.js";
 import type { WarmupSetup } from "../src/warmup-setup.js";
 import { WARMUP_SETUP_SCRIPT_HASH } from "../src/warmup-setup-page.js";
+import { PENDING_SUBMIT_SCRIPT_HASH } from "../src/lifty-brand.js";
 const token = "a".repeat(43);
 function harness() {
   const setup:WarmupSetup = {origin:"https://api.lifty.test", issue:vi.fn(),
@@ -29,7 +30,7 @@ it("shows only the mailbox, name fields and one Google button, with protected br
   expect(res.headers.get("referrer-policy")).toBe("same-origin");
   const csp = res.headers.get("content-security-policy")!;
   expect(csp).toContain("frame-ancestors 'none'");
-  expect(csp).toContain(`script-src '${WARMUP_SETUP_SCRIPT_HASH}'`);
+  expect(csp).toContain(`script-src '${WARMUP_SETUP_SCRIPT_HASH}' '${PENDING_SUBMIT_SCRIPT_HASH}';`);
   expect(csp).not.toContain("mailivery");
   const script = html.match(/<script>([^<]*)<\/script>/)?.[1];
   expect(`sha256-${createHash("sha256").update(script ?? "").digest("base64")}`).toBe(WARMUP_SETUP_SCRIPT_HASH);

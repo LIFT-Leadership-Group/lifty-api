@@ -10,7 +10,7 @@ export type ConnectionReturnResult =
 
 export type ConnectionReturnView =
   | { kind: "neutral" }
-  | { kind: "confirming"; refreshUrl: string }
+  | { kind: "confirming"; refreshUrl: string; refreshSeconds: number }
   | { kind: "connected"; account: string | null }
   | { kind: "failed"; reason: ConnectionFailureReason };
 
@@ -25,8 +25,8 @@ export function renderConnectionReturnPage(channel: "email" | "linkedin", view: 
   if (view.kind === "confirming") {
     return renderLiftyPage({
       title: "Confirming your connection",
-      head: `<meta http-equiv="refresh" content="3;url=${escape(view.refreshUrl)}">`,
-      content: `<h1>Confirming your ${account}</h1><p class="intro">Lifty is checking the connection with ${provider}. This usually takes a few seconds and the page updates by itself.</p><p class="reassurance">You can keep this tab open.</p>`,
+      head: `<meta http-equiv="refresh" content="${view.refreshSeconds};url=${escape(view.refreshUrl)}">`,
+      content: `<div class="symbol" aria-hidden="true"><span class="spinner"></span></div><h1>Confirming your ${account}</h1><p class="intro">Lifty is checking the connection with ${provider}. This usually takes a few seconds and the page updates by itself.</p><p class="reassurance">You can keep this tab open.</p>`,
     });
   }
   if (view.kind === "connected") {

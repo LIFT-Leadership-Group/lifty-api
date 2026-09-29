@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 // Órbita Fase mark, palette and controls from the dashboard's public brand.
 // Keep aligned with lift-gtm-dashboard components/landing/lifty-mark.tsx,
 // shell.module.css and buttons.module.css.
@@ -38,21 +40,35 @@ button.primary:hover{background:var(--lime-hover);border-color:var(--lime)}
 button.block{display:flex;width:100%}
 button.link{min-height:0;padding:0;border:0;background:none;box-shadow:none;color:var(--lime);font-size:inherit;font-weight:500;text-decoration:underline;text-underline-offset:4px}
 button:disabled{opacity:.55;cursor:wait}
+form[aria-busy=true] button:disabled{opacity:.85;cursor:progress}
+.spinner{width:16px;height:16px;flex:none;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin 800ms linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 :focus-visible{outline:2px solid var(--lime);outline-offset:3px}
 .error{color:var(--danger)}
 .success{color:var(--lime)}
 .symbol{display:grid;place-items:center;width:48px;height:48px;margin-bottom:22px;border-radius:50%;background:hsl(99 34% 65% / .12);color:var(--lime)}
 .symbol.error{background:hsl(351 95% 82% / .12)}
 .symbol svg{width:24px;height:24px}
+.symbol .spinner{width:22px;height:22px}
 .next-step{margin:28px 0 0;padding-left:16px;border-left:2px solid var(--lime);color:var(--muted)}
 .next-step strong{display:block;margin-bottom:4px;font-size:15px}
 .next-step p{font-size:14px}
 .reassurance{margin:28px 0 0;padding-top:20px;border-top:1px solid var(--line);color:var(--subtle);font-size:13px;line-height:1.65}
 [hidden]{display:none!important}
 @media(max-width:560px){.shell{place-items:start center;padding:20px 16px}.panel{padding:28px 22px;border-radius:16px}.brand{margin-bottom:28px}h1{font-size:28px}}
-@media(prefers-reduced-motion:reduce){button{transition:none}}
+@media(prefers-reduced-motion:reduce){button{transition:none}.spinner{animation-duration:2.4s}}
 @media(forced-colors:active){button.primary{border-color:ButtonText}}
 `;
+
+// A form marked data-pending="<label>" hands off to a provider with a server
+// redirect that can take several seconds; its button shows the label and a
+// spinner until the next page loads, and a second submit is dropped. Returning
+// through the back button restores the idle button. Pages allow this script by
+// hash in their CSP.
+const pendingSubmitSource = `document.querySelectorAll("form[data-pending]").forEach(function(form){var button=form.querySelector("button[type=submit]"),label=button.textContent,status=document.createElement("span");status.className="visually-hidden";status.setAttribute("role","status");form.append(status);addEventListener("pageshow",function(){form.removeAttribute("aria-busy");button.disabled=false;button.textContent=label;status.textContent=""});form.addEventListener("submit",function(event){if(form.hasAttribute("aria-busy")){event.preventDefault();return}var spinner=document.createElement("span");spinner.className="spinner";spinner.setAttribute("aria-hidden","true");form.setAttribute("aria-busy","true");button.disabled=true;button.replaceChildren(spinner,form.dataset.pending);status.textContent=form.dataset.pending})})`;
+export const pendingSubmitScript = `<script>${pendingSubmitSource}</script>`;
+export const PENDING_SUBMIT_SCRIPT_HASH = `sha256-${createHash("sha256").update(pendingSubmitSource).digest("base64")}`;
 
 export interface LiftyPageOptions {
   /** Complete, already escaped document title. */
