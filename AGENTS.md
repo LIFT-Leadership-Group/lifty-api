@@ -62,6 +62,6 @@ Every new browser callback must pass the shared conformance suite in `npm run
 verify`. See LIF-1139 and the parent workspace's Connection confirmation contract.
 
 LIF-1139 requires the Functions migration
-`20260929194500_lif1139_connection_browser_receipts.sql` before this API revision.
+`20260929203000_lif1139_connection_browser_receipts.sql` before this API revision.
 HubSpot/Slack fail closed before exchanging a code if its claim RPC is unavailable.
 Mailivery retains ephemeral tokens and its existing single-dispatch fence.
