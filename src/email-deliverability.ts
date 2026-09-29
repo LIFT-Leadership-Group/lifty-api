@@ -528,7 +528,7 @@ function presentStatus(parts: {
       ? `Paused · recovering (day ${recovery.day} of ${recovery.rewarm_days})` : "Paused · awaiting a clean re-test";
     return make("paused", label, "bad", recovery.description);
   }
-  if (placement.status.code === "failed") return make("placement_failed", placement.status.label, "bad", placement.status.description, placement.status.reasons);
+  if (placement.status.code === "failed") return make("placement_failed", "Failed placement", "bad", placement.status.description, placement.status.reasons);
   if (campaigns.status.code === "in_campaign_blocked") return make("blocked_in_campaign", "In campaign · blocked", "bad", campaigns.status.description, campaigns.status.reasons);
   if (warmup.status.code === "problem") return make("warmup_problem", warmup.status.label, "warn", warmup.status.description, warmup.status.reasons);
   if (approval.status.code === "awaiting_approval") return make("needs_approval", "Needs approval", "watch", approval.status.description, approval.status.reasons);

@@ -601,7 +601,7 @@
    },
    "status": {
     "code": "placement_failed",
-    "label": "Failed placement · 2026-09-24",
+    "label": "Failed placement",
     "tone": "bad",
     "description": "The latest completed test failed: Failed · 7/12 inbox.",
     "reasons": []
@@ -2030,7 +2030,7 @@
    },
    "status": {
     "code": "placement_failed",
-    "label": "Failed placement · 2026-09-28",
+    "label": "Failed placement",
     "tone": "bad",
     "description": "The latest completed test failed: Failed · 1/10 inbox.",
     "reasons": []
