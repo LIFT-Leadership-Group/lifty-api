@@ -28,7 +28,9 @@ describe("runtime stage context", () => {
     expect(context.instructions).toContain("Do not try `summary_get` or GET to find out");
     expect(context.instructions).toContain("`WORKSPACE_AMBIGUOUS` from a founder read means the same");
     expect(context.references.common).toContain("Call `whoami` first");
-    expect(context.references.common).toContain("use its result only when the workspace it returns is the named one");
+    expect(context.references.common).toContain("act only on the workspace `whoami`\nmarks `founder_default`");
+    expect(context.references.common).toContain("never fall back to\nan operation without a workspace");
+    expect(context.instructions).toContain("never use the founder\noperations for it");
     expect(context.instructions).toContain("One sender can own");
     expect(context.instructions).toContain("Warmup resume never resumes campaigns");
     expect(context.instructions).toContain("21\nactive warmup days");

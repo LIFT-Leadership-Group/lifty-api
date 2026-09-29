@@ -54,12 +54,14 @@ the listed workspaces, before any other read. Do not call a founder read to
 find out. `workspaces: null` means the list could not be read: retry `whoami`
 instead of assuming a single workspace.
 
-A founder read takes no workspace and resolves the user's own. For a user with
-several workspaces it fails with `WORKSPACE_AMBIGUOUS`, which means the same:
-ask which workspace. It can also answer for a different workspace than the one
-named, so use its result only when the workspace it returns is the named one.
-Prefer operations that take the named workspace. Do not search the client
-source or try other routes to pick a workspace.
+Operations without a workspace parameter act only on the workspace `whoami`
+marks `founder_default`. If none is marked, they fail with
+`WORKSPACE_AMBIGUOUS`, which means the same: ask which workspace. For any other
+chosen workspace, use only operations that take it. If a stage has none, say
+that stage cannot be changed from here for that workspace; never fall back to
+an operation without a workspace. Check that each result's workspace is the
+chosen one. Do not search the client source or try other routes to pick a
+workspace.
 
 At the start of onboarding, read `next_step`. For an existing workspace task,
 read `summary.get` and the requested stage guide.

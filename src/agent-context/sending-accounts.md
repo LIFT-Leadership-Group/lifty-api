@@ -2,13 +2,15 @@
 
 Start with `whoami`. If it lists several workspaces and the user has not named
 one, ask which workspace they mean, naming the listed workspaces, before any
-other read. Do not try `summary_get` or GET to find out. For a named workspace,
-or one chosen from several, start with `client_accounts` below using its exact
-slug. `WORKSPACE_AMBIGUOUS` from a founder read means the same: ask which
-workspace, then continue with `client_accounts`.
+other read. Do not try `summary_get` or GET to find out. For a named or chosen
+workspace that `whoami` does not mark `founder_default`, start with
+`client_accounts` below using its exact slug, and never use the founder
+operations for it. `WORKSPACE_AMBIGUOUS` from a founder read means the same:
+ask which workspace, then continue with `client_accounts`.
 
-With a single workspace, refresh `summary_get` with approval before proposing
-setup or changes in a new authenticated session.
+For the `founder_default` workspace (always the case with a single workspace),
+refresh `summary_get` with approval before proposing setup or changes in a new
+authenticated session.
 Do not infer a founder workspace from summary or create a founder profile to
 manage client mailboxes. Reuse verified saved state. Unavailable reads require
 a retry, not assumptions that setup is missing.

@@ -4,8 +4,8 @@ import { listMemberWorkspaces } from "../src/member-workspaces.js";
 
 const user = "11111111-1111-4111-8111-111111111111";
 const path = "/v1/me/workspaces";
-const lift = { workspace_ref: "22222222-2222-4222-8222-222222222222", slug: "lift", name: "LIFT", active: true };
-const client = { workspace_ref: "33333333-3333-4333-8333-333333333333", slug: "acme", name: "Acme", active: false };
+const lift = { workspace_ref: "22222222-2222-4222-8222-222222222222", slug: "lift", name: "LIFT", active: true, founder_default: false };
+const client = { workspace_ref: "33333333-3333-4333-8333-333333333333", slug: "acme", name: "Acme", active: false, founder_default: true };
 function harness(data: unknown = { workspaces: [client, lift] }, error: unknown = null) {
   const rpc = vi.fn(async () => ({ data, error }));
   const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: user, client: { rpc } } }), listMemberWorkspaces, log: () => {} });
@@ -32,7 +32,8 @@ describe("member workspace list", () => {
     expect(await response.text()).not.toContain("private-db-context");
   });
   it("never reports a partial or malformed list", async () => {
-    for (const [data, error] of [[null, { code: "42883", message: "function does not exist" }], [{ workspaces: [{ ...lift, owner: user }] }, null], [[lift], null]] as const) {
+    for (const [data, error] of [[null, { code: "42883", message: "function does not exist" }], [{ workspaces: [{ ...lift, owner: user }] }, null], [[lift], null],
+      [{ workspaces: [{ ...lift, founder_default: true }, client] }, null], [{ workspaces: [{ workspace_ref: lift.workspace_ref, slug: "lift", name: "LIFT", active: true }] }, null]] as const) {
       const response = await harness(data, error).app.request(path);
       expect(response.status).toBe(502);
       expect((await response.json()).error.code).toBe("WORKSPACES_UNAVAILABLE");

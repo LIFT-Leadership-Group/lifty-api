@@ -4,8 +4,11 @@ import { PublicError } from "./errors.js";
 
 export const MemberWorkspace = z.object({
   workspace_ref: z.uuid(), slug: z.string().min(1).max(100), name: z.string().min(1).max(500), active: z.boolean(),
+  // Operations without a workspace parameter act on this one; never guess it.
+  founder_default: z.boolean(),
 }).strict();
-export const MemberWorkspacesResult = z.object({ workspaces: z.array(MemberWorkspace).max(200) }).strict();
+export const MemberWorkspacesResult = z.object({ workspaces: z.array(MemberWorkspace).max(200) }).strict()
+  .refine(value => value.workspaces.filter(workspace => workspace.founder_default).length <= 1, "At most one founder default.");
 export type MemberWorkspacesOutput = z.infer<typeof MemberWorkspacesResult>;
 
 function failed(error: unknown): never {

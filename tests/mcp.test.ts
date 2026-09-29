@@ -71,10 +71,10 @@ describe("MCP HTTP boundary", () => {
   });
 
   it("whoami lists only the caller's workspaces and reports an unreadable list as unknown", async () => {
-    const lift = { workspace_ref: "22222222-2222-4222-8222-222222222222", slug: "lift", name: "LIFT", active: true };
+    const lift = { workspace_ref: "22222222-2222-4222-8222-222222222222", slug: "lift", name: "LIFT", active: true, founder_default: true };
     const listMemberWorkspaces = vi.fn(async (session: { userId: string }) => {
       if (session.userId === "founder-broken") throw new Error("database unavailable");
-      return { workspaces: session.userId === "founder-1" ? [lift, { ...lift, workspace_ref: "33333333-3333-4333-8333-333333333333", slug: "acme", name: "Acme" }] : [lift] };
+      return { workspaces: session.userId === "founder-1" ? [lift, { ...lift, workspace_ref: "33333333-3333-4333-8333-333333333333", slug: "acme", name: "Acme", founder_default: false }] : [lift] };
     });
     const app = createApp({ mcp: { ...settings, authenticate: authentication }, listMemberWorkspaces, log: () => {} });
     const whoami = async (userId: string) => (await (await app.request(post("tools/call", { name: "whoami", arguments: {} }, { authorization: `Bearer ${userId}` }))).json()).result.structuredContent;
