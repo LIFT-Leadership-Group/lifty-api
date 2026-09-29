@@ -34,8 +34,6 @@ function page(title: string, content: string, scripts = ""): string {
 function providerChoices(): string {
   const providers = [
     { value: "google", name: "Google", detail: "Gmail or Google Workspace" },
-    { value: "outlook", name: "Microsoft", detail: "Outlook or Microsoft 365" },
-    { value: "imap", name: "Other email", detail: "IMAP/SMTP" },
   ] as const;
   return `<fieldset><legend>Choose your email provider</legend><div class="providers">${providers.map(provider => `<label class="provider">${providerIcons[provider.value]}<span class="provider-copy"><span class="provider-name">${provider.name}</span><span class="provider-detail">${provider.detail}</span></span><input type="radio" name="email_provider" value="${provider.value}" aria-label="${provider.name} (${provider.detail})" required></label>`).join("")}</div></fieldset>`;
 }

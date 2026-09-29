@@ -15,6 +15,7 @@ import { deleteOwnLogin } from "./login-deletion.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
 import { createEmailConnectOperations } from "./email-connect.js";
 import { createEmailAccountOperations } from "./email-accounts.js";
+import { createClientEmailOperations } from "./client-email-connect.js";
 import { createEmailWarmupOperations } from "./email-warmup.js";
 import { createWarmupSetup } from "./warmup-setup.js";
 
@@ -73,7 +74,8 @@ import {
 export function createProductionApp(config: ServiceConfig) {
   const linkedin = config.linkedin ? createLinkedinConnectOperations(config.linkedin) : null;
   const email = config.email ? createEmailConnectOperations(config.email) : null;
-  const emailAccounts=createEmailAccountOperations(config.supabase);
+  const clientEmail=config.email ? createClientEmailOperations(config.email) : null;
+  const emailAccounts=clientEmail ?? createEmailAccountOperations(config.supabase);
   // Workspace member operations use their session. Browser setup uses a narrow,
   // server-key-protected intent RPC, never a Supabase administrative key.
   const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
@@ -105,6 +107,7 @@ export function createProductionApp(config: ServiceConfig) {
     getEmailAccounts:emailAccounts.accounts,
     connectEmailAccount:emailAccounts.connect,
     getEmailAccountAttempt:emailAccounts.status,
+    ...(clientEmail ? {authorizeClientEmail:clientEmail.authorize,receiveClientEmailV2Return:clientEmail.v2Return} : {}),
     ...(warmupSetup ? {warmupSetup} : {}),
     ...(config.unipileV2HostedAuthOrigins ? {unipileV2HostedAuthOrigins:config.unipileV2HostedAuthOrigins} : {}),
     ...(config.unipileHostedAuthOrigin ? { unipileHostedAuthOrigin: config.unipileHostedAuthOrigin } : {}),

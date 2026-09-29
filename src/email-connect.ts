@@ -45,6 +45,7 @@ function fail(code: string, status = 409): never {
     EMAIL_PROVIDER_SELECTION_UNAVAILABLE: "Lifty could not open a new email provider selector. Try again later; the saved account has not been reconnected.",
     EMAIL_IDENTITY_MISMATCH: "Authorize the exact email address you selected in LIFTY.",
     EMAIL_DECLARATION_INVALID: "Choose whether this is a mailbox you already use or a new account for outreach.",
+    NEW_ACCOUNTS_REQUIRE_V2: "New email connections currently support Google through Lifty. Your existing connections can still be checked or reconnected.",
   };
   throw new PublicError({status,code,message:messages[code] ?? "LIFTY could not complete the email connection. Try again from the CLI."});
 }
@@ -52,6 +53,7 @@ function mapRpcError(error: unknown): never {
   throwSenderError(error);
   const parsed = z.object({code:z.string().optional(),message:z.string().optional()}).safeParse(error);
   const message = parsed.success ? parsed.data.message ?? "" : "";
+  if(message==="new_accounts_require_v2")fail("NEW_ACCOUNTS_REQUIRE_V2");
   const safe = ["email_workspace_forbidden","email_workspace_suspended","email_profile_conflict","email_intent_expired","email_identity_mismatch","email_account_taken","email_namespace_mismatch","email_callback_invalid","email_callback_conflict","email_provider_required","email_provider_conflict","email_provider_invalid","email_reselection_requires_disconnect","email_reselection_pending_work","email_provider_selection_unavailable"];
   const code = safe.find(value=>message===value);
   fail(code?.toUpperCase() ?? "EMAIL_CONNECTION_UNAVAILABLE", parsed.success && parsed.data.code==="PT403" ? 403 : parsed.success && parsed.data.code==="PT410" ? 410 : code ? 409 : 502);

@@ -60,10 +60,11 @@ new authorization; continue the exact-attempt verification below as well.
 ## First setup and required inputs
 
 For a named client workspace, use `client_connect` with
-`{"workspace":"<slug-or-uuid>","sender_ref":"<returned-sender-uuid>","email":"<exact-address>"}`.
+`{"workspace":"<slug-or-uuid>","sender_ref":"<returned-sender-uuid>","email":"<exact-address>","protocol_version":2}`.
 Connect each requested mailbox separately under its intended sender. Show the
 actual returned `connection_url` as a clickable link labeled with that exact
-mailbox. The owner signs into the matching Google account and approves access;
+mailbox. New mailboxes use the Lifty-branded Google flow. The owner signs into
+the matching Google account and approves access;
 no separate Unipile signup is needed. Keep the returned `attempt_ref` private
 and retain it with that workspace, sender and email. Never guess it or use a
 previous healthy connection as evidence of the new authorization.
@@ -75,8 +76,17 @@ selected mailbox. Keep checking the same attempt after pending or an
 unavailable read. `needs_authorization` or `needs_reconnect` requires the owner
 to finish or renew consent; `conflict` needs operator review. Do not create
 another account to bypass a conflict. An expired attempt needs a fresh link
-after reading current accounts. These operations use membership in the
-explicit workspace and require no founder onboarding.
+after reading current accounts. After a connection is verified, check it later with
+`client_connect_status` and `{"workspace":"<same-workspace>","connection_ref":"<verified-connection>"}`.
+This performs a fresh provider check even after the sign-in link expires. Use this
+for the 65-minute renewal test; do not reconnect or use an inventory row as proof
+of current provider health. Membership is checked again on every read.
+These operations require no founder onboarding. `CLIENT_UPDATE_REQUIRED` means
+update the CLI and request a fresh link; never work around it by generating a
+legacy provider link. A new mailbox never falls back to the old connection flow.
+Existing accounts retain their own connection flow and require no bulk migration.
+Connecting alone starts neither warmup nor campaigns. Keep both off for a
+connection-only test; only call `warmup_start` when the user requests warmup.
 
 POST selects the channel. For LinkedIn, obtain only missing current-contract
 declarations (`timezone`, personal `account_use`, and no `other_automation`)
@@ -181,7 +191,9 @@ with `client_linkedin_status` and reconnect it with `client_linkedin_connect`.
 After that authorized disconnect is verified, POST
 `{"channel":"email","select_account":true,"sender":{"kind":"existing","sender_ref":"<selected sender>"}}`
 (or the confirmed new-sender choice). This opens a new hosted provider
-selector with Google, Microsoft and IMAP/SMTP and leaves sending disabled.
+selector for Google and leaves sending disabled. Existing Microsoft and IMAP/SMTP
+connections retain their reconnect flow; new connections for those providers
+are unavailable until equivalent account verification is supported.
 An ordinary POST without `select_account: true` reconnects the saved mailbox;
 it does not reopen provider selection. Do not disconnect a working account just
 to preview the selector. Selection does not erase earlier account history or

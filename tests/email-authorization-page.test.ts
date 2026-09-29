@@ -21,11 +21,12 @@ describe("email authorization renderer", () => {
     const retained = renderEmailAuthorizationPage("signed-state");
     expect(retained).not.toContain('name="email_provider"');
     const fresh = renderEmailAuthorizationPage("signed-state", true);
-    expect(fresh.match(/name="email_provider"/g)).toHaveLength(3);
-    for (const value of ["google", "outlook", "imap"]) {
+    expect(fresh.match(/name="email_provider"/g)).toHaveLength(1);
+    for (const value of ["google"]) {
       expect(fresh).toMatch(new RegExp(`<input type="radio" name="email_provider" value="${value}"[^>]* required>`));
     }
     expect(fresh).not.toMatch(/<input[^>]*name="email_provider"[^>]*\bchecked\b/);
+    expect(fresh).not.toMatch(/name="email_provider" value="(?:outlook|imap)"/);
   });
 
   it("acknowledges receipt without offering replay or claiming a connected account", () => {

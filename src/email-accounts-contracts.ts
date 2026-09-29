@@ -4,8 +4,11 @@ import { EmailConnectRequest } from "./email-contracts.js";
 export const EmailAccountsRequest = z.object({workspace: EmailConnectRequest.shape.workspace}).strict();
 export const EmailAccountAttempt = z.string().min(32).max(4096).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/);
 const email = z.email().max(254).refine(value => value === value.toLowerCase(), "Use the canonical email address.");
-export const EmailAccountConnectRequest = EmailAccountsRequest.extend({sender_ref:z.uuid(), email:z.email().max(254).transform(value=>value.toLowerCase())});
-export const EmailAccountStatusRequest = EmailAccountsRequest.extend({attempt_ref:EmailAccountAttempt});
+export const EmailAccountConnectRequest = EmailAccountsRequest.extend({sender_ref:z.uuid(), email:z.email().max(254).transform(value=>value.toLowerCase()), protocol_version:z.literal(2).optional()});
+export const EmailAccountStatusRequest = z.union([
+  EmailAccountsRequest.extend({attempt_ref:EmailAccountAttempt}),
+  EmailAccountsRequest.extend({connection_ref:z.uuid()}),
+]);
 export const EmailAccountsResult = z.object({
   workspace_ref:z.uuid(), workspace_slug:EmailConnectRequest.shape.workspace,
   senders:z.array(z.object({sender_ref:z.uuid(), display_name:z.string().min(1).max(200).regex(/^[^\u0000-\u001f\u007f]*$/)}).strict()).max(1000),
