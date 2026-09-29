@@ -220,6 +220,22 @@ describe("provider authorization stages", () => {
     expect((await request(app, "sending-accounts", "POST", input)).status).toBe(400);
     expect(startEmail).not.toHaveBeenCalled(); expect(startLinkedin).not.toHaveBeenCalled();
   });
+  it.each(["email", "linkedin"] as const)("%s: reports a hosted return error category for the exact attempt", async channel => {
+    const pending = { status: "pending" as const, attempt_ref: attemptRef, expires_at: expires, retry_after_seconds: 3 };
+    const failed = (ref: string, code: string) => channel === "email"
+      ? { ...emailStatus, status: "failed" as const, intent_ref: ref, failure_code: code }
+      : { ...linkedinStatus, status: "failed" as const, intent_ref: ref, failure_code: code };
+    const query = `?channel=${channel}&attempt_ref=${attemptRef}`;
+    for (const [read, expected] of [
+      [failed(attemptRef, "account_exists"), { status: "failed", attempt_ref: attemptRef, error_code: "account_exists" }],
+      [failed(nextAttempt, "authorization_cancelled"), pending],
+      [failed(attemptRef, "identity_mismatch"), pending],
+    ] as const) {
+      const currentRead = vi.fn(async () => read as never);
+      const app = createApp({ ...base, getEmailConnection: currentRead, getLinkedinConnection: currentRead, getConnectionAttempt: async () => pending });
+      expect(await (await request(app, "sending-accounts", "GET", undefined, query)).json()).toEqual(expected);
+    }
+  });
   it("keeps a completed attempt authoritative while a newer reconnect is pending", async () => {
     const currentRead = vi.fn(async () => ({ ...emailStatus, status: "pending" as const, intent_ref: nextAttempt }));
     const app = createApp({ ...base, getEmailConnection: currentRead,
