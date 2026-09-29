@@ -241,6 +241,17 @@ describe("warmup states", () => {
     expect(done.status.description).toMatch(/does not enable campaigns/);
   });
 
+  it("explains when an approved inbox's period counts from the registry start", () => {
+    const restarted = inbox(present(withInbox("sl-only@a.test", item => {
+      item.warmup.smartlead!.active_since = "2026-09-15T19:00:00Z";
+    })), "sl-only@a.test");
+    expect(restarted.warmup.sources[0]).toMatchObject({ active_days: 14, required_days: 21, period_complete: true });
+    expect(restarted.warmup.status.reasons).toEqual([expect.objectContaining({ code: "period_counted_from_registry",
+      message: expect.stringMatching(/registry warmup start, 2026-08-20\. The current run of continuous warmup activity began 2026-09-15\./) })]);
+    // A full run needs no explanation.
+    expect(inbox(present(), "sl-only@a.test").warmup.status.reasons).toEqual([]);
+  });
+
   it("reports Smartlead activity gaps and inactive warmup", () => {
     const mixed = inbox(present(), "mixed@a.test");
     expect(mixed.warmup.sources[0]!.state.reasons.map(item => item.code)).toEqual(["warmup_activity_low"]);
