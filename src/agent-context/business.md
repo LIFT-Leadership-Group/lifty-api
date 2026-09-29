@@ -44,6 +44,14 @@ Disconnect email and HubSpot first. A workspace with LinkedIn history cannot be
 retired. Mailbox send counters are preserved. After retirement, the founder
 starts again with a new workspace and a new identity.
 
+## Delete your login
+
+`delete_login` permanently deletes the signed-in user's own Lifty login, never
+anyone else's. Use it only when that user explicitly asks to delete their login
+and types its exact email. It is refused while the login still belongs to any
+workspace, so retire (or leave) every workspace first. After deletion, that
+session stops working, and using Lifty again needs a new sign-up.
+
 ## Saved website
 
 GET exposes `website` separately from the legacy configuration. An available
