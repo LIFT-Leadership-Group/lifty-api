@@ -15,6 +15,8 @@ const upstreamErrors = {
   workspace_forbidden:{status:403,code:"EMAIL_WORKSPACE_FORBIDDEN",message:"Choose a workspace you belong to."},
   sender_unavailable:{status:409,code:"EMAIL_SENDER_UNAVAILABLE",message:"Choose an available sender from this workspace's email accounts."},
   invalid_attempt:{status:400,code:"EMAIL_ATTEMPT_INVALID",message:"This connection attempt is invalid or expired. Check the workspace's email accounts before requesting a new link."},
+  new_accounts_require_v2:{status:409,code:"CLIENT_UPDATE_REQUIRED",message:"Update Lifty and request a fresh connection link. New accounts use the Lifty-branded connection flow."},
+  use_current_connection_flow:{status:409,code:"CLIENT_UPDATE_REQUIRED",message:"Update Lifty to check or reconnect this account through its current connection flow."},
 } as const;
 const claimsSchema = z.object({v:z.literal(1),workspace_id:z.uuid(),workspace_slug:EmailAccountsRequest.shape.workspace,
   sender_id:z.uuid(),channel:z.literal("email"),identity:z.email().max(254),iat:z.number().int().nonnegative(),
@@ -76,7 +78,7 @@ export function createEmailAccountOperations(settings:{supabaseUrl:string;publis
       return result.data;
     },
     async connect(session:AuthSession,input:EmailAccountConnectInput) {
-      const request=EmailAccountConnectRequest.parse(input);
+      const {protocol_version: _protocolVersion,...request}=EmailAccountConnectRequest.parse(input);
       const result=EmailAccountConnectResult.safeParse(await call(session,"connect",request));
       if(!result.success)throw unavailable();
       const data=result.data, attempt=claims(data.attempt_ref), url=new URL(data.connection_url);
@@ -90,6 +92,7 @@ export function createEmailAccountOperations(settings:{supabaseUrl:string;publis
     },
     async status(session:AuthSession,input:EmailAccountStatusInput) {
       const request=EmailAccountStatusRequest.parse(input);
+      if (!("attempt_ref" in request)) throw unavailable();
       // Let Edge decide expiry and authorization. Only a matching receipt can pass through.
       const result=EmailAccountStatusResult.safeParse(await call(session,"connect/status",request));
       if(!result.success)throw unavailable();

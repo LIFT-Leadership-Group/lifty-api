@@ -1,8 +1,13 @@
 # Email connection providers
 
-Hosted authentication offers Gmail/Google Workspace, Outlook/Microsoft 365,
-and IMAP/SMTP through the documented Unipile V1 provider values `GOOGLE`,
-`OUTLOOK`, and `MAIL`. The existing habitual-mailbox declaration, workspace
+New connections use Lifty's branded Unipile V2 Google application. Google is the
+only provider offered for new email connections while V2 identity verification
+for other providers is unavailable. Existing V1 Gmail/Google Workspace,
+Outlook/Microsoft 365 and IMAP/SMTP accounts retain their reconnect flow through
+the provider values `GOOGLE`, `OUTLOOK`, and `MAIL`; this release does not migrate
+or delete them. See [client connection rollout](client-email-v2.md).
+
+The existing habitual-mailbox declaration, workspace
 ownership, exact account binding, and ten-email daily budget still apply.
 Connecting a mailbox does not approve or activate outreach.
 

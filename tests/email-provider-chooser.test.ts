@@ -86,7 +86,7 @@ describe("fresh hosted email provider choice",()=>{
     const url=new URL(started.connect_url);
     const response=await h.app.request(url.pathname+url.search),html=await response.text();
     expect(response.status).toBe(200);
-    for(const provider of ["google","outlook","imap"])expect(html).toContain(`value="${provider}"`);
+    for(const provider of ["google"])expect(html).toContain(`value="${provider}"`);
     expect(h.http).toHaveLength(0);
     expect(h.calls[0]).toEqual({op:"start",payload:{workspace,reconnect:true,select_account:true}});
     await h.select("google");
@@ -99,13 +99,13 @@ describe("fresh hosted email provider choice",()=>{
       email_provider:"google",verified_transport:{api_version:"v2",account_id:"account_1",application_id:"app_test",
         account_scope_id:null,user_id:"owner",v1_account_id:"retained_v1_account"}});
   });
-  it("renders all providers on Lifty without issuing a vendor link and preserves the declaration",async()=>{
+  it("renders the supported new-account provider on Lifty without issuing a vendor link and preserves the declaration",async()=>{
     const h=harness(),response=await h.app.request(`/unipile/start?intent=${state}`),html=await response.text();
     expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("content-security-policy")).toContain("form-action 'self' https://account.unipile.com https://auth.lifty.test");
     const script=html.match(/<script>([^<]*)<\/script>/)?.[1];
     expect(response.headers.get("content-security-policy")).toContain(`script-src 'sha256-${createHash("sha256").update(script ?? "").digest("base64")}';`);
-    for(const label of ["Google (Gmail or Google Workspace)","Microsoft (Outlook or Microsoft 365)","Other email (IMAP/SMTP)","A new account for outreach"])expect(html).toContain(label);
+    for(const label of ["Google (Gmail or Google Workspace)","A new account for outreach"])expect(html).toContain(label);
     expect(html).toContain('class="brand" aria-label="Lifty"');
     // Opaque intent values can randomly contain V1/V2; branding is visible copy.
     expect(html.replace(/<[^>]+>/g," ")).not.toMatch(/\b(?:Unipile|V1|V2)\b/);expect(h.http).toHaveLength(0);

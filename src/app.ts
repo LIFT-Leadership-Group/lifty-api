@@ -166,6 +166,8 @@ export interface AppDependencies {
   unipileV2HostedAuthOrigins: string[];
   receiveEmailV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
   receiveLinkedinV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
+  receiveClientEmailV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
+  authorizeClientEmail: (state:string)=>Promise<string>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
@@ -1007,6 +1009,8 @@ const defaultDependencies: AppDependencies = {
   unipileV2HostedAuthOrigins: [],
   receiveEmailV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
   receiveLinkedinV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
+  receiveClientEmailV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
+  authorizeClientEmail: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
   emailAuthorizationOrigin: null,
   startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
@@ -1454,11 +1458,11 @@ export function createApp(
       );
     }
   });
-  for(const channel of ["email","linkedin"] as const) {
+  for(const channel of ["email","linkedin","client-email"] as const) {
     app.get(`/unipile/v2/${channel}/return`,async context=>{
       context.header("cache-control","no-store");
       context.header("referrer-policy","no-referrer");
-      const receive=channel==="email" ? dependencies.receiveEmailV2Return : dependencies.receiveLinkedinV2Return;
+      const receive=channel==="client-email" ? dependencies.receiveClientEmailV2Return : channel==="email" ? dependencies.receiveEmailV2Return : dependencies.receiveLinkedinV2Return;
       // Browser result fields (account_id, provider, state) are never trusted.
       // The signed intent lets the server confirm the attempt with the same
       // evidence as authenticated status: Unipile's signed authorization plus a
@@ -1487,12 +1491,24 @@ export function createApp(
               : result?.status==="pending" && check<RETURN_CONFIRMATION_CHECKS
                 ? {kind:"confirming",refreshUrl:refreshUrl(check+1),refreshSeconds:3}
                 : {kind:"neutral"};
-      return context.html(renderConnectionReturnPage(channel,view),200,{
+      return context.html(renderConnectionReturnPage(channel==="client-email" ? "email" : channel,view),200,{
         "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
         "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
       });
     });
   }
+  app.get("/unipile/client-email/start",async context=>{
+    context.header("cache-control","no-store");
+    context.header("referrer-policy","no-referrer");
+    const target=await dependencies.authorizeClientEmail(context.req.query("intent") ?? "");
+    if(target==="authorization_received")return context.html(renderEmailAuthorizationReceivedPage(),200,{
+      "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+      "x-content-type-options":"nosniff",
+    });
+    const url=versionedHostedAuthUrl(target,hostedAuthOrigin,v2HostedAuthOrigins);
+    if(!url || !v2HostedAuthOrigins.includes(new URL(url).origin))throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"Lifty could not prepare the email connection."});
+    return context.redirect(url,303);
+  });
   app.get("/unipile/linkedin/start", async (context) => {
     context.header("cache-control", "no-store");
     context.header("referrer-policy", "no-referrer");
