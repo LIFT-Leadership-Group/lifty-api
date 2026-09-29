@@ -181,6 +181,15 @@ function smartleadWarmup(mailbox: SourceMailbox, now: Date): WarmupSource | null
   const reasons: Reason[] = [];
   if (check.freshness === "stale") reasons.push(reason("warmup_check_stale", `The latest Smartlead warmup check is older than ${SMARTLEAD_WARMUP_FRESH_HOURS} hours.`));
   const detail = w.detail ? ` ${w.detail}` : "";
+  const activeDays = w.active_since ? Math.max(0, Math.floor((ms(w.observed_at) - ms(w.active_since)) / DAY)) : null;
+  const eligibleAt = ms(registry?.cold_eligible_at);
+  const complete = Number.isFinite(eligibleAt) ? eligibleAt <= now.getTime() : activeDays === null ? null : activeDays >= REQUIRED_WARMUP_ACTIVE_DAYS;
+  // Approved inboxes count the required period from the registry start
+  // (sender_mailbox_eligibility.cold_eligible_at), not from the latest
+  // continuous activity, so the two numbers can legitimately differ.
+  if (complete === true && registry?.approved_for_outbound && registry.warmup_started_at && activeDays !== null && activeDays < REQUIRED_WARMUP_ACTIVE_DAYS) {
+    reasons.push(reason("period_counted_from_registry", `For this approved inbox the required period counts from the registry warmup start, ${day(registry.warmup_started_at)}. The current run of continuous warmup activity began ${day(w.active_since)}.`));
+  }
   let state: WarmupSource["state"];
   if (w.status === "active" && w.health === "pass") state = make("active", "Warming", "ok", "Smartlead warmup is running and its latest check passed.", reasons);
   else if (w.status === "active" && w.health === "pending") state = make("active", "Warming · low activity", "watch",
@@ -190,9 +199,6 @@ function smartleadWarmup(mailbox: SourceMailbox, now: Date): WarmupSource | null
   else if (w.status === "inactive") state = make("not_running", "Warmup off", "warn", "Smartlead reports that warmup is not running for this inbox.", reasons);
   else if (w.status === "blocked") state = make("problem", "Warmup blocked", "bad", "Smartlead reports that warmup is blocked for this inbox.", [...reasons, reason("warmup_blocked", `Smartlead blocked warmup.${detail}`)]);
   else state = make("unknown", "Warmup state unknown", "warn", "The latest Smartlead check could not determine the warmup state.", reasons);
-  const activeDays = w.active_since ? Math.max(0, Math.floor((ms(w.observed_at) - ms(w.active_since)) / DAY)) : null;
-  const eligibleAt = ms(registry?.cold_eligible_at);
-  const complete = Number.isFinite(eligibleAt) ? eligibleAt <= now.getTime() : activeDays === null ? null : activeDays >= REQUIRED_WARMUP_ACTIVE_DAYS;
   return {
     provider: "smartlead", connection_ref: null, state,
     started_at: w.active_since ? iso(ms(w.active_since)) : null, started_at_basis: w.active_since ? "observed_activity" : null,
