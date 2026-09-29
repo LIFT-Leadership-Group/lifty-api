@@ -180,6 +180,22 @@ and resume on a running warmup only cancels a pending pause. For an `outreach`
 account, pausing or removing warmup delays or blocks sending; say so and get
 an explicit yes first.
 
+## Inbox health
+
+To answer how inboxes are doing, what a sender's last placement tests were,
+or when an inbox will be ready, use `deliverability` with the explicit
+`workspace` in query. Add `sender` (a ref from `client_accounts` or
+`senders`, or `unassigned`) or `mailbox`; add `detail: placement` with one
+`mailbox_ref` only when the stored test reports are needed. Follow
+`next_cursor` until it is null before describing all inboxes.
+
+Report each inbox's `label`, `description` and `reasons` as returned; do not
+recalculate health, readiness or dates. A pending or failed test run is not a
+placement result, a configured campaign is not evidence of sending, and
+missing or out-of-date evidence is not healthy. Workspace health covers the
+whole workspace, not one inbox. This read never starts a placement test or
+changes sending; propose those only as separate, explicitly requested actions.
+
 ## Later edits
 
 Reconnection uses POST again and must verify the new attempt, even while the

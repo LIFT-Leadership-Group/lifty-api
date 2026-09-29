@@ -18,6 +18,8 @@ import { createEmailConnectOperations } from "./email-connect.js";
 import { createEmailAccountOperations } from "./email-accounts.js";
 import { createClientEmailOperations } from "./client-email-connect.js";
 import { createEmailWarmupOperations } from "./email-warmup.js";
+import { createEmailDeliverabilityOperations } from "./email-deliverability.js";
+import { createPlacementReportReader } from "./email-deliverability-placement.js";
 import { createWarmupSetup } from "./warmup-setup.js";
 
 import { randomBytes } from "node:crypto";
@@ -82,6 +84,9 @@ export function createProductionApp(config: ServiceConfig) {
   const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
   const warmup = createEmailWarmupOperations({ mailivery: config.mailivery ?? null,
     ...(warmupSetup ? {issueSetupLink:warmupSetup.issue} : {}) });
+  // Reads use the caller's session; only report reads for authorized tests use the server-side key.
+  const deliverability = createEmailDeliverabilityOperations({
+    readPlacementDetails: createPlacementReportReader({ smartleadApiKey: config.smartleadApiKey ?? null }) });
   const hubspot = createHubspotConnectOperations(config.hubspot);
   const slackSettings = config.slack;
   const slack = slackSettings
@@ -105,6 +110,7 @@ export function createProductionApp(config: ServiceConfig) {
           scriptNonce, connectOrigin: new URL(config.supabase.supabaseUrl).origin };
       },
     } : {}),
+    getEmailDeliverability: deliverability.read,
     getEmailAccounts:emailAccounts.accounts,
     connectEmailAccount:emailAccounts.connect,
     getEmailAccountAttempt:emailAccounts.status,
