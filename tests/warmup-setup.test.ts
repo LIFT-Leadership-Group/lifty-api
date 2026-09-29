@@ -8,7 +8,7 @@ const policy = { version: 1, emails_per_day: 22, ramp: "slow", reply_rate: 30,
 const record = { email: "founder@example.test", workspace_ref: "22222222-2222-4222-8222-222222222222",
   sender_ref: "33333333-3333-4333-8333-333333333333", expires_at: "2026-10-01T00:00:00Z",
   state: "claimed", policy, first_name: "Ada", last_name: "Lovelace" };
-function harness(email = record.email, providerFailure = false, tokenOverrides:Record<string,unknown> = {}, recordOverrides:Partial<WarmupSetupRecord> = {}) {
+function harness(email = record.email, providerFailure = false, tokenOverrides:Record<string,unknown> = {}, recordOverrides:Partial<WarmupSetupRecord> = {}, cleanupFailure = false) {
   const writes: {operation: string; payload: Record<string, unknown>}[] = [];
   let claimed = false, dispatched = false;
   const rpc = vi.fn(async (operation: string, payload: Record<string, unknown>) => {
@@ -23,7 +23,9 @@ function harness(email = record.email, providerFailure = false, tokenOverrides:R
     if (String(url).includes("oauth2.googleapis.com")) return Response.json({access_token: "ACCESS-PRIVATE",
       refresh_token: "REFRESH-PRIVATE", id_token: "ID-PRIVATE", scope: "openid email https://mail.google.com/", token_type: "Bearer", ...tokenOverrides});
     if (providerFailure) throw new Error("REFRESH-PRIVATE network detail");
-    return Response.json({success: true});
+    const response=Response.json({success:true});
+    if(cleanupFailure)response.body!.cancel=async()=>{throw new Error("body cleanup failed");};
+    return response;
   };
   const setup = createWarmupSetup({serverKey: "k".repeat(32), publicBaseUrl: "https://api.lifty.test",
     supabaseUrl: "https://db.test", publishableKey: "publishable", googleClientId: "client-id", googleClientSecret: "client-secret",
@@ -32,6 +34,11 @@ function harness(email = record.email, providerFailure = false, tokenOverrides:R
   return {setup, requests, writes};
 }
 describe("warmup setup OAuth handoff", () => {
+  it("does not turn successful handoff into an error when discarding its response body fails",async()=>{
+    const h=harness(record.email,false,{}, {},true);
+    await expect(h.setup.callback(secret,browser,"code")).resolves.toBeUndefined();
+    expect(h.requests.filter(r=>r.url.includes("mailivery"))).toHaveLength(1);
+  });
   it("checks PKCE, offline access, nonce and exact mailbox hint on Google's consent URL", async()=>{
     const h=harness();
     const url=new URL(await h.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"Europe/Madrid"}));

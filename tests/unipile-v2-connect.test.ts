@@ -205,137 +205,39 @@ for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifec
     expect(h.http).toHaveLength(0);
   });
 });
-it.each(["email","linkedin"] as const)("V2 %s browser return is branded without claiming connection success",async channel=>{
-  const observed:{channel:string;state:string}[]=[];
-  const app=createCurrentClient({
-    receiveEmailV2Return:async state=>{observed.push({channel:"email",state});},
-    receiveLinkedinV2Return:async state=>{observed.push({channel:"linkedin",state});},
-  });
-  const response=await app.request(`/unipile/v2/${channel}/return?intent=opaque&account_id=foreign&provider=google&state=forged&check=1`);
-  expect(response.status).toBe(200);
-  expect(response.headers.get("cache-control")).toBe("no-store");
-  expect(response.headers.get("referrer-policy")).toBe("no-referrer");
-  expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
-  expect(observed).toEqual([{channel,state:"opaque"}]);
-  const html=await response.text();
-  expect(html).toContain('aria-label="Lifty"');
-  expect(html).toContain("<style>");
-  expect(html).toContain(channel==="linkedin" ? "Back from LinkedIn" : "Back from your email provider");
-  expect(html).toContain("Ask Lifty to verify whether");
-  expect(html).toContain("This page does not confirm that your account is connected.");
-  expect(html).not.toMatch(/<script\b|<form\b|<a\s/i);
+it.each(["email","linkedin"] as const)("V2 %s shows the shell before a bounded check, ignores browser account claims",async channel=>{
+  const observed:{state:string;error:string|null}[]=[];
+  const receive=async(state:string,error:string|null)=>{observed.push({state,error});return {status:"connected" as const,account:"founder<b>@example.test"};};
+  const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
+  const page=await app.request(`/unipile/v2/${channel}/return?intent=opaque&account_id=foreign&state=forged`);
+  const html=await page.text();expect(page.status).toBe(200);expect(observed).toEqual([]);
+  expect(html).toContain("Checking your connection");expect(html).not.toContain("foreign");expect(html).not.toContain("forged");
+  expect(page.headers.get("content-security-policy")).toContain("connect-src 'self'");
+  expect(page.headers.get("content-security-policy")).not.toContain("script-src 'unsafe-inline'");
+  const response=await app.request(`https://api.lifty.test/unipile/v2/${channel}/return/status`,{method:"POST",
+    headers:{origin:"https://api.lifty.test","content-type":"application/json","x-lifty-connection":"1"},body:JSON.stringify({state:"opaque"})});
+  expect(await response.json()).toEqual({status:"connected",account:"founder<b>@example.test"});
+  expect(observed).toEqual([{state:"opaque",error:null}]);
 });
-
-it.each(["email","linkedin"] as const)("V2 %s browser return still renders when the intent is missing or rejected",async channel=>{
-  const observed:string[]=[];
-  const reject=async(state:string)=>{observed.push(state);throw new PublicError({status:state==="foreign" ? 403 : 410,code:state==="foreign" ? "EMAIL_CALLBACK_INVALID" : "EMAIL_INTENT_EXPIRED",message:"Invalid email connection link."});};
-  const app=createCurrentClient({receiveEmailV2Return:reject,receiveLinkedinV2Return:reject});
-  for(const query of ["","?intent=expired&account_id=acc_new&provider=google&state=lifty-audit&check=1","?intent=foreign&check=1"]){
-    const response=await app.request(`/unipile/v2/${channel}/return${query}`);
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    const html=await response.text();
-    expect(html).toContain(channel==="linkedin" ? "Back from LinkedIn" : "Back from your email provider");
-    expect(html).toContain("This page does not confirm that your account is connected.");
-    expect(html).not.toContain("acc_new");
+it.each(["email","linkedin"] as const)("V2 %s maps only safe provider hints and preserves verified results",async channel=>{
+  const observed:(string|null)[]=[];
+  const receive=async(_state:string,error:string|null)=>{observed.push(error);return {status:"connected" as const,account:null};};
+  const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
+  for(const [input,expected] of [["canceled","authorization_cancelled"],["consent_denied","authorization_cancelled"],["api/already_exists","account_exists"],["api/internal_error","provider_rejected"]]){
+    const response=await app.request(`https://api.lifty.test/unipile/v2/${channel}/return/status`,{method:"POST",
+      headers:{origin:"https://api.lifty.test","content-type":"application/json","x-lifty-connection":"1"},body:JSON.stringify({state:"opaque",errorType:input})});
+    expect(await response.json()).toEqual({status:"connected",account:null});expect(observed.at(-1)).toBe(expected);
   }
-  expect(observed).toEqual(["","expired","foreign"]);
 });
-
-it.each(["email","linkedin"] as const)("V2 %s browser return reports a provider error instead of the neutral page",async channel=>{
-  const observed:{state:string;returnError:string|null}[]=[];
-  const receive=async(state:string,returnError:string|null)=>{observed.push({state,returnError});};
-  const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
-  const cases=[
-    {query:"?intent=opaque&error_type=canceled&error_title=Canceled&error_detail=Authentication%20canceled",text:"You stopped before giving access",returnError:"authorization_cancelled",next:"ask Lifty for a new connection link"},
-    {query:"?intent=opaque&error_type=consent_denied&error_title=Consent%20denied",text:"You stopped before giving access",returnError:"authorization_cancelled",next:"ask Lifty for a new connection link"},
-    {query:"?intent=opaque&error_type=api%2Finternal_error&error_title=Internal&error_detail=acc_existing",text:"could not finish the connection",returnError:"provider_rejected",next:"ask Lifty for a new connection link"},
-    {query:"?intent=opaque&error_title=Unknown",text:"could not finish the connection",returnError:"provider_rejected",next:"ask Lifty for a new connection link"},
-    {query:"?intent=opaque&error_type=api%2Falready_exists&error_title=Already%20exists&error_detail=acc_existing",text:"still linked from an earlier setup",returnError:"account_exists",next:"A new link won't fix this"},
-  ];
-  for(const {query,text,next} of cases){
-    const response=await app.request(`/unipile/v2/${channel}/return${query}`);
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    const html=await response.text();
-    expect(html).toContain(channel==="linkedin" ? "Your LinkedIn account did not connect" : "Your email account did not connect");
-    expect(html).toContain(text);
-    expect(html).toContain(next);
-    expect(html).not.toContain("acc_existing");
-    expect(html).not.toContain("Back from");
-    expect(html).not.toMatch(/<script\b|<form\b|<a\s/i);
-  }
-  expect(observed).toEqual(cases.map(c=>({state:"opaque",returnError:c.returnError})));
-  const success=await app.request(`/unipile/v2/${channel}/return?intent=opaque&account_id=acc_new&provider=google&check=1`);
-  expect(await success.text()).toContain("This page does not confirm that your account is connected.");
-  expect(observed.at(-1)).toEqual({state:"opaque",returnError:null});
-});
-
-it.each(["email","linkedin"] as const)("V2 %s arrival shows the confirming page before the first check",async channel=>{
-  const observed:string[]=[];
-  const receive=async(state:string)=>{observed.push(state);return {status:"connected",account:"founder@example.test"} as const;};
-  const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
-  const response=await app.request(`/unipile/v2/${channel}/return?intent=opaque%2Bv1&account_id=acc_forged&provider=google&state=forged`);
-  expect(response.status).toBe(200);
-  expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
-  const html=await response.text();
-  expect(html).toContain(`Confirming your ${channel==="linkedin" ? "LinkedIn account" : "email account"}`);
-  expect(html).toContain('<span class="spinner"></span>');
-  expect(html).toContain(`<meta http-equiv="refresh" content="0;url=/unipile/v2/${channel}/return?intent=opaque%2Bv1&amp;check=1">`);
-  expect(html).not.toMatch(/acc_forged|forged|<script\b/i);
-  expect(observed).toEqual([]);
-});
-
-it.each(["email","linkedin"] as const)("V2 %s return page confirms, refreshes while pending and stops after a minute",async channel=>{
-  const results:Record<string,unknown>={
-    ok:{status:"connected",account:"founder<b>@example.test"},
-    denied:{status:"failed",reason:"verification"},
-    wait:{status:"pending"},
-  };
-  const receive=async(state:string)=>results[state] as never;
-  const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
-  const account=channel==="linkedin" ? "LinkedIn account" : "email account";
-
-  const connected=await (await app.request(`/unipile/v2/${channel}/return?intent=ok&account_id=acc_forged&check=1`)).text();
-  expect(connected).toContain(`Your ${account} is connected`);
-  expect(connected).toContain("<!--email_off-->founder&lt;b&gt;@example.test<!--/email_off-->");
-  expect(connected).not.toContain("acc_forged");
-  expect(connected).not.toMatch(/http-equiv="refresh"|<script\b/i);
-
-  const failed=await (await app.request(`/unipile/v2/${channel}/return?intent=denied&check=1`)).text();
-  expect(failed).toContain(`Your ${account} did not connect`);
-  expect(failed).toContain("Lifty could not verify the account you chose");
-
-  const pending=await app.request(`/unipile/v2/${channel}/return?intent=wait&account_id=acc_forged&check=4`);
-  expect(pending.headers.get("content-security-policy")).toBe("default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
-  const pendingHtml=await pending.text();
-  expect(pendingHtml).toContain(`Confirming your ${account}`);
-  expect(pendingHtml).toContain('<span class="spinner"></span>');
-  expect(pendingHtml).toContain(`<meta http-equiv="refresh" content="3;url=/unipile/v2/${channel}/return?intent=wait&amp;check=5">`);
-  expect(pendingHtml).not.toMatch(/acc_forged|<script\b/i);
-
-  const expired=await (await app.request(`/unipile/v2/${channel}/return?intent=wait&check=20`)).text();
-  expect(expired).toContain("This page does not confirm that your account is connected.");
-  expect(expired).not.toContain("http-equiv");
-  const tampered=await (await app.request(`/unipile/v2/${channel}/return?intent=wait&check=-9`)).text();
-  expect(tampered).toContain("check=1\"");
-});
-
-it.each(["email","linkedin"] as const)("V2 %s browser return shows a provider error even when the intent is rejected",async channel=>{
-  const reject=async()=>{throw new PublicError({status:410,code:"EMAIL_INTENT_EXPIRED",message:"Invalid email connection link."});};
-  const app=createCurrentClient({receiveEmailV2Return:reject,receiveLinkedinV2Return:reject});
-  const response=await app.request(`/unipile/v2/${channel}/return?intent=expired&error_type=canceled`);
-  expect(response.status).toBe(200);
-  expect(await response.text()).toContain("did not connect");
-});
-
-it.each(["email","linkedin"] as const)("V2 %s browser return still surfaces unexpected failures",async channel=>{
-  for(const error of [new Error("database offline"),new PublicError({status:502,code:"EMAIL_CONNECTION_UNAVAILABLE",message:"Connection unavailable."})]){
-    const crash=async()=>{throw error;};
-    const app=createCurrentClient({receiveEmailV2Return:crash,receiveLinkedinV2Return:crash});
-    const response=await app.request(`/unipile/v2/${channel}/return?intent=opaque&check=1`);
-    expect(response.status).toBe(error instanceof PublicError ? error.status : 500);
-    expect(await response.text()).not.toContain("Back from");
+it.each(["email","linkedin"] as const)("V2 %s treats transient check failures as unknown, but rejects expired/foreign attempts",async channel=>{
+  for(const error of [new Error("private database detail"),new PublicError({status:502,code:"EMAIL_CONNECTION_UNAVAILABLE",message:"private detail"}),new PublicError({status:403,code:"EMAIL_CALLBACK_INVALID",message:"private detail"}),new PublicError({status:410,code:"EMAIL_INTENT_EXPIRED",message:"private detail"})]){
+    const receive=async()=>{throw error;};
+    const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
+    const response=await app.request(`https://api.lifty.test/unipile/v2/${channel}/return/status`,{method:"POST",
+      headers:{origin:"https://api.lifty.test","content-type":"application/json","x-lifty-connection":"1"},body:JSON.stringify({state:"opaque"})});
+    const terminal=error instanceof PublicError&&error.status<500;
+    expect(await response.json()).toEqual(terminal?{status:"failed",reason:"invalid"}:{status:"pending"});
+    expect(response.status).toBe(terminal?200:202);
   }
 });
 

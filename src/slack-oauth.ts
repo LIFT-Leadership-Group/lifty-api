@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 const AUTHORIZATION_ENDPOINT = "https://slack.com/oauth/v2/authorize";
 const TOKEN_ENDPOINT = "https://slack.com/api/oauth.v2.access";
 const AUTH_TEST_ENDPOINT = "https://slack.com/api/auth.test";
@@ -80,9 +81,9 @@ export async function exchangeAndVerifySlackGrant(options: {
   code: string;
   fetchImpl?: typeof fetch;
 }): Promise<SlackGrant> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(options.fetchImpl ?? fetch);
   const tokenResponse = await fetchImpl(TOKEN_ENDPOINT, {
-    method: "POST",
+    method: "POST", redirect:"error", signal:AbortSignal.timeout(15000),
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: options.clientId,
@@ -118,7 +119,7 @@ export async function exchangeAndVerifySlackGrant(options: {
     : requireString(enterprise.id, "slack_enterprise_invalid");
 
   const authResponse = await fetchImpl(AUTH_TEST_ENDPOINT, {
-    method: "GET",
+    method: "GET", redirect:"error", signal:AbortSignal.timeout(15000),
     headers: { authorization: `Bearer ${accessToken}` },
   });
   const auth = await parseSlackResponse(

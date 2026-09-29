@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 import type { AuthSession } from "./app.js";
 import {
   HubspotConnectStartSchema,
@@ -117,7 +118,7 @@ export interface HubspotConnectOperations {
 export function createHubspotConnectOperations(
   settings: HubspotConnectSettings,
 ): HubspotConnectOperations {
-  const fetchImpl = settings.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(settings.fetchImpl ?? fetch);
   const publicBaseUrl = settings.publicBaseUrl.replace(/\/$/, "");
   const redirectUri = `${publicBaseUrl}/hubspot/callback`;
 
@@ -236,7 +237,7 @@ export function createHubspotConnectOperations(
     const response = await fetchImpl(
       `${settings.supabaseUrl}/rest/v1/rpc/complete_lifty_hubspot_connection`,
       {
-        method: "POST",
+        method: "POST", redirect: "error", signal: AbortSignal.timeout(15000),
         headers: {
           apikey: settings.publishableKey,
           "content-type": "application/json",
@@ -295,7 +296,7 @@ export function createHubspotConnectOperations(
     completeCallback: async input => {
       try { return await completeCallback(input); }
       catch (error) {
-        if (error instanceof HubspotCallbackError && !["link_invalid", "link_used", "link_expired"].includes(error.reason)) {
+        if (error instanceof HubspotCallbackError && error.status < 500 && !["link_invalid", "link_used", "link_expired"].includes(error.reason)) {
           try { await failCallback(input.state, "failed", error.reason === "exchange_failed" ? "token_exchange_failed" : "callback_failed"); }
           catch { /* Preserve the original safe failure; reads remain unverified if persistence failed. */ }
         }

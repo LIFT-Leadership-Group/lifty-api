@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 import type { AuthSession } from "./app.js";
 import {
   SlackConnectStartSchema,
@@ -115,7 +116,7 @@ export interface SlackConnectOperations {
 export function createSlackConnectOperations(
   settings: SlackConnectSettings,
 ): SlackConnectOperations {
-  const fetchImpl = settings.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(settings.fetchImpl ?? fetch);
   const publicBaseUrl = settings.publicBaseUrl.replace(/\/$/, "");
   const redirectUri = `${publicBaseUrl}/slack/callback`;
 
@@ -228,7 +229,7 @@ export function createSlackConnectOperations(
     const response = await fetchImpl(
       `${settings.supabaseUrl}/rest/v1/rpc/complete_lifty_slack_connection`,
       {
-        method: "POST",
+        method: "POST", redirect: "error", signal: AbortSignal.timeout(15000),
         headers: {
           apikey: settings.publishableKey,
           "content-type": "application/json",
@@ -278,7 +279,7 @@ export function createSlackConnectOperations(
     completeCallback: async input => {
       try { return await completeCallback(input); }
       catch (error) {
-        if (error instanceof SlackCallbackError && !["link_invalid", "link_used", "link_expired", "link_revoked"].includes(error.reason)) {
+        if (error instanceof SlackCallbackError && error.status < 500 && !["link_invalid", "link_used", "link_expired", "link_revoked"].includes(error.reason)) {
           try { await failCallback(input.state, "failed", error.reason === "exchange_failed" ? "token_exchange_failed" : "callback_failed"); }
           catch { /* Preserve the original safe failure; reads remain unverified if persistence failed. */ }
         }

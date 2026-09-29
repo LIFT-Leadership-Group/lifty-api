@@ -10,6 +10,7 @@ function harness() {
   const setup:WarmupSetup = {origin:"https://api.lifty.test", issue:vi.fn(),
     read:vi.fn(async () => ({email:"ada@example.test", workspace_ref:"22222222-2222-4222-8222-222222222222",
       sender_ref:"33333333-3333-4333-8333-333333333333", state:"draft" as const, expires_at:"2026-10-01T00:00:00Z", policy:null,first_name:"",last_name:""})),
+    validateCallback:vi.fn(),receipt:vi.fn(async()=>({status:"pending" as const})),
     choose:vi.fn(async()=>"https://accounts.google.com/o/oauth2/v2/auth?state=not-a-secret"), callback:vi.fn()};
   return {setup, app:createWarmupSetupRouter(setup)};
 }
@@ -62,15 +63,19 @@ it("mounts browser routes before API auth without logging callback bodies or cod
   const log=vi.fn(),authenticate=vi.fn(async()=>{throw Error("must not authenticate browser callback as CLI");});
   const app=createApp({warmupSetup:setup,authenticate,log});
   const res=await app.request(`https://api.lifty.test/warmup/google/callback?state=${token}&code=PRIVATE_CODE`,{headers:{cookie:`__Host-lifty-warmup-browser=${token}`}});
-  expect(res.status).toBe(303); expect(res.headers.get("location")).toBe("../received");
+  expect(res.status).toBe(200); expect(await res.text()).toContain("Checking your connection");
   expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+  expect(setup.callback).not.toHaveBeenCalled();
+  const processed=await app.request("https://api.lifty.test/warmup/google/callback/process",{method:"POST",headers:{origin:"https://api.lifty.test","content-type":"application/json","x-lifty-connection":"1",cookie:`__Host-lifty-warmup-browser=${token}`},body:JSON.stringify({state:token,code:"PRIVATE_CODE"})});
+  expect(await processed.json()).toEqual({status:"pending"});
   expect(setup.callback).toHaveBeenCalledWith(token,token,"PRIVATE_CODE");
-  expect(authenticate).not.toHaveBeenCalled();expect(log).not.toHaveBeenCalled();
+  expect(authenticate).not.toHaveBeenCalled();expect(JSON.stringify(log.mock.calls)).not.toMatch(/PRIVATE_CODE|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+  expect(log).toHaveBeenCalledWith(expect.objectContaining({event:"connection_confirmation",stage:"process"}));
 });
 it("never echoes authorization codes or provider callback errors", async () => {
   const {app,setup} = harness();
   const res = await app.request(`https://api.lifty.test/google/callback?state=${token}&error=REFRESH_PRIVATE&error_description=PRIVATE`);
-  expect(res.status).toBe(400);
+  expect(res.status).toBe(200);
   expect(await res.text()).not.toContain("PRIVATE");
   expect(setup.callback).not.toHaveBeenCalled();
 });

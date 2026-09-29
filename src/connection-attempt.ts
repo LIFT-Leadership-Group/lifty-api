@@ -1,3 +1,4 @@
+import { connectionFetch } from "./connection-confirmation.js";
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
@@ -37,7 +38,7 @@ export async function recordOAuthFailure(input: {
   provider: "hubspot" | "slack"; intentToken: string; status: "denied" | "failed"; code: string;
   supabaseUrl: string; publishableKey: string; fetchImpl: typeof fetch;
 }): Promise<void> {
-  const response = await input.fetchImpl(`${input.supabaseUrl}/rest/v1/rpc/fail_lifty_connect_attempt`, {
+  const response = await connectionFetch(input.fetchImpl)(`${input.supabaseUrl}/rest/v1/rpc/fail_lifty_connect_attempt`, {
     method: "POST", redirect: "error", signal: AbortSignal.timeout(15_000),
     headers: { apikey: input.publishableKey, "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({ p_provider: input.provider, p_intent_token: input.intentToken,

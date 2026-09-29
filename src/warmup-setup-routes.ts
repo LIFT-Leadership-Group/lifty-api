@@ -1,6 +1,7 @@
+import { createConfirmationRouter, invalidConfirmation, pendingConfirmation, type ConfirmationLog } from "./connection-confirmation.js";
 import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
-import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { getCookie, setCookie } from "hono/cookie";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { newSetupSecret, type WarmupSetup } from "./warmup-setup.js";
@@ -8,7 +9,7 @@ import { renderWarmupReceipt, renderWarmupSetupPage, WARMUP_SETUP_SCRIPT_HASH } 
 import { PublicError } from "./errors.js";
 import { PENDING_SUBMIT_SCRIPT_HASH } from "./lifty-brand.js";
 
-export function createWarmupSetupRouter(setup:WarmupSetup) {
+export function createWarmupSetupRouter(setup:WarmupSetup, log?:(event:ConfirmationLog)=>void) {
   const app = new Hono();
   const secure = new URL(setup.origin).protocol === "https:";
   const cookieName = secure ? "__Host-lifty-warmup-browser" : "lifty-warmup-browser";
@@ -18,7 +19,8 @@ export function createWarmupSetupRouter(setup:WarmupSetup) {
     c.header("content-security-policy",`default-src 'none'; style-src 'unsafe-inline'; script-src '${WARMUP_SETUP_SCRIPT_HASH}' '${PENDING_SUBMIT_SCRIPT_HASH}'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'`);
     await next();
   });
-  // Deliberately no exception, query, request body or OAuth response logging.
+  // Never log exceptions, queries, bodies or OAuth responses. The shared
+  // controller records only allowlisted stage/outcome/timing diagnostics.
   app.onError((e,c)=>error(c, e instanceof PublicError ? e.status as ContentfulStatusCode : 500,
     e instanceof PublicError ? e.message : "Lifty could not complete setup. Return to your agent to check warmup status."));
   app.get("/setup",async c=>{
@@ -53,14 +55,23 @@ export function createWarmupSetupRouter(setup:WarmupSetup) {
     const target = await setup.choose(form.get("intent")!,cookie,{first_name:form.get("first_name"),last_name:form.get("last_name"),timezone:form.get("timezone")});
     return c.redirect(target,303);
   });
-  app.get("/google/callback",async c=>{
-    const params=new URL(c.req.url).searchParams;
-    if(params.has("error"))return error(c,400,"Google authorization was not completed. No tokens were sent to Mailivery. Run warmup start to try again.");
-    if(params.getAll("code").length!==1||params.getAll("state").length!==1) return error(c,400,"Google authorization could not be verified.");
-    await setup.callback(params.get("state")!,getCookie(c,cookieName)??"",params.get("code")!);
-    deleteCookie(c,cookieName,{path:"/",secure,httpOnly:true,sameSite:"Lax"});
-    return c.redirect("../received",303);
-  });
+  app.route("/",createConfirmationRouter("warmup",{
+    validate:(input,c)=>setup.validateCallback(input.state,getCookie(c,cookieName)??""),
+    status:(input,c)=>setup.receipt(input.state,getCookie(c,cookieName)??""),
+    process:async(input,c)=>{
+      const browser=getCookie(c,cookieName)??"";
+      // A denial hint cannot override a verified/previously dispatched attempt.
+      if(input.denied)return setup.receipt(input.state,browser,"canceled");
+      if(!input.code)return invalidConfirmation();
+      try{await setup.callback(input.state,browser,input.code);}
+      catch(error){
+        if(error instanceof PublicError && error.code==="WARMUP_IDENTITY_MISMATCH")return setup.receipt(input.state,browser,"verification");
+        if(error instanceof PublicError && error.code==="WARMUP_GOOGLE_UNAVAILABLE")return setup.receipt(input.state,browser,"provider");
+        // A consumed claim/uncertain provider response must only read the receipt.
+      }
+      try{return await setup.receipt(input.state,browser);}catch{return pendingConfirmation();}
+    },
+  },{prefix:"/warmup",origin:setup.origin,...(log?{log}:{})}));
   app.get("/received",c=>c.html(renderWarmupReceipt()));
   return app;
 }

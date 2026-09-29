@@ -1,3 +1,4 @@
+import { createConfirmationRouter, invalidConfirmation, type ConfirmationAdapters, type ConfirmationAdapter, type ConfirmationLog } from "./connection-confirmation.js";
 import { OnboardingStateSchema, OnboardingSaveSchema, SubmissionOptionsSchema, getOnboardingState, saveOnboardingState, type OnboardingState, type OnboardingSave, type SubmissionOptions } from "./onboarding-state.js";
 import { RunProgressQuerySchema, RunProgressSchema, type RunProgressQuery, type RunProgress } from "./run-progress.js";
 import type { BusinessWebsite, BusinessWebsitePatch } from "./business-website.js";
@@ -10,8 +11,8 @@ import { handleMcpRequest, mcpResourceMetadata, type McpDependencies } from "./m
 import { getStageMcpTools, callStageMcpTool } from "./mcp-stage-tools.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
-import { renderConnectionReturnPage, type ConnectionReturnResult, type ConnectionReturnView } from "./connection-return-page.js";
-import { hostedReturnError, hostedReturnReason, type HostedReturnError } from "./hosted-return-error.js";
+import { type ConnectionReturnResult } from "./connection-return-page.js";
+import { hostedReturnError, type HostedReturnError } from "./hosted-return-error.js";
 import { PENDING_SUBMIT_SCRIPT_HASH, renderLiftyPage } from "./lifty-brand.js";
 import { readFileSync } from "node:fs";
 import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
@@ -141,8 +142,6 @@ import { EmailAccountsRequest, EmailAccountsResult, EmailAccountConnectRequest, 
   type EmailAccountConnectInput, type EmailAccountConnectOutput, type EmailAccountStatusInput, type EmailAccountStatusOutput } from "./email-accounts-contracts.js";
 
 const MAX_REQUEST_BYTES = 132 * 1024;
-/** About one minute of three-second page refreshes while a return is confirmed. */
-const RETURN_CONFIRMATION_CHECKS = 20;
 // The create-workspace body carries only a bounded name and description.
 const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
 const RequestIdSchema = z.uuid();
@@ -288,12 +287,14 @@ export interface AppDependencies {
   checkReadiness(): Promise<boolean>;
   checkCompanyReadiness(): Promise<boolean>;
   checkCrmMappingReadiness(): Promise<boolean>;
+  connectionCallbacks?: ConfirmationAdapters;
+  validateConnectionReturn?(flow:"email"|"linkedin"|"client-email", state:string):void;
   log(event: LogEvent): void;
 }
 
 export interface LogEvent {
   level: "warn" | "error";
-  event: "request_failed" | "revocation_enqueue_failed";
+  event: "request_failed" | "revocation_enqueue_failed" | "connection_confirmation";
   request_id: string;
   method: string;
   path: string;
@@ -1178,7 +1179,10 @@ export function createApp(
     await next();
   });
 
-  if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup));
+  const logConfirmation=(event:ConfirmationLog)=>dependencies.log({level:"warn",event:"connection_confirmation",request_id:event.correlation,method:"POST",
+    path:`connection/${event.flow}`,error_code:event.outcome,status:event.status,stage:event.stage,elapsed_ms:event.elapsed_ms,
+    ...(event.upstream_status===undefined?{}:{upstream_code:String(event.upstream_status)}),...(event.upstream_outcome?{upstream_kind:event.upstream_outcome}:{})});
+  if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup,logConfirmation));
   app.get("/favicon.ico", (context) => context.body(new Uint8Array(favicon).buffer, 200, {
     "content-type": "image/x-icon",
     "cache-control": "public, max-age=3600",
@@ -1327,68 +1331,6 @@ export function createApp(
     context.header("referrer-policy", "no-referrer");
     return context.redirect(authorizeUrl, 302);
   });
-  app.get("/hubspot/callback", async (context) => {
-    if (context.req.query("error")) {
-      const state = context.req.query("state") ?? "";
-      if (isSealedHubspotState(state)) {
-        try { await dependencies.denyHubspotCallback(state); }
-        catch { return hubspotHtmlResponse(context, 503, "Authorization could not be verified", "The outcome could not be recorded. Return to Lifty to check the same attempt."); }
-      }
-      return hubspotHtmlResponse(
-        context,
-        400,
-        "HubSpot authorization was not completed",
-        "This attempt did not save a connection. If HubSpot blocked permissions, ask a HubSpot super admin "
-          + "to approve Lifty and its required permissions in Settings > Integrations > Connected Apps > Approved apps. "
-          + "Ask Lifty for a fresh HubSpot link when the admin is ready, and share that link with them. "
-          + "They can complete the connection without your Lifty login. If you cancelled, ask Lifty to retry when you are ready.",
-      );
-    }
-
-    const code = context.req.query("code") ?? "";
-    const state = context.req.query("state") ?? "";
-    if (!code || code.length > 4096 || !isSealedHubspotState(state)) {
-      return hubspotHtmlResponse(
-        context,
-        400,
-        "Invalid HubSpot callback",
-        "No connection was saved. Ask Lifty for a fresh link.",
-      );
-    }
-
-    try {
-      await dependencies.completeHubspotCallback({ code, state });
-      return hubspotHtmlResponse(
-        context,
-        200,
-        "HubSpot is connected",
-        "LIFTY verified and saved the connection.",
-      );
-    } catch (error) {
-      const callbackError = error instanceof HubspotCallbackError
-        ? error
-        : new HubspotCallbackError(
-            "internal_error",
-            500,
-            "LIFTY could not complete the HubSpot connection.",
-          );
-      dependencies.log({
-        level: callbackError.status >= 500 ? "error" : "warn",
-        event: "request_failed",
-        request_id: context.get("requestId"),
-        method: context.req.method,
-        path: context.req.path,
-        error_code: `HUBSPOT_CALLBACK_${callbackError.reason.toUpperCase()}`,
-        status: callbackError.status,
-      });
-      return hubspotHtmlResponse(
-        context,
-        callbackError.status as ContentfulStatusCode,
-        "HubSpot connection failed",
-        callbackError.safeMessage,
-      );
-    }
-  });
   app.get("/slack/start", (context) => {
     const intent = context.req.query("intent") ?? "";
     if (!isSealedSlackState(intent)) {
@@ -1412,103 +1354,19 @@ export function createApp(
     context.header("referrer-policy", "no-referrer");
     return context.redirect(authorizeUrl, 302);
   });
-  app.get("/slack/callback", async (context) => {
-    if (context.req.query("error")) {
-      const state = context.req.query("state") ?? "";
-      if (isSealedSlackState(state)) {
-        try { await dependencies.denySlackCallback(state); }
-        catch { return hubspotHtmlResponse(context, 503, "Authorization could not be verified", "The outcome could not be recorded. Return to Lifty to check the same attempt."); }
-      }
-      return hubspotHtmlResponse(
-        context,
-        400,
-        "Slack authorization was cancelled",
-        "No connection was saved. Ask Lifty for a fresh link when you are ready.",
-      );
-    }
-
-    const code = context.req.query("code") ?? "";
-    const state = context.req.query("state") ?? "";
-    if (!code || code.length > 4096 || !isSealedSlackState(state)) {
-      return hubspotHtmlResponse(
-        context,
-        400,
-        "Invalid Slack callback",
-        "No connection was saved. Ask Lifty for a fresh link.",
-      );
-    }
-
-    try {
-      await dependencies.completeSlackCallback({ code, state });
-      return hubspotHtmlResponse(
-        context,
-        200,
-        "Slack is connected",
-        "Your Slack workspace is connected. Invite @Lifty to the channel where you want notifications, then let LIFT know which channel you chose.",
-      );
-    } catch (error) {
-      const callbackError = error instanceof SlackCallbackError
-        ? error
-        : new SlackCallbackError(
-            "internal_error",
-            500,
-            "LIFTY could not complete the Slack connection.",
-          );
-      dependencies.log({
-        level: callbackError.status >= 500 ? "error" : "warn",
-        event: "request_failed",
-        request_id: context.get("requestId"),
-        method: context.req.method,
-        path: context.req.path,
-        error_code: `SLACK_CALLBACK_${callbackError.reason.toUpperCase()}`,
-        status: callbackError.status,
-      });
-      return hubspotHtmlResponse(
-        context,
-        callbackError.status as ContentfulStatusCode,
-        "Slack connection failed",
-        callbackError.safeMessage,
-      );
-    }
-  });
-  for(const channel of ["email","linkedin","client-email"] as const) {
-    app.get(`/unipile/v2/${channel}/return`,async context=>{
-      context.header("cache-control","no-store");
-      context.header("referrer-policy","no-referrer");
-      const receive=channel==="client-email" ? dependencies.receiveClientEmailV2Return : channel==="email" ? dependencies.receiveEmailV2Return : dependencies.receiveLinkedinV2Return;
-      // Browser result fields (account_id, provider, state) are never trusted.
-      // The signed intent lets the server confirm the attempt with the same
-      // evidence as authenticated status: Unipile's signed authorization plus a
-      // server-side identity read. A provider error is kept only as its safe
-      // category (a hint for status, never provider text) and never ends the
-      // attempt, so verified evidence still wins. While confirmation is pending
-      // the page refreshes itself (no script) for about a minute, then falls
-      // back to the neutral page. A missing, expired or foreign intent lands on
-      // the neutral page, or on the reported category's page. The first check
-      // can take seconds, so the arrival from the provider answers at once with
-      // the confirming page, which moves straight on to that check.
-      const intent=context.req.query("intent") ?? "";
-      const returnError=hostedReturnError(context.req.query("error_type")) ?? (context.req.query("error_title") ? "provider_rejected" : null);
-      const refreshUrl=(next:number)=>`/unipile/v2/${channel}/return?intent=${encodeURIComponent(intent)}&check=${next}`;
-      const arriving=context.req.query("check")===undefined && intent!=="" && !returnError;
-      const check=Math.min(Math.max(Number.parseInt(context.req.query("check") ?? "0",10) || 0,0),RETURN_CONFIRMATION_CHECKS);
-      let result:ConnectionReturnResult|null=null;
-      if(!arriving){
-        try {result=(await receive(intent,returnError)) ?? null;}
-        catch (error) {if (!(error instanceof PublicError) || error.status < 400 || error.status >= 500) throw error;}
-      }
-      const view:ConnectionReturnView=arriving ? {kind:"confirming",refreshUrl:refreshUrl(1),refreshSeconds:0}
-        : result?.status==="connected" ? {kind:"connected",account:result.account}
-          : result?.status==="failed" ? {kind:"failed",reason:result.reason}
-            : returnError ? {kind:"failed",reason:hostedReturnReason[returnError]}
-              : result?.status==="pending" && check<RETURN_CONFIRMATION_CHECKS
-                ? {kind:"confirming",refreshUrl:refreshUrl(check+1),refreshSeconds:3}
-                : {kind:"neutral"};
-      return context.html(renderConnectionReturnPage(channel==="client-email" ? "email" : channel,view),200,{
-        "cache-control":"no-store","referrer-policy":"no-referrer","x-content-type-options":"nosniff",
-        "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
-      });
+  for(const flow of ["hubspot","slack","email","linkedin","client-email"] as const) {
+    const receive=flow==="client-email" ? dependencies.receiveClientEmailV2Return : flow==="linkedin" ? dependencies.receiveLinkedinV2Return : dependencies.receiveEmailV2Return;
+    const adapter:ConfirmationAdapter=dependencies.connectionCallbacks?.[flow] ?? (flow==="hubspot" || flow==="slack" ? {
+      validate(input:{state:string}) { if(!(flow==="hubspot"?isSealedHubspotState:isSealedSlackState)(input.state))throw new SyntaxError("invalid_state"); },
+      status:async()=>invalidConfirmation(),
+    } : {
+      validate(input:{state:string}) { if(dependencies.validateConnectionReturn)dependencies.validateConnectionReturn(flow,input.state); },
+      status:async(input:{state:string;errorType?:string})=>(await receive(input.state,hostedReturnError(input.errorType??"")))??{status:"pending" as const},
     });
+    app.route("/",createConfirmationRouter(flow,adapter,{
+      ...((adapter.origin??dependencies.emailAuthorizationOrigin) ? {origin:(adapter.origin??dependencies.emailAuthorizationOrigin)!} : {}),
+      log:logConfirmation,
+    }));
   }
   app.get("/unipile/client-email/start",async context=>{
     context.header("cache-control","no-store");
