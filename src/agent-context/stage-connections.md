@@ -51,10 +51,12 @@ not; it uses the same server checks, but still verify with GET before continuing
   when the founder is ready. After `provider_rejected`, offer one fresh POST
   and ask for operator review if it fails again. `account_exists` means the
   mailbox or LinkedIn profile is still linked at the provider from an earlier
-  setup, so another link fails the same way: if it is the account this
-  workspace already saved, reconnect it with an ordinary POST (no
-  `select_account`); otherwise it needs operator review. Never disconnect or
-  delete another account to get around it. These codes come from the
+  setup, so another link fails the same way. If it is the account this
+  workspace already saved, disconnect this workspace's email (that closes the
+  still-open selection attempt) and then reconnect with an ordinary POST (no
+  `select_account`); a POST while that attempt is open returns the same
+  attempt. Otherwise it needs operator review. Never disconnect another
+  workspace or delete a provider account to get around it. These codes come from the
   founder's browser, not a verified outcome: a later `connected` for the same
   attempt means they finished in another tab, and that result wins.
   `error_code: attempt_superseded` means a newer attempt replaced this one;
