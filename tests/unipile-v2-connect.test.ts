@@ -262,7 +262,7 @@ it.each(["email","linkedin"] as const)("V2 %s return page confirms, refreshes wh
 
   const connected=await (await app.request(`/unipile/v2/${channel}/return?intent=ok&account_id=acc_forged`)).text();
   expect(connected).toContain(`Your ${account} is connected`);
-  expect(connected).toContain("founder&lt;b&gt;@example.test");
+  expect(connected).toContain("<!--email_off-->founder&lt;b&gt;@example.test<!--/email_off-->");
   expect(connected).not.toContain("acc_forged");
   expect(connected).not.toMatch(/http-equiv="refresh"|<script\b/i);
 
