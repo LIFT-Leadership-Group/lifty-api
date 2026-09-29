@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SenderChoice } from "./sender-choice.js";
+import { HostedReturnError } from "./hosted-return-error.js";
 
 export const LinkedinWorkspace = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
 export const LinkedinTimezone = z.string().min(1).max(100).refine(value => {
@@ -29,7 +30,7 @@ export const LinkedinConnectRequest = z.object({
 }).strict();
 export const LinkedinWorkspaceRequest = z.object({ workspace: LinkedinWorkspace }).strict();
 export const LinkedinDisconnectRequest = LinkedinWorkspaceRequest.extend({ confirm: z.literal(true) }).strict();
-export const LinkedinFailureCode = z.enum(["identity_mismatch", "provider_unavailable", "link_failed", "account_taken"]);
+export const LinkedinFailureCode = z.enum(["identity_mismatch", "provider_unavailable", "link_failed", "account_taken", ...HostedReturnError.options]);
 const profile = {
   provider: z.literal("unipile"), channel: z.literal("linkedin"), workspace_ref: z.uuid(),
   profile_id: LinkedinProfileId.nullable(), profile_url: LinkedinProfileUrl.nullable(), display_name: z.string().max(401).nullable(),

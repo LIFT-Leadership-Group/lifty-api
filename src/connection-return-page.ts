@@ -1,6 +1,6 @@
 import { renderLiftyPage } from "./lifty-brand.js";
 
-export type ConnectionFailureReason = "canceled" | "provider" | "verification" | "ended";
+export type ConnectionFailureReason = "canceled" | "exists" | "provider" | "verification" | "ended";
 
 /** What the server could prove about an attempt from the signed intent alone. */
 export type ConnectionReturnResult =
@@ -41,6 +41,8 @@ export function renderConnectionReturnPage(channel: "email" | "linkedin", view: 
   if (view.kind === "failed") {
     const reason = view.reason === "canceled"
       ? "You stopped before giving access, so nothing was connected."
+      : view.reason === "exists"
+        ? `This ${account} is still linked from an earlier setup, so Lifty couldn't connect it again.`
       : view.reason === "verification"
         ? "Lifty could not verify the account you chose, so nothing was connected."
         : view.reason === "ended"
@@ -48,7 +50,10 @@ export function renderConnectionReturnPage(channel: "email" | "linkedin", view: 
           : `${channel === "linkedin" ? "LinkedIn" : "Your email provider"} could not finish the connection, so nothing was connected.`;
     return renderLiftyPage({
       title: "Connection not finished",
-      content: `<h1>Your ${account} did not connect</h1><p class="intro">${reason}</p><div class="next-step"><strong>Try again from Lifty</strong><p>Return to the conversation where you started and ask Lifty for a new connection link.</p></div><p class="reassurance">You can close this tab.</p>`,
+      // A new link fails the same way for an account that is still linked.
+      content: `<h1>Your ${account} did not connect</h1><p class="intro">${reason}</p><div class="next-step">${view.reason === "exists"
+        ? "<strong>Ask Lifty what to do next</strong><p>A new link won't fix this. Return to the conversation where you started; Lifty will check the existing connection and explain your options.</p>"
+        : "<strong>Try again from Lifty</strong><p>Return to the conversation where you started and ask Lifty for a new connection link.</p>"}</div><p class="reassurance">You can close this tab.</p>`,
     });
   }
   return renderLiftyPage({

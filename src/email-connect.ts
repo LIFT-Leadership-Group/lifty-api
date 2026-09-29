@@ -5,6 +5,7 @@ import { createUnipileV2Provider } from "./unipile-v2-provider.js";
 import { unipileV2AuthState } from "./unipile-v2-state.js";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
+import { HostedReturnError, hostedReturnReason } from "./hosted-return-error.js";
 import { HostedEmailProvider, EmailPolicy, EmailConnectRequest, EmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 import { createUnipileProvider, type UnipileProviderSettings } from "./unipile-provider.js";
 import { sealEmailIntent, openEmailIntent, emailCallbackName, validEmailCallbackName } from "./email-state.js";
@@ -28,7 +29,7 @@ const Stored = z.object({
   account_id: z.string().nullable().optional(), connection_ref: z.uuid().nullable().optional(), intent_ref: z.uuid().nullable().optional(),
   expires_at: z.string().optional(), failure_code: z.enum(["identity_mismatch","provider_unavailable","link_failed","account_taken"]).nullable().optional(),
 });
-const Intent = z.object({provider_selection_required:z.boolean().optional(),email_provider:HostedEmailProvider.nullish(),transport:UnipileTransport.optional(),authorization_account_id:z.string().nullish(),state:z.enum(["pending","issuing","ready","completed","failed"]),intent_ref:z.uuid(),workspace_ref:z.uuid(),email:z.email().nullable(),expires_at:z.string(),account_id:z.string().nullable(),hosted_url:z.url().nullable(),selection_required:z.boolean().optional(),authorization_received:z.boolean().optional()});
+const Intent = z.object({provider_selection_required:z.boolean().optional(),email_provider:HostedEmailProvider.nullish(),transport:UnipileTransport.optional(),authorization_account_id:z.string().nullish(),state:z.enum(["pending","issuing","ready","completed","failed"]),intent_ref:z.uuid(),workspace_ref:z.uuid(),email:z.email().nullable(),expires_at:z.string(),account_id:z.string().nullable(),hosted_url:z.url().nullable(),selection_required:z.boolean().optional(),authorization_received:z.boolean().optional(),return_error:HostedReturnError.nullish()});
 function fail(code: string, status = 409): never {
   const messages: Record<string,string> = {
     EMAIL_WORKSPACE_FORBIDDEN: "Choose a workspace you belong to.",
@@ -143,6 +144,7 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
   }
   async function readStatus(session:AuthSession,workspace:string,attemptRef:string|undefined,allowChoiceRefresh:boolean):Promise<EmailStatus>{
     let value=Stored.parse(await rpc("status",{workspace},session));
+    let returnError:HostedReturnError|null=null;
     if(value.state==="pending" && value.intent_ref && (!attemptRef || value.intent_ref===attemptRef)){
       const pendingIntent=value.transport?.api_version==="v2" || value.email_provider || value.provider_selection_required ? await readIntent(value.intent_ref) : null;
       if (pendingIntent) {
@@ -166,6 +168,9 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
         if (pendingIntent.workspace_ref !== value.workspace_ref
           || (value.transport && pendingIntent.transport?.api_version !== value.transport.api_version && !selectedDuringPoll)) fail("EMAIL_CALLBACK_INVALID",403);
       }
+      // Unipile's browser-reported error explains why no signed authorization
+      // arrived. It stays a hint: verified authorization below still binds.
+      if(pendingIntent?.transport?.api_version==="v2" && !pendingIntent.authorization_received)returnError=pendingIntent.return_error ?? null;
       const hint=pendingIntent?.transport?.api_version==="v2" ? {account_id:pendingIntent.authorization_received ? pendingIntent.authorization_account_id ?? null : null}
         : z.object({workspace_ref:z.literal(value.workspace_ref),intent_ref:z.literal(value.intent_ref),account_id:z.string().regex(/^[A-Za-z0-9_-]{1,255}$/).nullable()})
           .parse(await rpc("read",{workspace_ref:value.workspace_ref,intent_ref:value.intent_ref},session,"lifty_email_callback_hint"));
@@ -190,6 +195,8 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
       try {if(!(await readIdentity(value.account_id,value.email,value.transport)).healthy)state="disconnected";}
       catch(error){if(error instanceof PublicError && ["UNIPILE_ACCOUNT_NOT_FOUND","UNIPILE_IDENTITY_MISMATCH"].includes(error.code))state="disconnected";else throw error;}
     }
+    if(state==="pending" && returnError)return EmailConnectionStatus.parse({...publicProfile(value),status:"failed",
+      connection_ref:value.connection_ref??null,intent_ref:value.intent_ref??null,failure_code:returnError});
     return EmailConnectionStatus.parse({...publicProfile(value),status:state==="revoked"?"disconnected":state,
       connection_ref:value.connection_ref??null,intent_ref:value.intent_ref??null,failure_code:value.failure_code??null});
   }
@@ -285,18 +292,19 @@ export function createEmailConnectOperations(settings: EmailConnectSettings) {
     await rpc("declare",{intent_ref:id,mailbox_use:mailboxUse,...(selectedProvider ? {email_provider:selectedProvider} : {})});
     return authorize(state);
   }
-  async function v2Return(state:string,providerError=false):Promise<ConnectionReturnResult> {
+  async function v2Return(state:string,returnError:HostedReturnError|null=null):Promise<ConnectionReturnResult> {
     const id=open(state);
     const intent=await readIntent(id);
     if(intent.transport?.api_version!=="v2" || !["ready","completed","failed"].includes(intent.state))fail("EMAIL_CALLBACK_INVALID",403);
     // A browser-supplied account_id is never persisted or treated as authorization.
-    // A provider error only ends a still-open attempt, so status reports the
-    // failure instead of pending until expiry. It never completes anything.
-    if(providerError){
-      if(intent.state==="ready")await rpc("fail",{intent_ref:id,failure_code:"provider_unavailable"});
-      return {status:"failed",reason:"provider"};
-    }
     if(intent.state==="completed")return {status:"connected",account:intent.email};
+    // A reported provider error is kept only as a hint explaining why no signed
+    // authorization arrived. The attempt stays open, so a later verified
+    // authorization on the same hosted session still completes it.
+    if(returnError && !intent.authorization_received){
+      if(intent.state==="ready")await rpc("return_error",{intent_ref:id,return_error:returnError});
+      return {status:"failed",reason:hostedReturnReason[returnError]};
+    }
     if(intent.state==="failed")return {status:"failed",reason:"ended"};
     // The page confirms with the same evidence as authenticated status: the
     // signed Unipile authorization plus a server-side identity read.

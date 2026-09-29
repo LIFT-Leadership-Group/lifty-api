@@ -190,7 +190,9 @@ restart campaigns, and still requires verified authorization for the new attempt
 ## User-facing behavior and errors
 
 Explain confirmed pending, expired, denied or failed attempts without exposing
-callback contents. Retry status reads using the same reference and wait the
+callback contents. A failed attempt with `authorization_cancelled`,
+`account_exists` or `provider_rejected` means the provider reported that error
+when it sent the founder back; follow the connection-stage guidance for each. Retry status reads using the same reference and wait the
 returned retry interval. When a known mailbox already exists at the provider,
 Lifty reconnects that account instead of creating another one, and a mailbox
 held live by another workspace fails before any link is issued. Never interpret a failed read as disconnected or a

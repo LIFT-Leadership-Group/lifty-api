@@ -11,7 +11,7 @@ const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8
 const secret="connection-test-server-key-"+"x".repeat(40),email="founder@example.test";
 const expires=new Date(Date.now()+600000).toISOString();
 const transport={api_version:"v2",connection_ref:connection,canonical_account_id:"legacy",provider_namespace:"unipile:old",account_id:"acc_test",application_id:"app_test",account_scope_id:null,generation:1,user_id:"owner",v1_account_id:"legacy",hosted_auth_origin:"https://auth.unipile.com"};
-function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUserId?:string;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean;fresh?:boolean;completeTaken?:boolean;v2Siblings?:string[]}={}) {
+function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUserId?:string;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean;fresh?:boolean;completeTaken?:boolean;v2Siblings?:string[];returnError?:string}={}) {
   let phase=options.intentState??"ready",status=options.statusState??"pending",reads=0;
   const calls:{operation:string;payload:Record<string,unknown>;caller:boolean}[]=[];
   const http:{url:string;body:Record<string,unknown>|null}[]=[],deleted:string[]=[];
@@ -26,7 +26,7 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUser
     calls.push({operation,payload,caller});
     if(operation==="intent")return {data:{...stored(),state:phase,workspace_ref:options.wrongWorkspace?connection:workspace,
       hosted_url:phase==="ready"?"https://auth.unipile.com/?token=old":null,
-      authorization_received:options.authorized??false,authorization_account_id:options.authorized?options.authorizationId??"acc_test":null},error:null};
+      authorization_received:options.authorized??false,authorization_account_id:options.authorized?options.authorizationId??"acc_test":null,return_error:options.returnError??null},error:null};
     if(operation==="issue_link") {const claimed=phase==="pending";phase="issuing";return {data:{claimed},error:null};}
     if(operation==="save_link") {if(options.saveFail)return {data:null,error:{code:"PT409",message:"save unavailable"}};phase="ready";}
     if(operation==="probe")return {data:{referenced:[],mailbox:null},error:null};
@@ -85,12 +85,31 @@ for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifec
     expect(h.http).toHaveLength(0);
     expect(h.calls.every(c=>["intent","status"].includes(c.operation))).toBe(true);
   });
-  it("ends an open attempt when the provider returns an error",async()=>{
+  it("keeps a reported provider error as a hint without ending the attempt",async()=>{
     const h=harness(channel);
-    await h.ops.v2Return(h.state,true);
-    expect(h.calls.find(c=>c.operation==="fail")?.payload).toEqual({intent_ref:id,failure_code:"provider_unavailable"});
-    expect(h.calls.some(c=>c.operation==="complete")).toBe(false);
+    expect(await h.ops.v2Return(h.state,"account_exists")).toEqual({status:"failed",reason:"exists"});
+    expect(h.calls.map(c=>c.operation)).toEqual(["intent","return_error"]);
+    expect(h.calls[1]).toMatchObject({payload:{intent_ref:id,return_error:"account_exists"},caller:false});
     expect(h.http).toHaveLength(0);
+  });
+  it("lets signed authorization win over a reported provider error",async()=>{
+    const h=harness(channel,{authorized:true});
+    expect(await h.ops.v2Return(h.state,"provider_rejected")).toMatchObject({status:"connected"});
+    expect(h.calls.some(c=>c.operation==="return_error"||c.operation==="fail")).toBe(false);
+  });
+  it("status explains a reported error while no signed authorization exists",async()=>{
+    const h=harness(channel,{returnError:"account_exists"});
+    expect(await h.ops.status(h.session,workspace,id)).toMatchObject({status:"failed",failure_code:"account_exists",intent_ref:id,sending_enabled:false});
+    expect(h.calls.some(c=>["fail","complete","return_error"].includes(c.operation))).toBe(false);
+    expect(h.http).toHaveLength(0);
+  });
+  it("verified authorization still binds after a reported error",async()=>{
+    const h=harness(channel,{authorized:true,returnError:"provider_rejected"});
+    expect((await h.ops.status(h.session,workspace,id)).status).toBe("connected");
+  });
+  it("does not apply the hint to a different requested attempt",async()=>{
+    const h=harness(channel,{returnError:"authorization_cancelled"});
+    expect((await h.ops.status(h.session,workspace,connection)).status).toBe("pending");
   });
   it("confirms from the return page with signed authorization and a server identity read",async()=>{
     const h=harness(channel,{authorized:true});
@@ -120,7 +139,7 @@ for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifec
   });
   it("never fails a completed attempt on a late provider error",async()=>{
     const h=harness(channel,{intentState:"completed"});
-    await h.ops.v2Return(h.state,true);
+    expect(await h.ops.v2Return(h.state,"provider_rejected")).toMatchObject({status:"connected"});
     expect(h.calls.map(c=>c.operation)).toEqual(["intent"]);
   });
   it("completes exact pending attempt only with authenticated matching account evidence",async()=>{
@@ -224,30 +243,32 @@ it.each(["email","linkedin"] as const)("V2 %s browser return still renders when 
 });
 
 it.each(["email","linkedin"] as const)("V2 %s browser return reports a provider error instead of the neutral page",async channel=>{
-  const observed:{state:string;providerError:boolean|undefined}[]=[];
-  const receive=async(state:string,providerError?:boolean)=>{observed.push({state,providerError});};
+  const observed:{state:string;returnError:string|null}[]=[];
+  const receive=async(state:string,returnError:string|null)=>{observed.push({state,returnError});};
   const app=createCurrentClient({receiveEmailV2Return:receive,receiveLinkedinV2Return:receive});
   const cases=[
-    {query:"?intent=opaque&error_type=canceled&error_title=Canceled&error_detail=Authentication%20canceled",text:"You stopped before giving access"},
-    {query:"?intent=opaque&error_type=consent_denied&error_title=Consent%20denied",text:"You stopped before giving access"},
-    {query:"?intent=opaque&error_type=api%2Finternal_error&error_title=Internal&error_detail=acc_existing",text:"could not finish the connection"},
+    {query:"?intent=opaque&error_type=canceled&error_title=Canceled&error_detail=Authentication%20canceled",text:"You stopped before giving access",returnError:"authorization_cancelled",next:"ask Lifty for a new connection link"},
+    {query:"?intent=opaque&error_type=consent_denied&error_title=Consent%20denied",text:"You stopped before giving access",returnError:"authorization_cancelled",next:"ask Lifty for a new connection link"},
+    {query:"?intent=opaque&error_type=api%2Finternal_error&error_title=Internal&error_detail=acc_existing",text:"could not finish the connection",returnError:"provider_rejected",next:"ask Lifty for a new connection link"},
+    {query:"?intent=opaque&error_title=Unknown",text:"could not finish the connection",returnError:"provider_rejected",next:"ask Lifty for a new connection link"},
+    {query:"?intent=opaque&error_type=api%2Falready_exists&error_title=Already%20exists&error_detail=acc_existing",text:"still linked from an earlier setup",returnError:"account_exists",next:"A new link won't fix this"},
   ];
-  for(const {query,text} of cases){
+  for(const {query,text,next} of cases){
     const response=await app.request(`/unipile/v2/${channel}/return${query}`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const html=await response.text();
     expect(html).toContain(channel==="linkedin" ? "Your LinkedIn account did not connect" : "Your email account did not connect");
     expect(html).toContain(text);
-    expect(html).toContain("ask Lifty for a new connection link");
+    expect(html).toContain(next);
     expect(html).not.toContain("acc_existing");
     expect(html).not.toContain("Back from");
     expect(html).not.toMatch(/<script\b|<form\b|<a\s/i);
   }
-  expect(observed).toEqual(cases.map(()=>({state:"opaque",providerError:true})));
+  expect(observed).toEqual(cases.map(c=>({state:"opaque",returnError:c.returnError})));
   const success=await app.request(`/unipile/v2/${channel}/return?intent=opaque&account_id=acc_new&provider=google`);
   expect(await success.text()).toContain("This page does not confirm that your account is connected.");
-  expect(observed.at(-1)).toEqual({state:"opaque",providerError:false});
+  expect(observed.at(-1)).toEqual({state:"opaque",returnError:null});
 });
 
 it.each(["email","linkedin"] as const)("V2 %s return page confirms, refreshes while pending and stops after a minute",async channel=>{

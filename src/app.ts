@@ -11,6 +11,7 @@ import { getStageMcpTools, callStageMcpTool } from "./mcp-stage-tools.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { renderConnectionReturnPage, type ConnectionReturnResult, type ConnectionReturnView } from "./connection-return-page.js";
+import { hostedReturnError, hostedReturnReason, type HostedReturnError } from "./hosted-return-error.js";
 import { renderLiftyPage } from "./lifty-brand.js";
 import { readFileSync } from "node:fs";
 import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
@@ -162,8 +163,8 @@ export interface AppDependencies {
   warmupSetup?: WarmupSetup;
   unipileHostedAuthOrigin: string;
   unipileV2HostedAuthOrigins: string[];
-  receiveEmailV2Return: (state:string,providerError?:boolean)=>Promise<ConnectionReturnResult|void>;
-  receiveLinkedinV2Return: (state:string,providerError?:boolean)=>Promise<ConnectionReturnResult|void>;
+  receiveEmailV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
+  receiveLinkedinV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
@@ -1455,21 +1456,21 @@ export function createApp(
       // Browser result fields (account_id, provider, state) are never trusted.
       // The signed intent lets the server confirm the attempt with the same
       // evidence as authenticated status: Unipile's signed authorization plus a
-      // server-side identity read. A provider error only ends a still-open
-      // attempt. While confirmation is pending the page refreshes itself (no
-      // script) for about a minute, then falls back to the neutral page. A
-      // missing, expired or foreign intent lands on the neutral page.
+      // server-side identity read. A provider error is kept only as its safe
+      // category (a hint for status, never provider text) and never ends the
+      // attempt, so verified evidence still wins. While confirmation is pending
+      // the page refreshes itself (no script) for about a minute, then falls
+      // back to the neutral page. A missing, expired or foreign intent lands on
+      // the neutral page, or on the reported category's page.
       const intent=context.req.query("intent") ?? "";
-      const errorType=context.req.query("error_type") ?? "";
-      const providerError=errorType!=="" || Boolean(context.req.query("error_title"));
+      const returnError=hostedReturnError(context.req.query("error_type")) ?? (context.req.query("error_title") ? "provider_rejected" : null);
       const check=Math.min(Math.max(Number.parseInt(context.req.query("check") ?? "0",10) || 0,0),RETURN_CONFIRMATION_CHECKS);
       let result:ConnectionReturnResult|null=null;
-      try {result=(await receive(intent,providerError)) ?? null;}
+      try {result=(await receive(intent,returnError)) ?? null;}
       catch (error) {if (!(error instanceof PublicError) || error.status < 400 || error.status >= 500) throw error;}
-      const view:ConnectionReturnView=providerError
-        ? {kind:"failed",reason:["canceled","consent_denied"].includes(errorType) ? "canceled" : "provider"}
-        : result?.status==="connected" ? {kind:"connected",account:result.account}
-          : result?.status==="failed" ? {kind:"failed",reason:result.reason}
+      const view:ConnectionReturnView=result?.status==="connected" ? {kind:"connected",account:result.account}
+        : result?.status==="failed" ? {kind:"failed",reason:result.reason}
+          : returnError ? {kind:"failed",reason:hostedReturnReason[returnError]}
             : result?.status==="pending" && check<RETURN_CONFIRMATION_CHECKS
               ? {kind:"confirming",refreshUrl:`/unipile/v2/${channel}/return?intent=${encodeURIComponent(intent)}&check=${check+1}`}
               : {kind:"neutral"};
