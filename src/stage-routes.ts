@@ -1,4 +1,4 @@
-import { readSenderRoster } from "./sender-choice.js";
+import { readSenderRoster, readSenderSignatures, saveSenderSignature, SenderSignatureRequest } from "./sender-choice.js";
 import { getWorkspaceSummary, readComponent } from "./workspace-summary.js";
 import { getNextStep } from "./next-step.js";
 import { NextStepSchema } from "./next-step-contracts.js";
@@ -170,6 +170,17 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     context.header("cache-control", "no-store");
     parse(Empty, context.req.query());
     return context.json(await readSenderRoster(context.get("authSession"), await workspace(context)));
+  });
+  app.get("/v1/workspace/sending-accounts/signature", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    return context.json(await readSenderSignatures(context.get("authSession"), await workspace(context)));
+  });
+  app.post("/v1/workspace/sending-accounts/signature", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    const input = parse(SenderSignatureRequest, await readBody(context));
+    return context.json(await saveSenderSignature(context.get("authSession"), await workspace(context), input));
   });
 
   // Disconnection stays in the existing handlers. These POST adapters exist
