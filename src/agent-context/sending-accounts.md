@@ -73,13 +73,14 @@ email, after a blank line. While a sender has none, its email campaigns show
 
 After an email account is connected, and whenever `email_signature_missing`
 appears, call `signature` to read each sender's saved signature. If it is
-missing, propose one from the sender's name (the first name alone is the usual
-sign-off) and ask the founder to confirm or edit the exact text. Save only the
-confirmed text with `signature_save` and body
-`{"sender_ref":"<returned sender reference>","signature":"<confirmed text>"}`.
+missing, ask the founder for the exact signature text for that sender. The
+signature is never written by AI: do not draft, suggest, complete or polish it,
+and add nothing the founder did not write (no title, company, link or
+tagline). If they only want their first name, that is the whole signature.
+Save exactly their text with `signature_save` and body
+`{"sender_ref":"<returned sender reference>","signature":"<their exact text>"}`.
 It must be plain text of at most 500 characters, with no HTML, and any link
-must start with `https://`. Never save a signature the founder has not
-confirmed.
+must start with `https://`.
 
 Saving a different signature composes unsent campaign previews again; emails
 already approved keep the signature they were approved with. Show the new
