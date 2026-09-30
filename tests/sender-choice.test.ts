@@ -63,6 +63,28 @@ describe("named sender setup", () => {
     expect((await request(app, "", { ...body, sender: { ...body.sender, workspace_ref: sender } })).status).toBe(400);
   });
 
+  it("reads and saves the current workspace's sender signature only with exact readback", async () => {
+    const listed = { workspace_ref: workspace, senders: [{ sender_ref: sender, name: "Juan", email_signature: null }] };
+    const saved = { workspace_ref: workspace, sender_ref: sender, email_signature: "Juan\nFounder, Lifty", recomposing: 1 };
+    const rpc = vi.fn(async (name: string, _args: Record<string, unknown>) =>
+      ({ data: (name === "lifty_sender_signatures" ? listed : saved) as unknown, error: null as unknown }));
+    const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "user", client: { rpc } } }), getWorkspace, log: () => {} });
+    expect(await (await request(app, "/signature")).json()).toEqual(listed);
+    expect(rpc).toHaveBeenLastCalledWith("lifty_sender_signatures", { p_workspace: workspace });
+    const body = { sender_ref: sender, signature: " Juan\r\nFounder, Lifty\n" };
+    expect(await (await request(app, "/signature", body)).json()).toEqual(saved);
+    expect(rpc).toHaveBeenLastCalledWith("lifty_sender_signature", { p_workspace: workspace, p_sender: sender, p_signature: body.signature });
+    expect((await request(app, "/signature", { ...body, workspace_ref: workspace })).status).toBe(400);
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "sender_signature_invalid", code: "PT400" } });
+    const invalid = await request(app, "/signature", body);
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ error: { code: "SENDER_SIGNATURE_INVALID" } });
+    saved.email_signature = "Juan";
+    expect((await request(app, "/signature", body)).status).toBe(503);
+    listed.workspace_ref = sender;
+    expect((await request(app, "/signature")).status).toBe(503);
+  });
+
   it("requires person names and accepts the automatic creator path without manufacturing a name", () => {
     expect(SenderChoice.parse({ kind: "self" })).toEqual({ kind: "self" });
     for (const name of ["LinkedIn", "Email", "", "juan@example.test", "Valen\nInjected"]) {

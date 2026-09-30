@@ -23,6 +23,7 @@ export const senderMessages: Record<string, string> = {
   sender_invalid_choice: "Choose an existing sender, a named new sender, or the account creator for the first sender.",
   sender_workspace_forbidden: "Choose a sender from this workspace.",
   sender_selection_conflict: "This connection is already assigned to a sender. Continue with that sender; reconnecting cannot change ownership.",
+  sender_signature_invalid: "Use a plain-text signature of at most 500 characters: no HTML, and links must start with https://.",
 };
 export function throwSenderError(error: unknown): void {
   const parsed = z.object({ message: z.string(), code: z.string().optional() }).safeParse(error);
@@ -48,5 +49,37 @@ export async function readSenderRoster(session: AuthSession, workspace: string) 
   if (error || !result.success || result.data.workspace_ref !== workspace) {
     throw new PublicError({ status: 503, code: "SENDER_ROSTER_UNAVAILABLE", message: "Lifty could not read the workspace's senders. Retry before connecting an account." });
   }
+  return result.data;
+}
+
+// LIF-1163: Lifty appends the sender's plain-text signature to every campaign
+// email. The database validates and normalizes it; readback proves the save.
+const SignatureText = z.string().min(1).max(500);
+export const SenderSignatureRequest = z.object({ sender_ref: z.uuid(), signature: z.string().min(1).max(2000) }).strict();
+export const SenderSignatures = z.object({
+  workspace_ref: z.uuid(),
+  senders: z.array(z.object({ sender_ref: z.uuid(), name: z.string().nullable(), email_signature: SignatureText.nullable() }).strict()),
+}).strict();
+export const SenderSignatureResult = z.object({
+  workspace_ref: z.uuid(), sender_ref: z.uuid(), email_signature: SignatureText, recomposing: z.number().int().nonnegative(),
+}).strict();
+const signatureUnavailable = () => new PublicError({ status: 503, code: "SENDER_SIGNATURE_UNAVAILABLE",
+  message: "Lifty could not confirm the email signature. Read the signatures again before retrying." });
+const normalizedSignature = (value: string) => value.replace(/\r\n/g, "\n").replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
+export async function readSenderSignatures(session: AuthSession, workspace: string) {
+  const client = session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+  const { data, error } = await client.rpc("lifty_sender_signatures", { p_workspace: workspace });
+  if (error) throwSenderError(error);
+  const result = SenderSignatures.safeParse(data);
+  if (error || !result.success || result.data.workspace_ref !== workspace) throw signatureUnavailable();
+  return result.data;
+}
+export async function saveSenderSignature(session: AuthSession, workspace: string, input: z.infer<typeof SenderSignatureRequest>) {
+  const client = session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+  const { data, error } = await client.rpc("lifty_sender_signature", { p_workspace: workspace, p_sender: input.sender_ref, p_signature: input.signature });
+  if (error) throwSenderError(error);
+  const result = SenderSignatureResult.safeParse(data);
+  if (error || !result.success || result.data.workspace_ref !== workspace || result.data.sender_ref !== input.sender_ref
+    || result.data.email_signature !== normalizedSignature(input.signature)) throw signatureUnavailable();
   return result.data;
 }

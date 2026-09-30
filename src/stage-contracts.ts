@@ -1,5 +1,5 @@
 import { OnboardingStateSchema, OnboardingSaveSchema } from "./onboarding-state.js";
-import { SenderChoice, SenderRoster } from "./sender-choice.js";
+import { SenderChoice, SenderRoster, SenderSignatureRequest, SenderSignatureResult, SenderSignatures } from "./sender-choice.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
 import { BusinessWebsiteSchema, BusinessWebsitePatchSchema } from "./business-website.js";
@@ -287,6 +287,8 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   },
   "sending-accounts": {
     senders: operation("GET", "/v1/workspace/sending-accounts/senders", "Read named senders and their connections. The first sender defaults to the account creator; later account setup requires a choice of existing or new sender.", SenderRoster),
+    signature: operation("GET", "/v1/workspace/sending-accounts/signature", "Read each sender's plain-text email signature. Lifty appends it to every campaign email after a blank line; while a sender has none, its email campaigns show email_signature_missing and cannot compose, approve or send.", SenderSignatures),
+    signature_save: operation("POST", "/v1/workspace/sending-accounts/signature", "Save the exact signature text the founder confirmed for one sender: plain text of at most 500 characters, no HTML, links only with https://. Unsent campaign previews are composed again with it; emails already approved keep theirs. Never sends.", SenderSignatureResult, SenderSignatureRequest),
     get: { ...operation("GET", stageRoute("sending-accounts"), "Check the selected channel's current account or exact attempt_ref after approval. This can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. A healthy previous account is not a new attempt's success. Does not authorize outreach.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema), readOnly: false },
     post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. For email, select_account: true opens provider/account selection after an explicit disconnect; omit it to reconnect the saved account.", AuthorizationRequiredSchema, SendingAccountStartSchema),
     patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),

@@ -377,6 +377,8 @@ API returns; never substitute another workspace or provider silently.
 4. GET the exact preview. Show sender, recipient, copy, schedule, daily ceiling
    and blockers. Do not fabricate warmup or placement evidence. Habitual personal
    or business correspondence accounts may qualify, including corporate domains.
+   `email_signature_missing` means the sender has no saved signature: follow
+   the `sending-accounts` signature steps, then prepare the campaign again.
    A new or dedicated `outreach` account shows `email_warmup_required` until
    its warmup passes: 21 active days, healthy, checked within the last 24 hours.
    Read sending-accounts `warmup_status` for that workspace and give the

@@ -57,7 +57,9 @@ and recovery; they are not the default for a new campaign.
 
 ## User-facing behavior and errors
 
-Explain actual blockers and preparation errors. An unsupported graph does not
+Explain actual blockers and preparation errors. `email_signature_missing` means
+no preview can be composed until the sender's signature is saved (follow the
+`sending-accounts` signature steps). An unsupported graph does not
 become executable because structural validation succeeded. Preserve receipts
 and read after uncertain writes. Never treat saved preview examples as sends.
 Pending calibration or exhausted discovery allowance does not prevent drafting.

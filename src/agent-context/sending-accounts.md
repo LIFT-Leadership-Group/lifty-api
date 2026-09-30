@@ -65,6 +65,26 @@ authorization, read `senders` again to confirm the exact connection is attached
 to the selected person. The returned connection status alone does not prove a
 new authorization; continue the exact-attempt verification below as well.
 
+## Email signature
+
+Lifty adds the sender's plain-text signature to the end of every campaign
+email, after a blank line. While a sender has none, its email campaigns show
+`email_signature_missing` and cannot compose, be approved or send.
+
+After an email account is connected, and whenever `email_signature_missing`
+appears, call `signature` to read each sender's saved signature. If it is
+missing, propose one from the sender's name (the first name alone is the usual
+sign-off) and ask the founder to confirm or edit the exact text. Save only the
+confirmed text with `signature_save` and body
+`{"sender_ref":"<returned sender reference>","signature":"<confirmed text>"}`.
+It must be plain text of at most 500 characters, with no HTML, and any link
+must start with `https://`. Never save a signature the founder has not
+confirmed.
+
+Saving a different signature composes unsent campaign previews again; emails
+already approved keep the signature they were approved with. Show the new
+previews before approval.
+
 ## First setup and required inputs
 
 For a named client workspace, use `client_connect` with

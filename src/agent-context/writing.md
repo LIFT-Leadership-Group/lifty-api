@@ -200,6 +200,9 @@ blank line after the greeting, after the opener when there is one, after
 the main focus, and after the hook. Email 1 with no opener goes greeting,
 blank line, main focus. Do not collapse the fields onto one paragraph or
 a labeled stack with no spacing. The stored `text` uses that same spacing.
+End every email at the CTA. Do not write a sign-off or the sender's name:
+Lifty adds the sender's saved signature after a blank line, and saved previews
+show it. Overlays and template banks do not include one either.
 
 Jobs by step:
 
