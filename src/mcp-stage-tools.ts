@@ -21,6 +21,13 @@ const splitCampaigns = new Set(["post", "client_email", "client_linkedin"]);
 const openWorld = new Set(["sample-review.post", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
   "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test", "capacity.apollo_recovery"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
+// Clients load every tool definition on every turn; the dialect marker adds
+// nothing to an input schema a client already treats as JSON Schema.
+function withoutDialect(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutDialect);
+  if (!plainObject(value)) return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "$schema").map(([key, item]) => [key, withoutDialect(item)]));
+}
 const title = (value: string) => value.replace(/[-_]/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
 
 // Split the existing discriminated request, including nested channel unions.
@@ -67,11 +74,11 @@ function entries(): Entry[] {
       const label = title(name);
       const body = campaignRead === undefined ? operation.request.body : campaignBody(operation.request.body!, campaignRead);
       if (operation.request.body && !body) throw new Error(`Empty MCP request variant: ${name}`);
-      const properties: Record<string, object> = { path: operation.request.path, query: operation.request.query };
+      const properties: Record<string, object> = { path: withoutDialect(operation.request.path) as object, query: withoutDialect(operation.request.query) as object };
       const required: string[] = [];
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
-      if (body) { properties.body = body; required.push("body"); }
+      if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
       const description = `${operation.description}${campaignRead === undefined ? "" : read ? " This tool accepts only status and preview operations." : " This tool changes campaign state and excludes status and preview operations."}${read ? "" : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
       return { stage, action, operation,
         ...(campaignRead === undefined ? {} : { campaignRead }),
@@ -85,7 +92,21 @@ function entries(): Entry[] {
   }));
 }
 
-export const getStageMcpTools = (): StageMcpTool[] => entries().map(entry => entry.tool);
+// Several stages publish the same operation (onboarding state, generation
+// context, import and update receipts). List it once under its first stage;
+// the other names stay callable for clients holding an older tool list.
+export const getStageMcpTools = (): StageMcpTool[] => {
+  const all = entries();
+  const key = (entry: Entry) => `${entry.operation.method} ${entry.operation.route} ${entry.campaignRead ?? ""}`;
+  const stages = new Map<string, string[]>();
+  for (const entry of all) stages.set(key(entry), [...(stages.get(key(entry)) ?? []), entry.stage]);
+  const listed = new Set<string>();
+  return all.filter(entry => !listed.has(key(entry)) && listed.add(key(entry))).map(entry => {
+    const shared = stages.get(key(entry))!;
+    return shared.length === 1 ? entry.tool
+      : { ...entry.tool, description: `${entry.tool.description} One tool serves the ${shared.join(", ")} stages.` };
+  });
+};
 
 const Envelope = z.object({
   path: z.record(z.string(), z.string().regex(/^[A-Za-z0-9_-]+$/)).default({}),

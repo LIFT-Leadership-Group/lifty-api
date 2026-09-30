@@ -3,6 +3,7 @@ import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import { LocalOnboardingConfigurationSchema, OnboardingSubmissionSchema } from "./contracts.js";
 import { lintOnboardingDraft } from "./onboarding-draft.js";
+import { interviewGates, InterviewGatesSchema } from "./interview-gates.js";
 
 export const OnboardingSaveSchema = z.object({
   expected_revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
@@ -18,7 +19,8 @@ const Saved = z.object({
 }).strict();
 export const OnboardingStateSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("none"), revision: z.literal(0) }).strict(),
-  Saved.extend({ draft_ready: z.boolean().describe("Server validation of the complete confirmed draft; a client-provided status alone is not readiness.") }),
+  Saved.extend({ draft_ready: z.boolean().describe("Server validation of the complete confirmed draft; a client-provided status alone is not readiness."),
+    gates: InterviewGatesSchema.optional().describe("Interview decisions still missing from this draft, in asking order. Ask for gates.next; fix gates.issues technically.") }),
 ]);
 export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
 export type OnboardingSave = z.infer<typeof OnboardingSaveSchema>;
@@ -38,7 +40,8 @@ async function rpc(session: AuthSession, name: string, args?: Record<string, unk
   }
   const shape = z.discriminatedUnion("state", [z.object({ state: z.literal("none"), revision: z.literal(0) }).strict(), Saved]).safeParse(data);
   if (!shape.success) throw new PublicError({ status: 502, code: "ONBOARDING_STATE_UNAVAILABLE", message: "The saved onboarding state could not be verified." });
-  return shape.data.state === "none" ? shape.data : { ...shape.data, draft_ready: lintOnboardingDraft(shape.data.draft).length === 0 };
+  return shape.data.state === "none" ? shape.data
+    : { ...shape.data, draft_ready: lintOnboardingDraft(shape.data.draft).length === 0, gates: interviewGates(shape.data.draft) };
 }
 export const getOnboardingState = (session: AuthSession) => rpc(session, "get_lifty_onboarding_state");
 export const saveOnboardingState = (session: AuthSession, input: OnboardingSave) => rpc(session, "save_lifty_onboarding_state", { payload: input });

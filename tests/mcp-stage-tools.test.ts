@@ -7,12 +7,22 @@ import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
 const incoming = () => new Request("https://api.example.test/mcp", { headers: { authorization: "Bearer founder" } });
 const workspace = { workspace_ref: "22222222-2222-4222-8222-222222222222", name: "Example" };
 
+const withoutDialect = (value: unknown): unknown => Array.isArray(value) ? value.map(withoutDialect)
+  : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "$schema")
+    .map(([key, item]) => [key, withoutDialect(item)])) : value;
+
 describe("generated MCP stage operations", () => {
   it("covers every supported operation with unique annotated tools and the canonical schema", () => {
     const tools = getStageMcpTools();
     expect(new Set(tools.map(tool => tool.name)).size).toBe(tools.length);
+    // An operation several stages share is listed once, under its first stage.
+    const firstStage = new Map<string, string>();
+    for (const [stage, operations] of Object.entries(stageOperations)) for (const operation of Object.values(operations)) {
+      if (!firstStage.has(`${operation.method} ${operation.route}`)) firstStage.set(`${operation.method} ${operation.route}`, stage);
+    }
     for (const [stage, operations] of Object.entries(stageOperations)) for (const [action, operation] of Object.entries(operations)) {
-      const name = stage === "summary" && action === "next_step" ? "next_step" : `${stage.replace(/-/g, "_")}_${action}`;
+      const listedStage = firstStage.get(`${operation.method} ${operation.route}`)!;
+      const name = stage === "summary" && action === "next_step" ? "next_step" : `${listedStage.replace(/-/g, "_")}_${action}`;
       const supported = Object.keys(operation.responses).some(status => status.startsWith("2"));
       const matches = tools.filter(tool => tool.name === name || tool.name === `${name}_read` || tool.name === `${name}_write`);
       const split = stage === "campaigns" && ["post", "client_email", "client_linkedin"].includes(action);
@@ -22,11 +32,18 @@ describe("generated MCP stage operations", () => {
         expect(typeof tool.annotations.readOnlyHint).toBe("boolean");
         expect(typeof tool.annotations.destructiveHint).toBe("boolean");
         if (tool.annotations.readOnlyHint) expect(tool.annotations.destructiveHint).toBe(false);
-        expect(tool.inputSchema.properties.path).toEqual(operation.request.path);
-        expect(tool.inputSchema.properties.query).toEqual(operation.request.query);
-        if (!split && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(operation.request.body);
+        expect(tool.inputSchema.properties.path).toEqual(withoutDialect(operation.request.path));
+        expect(tool.inputSchema.properties.query).toEqual(withoutDialect(operation.request.query));
+        if (!split && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(withoutDialect(operation.request.body));
       }
     }
+    expect(JSON.stringify(tools)).not.toContain("$schema");
+    expect(tools.find(tool => tool.name === "business_onboarding_save")!.description).toContain("One tool serves the business, targeting, research-criteria, commercial-voice stages.");
+    for (const alias of ["targeting_onboarding_save", "research_criteria_generation_context", "commercial_voice_onboarding_status"]) {
+      expect(tools.some(tool => tool.name === alias), alias).toBe(false);
+    }
+    // Every turn of a connector carries this list; keep it bounded.
+    expect(JSON.stringify(tools).length).toBeLessThan(190_000);
     expect(tools.find(tool => tool.name === "crm_mapping_sources")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "sending_accounts_deliverability")!.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     expect(tools.find(tool => tool.name === "sending_accounts_client_connect_status")!.annotations.readOnlyHint).toBe(false);
@@ -71,6 +88,13 @@ describe("generated MCP stage operations", () => {
         readOnlyHint: true, destructiveHint: false, openWorldHint: false,
       });
     }
+  });
+
+  it("keeps unlisted shared-operation aliases callable for clients with an older tool list", async () => {
+    const dispatch = vi.fn(async (_route: string, _init: RequestInit) => Response.json({ state: "none", revision: 0 }));
+    const result = await callStageMcpTool("research_criteria_onboarding_state", {}, incoming(), dispatch);
+    expect(result.isError).toBe(false);
+    expect(dispatch.mock.calls[0]![0]).toBe("/v1/onboarding/state");
   });
 
   it("cannot dispatch a campaign write through a read tool or replace the route, query, or identity", async () => {

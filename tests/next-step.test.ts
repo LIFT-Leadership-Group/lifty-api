@@ -10,7 +10,8 @@ import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
 import { confirmedDraft, localConfiguration } from "./onboarding-fixtures.js";
 import { getNextStep } from "../src/next-step.js";
 import { getOnboardingState } from "../src/onboarding-state.js";
-import { getWorkspaceStatus, getOnboardingStatus, getRunStatus } from "../src/workspace-operations.js";
+import { getWorkspaceStatus, getOnboardingStatus, getRunStatus, getCrmSyncStatus } from "../src/workspace-operations.js";
+import { createHubspotConnectOperations } from "../src/hubspot-connect.js";
 
 const workspace = { workspace_ref: "22222222-2222-4222-8222-222222222222", name: "Example" };
 const saved = { state: "saved" as const, revision: 1, workspace_ref: workspace.workspace_ref,
@@ -55,23 +56,56 @@ describe("server-observed onboarding guidance", () => {
       expect(result.guide.instructions.length).toBeGreaterThan(100);
       return result;
     };
-    expect(await next()).toMatchObject({ step: "business", reason: "workspace_missing" });
+    // Each Section 1 step returns its short playbook, never a full stage guide.
+    const within = (result: unknown, limit: number) => expect(JSON.stringify(result).length).toBeLessThan(limit);
+    const missing = await next();
+    expect(missing).toMatchObject({ step: "business", reason: "workspace_missing", section: "leads",
+      gates: { next: "company", missing: ["company", "motion", "market", "exclusions", "boundaries", "persona"], issues: [] },
+      guide: { task: "step-interview", schemas: { draft: expect.any(Object) }, references: { interview: expect.any(String) } },
+      context_task: "onboarding", recommended_tools: ["business_onboarding_state", "business_onboarding_save", "business_get", "business_post"] });
+    expect(missing.actions[0]).toMatch(/^Reply to the founder in one line now/);
+    expect(missing.actions.join("\n")).toContain("business_post {name, description, website_url}");
+    expect(missing.guide.operations).toBeUndefined();
+    within(missing, 25_000);
     current = { state: "ready_for_connections", workspace, next_action: null };
-    expect(await next()).toMatchObject({ step: "interview", guide: { task: "onboarding" } });
+    expect(await next()).toMatchObject({ step: "interview", guide: { task: "step-interview" } });
+    draft = { ...saved, draft: { ...confirmedDraft, personas: [], icp: { ...confirmedDraft.icp, hard_disqualifiers: [] } } };
+    const resumed = await next();
+    expect(resumed).toMatchObject({ step: "interview", saved: { revision: 1, draft_ready: false },
+      gates: { next: "exclusions", missing: ["exclusions", "persona"] } });
+    expect(resumed.actions.join("\n")).toContain("Ask next: at least one hard exclusion");
+    expect(resumed.actions.join("\n")).toContain("Still missing after that: persona.");
+    expect(resumed.actions.join("\n")).not.toContain("business_post");
     draft = saved;
-    expect(await next()).toMatchObject({ step: "interview", saved: { revision: 1, draft_ready: false } });
+    expect(await next()).toMatchObject({ step: "interview", gates: { next: null, missing: [] } });
     draft = { ...saved, draft_ready: true };
-    expect(await next()).toMatchObject({ step: "configuration", recommended_tools: ["targeting_onboarding_context", "targeting_onboarding_save"] });
+    const configuration = await next();
+    expect(configuration).toMatchObject({ step: "configuration", guide: { task: "step-configuration", references: { configuration: expect.any(String) } },
+      recommended_tools: ["targeting_onboarding_context", "business_onboarding_save", "targeting_post", "targeting_onboarding_status"] });
+    within(configuration, 40_000);
     draft = { ...saved, revision: 2, draft_ready: true, configuration: localConfiguration };
-    expect(await next()).toMatchObject({ step: "submission", saved: { revision: 2 } });
+    const submission = await next();
+    expect(submission).toMatchObject({ step: "submission", saved: { revision: 2 }, guide: { task: "step-submission", references: {} } });
+    expect(submission.actions[0]).toContain("expected_revision 2");
+    within(submission, 12_000);
     onboarding = { ...imported, state: "pending", summary: null };
     expect(await next()).toMatchObject({ step: "import", state: "pending", receipt: { submission_ref: "receipt" } });
     onboarding = imported;
-    expect(await next()).toMatchObject({ step: "sample-review", reason: "sample_not_started" });
+    const notStarted = await next();
+    expect(notStarted).toMatchObject({ step: "sample-review", reason: "sample_not_started", guide: { task: "step-sample" } });
+    // After import only the confirmed draft is useful for the recap.
+    expect(notStarted.saved).toEqual({ state: "saved", revision: 2, workspace_ref: workspace.workspace_ref, draft: confirmedDraft, updated_at: saved.updated_at });
+    within(notStarted, 12_000);
     research = { ...run, state: "running", completed_at: null };
-    expect(await next()).toMatchObject({ step: "sample-review", state: "pending", recommended_tools: ["sample_review_progress"] });
+    const pending = await next();
+    expect(pending).toMatchObject({ step: "sample-review", state: "pending", recommended_tools: ["sample_review_progress"] });
+    expect(pending.actions[0]).toContain("run_ref run");
     research = run;
-    expect(await next()).toMatchObject({ state: "review", reason: "sample_ready_for_founder_review" });
+    const review = await next();
+    expect(review).toMatchObject({ state: "review", reason: "sample_ready_for_founder_review", guide: { task: "step-review" } });
+    // HubSpot readers are not configured in this app: the CRM action says to read it first.
+    expect(review.actions[2]).toMatch(/^Read crm_get before offering HubSpot/);
+    within(review, 40_000);
     campaign = draftCampaign;
     const preparing = await next();
     expect(preparing).toMatchObject({ state: "pending", step: "campaign", reason: "campaign_preparing",
@@ -98,16 +132,44 @@ describe("server-observed onboarding guidance", () => {
       get_lifty_onboarding_status: imported,
       get_lifty_run_status: run,
       lifty_workspace_outreach: unconfigured,
+      get_lifty_hubspot_connection: { provider: "hubspot", status: "not_connected" },
+      get_lifty_crm_sync_status: { state: "none" },
     };
     const rpc = vi.fn(async (name: string, _args?: Record<string, unknown>) => {
       if (!Object.hasOwn(data, name)) throw new Error(`Unexpected non-read RPC: ${name}`);
       return { data: data[name], error: null };
     });
+    const hubspot = createHubspotConnectOperations({ publicBaseUrl: "https://api.example.test", clientId: "client", fetchImpl: async () => { throw new Error("Unexpected provider call"); } } as never);
     const result = await getNextStep({ getWorkspace: getWorkspaceStatus, getOnboardingState,
-      getOnboardingStatus, getRunStatus, workspaceCampaign: createWorkspaceCampaignOperations("k".repeat(32)) }, { userId: "founder", client: { rpc } });
+      getOnboardingStatus, getRunStatus, workspaceCampaign: createWorkspaceCampaignOperations("k".repeat(32)),
+      getHubspotConnection: hubspot.getConnection, getCrmSyncStatus }, { userId: "founder", client: { rpc } });
     expect(result).toMatchObject({ state: "review", reason: "sample_ready_for_founder_review" });
+    expect(result.actions[2]).toMatch(/^Ask once whether they want these leads and their research in HubSpot/);
     expect(rpc.mock.calls.map(([name]) => name)).toEqual(Object.keys(data));
-    expect(rpc.mock.calls.at(-1)?.[1]).toMatchObject({ p_operation: "status", p_payload: { workspace: workspace.workspace_ref } });
+    expect(rpc.mock.calls[4]?.[1]).toMatchObject({ p_operation: "status", p_payload: { workspace: workspace.workspace_ref } });
+  });
+
+  it("chooses one CRM action from the saved HubSpot connection and latest sync, never blocking on them", async () => {
+    const connected = { provider: "hubspot" as const, status: "connected" as const, portal_id: "123", hub_domain: null,
+      granted_scopes: [], connected_at: null, reconnect_required: false };
+    const syncRun = { run_ref: "sync-1", requested_leads: 5, leads_synced: 5, error_code: null, portal_id: "123",
+      started_at: "2026-09-28T00:02:00Z", completed_at: null, workspace };
+    const reads = (hubspot: unknown, sync: unknown) => ({ getWorkspace: async () => ({ state: "ready_for_connections" as const, workspace, next_action: null }),
+      getOnboardingState: async () => ({ state: "none" as const, revision: 0 as const }), getOnboardingStatus: async () => imported,
+      getRunStatus: async () => run, workspaceCampaign: async () => unconfigured,
+      getHubspotConnection: async () => { if (hubspot instanceof Error) throw hubspot; return hubspot as never; },
+      getCrmSyncStatus: async () => { if (sync instanceof Error) throw sync; return sync as never; } });
+    const crm = async (hubspot: unknown, sync: unknown) => (await getNextStep(reads(hubspot, sync), { userId: "founder", client: {} })).actions[2];
+    expect(await crm(new Error("offline"), { state: "none" })).toMatch(/^Read crm_get before offering HubSpot/);
+    expect(await crm({ ...connected, reconnect_required: true }, { state: "none" })).toMatch(/^HubSpot needs reconnecting/);
+    expect(await crm(connected, new Error("offline"))).toMatch(/read crm_sync_status before offering a sync/);
+    expect(await crm(connected, { state: "none" })).toMatch(/nothing is synced yet: offer to sync these leads/);
+    expect(await crm(connected, { ...syncRun, state: "running", leads_synced: null })).toContain("in progress (run_ref sync-1)");
+    expect(await crm(connected, { ...syncRun, state: "succeeded", completed_at: "2026-09-28T00:03:00Z" })).toContain("finished (5 leads)");
+    expect(await crm(connected, { ...syncRun, state: "failed", leads_synced: null, error_code: "portal_scope_missing" })).toContain("failed (portal_scope_missing)");
+    // A receipt for another workspace is not evidence about this one.
+    const foreign = { ...syncRun, state: "succeeded", workspace: { ...workspace, workspace_ref: "33333333-3333-4333-8333-333333333333" } };
+    expect(await crm(connected, foreign)).toMatch(/read crm_sync_status before offering a sync/);
   });
 
   it("preserves legacy imported state with no cache and treats import/run failures as blockers", async () => {
