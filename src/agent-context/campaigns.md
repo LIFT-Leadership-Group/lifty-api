@@ -50,6 +50,11 @@ the relevant transition, preserving the rest. Stale references require a read.
 Read back the result; do not rewrite unrelated graph, channels, mode or overlay.
 
 Material edits pause automatic outreach and need fresh preparation and approval.
+A mailbox change is not an edit: the campaign sends from the workspace's current
+mailbox, and its saved connection_ref only records the one used at
+configuration. Never modify the campaign to follow a reconnected or replaced
+account. A disconnect pauses outreach; activate the same version_ref/digest,
+with the founder's confirmation, to resume.
 Continuing_versions identifies enrolled leads on earlier approved definitions.
 Use pause with current version/digest when asked to stop. Legacy workspace
 prepare and explicit individual operations remain available for compatibility

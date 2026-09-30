@@ -248,6 +248,10 @@ An ordinary POST without `select_account: true` reconnects the saved mailbox;
 it does not reopen provider selection. Do not disconnect a working account just
 to preview the selector. Selection does not erase earlier account history or
 restart campaigns, and still requires verified authorization for the new attempt.
+The workspace campaign sends from the workspace's current mailbox: a reconnect
+or a replaced account changes neither its version nor its approval. Do not
+modify the campaign to point at the new connection; after a disconnect the
+founder resumes it by activating the same version.
 
 ## User-facing behavior and errors
 
