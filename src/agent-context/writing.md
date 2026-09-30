@@ -18,7 +18,10 @@ The multi-step examples below apply only when those steps exist in the graph.
 
 Read the existing campaign before drafting. Use the `business`, `targeting`,
 `commercial-voice` and `sample-review` stages for the saved business description,
-confirmed website, audience, voice and researched sample. Reuse facts already
+confirmed website, audience, voice and researched sample. The founder confirmed
+the offer during onboarding: `business_onboarding_state` returns it in
+`draft.company` as `value_proposition`, `pain_points` and `offerings`. Build the
+pain and offer messages from it instead of asking again. Reuse facts already
 read in this session when still current. A failed read is unavailable, not proof
 that context is missing. Ask only for a decision or fact that matters to the copy
 and is not already saved.

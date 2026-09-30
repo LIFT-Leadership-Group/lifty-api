@@ -198,6 +198,13 @@ Do not require public ARR disclosure to award A to an otherwise strong fit.
 Start with core positive fit and the founder's actual exclusions; additional
 preferences can follow sample feedback instead of silently narrowing A.
 
+Use the confirmed offer (`company.value_proposition`, `pain_points`,
+`offerings`) to tell Scout which observable signals suggest a company or buyer
+likely has those pains, for example a hiring post, a stated initiative, a tool
+in use or a growth event, and treat that evidence as positive fit in the
+`## ICP gate` and `## Tier definitions`. A pain signal supports A or B; its
+absence is unknown, never a failed criterion or an exclusion.
+
 Use workspace name/description as context and the confirmed draft as the
 source of targeting decisions. Write instructions for the researching agent,
 not marketing copy. Do not configure outreach, sender voice, sequences, sends,

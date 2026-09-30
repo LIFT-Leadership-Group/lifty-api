@@ -24,7 +24,9 @@ export const onboardingContext: OnboardingContext = {
 
 export const confirmedDraft = {
   schema_version: "2.1", status: "ready_for_auth", stage: "icp_bootstrap",
-  company: { name: "Example", description: "Software for growing commercial teams.", example_companies: [] },
+  company: { name: "Example", description: "Software for growing commercial teams.",
+    value_proposition: "Commercial teams find and win their next customers faster.",
+    pain_points: ["Pipeline depends on the founder's network"], offerings: ["Outbound software"], example_companies: [] },
   primary_motion: { name: "Software", outcome: "Help commercial teams grow" }, parked_secondary_motions: [],
   icp: { industries_in: ["computer software"], industries_out: ["agencies"],
     size: { floor: 51, ceiling: 200, unit: "employees" }, hard_disqualifiers: ["Agencies"], operating_state_split: null,

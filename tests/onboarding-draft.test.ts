@@ -14,6 +14,13 @@ const badDrafts = [
   { ...confirmedDraft, research_findings: [{ ...finding, field: "research_findings.0.source", value: finding.source }] },
   { ...confirmedDraft, founder_statement_history: [{ sequence: 1, field: "company.name", value: "Example" }, { sequence: 2, field: "company.name", value: "Latest founder name" }] },
   { ...confirmedDraft, founder_statement_history: [{ sequence: 1, field: "company.name", value: "Example" }, { sequence: 1, field: "company.name", value: "Example" }] },
+  // The offer is a bootstrap decision: missing, empty, too short or duplicated is not ready.
+  { ...confirmedDraft, company: { ...confirmedDraft.company, value_proposition: undefined } },
+  { ...confirmedDraft, company: { ...confirmedDraft.company, value_proposition: "Faster sales." } },
+  { ...confirmedDraft, company: { ...confirmedDraft.company, pain_points: [] } },
+  { ...confirmedDraft, company: { ...confirmedDraft.company, pain_points: ["No pipeline", " no pipeline "] } },
+  { ...confirmedDraft, company: { ...confirmedDraft.company, pain_points: ["a", "b", "c", "d", "e", "f"] } },
+  { ...confirmedDraft, company: { ...confirmedDraft.company, offerings: [] } },
 ];
 describe("API-owned onboarding decisions", () => {
   it("locates each latest mismatching history entry and names its configured field without exposing values", () => {

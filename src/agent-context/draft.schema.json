@@ -23,10 +23,30 @@
     "company": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "description", "example_companies"],
+      "required": ["name", "description", "value_proposition", "pain_points", "offerings", "example_companies"],
       "properties": {
         "name": {"type": "string", "minLength": 1},
         "description": {"type": "string", "minLength": 20},
+        "value_proposition": {
+          "type": "string",
+          "minLength": 20,
+          "description": "Founder-confirmed outcome the company delivers and for whom, in one or two sentences."
+        },
+        "pain_points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1},
+          "description": "Founder-confirmed problems the target buyer has that the offer solves, most important first."
+        },
+        "offerings": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1},
+          "description": "Founder-confirmed products, services or solutions the company sells."
+        },
         "example_companies": {
           "type": "array",
           "uniqueItems": true,

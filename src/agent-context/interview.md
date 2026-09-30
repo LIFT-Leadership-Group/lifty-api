@@ -39,8 +39,9 @@ summaries. These are two representations of the same confirmed decision.
 After the one-line first reply, research the company website, relevant public
 profiles, case studies, hiring pages, and reputable news. Open with a short,
 confident read written as your take on their business, not a form to validate:
-what they sell and to whom, what stands out, who you would target first and why,
-and one request to confirm or correct the read. Close with what their answer
+what they sell and to whom, the value proposition, the pains it solves for the
+buyer, the offerings, what stands out, who you would target first and why, and
+one request to confirm or correct the read. Close with what their answer
 unlocks: locking the targeting and moving to the first search.
 
 Every researched value stays `inferred` — an internal label, never shown to
@@ -56,6 +57,19 @@ organizational tell without founder confirmation.
 
 Capture a plain company description and one primary motion. Record secondary
 motions as `parked` without interviewing them.
+
+### Offer
+
+Capture the founder's offer before the search: `company.value_proposition`
+(the outcome delivered and for whom, one or two sentences),
+`company.pain_points` (one to five buyer problems the offer solves, most
+important first) and `company.offerings` (the products, services or solutions
+sold). Propose them from the website and public material and ask the founder to
+confirm, correct or add ("Here is what I think you solve; is this right? What
+would you add?"). Research alone never fills them. Pains describe the buyer's
+problem, not the product's features. The offer informs how research recognizes
+a buyer likely to have these pains and, later, the outreach copy; it does not
+create hard exclusions by itself.
 
 ### Initial ICP
 
@@ -141,11 +155,12 @@ questions with evidence.
 Write the draft as soon as these items exist:
 
 1. A standalone company description.
-2. One primary motion.
-3. A numeric size floor plus its unit.
-4. At least one hard exclusion.
-5. At least one persona with role, title, and organizational tell.
-6. Geography and employee-size decisions are each confirmed, including any
+2. The confirmed offer: value proposition, pain points and offerings.
+3. One primary motion.
+4. A numeric size floor plus its unit.
+5. At least one hard exclusion.
+6. At least one persona with role, title, and organizational tell.
+7. Geography and employee-size decisions are each confirmed, including any
    explicit unrestricted choice; wholly broad search is explicitly accepted.
    Record them in `icp.discovery` using the current schema.
 

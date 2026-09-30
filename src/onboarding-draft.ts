@@ -7,7 +7,8 @@ const currentSchema = JSON.parse(readFileSync(new URL("./agent-context/draft.sch
 const draftSchema = z.fromJSONSchema(currentSchema);
 const MeaningfulText = z.string().trim().min(1);
 const Semantics = z.object({
-  company: z.object({ name: MeaningfulText, description: z.string().trim().min(20), example_companies: z.array(z.string()) }),
+  company: z.object({ name: MeaningfulText, description: z.string().trim().min(20), value_proposition: z.string().trim().min(20),
+    pain_points: z.array(z.string()), offerings: z.array(z.string()), example_companies: z.array(z.string()) }),
   primary_motion: z.object({ name: MeaningfulText, outcome: MeaningfulText }),
   parked_secondary_motions: z.array(z.object({ name: MeaningfulText })),
   icp: z.object({
@@ -47,6 +48,8 @@ export function lintOnboardingDraft(draft: Record<string, unknown>): OnboardingL
     if (normalized.some(item => !item) || new Set(normalized).size !== normalized.length) add("draft_list_invalid", path, "Confirmed lists need distinct nonempty values.");
   };
   list(value.company.example_companies, "/company/example_companies");
+  list(value.company.pain_points, "/company/pain_points");
+  list(value.company.offerings, "/company/offerings");
   list(value.icp.industries_in, "/icp/industries_in");
   list(value.icp.industries_out, "/icp/industries_out");
   list(value.icp.hard_disqualifiers, "/icp/hard_disqualifiers");

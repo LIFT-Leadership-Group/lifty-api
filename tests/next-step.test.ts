@@ -60,7 +60,7 @@ describe("server-observed onboarding guidance", () => {
     const within = (result: unknown, limit: number) => expect(JSON.stringify(result).length).toBeLessThan(limit);
     const missing = await next();
     expect(missing).toMatchObject({ step: "business", reason: "workspace_missing", section: "leads",
-      gates: { next: "company", missing: ["company", "motion", "market", "exclusions", "boundaries", "persona"], issues: [] },
+      gates: { next: "company", missing: ["company", "offer", "motion", "market", "exclusions", "boundaries", "persona"], issues: [] },
       guide: { task: "step-interview", schemas: { draft: expect.any(Object) }, references: { interview: expect.any(String) } },
       context_task: "onboarding", recommended_tools: ["business_onboarding_state", "business_onboarding_save", "business_get", "business_post"] });
     expect(missing.actions[0]).toMatch(/^Reply to the founder in one line now/);
@@ -76,6 +76,12 @@ describe("server-observed onboarding guidance", () => {
     expect(resumed.actions.join("\n")).toContain("Ask next: at least one hard exclusion");
     expect(resumed.actions.join("\n")).toContain("Still missing after that: persona.");
     expect(resumed.actions.join("\n")).not.toContain("business_post");
+    // A draft from before the offer gate resumes at the offer, not at the start.
+    const { value_proposition: _value, pain_points: _pains, offerings: _offerings, ...company } = confirmedDraft.company;
+    draft = { ...saved, draft: { ...confirmedDraft, company } };
+    const offer = await next();
+    expect(offer).toMatchObject({ gates: { next: "offer", missing: ["offer"] } });
+    expect(offer.actions.join("\n")).toContain("Ask next: the value proposition, the buyer's top pain points");
     draft = saved;
     expect(await next()).toMatchObject({ step: "interview", gates: { next: null, missing: [] } });
     draft = { ...saved, draft_ready: true };

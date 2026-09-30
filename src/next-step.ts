@@ -26,6 +26,7 @@ interface Step {
 
 const ASK: Record<InterviewGate, string> = {
   company: "what the company sells and to whom (name and a plain description)",
+  offer: "the value proposition, the buyer's top pain points (up to five) and the offerings, as your researched read to confirm or correct",
   motion: "the primary sales motion and the outcome it drives (park any other motion)",
   market: "target industries plus a numeric size range and its unit",
   exclusions: "at least one hard exclusion: who must never be targeted",
@@ -44,7 +45,7 @@ function interviewStep(saved: OnboardingState, workspaceMissing: boolean): Step 
   if (saved.state === "none") {
     actions = [
       "Reply to the founder in one line now with what you will look into; then research their website and public profiles once.",
-      "Play back your read in one message: what they sell, to whom, the primary motion, industries and a numeric size range. Ask them to confirm or correct it.",
+      "Play back your read in one message: what they sell and to whom, the value proposition, the buyer's top pain points, the offerings, the primary motion, industries and a numeric size range. Ask them to confirm or correct it.",
       create, save, "Ask the remaining gates one block at a time, leading with your hypothesis.", finish,
     ];
   } else if (gates.next) {

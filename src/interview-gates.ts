@@ -4,7 +4,7 @@ import { lintOnboardingDraft } from "./onboarding-draft.js";
 // The interview's bootstrap decisions, in the order an agent should ask for
 // them. Computed from a partial saved draft so the agent never re-derives
 // what is missing; `draft_ready` (the full lint) stays the only readiness.
-export const INTERVIEW_GATES = ["company", "motion", "market", "exclusions", "boundaries", "persona"] as const;
+export const INTERVIEW_GATES = ["company", "offer", "motion", "market", "exclusions", "boundaries", "persona"] as const;
 export type InterviewGate = typeof INTERVIEW_GATES[number];
 export const InterviewGatesSchema = z.object({
   next: z.enum(INTERVIEW_GATES).nullable().describe("The one decision to ask for now; null when every gate is done."),
@@ -23,6 +23,10 @@ const EMPLOYEE_UNIT = /employee|headcount|\bfte|people|staff/i;
 
 const checks: Record<InterviewGate, (draft: Json) => boolean> = {
   company: draft => { const company = record(draft.company); return !!company && text(company.name) && text(company.description, 20); },
+  offer: draft => {
+    const company = record(draft.company);
+    return !!company && text(company.value_proposition, 20) && texts(company.pain_points) && texts(company.offerings);
+  },
   motion: draft => { const motion = record(draft.primary_motion); return !!motion && text(motion.name) && text(motion.outcome); },
   market: draft => {
     const icp = record(draft.icp); const size = record(icp?.size);

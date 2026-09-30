@@ -27,24 +27,27 @@ Then Lifty builds the search and researches five real leads. Do `actions` from
 ## First message: your read
 
 Open with a short, confident take on their business: what they sell, to whom,
-what stands out, who you would go after first and why (industries plus a
-numeric size range with its unit). End with one request to confirm or correct,
-and say what the answer unlocks: locking the targeting and running the first
-search.
+the value proposition in one sentence, the two or three pains it solves for the
+buyer, the offerings, and who you would go after first and why (industries plus
+a numeric size range with its unit). End with one request to confirm or
+correct, and say what the answer unlocks: locking the targeting and running the
+first search. The offer shapes how research tiers leads and, later, what the
+outreach says.
 
 ## Gates, in order
 
 | Gate | Done when the saved draft has |
 | --- | --- |
 | `company` | Company name and a plain description (20+ characters). |
+| `offer` | Value proposition (a real sentence), one to five buyer pain points, and the offerings, each confirmed or corrected by the founder. |
 | `motion` | One primary motion with its outcome; other motions parked. |
 | `market` | Industries in, plus a numeric size floor, ceiling or null, and unit. |
 | `exclusions` | At least one hard exclusion the founder confirmed. |
 | `boundaries` | Company HQ geography, buyer location and headcount each decided; null means explicitly unrestricted. All unrestricted needs `broad_search_confirmed`. |
 | `persona` | One persona: role (`decision_maker` or `influencer`), first-contact titles and the organizational tell. |
 
-Never infer a size number, hard exclusion, persona role or organizational tell
-without the founder's confirmation. Researched values stay `inferred` in
+Never infer the offer, a size number, hard exclusion, persona role or
+organizational tell without the founder's confirmation. Researched values stay `inferred` in
 `research_findings` until confirmed. When the founder changes a value, update
 the field and append the exact dotted path and JSON value to
 `founder_statement_history`. Units, ARR versus headcount, proxies and search
