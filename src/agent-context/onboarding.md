@@ -31,9 +31,11 @@ Later changes use the appropriate stage PATCH and fresh generation context.
 
 After a completed sample, `next_step` also reads the saved campaign. The
 `campaign_draft`, `campaign_preparing`, `campaign_preparation_failed` and
-`campaign_paused` reasons continue in the campaigns guide from the saved
-version. `campaign_active` means onboarding is complete: help with the
-founder's request instead of restarting setup. With no saved campaign the
+`campaign_paused` reasons continue from the saved version: read `campaigns.get`,
+and fetch the campaigns guide with `summary_context` (task `campaigns`) before
+changing or approving the campaign. `campaign_active` means onboarding is
+complete: help with the founder's request instead of restarting setup. With no
+saved campaign the
 sample stays the current step, which is also where a lead-only founder rests.
 Offer the saved leads, outreach or nothing, and never describe that workspace
 as unfinished. No step, including a reviewed sample or skipped outreach,

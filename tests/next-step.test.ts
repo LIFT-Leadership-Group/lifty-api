@@ -73,8 +73,11 @@ describe("server-observed onboarding guidance", () => {
     research = run;
     expect(await next()).toMatchObject({ state: "review", reason: "sample_ready_for_founder_review" });
     campaign = draftCampaign;
-    expect(await next()).toMatchObject({ state: "pending", step: "campaign", reason: "campaign_preparing",
-      guide: { task: "campaigns" }, receipt: { state: "draft", version_ref: draftCampaign.version_ref, preparation: "pending" } });
+    const preparing = await next();
+    expect(preparing).toMatchObject({ state: "pending", step: "campaign", reason: "campaign_preparing",
+      guide: { task: "summary" }, receipt: { state: "draft", version_ref: draftCampaign.version_ref, preparation: "pending" } });
+    // Chat connectors stall on the ~300 KB campaigns guide; resume stays small.
+    expect(JSON.stringify(preparing).length).toBeLessThan(80_000);
     campaign = { ...draftCampaign, preparation: { state: "failed", errors: ["render_failed"] } };
     expect(await next()).toMatchObject({ state: "blocked", reason: "campaign_preparation_failed" });
     campaign = { ...draftCampaign, preparation: { state: "ready", errors: [] }, blockers: ["sender_not_connected"] };
@@ -82,7 +85,7 @@ describe("server-observed onboarding guidance", () => {
     campaign = { ...draftCampaign, state: "paused", preparation: { state: "ready", errors: [] } };
     expect(await next()).toMatchObject({ state: "action_required", reason: "campaign_paused" });
     campaign = { ...draftCampaign, state: "active", outreach_enabled: true, preparation: { state: "ready", errors: [] } };
-    expect(await next()).toMatchObject({ state: "complete", step: "campaign", reason: "campaign_active", recommended_tools: ["campaigns_get"] });
+    expect(await next()).toMatchObject({ state: "complete", step: "campaign", reason: "campaign_active", recommended_tools: ["campaigns_get", "summary_context"] });
     expect(readCampaign.mock.calls.map(([, input]) => input)).toEqual(
       Array(readCampaign.mock.calls.length).fill({ operation: "status", payload: { workspace: workspace.workspace_ref } }));
     expect(mutate).not.toHaveBeenCalled();
