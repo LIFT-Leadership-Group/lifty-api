@@ -22,7 +22,7 @@ function harness(options:{account?:unknown;senders?:unknown;profile?:unknown;lin
       : String(url).includes("/users/") ? options.profile??profile : options.account??account;
     return new Response(JSON.stringify(result),{status:options.status??200});
   };
-  return {calls,provider:createUnipileV2Provider({accessToken:"v2-test-key",applicationId:"app_test",hostedAuthOrigins:["https://auth.unipile.com","https://connect-v2.lifty.test"],fetchImpl})};
+  return {calls,provider:createUnipileV2Provider({accessToken:"v2-test-key",applicationId:"app_test",hostedAuthOrigins:["https://connect-v2.lifty.test"],fetchImpl})};
 }
 describe("Unipile V2 authenticated contract",()=>{
   it("retains canonical legacy identity after exact application/scope/owner/alias readback",async()=>{
@@ -83,8 +83,15 @@ describe("Unipile V2 authenticated contract",()=>{
   it.each(["https://account.unipile.com/?token=x","https://auth.unipile.com/?token=x","http://connect-v2.lifty.test/?token=x","https://connect-v2.lifty.test:444/?token=x","https://user@connect-v2.lifty.test/?token=x","https://connect-v2.lifty.test/?token=x#fragment","https://evil.test/?token=x"])("rejects wrong hosted URL %s",async(link)=>{
     await expect(harness({link}).provider.createLink({channel:"linkedin",state:"opaque",redirectUri:"https://api.lifty.test/return",expiresAt:"2026-09-18T00:00:00.000Z",transport})).rejects.toMatchObject({code:"UNIPILE_HOSTED_URL_INVALID"});
   });
+  it("never sends a founder to Unipile's default sign-in page",async()=>{
+    expect(()=>createUnipileV2Provider({accessToken:"v2-test-key",applicationId:"app_test",hostedAuthOrigins:["https://connect-v2.lifty.test","https://auth.unipile.com"]})).toThrow();
+    const h=harness();
+    await expect(h.provider.createLink({channel:"email",state:"opaque",redirectUri:"https://api.lifty.test/return",expiresAt:"2026-09-18T00:00:00.000Z",
+      transport:{...transport,hosted_auth_origin:"https://auth.unipile.com"}})).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+    expect(h.calls).toHaveLength(0);
+  });
   it("preserves V1 links and returns V2 links unchanged across configured domains",()=>{
-    const origins=["https://auth.unipile.com","https://connect-v2.lifty.test","https://old-v2.lifty.test"];
+    const origins=["https://connect-v2.lifty.test","https://old-v2.lifty.test"];
     expect(versionedHostedAuthUrl("https://account.unipile.com/?opaque=old","https://connect.lifty.test",origins)).toBe("https://connect.lifty.test/?opaque=old");
     for(const origin of origins)expect(versionedHostedAuthUrl(`${origin}/?opaque=old`,"https://connect.lifty.test",origins)).toBe(`${origin}/?opaque=old`);
     expect(versionedHostedAuthUrl("https://foreign.test/?opaque=x","https://connect.lifty.test",origins)).toBeNull();

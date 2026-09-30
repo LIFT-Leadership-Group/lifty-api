@@ -31,7 +31,7 @@ const Profile = z.object({object: z.literal("UserProfile"), provider: z.literal(
 export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl?: typeof fetch; timeoutMs?: number}) {
   if (!settings.accessToken.trim() || !ProviderIdentifier.safeParse(settings.applicationId).success) throw new Error("Invalid Unipile V2 configuration.");
   const origins = settings.hostedAuthOrigins.map(origin => parseHostedAuthOrigin(origin));
-  if (!origins.length || origins.includes("https://account.unipile.com")) throw new Error("Invalid Unipile V2 hosted origin.");
+  if (!origins.length || origins.includes("https://account.unipile.com") || origins.includes("https://auth.unipile.com")) throw new Error("Invalid Unipile V2 hosted origin.");
   const fetchImpl = connectionFetch(settings.fetchImpl ?? fetch);
   const timeoutMs = settings.timeoutMs ?? 15_000;
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30_000) throw new Error("Invalid Unipile V2 timeout.");
@@ -96,7 +96,7 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     const raw = await request("auth/link", {
       ...(input.transport.account_id ? {account_id: input.transport.account_id} : {providers: input.channel === "linkedin" ? ["linkedin"] : ["google"]}),
       ...(input.transport.account_scope_id ? {account_scope_id: input.transport.account_scope_id} : {}),
-      ...(origin !== "https://auth.unipile.com" ? {domain: new URL(origin).hostname} : {}),
+      domain: new URL(origin).hostname,
       expires_on: input.expiresAt, redirect_uri: input.redirectUri, state: input.state,
     });
     const parsed = z.object({object: z.literal("HostedAuthLink"), link: z.url()}).safeParse(raw);

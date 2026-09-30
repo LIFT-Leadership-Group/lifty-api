@@ -49,6 +49,7 @@ const messages: Record<string, string> = {
   linkedin_channel_inactive: "LinkedIn sending is paused. Verify the connection, then explicitly activate the campaign.",
   linkedin_recovery_required: "An action has an uncertain result. Inspect status; do not resend it.",
   linkedin_cancel_confirmation_required: "Cancel using the exact digest and explicit confirmation.",
+  unipile_v1_retired: "This LinkedIn account was connected through Lifty's previous sign-in, which is retired. Disconnect it, then connect it again.",
 };
 export function linkedinFailure(code: string, status = 502, message = "LIFTY could not complete the LinkedIn request. Check status before trying again."): never {
   throw new PublicError({ status, code, message });

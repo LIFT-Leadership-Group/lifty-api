@@ -163,8 +163,11 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if(Boolean(v2Token)!==Boolean(v2Application) || (v2Origins && !v2Token))throw new Error("Unipile V2 requires UNIPILE_V2_ACCESS_TOKEN and UNIPILE_V2_APPLICATION_ID.");
   if(v2Application && !/^app_[A-Za-z0-9_-]+$/.test(v2Application))throw new Error("Invalid UNIPILE_V2_APPLICATION_ID.");
   const v2=v2Token && v2Application ? {accessToken:v2Token,applicationId:v2Application,
-    hostedAuthOrigins:[...new Set(["https://auth.unipile.com",...(v2Origins?.split(",") ?? [])].map(value=>parseHostedAuthOrigin(value)))]} : undefined;
+    hostedAuthOrigins:[...new Set((v2Origins ? v2Origins.split(",") : []).map(value=>parseHostedAuthOrigin(value)))]} : undefined;
   if(v2?.hostedAuthOrigins.includes("https://account.unipile.com"))throw new Error("V2 cannot use the V1 hosted authentication origin.");
+  // Founders sign in on Lifty's own hosted page; Unipile's default page is never offered.
+  if(v2 && (!v2.hostedAuthOrigins.length || v2.hostedAuthOrigins.includes("https://auth.unipile.com")))
+    throw new Error("UNIPILE_V2_HOSTED_AUTH_ORIGINS must list Lifty's hosted sign-in origins only.");
   const crmKey = environment.LIFTY_CRM_SERVER_KEY?.trim();
   if (crmKey && (crmKey.length < 32 || crmKey.length > 256)) throw new Error("LIFTY_CRM_SERVER_KEY must contain 32 to 256 characters.");
   const emailKey = environment.LIFTY_EMAIL_SERVER_KEY?.trim();
