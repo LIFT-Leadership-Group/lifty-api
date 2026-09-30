@@ -10,7 +10,7 @@ import { PublicError } from "../src/errors.js";
 const id="11111111-1111-4111-8111-111111111111", workspace="22222222-2222-4222-8222-222222222222",connection="33333333-3333-4333-8333-333333333333";
 const secret="connection-test-server-key-"+"x".repeat(40),email="founder@example.test";
 const expires=new Date(Date.now()+600000).toISOString();
-const transport={api_version:"v2",connection_ref:connection,canonical_account_id:"legacy",provider_namespace:"unipile:old",account_id:"acc_test",application_id:"app_test",account_scope_id:null,generation:1,user_id:"owner",v1_account_id:"legacy",hosted_auth_origin:"https://auth.unipile.com"};
+const transport={api_version:"v2",connection_ref:connection,canonical_account_id:"legacy",provider_namespace:"unipile:old",account_id:"acc_test",application_id:"app_test",account_scope_id:null,generation:1,user_id:"owner",v1_account_id:"legacy",hosted_auth_origin:"https://auth.lifty.test"};
 function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUserId?:string;authorizationId?:string;accountChanges?:Record<string,unknown>;intentState?:string;saveFail?:boolean;dbCompleteDenied?:boolean;missingV2?:boolean;wrongWorkspace?:boolean;statusState?:string;providerFailsOnce?:boolean;hostedStatus?:number;hostedMalformed?:boolean;fresh?:boolean;completeTaken?:boolean;v2Siblings?:string[];returnError?:string}={}) {
   let phase=options.intentState??"ready",status=options.statusState??"pending",reads=0;
   const calls:{operation:string;payload:Record<string,unknown>;caller:boolean}[]=[];
@@ -25,7 +25,7 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUser
     const operation=String(args.p_operation),payload=args.p_payload as Record<string,unknown>;
     calls.push({operation,payload,caller});
     if(operation==="intent")return {data:{...stored(),state:phase,workspace_ref:options.wrongWorkspace?connection:workspace,
-      hosted_url:phase==="ready"?"https://auth.unipile.com/?token=old":null,
+      hosted_url:phase==="ready"?"https://auth.lifty.test/?token=old":null,
       authorization_received:options.authorized??false,authorization_account_id:options.authorized?options.authorizationId??"acc_test":null,return_error:options.returnError??null},error:null};
     if(operation==="issue_link") {const claimed=phase==="pending";phase="issuing";return {data:{claimed},error:null};}
     if(operation==="save_link") {if(options.saveFail)return {data:null,error:{code:"PT409",message:"save unavailable"}};phase="ready";}
@@ -52,14 +52,14 @@ function harness(channel:"email"|"linkedin",options:{authorized?:boolean;rawUser
     if(target.endsWith("/auth/link") && options.hostedStatus)return new Response("private provider details",{status:options.hostedStatus});
     if(target.endsWith("/auth/link") && options.hostedMalformed)return new Response("{}");
     if(options.providerFailsOnce && reads++===0)return new Response("{}",{status:503});
-    const data=target.endsWith("/auth/link")?{object:"HostedAuthLink",link:"https://auth.unipile.com/?token=created"}
+    const data=target.endsWith("/auth/link")?{object:"HostedAuthLink",link:"https://auth.lifty.test/?token=created"}
       :target.endsWith("/email-senders")?{data:[{object:"EmailSender",email,is_primary:true,verification_status:"verified"}]}
       :target.includes("/users/")?{object:"UserProfile",provider:"linkedin",id:"owner",type:"individual",display_name:"Founder",specifics:{network_distance:"SELF"}}
       :{object:"Account",id:"acc_test",application_id:"app_test",account_scope_id:null,user_id:options.rawUserId??"owner",provider:channel==="email"?"google":"linkedin",status:"running",is_locked:false,metadata:{v1_account_id:"legacy"},...options.accountChanges};
     return new Response(JSON.stringify(data));
   };
   const settings={dsn:"https://api1.unipile.com:13111",accessToken:"v1-test",serverKey:secret,publicBaseUrl:"https://api.lifty.test",supabaseUrl:"https://project.supabase.co",publishableKey:"sb_publishable",fetchImpl,
-    ...(options.missingV2?{}:{v2:{accessToken:"v2-test",applicationId:"app_test",hostedAuthOrigins:["https://auth.unipile.com"]}})};
+    ...(options.missingV2?{}:{v2:{accessToken:"v2-test",applicationId:"app_test",hostedAuthOrigins:["https://auth.lifty.test"]}})};
   const ops=channel==="email"?createEmailConnectOperations(settings):createLinkedinConnectOperations(settings);
   const session={userId:id,client:{rpc:(name:string,args:Record<string,unknown>)=>rpc(name,args,true)}};
   return {ops,session,calls,http,deleted,state:authState};
@@ -162,7 +162,7 @@ for(const channel of ["email","linkedin"] as const)describe(`V2 ${channel} lifec
   });
   it("persists exact state before provider POST and retains V2 link once",async()=>{
     const h=harness(channel,{intentState:"pending"});
-    expect(await h.ops.authorize(h.state)).toBe("https://auth.unipile.com/?token=created");
+    expect(await h.ops.authorize(h.state)).toBe("https://auth.lifty.test/?token=created");
     expect(h.calls.map(c=>c.operation)).toEqual(["intent","issue_link","auth_state","save_link"]);
     expect(h.calls[2]?.payload.state).toBe(unipileV2AuthState(channel,id,secret));
     expect(h.http[0]?.body?.state).toBe(h.calls[2]?.payload.state);
