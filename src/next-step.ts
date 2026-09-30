@@ -47,12 +47,15 @@ export async function getNextStep(dependencies: NextStepReads, session: AuthSess
     if (campaign.state === "unconfigured") return response("review", "sample-review", "sample_ready_for_founder_review", "sample-review", ["sample_review_get"], saved, run);
     const receipt = { state: campaign.state, outreach_enabled: campaign.outreach_enabled, version_ref: campaign.version_ref,
       preparation: campaign.preparation?.state ?? null, blockers: campaign.blockers };
-    const tools = ["campaigns_get"];
-    if (campaign.state === "active") return response("complete", "campaign", "campaign_active", "campaigns", tools, saved, receipt);
-    if (campaign.state === "paused") return response("action_required", "campaign", "campaign_paused", "campaigns", tools, saved, receipt);
-    if (campaign.preparation?.state === "pending") return response("pending", "campaign", "campaign_preparing", "campaigns", tools, saved, receipt);
-    if (campaign.preparation?.state === "failed") return response("blocked", "campaign", "campaign_preparation_failed", "campaigns", tools, saved, receipt);
-    return response("action_required", "campaign", "campaign_draft", "campaigns", tools, saved, receipt);
+    // The campaigns guide with its references is ~300 KB; inlining it on every
+    // resume stalls chat connectors. Return the workspace resume guide and let
+    // the client fetch the campaigns guide when the founder works on it.
+    const tools = ["campaigns_get", "summary_context"];
+    if (campaign.state === "active") return response("complete", "campaign", "campaign_active", "summary", tools, saved, receipt);
+    if (campaign.state === "paused") return response("action_required", "campaign", "campaign_paused", "summary", tools, saved, receipt);
+    if (campaign.preparation?.state === "pending") return response("pending", "campaign", "campaign_preparing", "summary", tools, saved, receipt);
+    if (campaign.preparation?.state === "failed") return response("blocked", "campaign", "campaign_preparation_failed", "summary", tools, saved, receipt);
+    return response("action_required", "campaign", "campaign_draft", "summary", tools, saved, receipt);
   }
   if (saved.state === "none" || !saved.draft_ready) return response("action_required", "interview", "confirmed_interview_needed", "onboarding", ["business_onboarding_state", "business_onboarding_save"], saved);
   if (!saved.configuration) return response("action_required", "configuration", "configuration_needed", "targeting", ["targeting_onboarding_context", "targeting_onboarding_save"], saved);
