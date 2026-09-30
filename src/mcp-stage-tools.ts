@@ -19,7 +19,7 @@ const campaignReads = new Set(["status", "preview", "placement-status", "placeme
 const splitCampaigns = new Set(["post", "client_email", "client_linkedin"]);
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
 const openWorld = new Set(["sample-review.post", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
-  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "notifications.test", "capacity.apollo_recovery"]);
+  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test", "capacity.apollo_recovery"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 const title = (value: string) => value.replace(/[-_]/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
 

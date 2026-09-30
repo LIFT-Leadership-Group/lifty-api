@@ -21,6 +21,7 @@ import { createEmailConnectOperations } from "./email-connect.js";
 import { createEmailAccountOperations } from "./email-accounts.js";
 import { createClientEmailOperations } from "./client-email-connect.js";
 import { createEmailWarmupOperations } from "./email-warmup.js";
+import { createEmailConnectionPlacementOperations } from "./email-connection-placement.js";
 import { createEmailDeliverabilityOperations } from "./email-deliverability.js";
 import { createPlacementReportReader } from "./email-deliverability-placement.js";
 import { createWarmupSetup } from "./warmup-setup.js";
@@ -85,6 +86,7 @@ export function createProductionApp(config: ServiceConfig) {
   // Workspace member operations use their session. Browser setup uses a narrow,
   // server-key-protected intent RPC, never a Supabase administrative key.
   const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
+  const placement = createEmailConnectionPlacementOperations();
   const warmup = createEmailWarmupOperations({ mailivery: config.mailivery ?? null,
     ...(warmupSetup ? {issueSetupLink:warmupSetup.issue} : {}) });
   // Reads use the caller's session; only report reads for authorized tests use the server-side key.
@@ -124,6 +126,8 @@ export function createProductionApp(config: ServiceConfig) {
       },
     } : {}),
     getEmailDeliverability: deliverability.read,
+    getEmailPlacement: placement.status,
+    startEmailPlacement: placement.start,
     getEmailAccounts:emailAccounts.accounts,
     connectEmailAccount:emailAccounts.connect,
     getEmailAccountAttempt:emailAccounts.status,

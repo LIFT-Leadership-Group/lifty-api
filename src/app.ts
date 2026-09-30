@@ -136,6 +136,7 @@ import { LinkedinConnectRequest, LinkedinConnectResult, LegacyLinkedinConnectRes
 import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 import { HostedEmailProvider, EmailConnectRequest, EmailConnectResult, LegacyEmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
 import { WarmupStartResult, WarmupStatus, WarmupWorkspaceRequest, type WarmupStartResult as WarmupStart, type WarmupStatus as WarmupStatusValue } from "./email-warmup-contracts.js";
+import { ConnectionPlacementStatus, PlacementStartRequest, PlacementStatusRequest, type PlacementStartInput, type PlacementStatusInput } from "./email-connection-placement.js";
 import { DeliverabilityQuery, DeliverabilityQueryParams, DeliverabilityResponse, type DeliverabilityQuery as DeliverabilityQueryValue, type DeliverabilityResponse as DeliverabilityResponseValue } from "./email-deliverability-contracts.js";
 import { EmailAccountsRequest, EmailAccountsResult, EmailAccountConnectRequest, EmailAccountConnectResult,
   EmailAccountStatusRequest, EmailAccountStatusResult, type EmailAccountsInput, type EmailAccountsOutput,
@@ -195,6 +196,8 @@ export interface AppDependencies {
   startEmailWarmup(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStart>;
   changeEmailWarmup(session: AuthSession, workspace: string, operation: "pause" | "resume" | "remove", connectionRef?: string): Promise<WarmupStatusValue>;
   getEmailDeliverability(session: AuthSession, query: DeliverabilityQueryValue): Promise<DeliverabilityResponseValue>;
+  getEmailPlacement(session: AuthSession, input: PlacementStatusInput): Promise<ConnectionPlacementStatus>;
+  startEmailPlacement(session: AuthSession, input: PlacementStartInput): Promise<ConnectionPlacementStatus>;
   getEmailAccounts(session:AuthSession,input:EmailAccountsInput):Promise<EmailAccountsOutput>;
   connectEmailAccount(session:AuthSession,input:EmailAccountConnectInput):Promise<EmailAccountConnectOutput>;
   getEmailAccountAttempt(session:AuthSession,input:EmailAccountStatusInput):Promise<EmailAccountStatusOutput>;
@@ -452,6 +455,13 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/deliverability",operationId:"getEmailDeliverability",security:[{bearerAuth:[]}],
     description:"Read-only inbox health shared by the Deliverability page and the Lifty CLI: inboxes, warmup, placement history, campaigns, approval, notes and explained states (email-deliverability.v1). Never creates tests or changes sending.",
     request:{query:DeliverabilityQueryParams},responses:{200:JsonResponse(DeliverabilityResponse),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),404:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/placement",operationId:"getEmailPlacement",security:[{bearerAuth:[]}],
+    description:"LIF-1063: the latest Mailivery placement test for one warmed mailbox, whether a new one can be requested, and whether its result gates sending. Read-only.",
+    request:{query:PlacementStatusRequest},responses:{200:JsonResponse(ConnectionPlacementStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
+  app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/placement/start",operationId:"startEmailPlacement",security:[{bearerAuth:[]}],
+    description:"LIF-1063: queue one Mailivery connected-mailbox placement test after explicit consent. Mailivery sends the email from the warmed mailbox to its seed inboxes and uses one test credit. A retried start returns the open test. Never releases a mailbox.",
+    request:{body:{required:true,content:{"application/json":{schema:PlacementStartRequest}}}},
+    responses:{200:JsonResponse(ConnectionPlacementStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),413:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/accounts",operationId:"getEmailAccounts",security:[{bearerAuth:[]}],
     request:{query:EmailAccountsRequest},responses:{200:JsonResponse(EmailAccountsResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   for (const [path,operationId,request,response] of [
@@ -991,6 +1001,8 @@ const defaultDependencies: AppDependencies = {
   startEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet. Nothing was changed." }); },
   changeEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet. Nothing was changed." }); },
   getEmailDeliverability: async () => { throw new PublicError({ status: 503, code: "DELIVERABILITY_NOT_CONFIGURED", message: "Deliverability is not available on this LIFTY server yet." }); },
+  getEmailPlacement: async () => { throw new PublicError({ status: 503, code: "EMAIL_PLACEMENT_NOT_CONFIGURED", message: "Placement tests are not available on this LIFTY server yet." }); },
+  startEmailPlacement: async () => { throw new PublicError({ status: 503, code: "EMAIL_PLACEMENT_NOT_CONFIGURED", message: "Placement tests are not available on this LIFTY server yet. Nothing was requested." }); },
   getEmailAccounts: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account management is not available yet."}); },
   connectEmailAccount: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account management is not available yet. Nothing was changed."}); },
   getEmailAccountAttempt: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account setup could not be verified. Keep the same attempt reference."}); },
@@ -2424,6 +2436,24 @@ export function createApp(
     if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST",
       parsed.error.issues.find(issue => issue.code === "custom")?.message ?? "Choose a workspace and valid deliverability filters.");
     return context.json(DeliverabilityResponse.parse(await dependencies.getEmailDeliverability(context.get("authSession"), parsed.data)));
+  });
+  // LIF-1063: member-authorized placement tests for one warmed mailbox. The
+  // database checks membership and the exact connection on every request.
+  app.get("/v1/email/placement", async (context) => {
+    context.header("cache-control", "no-store");
+    const parsed = PlacementStatusRequest.safeParse(context.req.query());
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace and, when it has several warmed mailboxes, a connection_ref.");
+    return context.json(ConnectionPlacementStatus.parse(await dependencies.getEmailPlacement(context.get("authSession"), parsed.data)));
+  });
+  app.post("/v1/email/placement/start", async (context) => {
+    context.header("cache-control", "no-store");
+    const raw = await readRequestTextWithinLimit(context.req.raw, 32_768);
+    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Placement request is too large.");
+    let body: unknown;
+    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide the workspace, test subject, body and confirm: true."); }
+    const parsed = PlacementStartRequest.safeParse(body);
+    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide the workspace, a subject, a body of at least 10 characters and confirm: true.");
+    return context.json(ConnectionPlacementStatus.parse(await dependencies.startEmailPlacement(context.get("authSession"), parsed.data)));
   });
   // Explicit member workspace operations deliberately bypass founder-profile
   // adapters. The authenticated Edge owner checks membership on every request.
