@@ -180,6 +180,32 @@ and resume on a running warmup only cancels a pending pause. For an `outreach`
 account, pausing or removing warmup delays or blocks sending; say so and get
 an explicit yes first.
 
+## Placement tests
+
+A placement test shows where a mailbox's email lands: inbox, spam or missing,
+across Gmail, Microsoft (Outlook) and other providers. It runs through
+Mailivery and only for a mailbox Mailivery is already warming. Read
+`placement_status` with the explicit `workspace` and, when the workspace has
+more than one warmed mailbox, its `connection_ref`.
+
+Only call `placement_start` after the user explicitly agrees to what it does.
+Mailivery sends one email from that mailbox to roughly 20-40 of its seed
+inboxes, and each test uses one Mailivery test credit. Use the subject and
+plain-text body of the first email of the real sequence, and send
+`confirm: true`. Retrying the same start returns the test already in progress.
+A second test within 24 hours of a completed one is refused.
+
+A test takes about 10-20 minutes after Lifty creates it. Read
+`placement_status` again and repeat its `label`; do not compute a verdict
+yourself. `uncertain` means Lifty is checking whether Mailivery created the
+test and will not create a second one. `did_not_run` is not a placement
+result.
+
+When `gates_sending` is true (LIFT client mailboxes), the mailbox can send
+campaign email only with a passing test from the last 10 days, after 21 active
+warmup days and an explicit operator release. A passing test never releases the
+mailbox or starts campaigns by itself. For founders it is advisory.
+
 ## Inbox health
 
 To answer how inboxes are doing, what a sender's last placement tests were,
