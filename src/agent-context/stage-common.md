@@ -5,7 +5,11 @@ serve the same guide. `operations` defines each method, relative route and
 path/query/body schema. MCP tool names replace stage hyphens with underscores
 and append the operation, for example `business_get` and `targeting_post`.
 The summary `next_step` operation is named `next_step`. Campaign POST has separate
-`campaigns_post_read` and `campaigns_post_write` tools. Use the listed tool schema.
+`campaigns_post_read` and `campaigns_post_write` tools. Operations several stages
+share are listed once: `business_onboarding_state`, `business_onboarding_save`,
+`business_update_status`, `targeting_generation_context`,
+`targeting_onboarding_context`, `targeting_onboarding_status` and
+`targeting_resolve_update`. Use the listed tool schema.
 
 The transport envelope is `{path?, query?, body?}`. Supply path parameters in
 path, GET filters in query and write inputs in body. The client handles transport;

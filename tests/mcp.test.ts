@@ -61,7 +61,9 @@ describe("MCP HTTP boundary", () => {
         const result = await client.callTool({ name: "whoami", arguments: {} });
         expect(result.structuredContent).toEqual({ user_id: userId, workspaces: null });
         const next = await client.callTool({ name: "next_step", arguments: {} });
-        expect(next.structuredContent).toMatchObject({ status: 200, data: { step: "business", reason: "workspace_missing", guide: { task: "business" } } });
+        expect(next.structuredContent).toMatchObject({ status: 200, data: { step: "business", reason: "workspace_missing",
+          section: "leads", gates: { next: "company" }, guide: { task: "step-interview" } } });
+        expect(client.getInstructions()).toContain("Start with whoami, then next_step");
         expect(JSON.stringify(result)).not.toContain("Bearer");
         expect(transport.sessionId).toBeUndefined();
       } finally { await client.close(); }

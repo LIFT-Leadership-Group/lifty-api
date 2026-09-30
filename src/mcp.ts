@@ -48,8 +48,17 @@ const whoami: Tool = {
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 };
 
+// Clients read this before any tool call, so the first turn already knows
+// the order of work instead of discovering it from long stage guides.
+export const MCP_INSTRUCTIONS = [
+  "Lifty sets up a founder's outbound: Section 1 finds leads (interview, search, five researched leads, optional HubSpot sync); Section 2 sets up outreach, LinkedIn first.",
+  "Start with whoami, then next_step. Before any research or long read, reply to the founder in one line with what you are doing.",
+  "next_step returns actions to do in order, the interview gates still missing, and a short guide for the current step. Fetch a full stage guide with summary_context only when an action or an edge case needs it.",
+  "Nothing is sent without the founder's explicit approval of the exact campaign preview. Never ask for passwords, tokens or provider credentials.",
+].join("\n");
+
 function createMcpServer(session: AuthSession, request: Request, settings: McpSettings, registry?: McpToolRegistry) {
-  const server = new Server({ name: "lifty", version: "0.1.0" }, { capabilities: { tools: {} } });
+  const server = new Server({ name: "lifty", version: "0.1.0" }, { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS });
   const securitySchemes = [{ type: "oauth2", scopes: ["openid", "email", "profile"] }];
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [whoami, ...(registry?.tools ?? [])].map(tool => ({
     ...tool, securitySchemes, _meta: { ...tool._meta, securitySchemes },

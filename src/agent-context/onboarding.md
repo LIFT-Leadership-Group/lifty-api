@@ -1,9 +1,12 @@
 # Lifty founder onboarding
 
 Start with the read-only `next_step` tool, or the summary stage's `next_step`
-operation. It reads server state and returns the current guide. Call it after
-saving an interview, submitting configuration, or receiving completed work.
-A failed read leaves progress unknown; it never means the founder must restart.
+operation. It reads server state and returns the current step's `actions` in
+order, the interview `gates` still missing and a short step guide. Call it when
+a step completes: the interview is ready, the import finished, or the sample
+run is terminal. Interview saves return their own `gates`, so do not call it
+between interview blocks. A failed read leaves progress unknown; it never means
+the founder must restart.
 
 ## Authentication and saved work
 
@@ -102,8 +105,9 @@ not persist sample acceptance; never claim a conversation answer was saved there
 
 ## Workflow
 
-1. Read `next_step` and its complete guide and references. For the interview,
-   read `references.interview` and use `schemas.draft` as the only draft shape.
+1. Read `next_step` and do its `actions` in order; its guide is the current
+   step's playbook. For the interview, read `references.interview` and use
+   `schemas.draft` as the only draft shape.
 2. Send a brief first reply, then research the company and founder from public
    sources. Share a concrete hypothesis and ask the founder to correct it.
    Record research as inferred until the founder confirms or corrects it.
@@ -111,7 +115,8 @@ not persist sample acceptance; never claim a conversation answer was saved there
    Require numeric size and its unit, explicit geography and employee boundaries,
    and the persona's role, titles and organizational tell. Offer researched
    hypotheses for unknowns. Never substitute assumptions for confirmation.
-4. Save confirmed answers and provenance after each block. The newest statement
+4. Save confirmed answers and provenance after each block; the save returns
+   `gates.next`, the next decision to ask. The newest statement
    replaces the affected value; preserve earlier statements as history. Park
    secondary motions. Defer optional outreach questions when asked to continue.
 5. Once `draft_ready` is true, read `targeting.onboarding_context` and the full
