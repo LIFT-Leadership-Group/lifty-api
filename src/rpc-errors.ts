@@ -67,20 +67,13 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   RECOVERY_RESTART_REQUIRED: "This acquisition has ended. Use the explicit recovery restart with its current reference.",
 };
 
-// Lower-case tokens raised by the shared database workspace resolver and older
-// functions the new RPCs still call. Mapped by value, never by route.
+// Lower-case tokens raised by the shared database workspace resolver
+// (private.lifty_pick_workspace / lifty_business_workspace). Mapped by value,
+// never by route.
 const DATABASE_TOKENS: Record<string, string> = {
   UNAUTHENTICATED: "UNAUTHORIZED",
   LIFTY_WORKSPACE_AMBIGUOUS: "WORKSPACE_SELECTION_REQUIRED",
   LIFTY_WORKSPACE_FORBIDDEN: "WORKSPACE_FORBIDDEN",
-  LIFTY_WORKSPACE_SUSPENDED: "WORKSPACE_SUSPENDED",
-  LIFTY_WORKSPACE_MISSING: "WORKSPACE_NOT_READY",
-  LIFTY_RUN_WORKSPACE_SUSPENDED: "WORKSPACE_SUSPENDED",
-  LIFTY_RUN_NOT_CONFIGURED: "RUN_NOT_CONFIGURED",
-  LIFTY_RUN_ALREADY_COMPLETED: "RUN_ALREADY_COMPLETED",
-  LIFTY_RUN_UNAVAILABLE: "RUN_UNAVAILABLE",
-  LIFTY_RUN_MISSING: "RUN_NOT_FOUND",
-  LIFTY_PROGRESS_COHORT_TOO_LARGE: "RUN_PROGRESS_UNAVAILABLE",
 };
 
 const STATUS = new Set([400, 401, 403, 404, 409, 413, 422, 429]);

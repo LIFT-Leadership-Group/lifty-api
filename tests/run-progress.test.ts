@@ -66,7 +66,7 @@ describe("resumable research observations", () => {
   it("reanalyzes authorization on every read and stops immediately after membership revocation", async () => {
     vi.useFakeTimers(); const f = fixture(); const signal = controller().signal;
     const first = await f.progress(f.session, query(), signal);
-    f.read.mockResolvedValueOnce({ data: initial, error: null }).mockResolvedValueOnce({ data: null, error: { code: "PT404", message: "lifty_run_missing" } });
+    f.read.mockResolvedValueOnce({ data: initial, error: null }).mockResolvedValueOnce({ data: null, error: { code: "PT404", message: "RUN_NOT_FOUND" } });
     const waiting = f.progress(f.session, query({ cursor: first.cursor }), signal);
     const rejected = expect(waiting).rejects.toMatchObject({ status: 404, code: "RUN_NOT_FOUND" });
     await vi.advanceTimersByTimeAsync(2000); await rejected;
