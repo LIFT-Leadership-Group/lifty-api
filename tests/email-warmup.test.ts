@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createEmailWarmupOperations, presentWarmupStatus, readSignedFormUrl, type EmailWarmupSettings } from "../src/email-warmup.js";
 import { WarmupStartResult, WarmupStatus, type StoredWarmupStatus } from "../src/email-warmup-contracts.js";
 import { createCurrentClient as createApp } from "./current-client.js";
+import { checkWarmupDns, WARMUP_DNS_TIMEOUT_MS, type WarmupDnsResolver } from "../src/warmup-dns.js";
 
 const workspace = "22222222-2222-4222-8222-222222222222";
 const binding = "33333333-3333-4333-8333-333333333333";
@@ -31,8 +32,22 @@ function clientStored(overrides: Partial<StoredWarmupStatus> = {}, bindingOverri
   return stored({ connection_ref: connection, campaign_send_paused: true, campaign_release_required: true, ...overrides }, bindingOverrides);
 }
 
+type DnsAnswer = readonly string[] | "NXDOMAIN" | "SERVFAIL" | "HANG";
+/** node:dns-shaped fake: every domain publishes SPF, DMARC (p=none) and MX unless a test overrides `txt:<host>` or `mx:<host>`. */
+function fakeDns(answers: Record<string, DnsAnswer> = {}): WarmupDnsResolver {
+  const answer = async (key: string): Promise<string[]> => {
+    const value = answers[key] ?? (key.startsWith("txt:_dmarc.") ? ["v=DMARC1; p=none;"]
+      : key.startsWith("txt:") ? ["v=spf1 include:_spf.google.com ~all"] : ["smtp.google.com"]);
+    if (value === "HANG") return new Promise<never>(() => {});
+    if (value === "NXDOMAIN" || value === "SERVFAIL") throw Object.assign(new Error(key), { code: value === "NXDOMAIN" ? "ENOTFOUND" : "ESERVFAIL" });
+    return [...value];
+  };
+  return { resolveTxt: async host => (await answer(`txt:${host}`)).map(value => [value]),
+    resolveMx: async host => (await answer(`mx:${host}`)).map(exchange => ({ exchange, priority: 1 })) };
+}
+
 function harness(options: { data?: unknown; error?: unknown; key?: string | null; provider?: () => Response | Promise<Response>;
-  issueSetupLink?: EmailWarmupSettings["issueSetupLink"] } = {}) {
+  issueSetupLink?: EmailWarmupSettings["issueSetupLink"]; dns?: WarmupDnsResolver } = {}) {
   const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
   const http: { url: string; init: RequestInit | undefined }[] = [];
   const session = { userId: user, client: { rpc: async (name: string, args: Record<string, unknown>) => {
@@ -45,7 +60,7 @@ function harness(options: { data?: unknown; error?: unknown; key?: string | null
   };
   const ops = createEmailWarmupOperations({ mailivery: options.key === null ? null : { apiKey: options.key ?? apiKey },
     ...(options.issueSetupLink ? {issueSetupLink: options.issueSetupLink} : {}),
-    fetchImpl, now: () => now, requestId: () => "req-1" });
+    fetchImpl, now: () => now, requestId: () => "req-1", dns: options.dns ?? fakeDns() });
   return { ops, session, rpcCalls, http };
 }
 
@@ -56,7 +71,7 @@ describe("warmup status presentation", () => {
     const ops = createEmailWarmupOperations({mailivery:{apiKey}, issueSetupLink:async(session, selected)=>{
       expect(session).toBe(h.session); expect(selected).toBe("lifty-gtm"); issued++;
       return {url:`https://api.lifty.test/warmup/setup?intent=${"a".repeat(43)}`, expiresAt:now.toISOString()};
-    }, fetchImpl:async()=>{throw new Error("Hosted forms must not be requested");}});
+    }, fetchImpl:async()=>{throw new Error("Hosted forms must not be requested");}, dns:fakeDns()});
     const result = await ops.start(h.session, "lifty-gtm");
     expect(result.connect_url).toContain("https://api.lifty.test/warmup/setup");
     expect(issued).toBe(1);
@@ -172,7 +187,7 @@ describe("warmup operations", () => {
     const h = harness({ data: stored({ evidence: null }, { state: "link_issued", provider_campaign_bound: false, snapshot: null, last_readback_at: null }) });
     const result = await h.ops.start(h.session, "senja");
     expect(WarmupStartResult.parse(result)).toEqual(result);
-    expect(h.rpcCalls.map(call => call.args.p_operation)).toEqual(["start"]);
+    expect(h.rpcCalls.map(call => call.args.p_operation)).toEqual(["status", "start"]);
     expect(h.http).toHaveLength(1);
     const url = new URL(h.http[0]!.url);
     expect(url.origin + url.pathname).toBe("https://app.mailivery.io/api/v1/embed/form/secure");
@@ -182,6 +197,43 @@ describe("warmup operations", () => {
     expect(headers["x-request-id"]).toBe("req-1");
     expect(h.http[0]!.init!.method).toBe("GET");
     expect(result).toMatchObject({ state: "link_issued", connect_url: signedUrl, expires_at: new Date(expires * 1000).toISOString() });
+  });
+
+  it("issues no link and writes nothing while the mailbox domain verifiably lacks DMARC; valid or unverifiable DNS gets the link", async () => {
+    const unbound = stored({ evidence: null }, { state: "link_issued", provider_campaign_bound: false, snapshot: null, last_readback_at: null });
+    const missing = harness({ data: unbound, dns: fakeDns({ "txt:_dmarc.example.test": "NXDOMAIN" }) });
+    await expect(missing.ops.start(missing.session, "senja")).rejects.toMatchObject({ status: 409, code: "EMAIL_WARMUP_DNS_INVALID",
+      message: expect.stringMatching(/^Lifty didn't create a warmup link: example\.test has no valid DMARC record\. .*_dmarc.*Run warmup start again once DNS is published\./) });
+    expect(missing.rpcCalls.map(call => call.args.p_operation)).toEqual(["status"]);
+    expect(missing.http).toHaveLength(0);
+    const all = harness({ data: unbound, dns: fakeDns({ "txt:example.test": "NXDOMAIN", "txt:_dmarc.example.test": [], "mx:example.test": [] }) });
+    await expect(all.ops.start(all.session, "senja")).rejects.toMatchObject({ message: expect.stringMatching(/no valid SPF, DMARC and MX records\. Add them/) });
+    // SERVFAIL and an unanswered lookup are unknown, not invalid: the link is issued as today.
+    for (const answer of ["SERVFAIL", "HANG"] as const) {
+      vi.useFakeTimers();
+      try {
+        const unknown = harness({ data: unbound, dns: fakeDns({ "txt:_dmarc.example.test": answer }) });
+        const pending = unknown.ops.start(unknown.session, "senja");
+        await vi.advanceTimersByTimeAsync(WARMUP_DNS_TIMEOUT_MS);
+        expect(await pending).toMatchObject({ connect_url: signedUrl });
+        expect(unknown.rpcCalls.map(call => call.args.p_operation)).toEqual(["status", "start"]);
+      } finally { vi.useRealTimers(); }
+    }
+    const valid = harness({ data: unbound });
+    expect(await valid.ops.start(valid.session, "senja")).toMatchObject({ connect_url: signedUrl });
+    // A bound warmup issues no link, so its DNS is not consulted.
+    const bound = harness({ data: stored(), dns: fakeDns({ "txt:_dmarc.example.test": "NXDOMAIN" }) });
+    expect(await bound.ops.start(bound.session, "senja")).toMatchObject({ state: "warming", connect_url: null });
+  });
+
+  it.each([
+    ["DMARC p=none and SPF ?all are published", {}, []],
+    ["two SPF records are a permerror", { "txt:example.test": ["v=spf1 -all", "v=spf1 include:x ~all"] }, ["spf"]],
+    ["a _dmarc TXT without v=DMARC1", { "txt:_dmarc.example.test": ["p=reject"] }, ["dmarc"]],
+    ["no MX hosts", { "mx:example.test": [] }, ["mx"]],
+  ] as const)("classifies DNS like the Jobs check: %s", async (_name, answers, invalid) => {
+    const dns = fakeDns({ "txt:example.test": ["v=spf1 include:_spf.google.com ?all"], ...answers });
+    expect(await checkWarmupDns("example.test", { resolver: dns })).toEqual({ invalid, unknown: [] });
   });
 
   it("never mints a second form while Microsoft consent is pending", async () => {
@@ -209,7 +261,7 @@ describe("warmup operations", () => {
     const result = await h.ops.start(session, "senja");
     expect(result).toMatchObject({ state: "link_issued", connect_url: signedUrl });
     expect(new URL(h.http[0]!.url).searchParams.get("tags")).toBe(`lifty-ws:${workspace},lifty-sender:${binding}`);
-    expect(calls).toBe(2);
+    expect(calls).toBe(3);
   });
 
   it("reflects pending actions in the label, with remove winning", () => {
@@ -323,8 +375,9 @@ describe("warmup operations", () => {
         } });
       const result = await h.ops.start(h.session, "lift", connectionRef);
       expect(result).toMatchObject({ connection_ref: connectionRef, connect_url: expect.stringContaining(connectionRef) });
-      expect(h.rpcCalls).toEqual([{ name: "lifty_email_warmup", args: { p_operation: "start",
-        p_payload: { workspace: "lift", connection_ref: connectionRef } } }]);
+      // A read-only status precedes the single start write (DNS is checked in between).
+      expect(h.rpcCalls).toEqual(["status", "start"].map(operation => ({ name: "lifty_email_warmup", args: { p_operation: operation,
+        p_payload: { workspace: "lift", connection_ref: connectionRef } } })));
       expect(h.http).toHaveLength(0);
     }
     expect(selected).toEqual([connection, otherConnection]);
