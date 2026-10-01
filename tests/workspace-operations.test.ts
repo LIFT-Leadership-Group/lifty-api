@@ -233,6 +233,7 @@ describe("first run operations", () => {
 
   it.each([
     [{ code: "PT409", message: "lifty_run_not_configured" }, { status: 409, code: "RUN_NOT_CONFIGURED" }],
+    [{ code: "PT409", message: "RUN_IN_PROGRESS" }, { status: 409, code: "RUN_IN_PROGRESS" }],
     [{ code: "PT409", message: "RESEARCH_LIMIT_REACHED", details: JSON.stringify({ resets_at: "2026-10-05T00:00:00+00:00", internal: "x" }) },
       { status: 409, code: "RESEARCH_LIMIT_REACHED", resets_at: "2026-10-05T00:00:00+00:00" }],
     [{ code: "PT409", message: "lifty_apollo_allowance_exhausted", details: "{\"provider\":\"secret\"}" }, { status: 502, code: "SAMPLE_REVIEW_UNAVAILABLE", resets_at: undefined }],

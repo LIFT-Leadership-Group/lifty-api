@@ -52,6 +52,8 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
     "The sample for the current targeting is complete. Read it instead of starting another.",
   RUN_UNAVAILABLE:
     "Lifty cannot start research for this workspace right now. Contact LIFT support.",
+  RUN_IN_PROGRESS:
+    "Another research run is in progress for this workspace. Start the sample after it finishes.",
   RUN_NOT_FOUND: "This research run is unavailable in the selected workspace.",
   RUN_PROGRESS_UNAVAILABLE:
     "Research progress is unavailable for the selected workspace or sample.",
