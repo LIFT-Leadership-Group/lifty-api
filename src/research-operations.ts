@@ -81,7 +81,7 @@ export const ResearchStatusSchema = z
 export const LeadsQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(25),
-    cursor: z.string().regex(/^[A-Za-z0-9_-]{1,512}$/).optional(),
+    cursor: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/).optional(),
     grade: z.array(Grade).min(1).max(3).optional(),
     week: Monday.optional(),
   })
@@ -105,11 +105,12 @@ export const LeadsPageSchema = z
     next_cursor: z.string().nullable(),
   })
   .strict();
-// The dashboard origin is API configuration (LIFTY_DASHBOARD_ORIGIN), the
-// same owner that builds sample-review research links.
+// The database returns the rows without links: the dashboard origin is API
+// configuration (LIFTY_DASHBOARD_ORIGIN), the same owner that builds
+// sample-review research links.
 const LeadsRowsSchema = z
   .object({
-    items: z.array(LeadItem.extend({ research_url: z.string().optional() })).max(100),
+    items: z.array(LeadItem.omit({ research_url: true })).max(100),
     next_cursor: z.string().nullable(),
   })
   .strict();

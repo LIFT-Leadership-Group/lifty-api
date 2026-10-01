@@ -239,11 +239,12 @@ describe("customer surfaces name no provider or retired volume knob", () => {
     ...text.matchAll(/\bcode:\s*"([A-Z][A-Z0-9_]+)"/g),
     ...text.matchAll(/errorJson\([^,]+,\s*\d+,\s*"([A-Z][A-Z0-9_]+)"/g),
   ].map(match => match[1]!));
-  it("scans the catalog, MCP tools, every guide and every public error code", () => {
+  it("scans the catalog, OpenAPI, MCP tools, every guide and every public error code", async () => {
     const guides = readdirSync(new URL("../src/agent-context/", import.meta.url)).filter(name => name.endsWith(".md"));
     expect(guides).toEqual(expect.arrayContaining(["research-schedule.md", "leads.md"]));
     const surfaces: Record<string, string> = {
       catalog: JSON.stringify(stageOperations),
+      openapi: await (await createApp().request("/openapi.json")).text(),
       mcp: JSON.stringify(getStageMcpTools()),
       rpc_errors: JSON.stringify(RPC_ERROR_MESSAGES),
       public_codes: publicCodes.join(" "),

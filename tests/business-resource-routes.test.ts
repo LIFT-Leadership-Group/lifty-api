@@ -33,7 +33,7 @@ const get = { workspace: identity, profile: profileFixture };
 const limitFixture = {
   weekly_research_limit: 25,
   source: "free",
-  effective_from: "2026-09-01T00:00:00+00:00",
+  effective_from: "2026-09-01T00:00:00Z",
 };
 const scheduleFixture = {
   version: 1,
@@ -41,12 +41,12 @@ const scheduleFixture = {
   weekly_target: 20,
   limit: limitFixture,
   effective_target: 20,
-  updated_at: "2026-10-01T18:00:00+00:00",
+  updated_at: "2026-10-01T18:00:00Z",
   updated_by: null,
 };
 const statusFixture = {
   week_start: "2026-09-28",
-  resets_at: "2026-10-05T00:00:00+00:00",
+  resets_at: "2026-10-05T00:00:00Z",
   state: "active",
   policy_version: 1,
   limit: limitFixture,
@@ -73,7 +73,7 @@ const leadsFixture = {
       linkedin_url: "https://www.linkedin.com/in/ada",
       grade: "A",
       fit_rationale: "Owns sales.",
-      researched_at: "2026-09-29T10:00:00+00:00",
+      researched_at: "2026-09-29T10:00:00Z",
     },
   ],
   next_cursor: "MjAyNi0wOS0yOXw1NTU1",
@@ -822,11 +822,11 @@ describe("research schedule, leads and sample share one workspace rule", () => {
   });
   it("starts the sample inside the weekly limit and returns the reset time when it is reached", async () => {
     const enqueue = vi.fn(async () => ({ id: "job" }));
-    const h = harness(null, { code: "PT409", message: "RESEARCH_LIMIT_REACHED", details: JSON.stringify({ resets_at: "2026-10-05T00:00:00+00:00" }) },
+    const h = harness(null, { code: "PT409", message: "RESEARCH_LIMIT_REACHED", details: JSON.stringify({ resets_at: "2026-10-05T00:00:00Z" }) },
       { ...runAdapters, enqueueFirstRun: enqueue });
     const response = await h.request("/v1/workspace/sample-review", "POST", {});
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toEqual({ code: "RESEARCH_LIMIT_REACHED", message: expect.any(String), resets_at: "2026-10-05T00:00:00+00:00" });
+    expect((await response.json()).error).toEqual({ code: "RESEARCH_LIMIT_REACHED", message: expect.any(String), resets_at: "2026-10-05T00:00:00Z" });
     expect(enqueue).not.toHaveBeenCalled();
     expect((await h.request("/v1/workspace/sample-review", "PATCH", {})).status).toBe(404);
   });
