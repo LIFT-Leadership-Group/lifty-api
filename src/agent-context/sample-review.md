@@ -11,8 +11,7 @@ Preserve historical policy and grades; old cohorts are not new research.
 
 ## First setup and required inputs
 
-After configuration is imported, read the capacity stage before new discovery.
-POST has an empty object body and reuses the existing bounded first-run
+After setup is imported, POST has an empty object body and reuses the existing bounded first-run
 operation. It starts/retrieves the initial cohort; it does not repeatedly buy
 new leads until a desired grade appears. Use the returned `run_ref` with
 `sample-review.progress` while work is pending. The first read returns immediately;
@@ -40,6 +39,10 @@ but cannot guarantee the host narrates each lead in real time.
 
 PATCH is unsupported (405): no grade editing, new sample approval store or
 persisted stage ledger. A targeting/rubric change goes through its own stage.
+When several people were disqualified for the same reason a search filter can
+express (industry, company size, location), propose that Targeting filter so
+research is not spent on people who cannot fit; evidence-only reasons stay in
+the research criteria.
 Founder acceptance stays a conversation decision; never claim it was saved as
 a new product feature. A saved shortfall requires diagnosis before more work.
 
@@ -73,3 +76,13 @@ In a later session `next_step` returns this stage while no campaign is saved.
 The saved cohort is ready to use: do not present it as new work or ask for a
 second review unless the founder wants one. A "not right now" answer about
 outreach is not saved, so ask about it at most once per session and accept it.
+
+## Exact failed-run recovery
+
+Recovery reads and writes belong to this research stage. recovery_status reads
+the selected workspace and first-run references. recovery request verifies that
+the current acquisition is terminal; it does not restart it. An explicit restart
+requires the current expected_acquisition_ref, authoritative verified status and
+the founder's request. Keep the durable attempt and historical budget; lost
+wakeups are recovered with the same exact references. Pending is not completion.
+Never use repeated first-run POSTs to bypass active acquisition or consumed limits.

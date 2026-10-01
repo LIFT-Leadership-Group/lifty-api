@@ -50,6 +50,22 @@ const antiSlop = readFileSync(
   "utf8",
 );
 const documents = {
+  "step-sample": {
+    instructions: readFileSync(
+      new URL("./agent-context/step-sample.md", import.meta.url),
+      "utf8",
+    ),
+    schemas: {},
+    references: {},
+  },
+  "step-review": {
+    instructions: readFileSync(
+      new URL("./agent-context/step-review.md", import.meta.url),
+      "utf8",
+    ),
+    schemas: {},
+    references: { calibration, company_mapping: companyMapping },
+  },
   campaign: {
     instructions: readFileSync(
       new URL("./agent-context/campaign.md", import.meta.url),
@@ -70,6 +86,7 @@ const documents = {
 };
 const readGuide = (name: string) =>
   readFileSync(new URL(`./agent-context/${name}.md`, import.meta.url), "utf8");
+const configuration = readGuide("configuration");
 function operationGuide(
   stage: string,
   operations: Record<string, StageOperation>,
@@ -102,8 +119,12 @@ const stageDocuments = Object.fromEntries(
         ...(["crm", "sending-accounts", "notifications"].includes(stage)
           ? { connections: readGuide("stage-connections") }
           : {}),
-        ...(["setup"].includes(stage)
-          ? { interview, configuration: readGuide("configuration") }
+        // The interview carries the founder voice and first-reply rules;
+        // configuration carries the criteria authoring rules a persona edit
+        // needs to regenerate criteria in the same targeting PATCH.
+        ...(stage === "business" ? { interview } : {}),
+        ...(["setup", "targeting", "research-criteria"].includes(stage)
+          ? { interview, configuration }
           : {}),
         ...(["targeting", "research-criteria", "sample-review"].includes(stage)
           ? { calibration }
@@ -185,9 +206,6 @@ export function getAgentContext(task: string) {
                   .join("\n")}`
               : `${document.instructions}\n${operationGuide(task, stageDocument.operations)}`,
         }
-      : {}),
-    ...(!stageDocument && task !== "campaign"
-      ? { instructions: `${document.instructions}\n${companyMapping}` }
       : {}),
     // Compact per call: operation definitions stay live objects (routes can
     // change at runtime in tests and the revision must follow them).

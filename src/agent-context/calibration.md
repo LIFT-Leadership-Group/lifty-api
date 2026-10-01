@@ -48,9 +48,9 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
 
 ## Review the first cohort
 
-1. Wait for configuration import or the targeting update to finish. Before
-   new discovery, fetch `context capacity` and read `stage capacity get`.
-   Fetch `context sample-review`, then use `stage sample-review post --input -`
+1. Wait for setup or the targeting update to finish. The first-run operation
+   enforces platform discovery limits and reports exhaustion with its reset
+   time. Fetch `context sample-review`, then use `stage sample-review post --input -`
    with `{ "body": {} }` to research the initial five candidates. Keep its
    `run_ref` and use `stage sample-review progress` as described in the sample
    guide. Pass the returned cursor on the next wait and report newly completed
@@ -73,6 +73,11 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    problem. Confirmed exclusions stay excluded. Retrieval failures call for
    technical recovery. Do not remove an exclusion, widen the founder's market,
    invent missing facts, or claim success to fill the table.
+   When several people were disqualified for the same reason a search filter
+   can express (an industry, company size or location), propose adding that
+   filter to Targeting. Explain it in one sentence: research costs time and
+   budget, and the filter keeps it on people who can fit. A reason that needs
+   evidence to detect stays in the research criteria.
 4. A historical `calibration_review_required` result can be retried explicitly
    through `stage sample-review post` to evaluate its saved cohort under the
    current policy. This is not permission for another acquisition wave.

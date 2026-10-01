@@ -1,3 +1,4 @@
+import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult } from "./acquisition-recovery.js";
 import { businessOperationDefinitions } from "./business-operations.js";
 import { SenderChoice, SenderRoster, SenderSignatureRequest, SenderSignatureResult, SenderSignatures } from "./sender-choice.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
@@ -13,7 +14,6 @@ import {
 import { z } from "zod";
 import { WorkspaceCampaignConfigureRequest, WorkspaceCampaignModifyRequest, WorkspaceCampaignRequest, WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { HubspotConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, RunStatusSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, StartRunResultSchema, UpsertNotificationDestinationRequestSchema, WorkspaceStatusSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema } from "./contracts.js";
-import { RetireWorkspaceConfirmation, RetireWorkspaceResult } from "./workspace-retirement.js";
 import { DeleteLoginRequest, DeleteLoginResult } from "./login-deletion.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
@@ -43,9 +43,10 @@ export const StageErrorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string(), issues: z.array(z.object({code:z.string(),path:z.string(),message:z.string(),suggestion:z.string()}).strict()).optional(), current_version:z.number().int().nonnegative().optional(), stale_sources:z.array(z.string()).optional(), workspaces:z.array(z.object({workspace_ref:z.uuid(),name:z.string(),slug:z.string()}).strict()).optional() }),
   request_id: z.string(),
 });
+const RecoveryPath = z.object({workspace_ref:z.uuid(),first_run_ref:z.uuid()}).strict();
+const AcquisitionRecoveryWriteSchema = z.union([AcquisitionRecoveryBody.options[1],AcquisitionRecoveryBody.options[2]]);
 const Empty = z.object({}).strict();
 // LIF-1138: one of the caller's own workspaces, by slug or reference.
-export const SummaryQuerySchema = z.object({ workspace: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/).optional() }).strict();
 const AttemptRef = z.uuid();
 export const AuthorizationRequiredSchema = z.object({
   status: z.literal("authorization_required"),
@@ -138,17 +139,18 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   summary: {
     next_step: operation("GET", "/v1/workspace/next-step", "Read the next step from saved Business resources, setup draft, research and campaign receipts together with the current stage guide. Does not start work, accept a sample or authorize sending.", NextStepSchema),
     context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for a specific requested Lifty stage.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
-    get: { ...operation("GET", stageRoute("summary"), "Refresh the selected workspace's typed Business resources and versions, immutable setup receipt, first research run, HubSpot and its last sync, email (or the mailbox list of a LIFT-managed client workspace), LinkedIn and the saved campaign. Without workspace it describes the caller's default; pass one of the caller's own workspaces by slug or reference to read that one instead. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema, null, SummaryQuerySchema), readOnly: false },
+    get: { ...operation("GET", stageRoute("summary"), "Refresh the selected workspace's typed Business resources and versions, immutable setup receipt, first research run, HubSpot and its last sync, email (or the mailbox list of a LIFT-managed client workspace), LinkedIn and the saved campaign. With several workspaces, select one with the x-lifty-workspace header. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema), readOnly: false },
     post: unsupported("summary", "POST", "Use the summary GET operation; its connection checks can change saved provider state."),
     patch: unsupported("summary", "PATCH", "Use the summary GET operation; its connection checks can change saved provider state."),
   },
-  business: { ...businessCatalog.business!, delete: unsupported("business", "DELETE", "Profile revisions and pinned history are retained. Retire the workspace through its lifecycle operation.") },
+  business: { ...businessCatalog.business!, delete: unsupported("business", "DELETE", "Profile revisions and pinned history are retained. Customers cannot delete a workspace; contact LIFT support.") },
   targeting: { ...businessCatalog.targeting!, post: unsupported("targeting", "POST", "Setup creates targeting together with criteria."), delete: unsupported("targeting", "DELETE", "Search activation belongs to the research schedule; targeting history is retained.") },
   "research-criteria": { ...businessCatalog["research-criteria"]!, post: unsupported("research-criteria", "POST", "Setup creates criteria together with targeting."), delete: unsupported("research-criteria", "DELETE", "Use PATCH to clear criteria; pinned history is retained.") },
   setup: businessCatalog.setup!,
-  workspace: { retire: operation("POST", "/v1/workspaces/{workspace_ref}/retire", "Retire the selected workspace with exact identity confirmation while preserving retained history and budgets.", RetireWorkspaceResult, RetireWorkspaceConfirmation, Empty, WorkspaceRefPath) },
   account: { delete: operation("POST", "/v1/me/delete", "Delete your own login only after all memberships and retained-history restrictions are resolved.", DeleteLoginResult, DeleteLoginRequest) },
   "sample-review": {
+    recovery_status: {...operation("GET","/v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}","Read recovery state of an exact failed first research run: current acquisition, attempt, restart permission and blocker.",AcquisitionRecoveryStatus,null,Empty,RecoveryPath),cli:{operation:"recovery"}},
+    recovery: {...operation("POST","/v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}","For an exact failed first run, request terminal verification or explicitly restart only after verification allows it. Requires the current acquisition reference; durable attempts and consumed budgets are preserved.",z.union([AcquisitionRecoveryStatus,AcquisitionRestartResult]),AcquisitionRecoveryWriteSchema,Empty,RecoveryPath),cli:{operation:"recovery"}},
     progress: operation("GET", "/v1/workspace/runs/progress", "Wait up to 25 seconds for a change to this exact run. Pass the last cursor to resume. Returns the complete current bounded cohort, live research count and terminal state; not a persisted event history. Read-only and reauthorized on each poll.", RunProgressSchema, null, RunProgressQuerySchema),
     get: operation("GET", stageRoute("sample-review"), "Read the existing cohort, grades and run state; no persisted approval ledger.", RunStatusSchema),
     post: operation("POST", stageRoute("sample-review"), "Start/retrieve the existing bounded initial run; no repeated discovery waves or new approval store.", StartRunResultSchema, Empty),

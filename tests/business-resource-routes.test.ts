@@ -98,10 +98,7 @@ describe("typed Business direct HTTP boundary", () => {
     ).toBe(201);
     expect(h.rpc).toHaveBeenCalledExactlyOnceWith(
       "create_lifty_business_profile",
-      {
-        p_payload: { name: "Example", website_url: null },
-        p_workspace_id: workspaceRef,
-      },
+      { p_payload: { name: "Example", website_url: null } },
     );
     expect(h.authenticate).toHaveBeenCalledOnce();
     const replay = await harness({ ...created, created: false }).request(
@@ -172,6 +169,36 @@ describe("typed Business direct HTTP boundary", () => {
       expect(h.rpc).not.toHaveBeenCalled();
     },
   );
+  it.each([
+    ["CRITERIA_REGENERATION_REQUIRED", "PT409", 409],
+    ["PROFILE_CONFIRMATION_REQUIRED", "PT409", 409],
+    ["SETUP_REQUIRED", "PT409", 409],
+    ["TARGETING_LANE_UNKNOWN", "PT422", 422],
+    ["VERSION_REQUIRED", "PT422", 422],
+  ])(
+    "preserves the expected SQL repair state %s",
+    async (message, code, status) => {
+      const h = harness(null, {
+        code,
+        message,
+        details: JSON.stringify({
+          stale_sources: ["profile", "base"],
+          private: "Secret upstream detail",
+        }),
+      });
+      const response = await h.request(
+        "/v1/workspace/research-criteria",
+        "PATCH",
+        { expected_version: 1, research_fields: [] },
+      );
+      expect(response.status).toBe(status);
+      const body = await response.json();
+      expect(body.error.code).toBe(message);
+      expect(body.error.message).not.toContain("could not be verified");
+      expect(body.error.stale_sources).toEqual(["profile", "base"]);
+      expect(JSON.stringify(body)).not.toContain("Secret");
+    },
+  );
   it("patches profile values directly without regeneration or receipt transport", async () => {
     const h = harness({ ...get, profile: { ...profileFixture, version: 2 } });
     const body = {
@@ -184,7 +211,7 @@ describe("typed Business direct HTTP boundary", () => {
     expect((await result.json()).profile.version).toBe(2);
     expect(h.rpc).toHaveBeenCalledExactlyOnceWith(
       "patch_lifty_business_profile",
-      { p_workspace_id: workspaceRef, p_payload: body },
+      { p_workspace_id: null, p_payload: body },
     );
     expect(h.authenticate).toHaveBeenCalledOnce();
   });
@@ -216,70 +243,44 @@ describe("typed Business direct HTTP boundary", () => {
     expect(blocked.status).toBe(409);
     expect(await blocked.text()).not.toContain("secret database");
   });
-  it("requires explicit selection for multiple memberships and rejects foreign selectors before writes", async () => {
-    const other = {
-      ...membershipFixture,
-      workspace_ref: "11111111-1111-4111-8111-111111111111",
-      slug: "other",
-      name: "Other",
-      founder_default: false,
-    };
-    const h = harness(undefined, null, {
-      listMemberWorkspaces: async () => ({
-        workspaces: [membershipFixture, other],
-      }),
-    });
-    const ambiguous = await h.request("/v1/workspace/business");
+  it("returns the database selection rule as public codes with the caller's workspaces", async () => {
+    const workspaces = [
+      { workspace_ref: workspaceRef, name: "Example", slug: "example" },
+      { workspace_ref: "11111111-1111-4111-8111-111111111111", name: "Other", slug: "other" },
+    ];
+    const ambiguous = await harness(null, {
+      code: "PT409",
+      message: "lifty_workspace_ambiguous",
+      details: JSON.stringify({ workspaces }),
+    }).request("/v1/workspace/business");
     expect(ambiguous.status).toBe(409);
     expect((await ambiguous.json()).error).toEqual({
       code: "WORKSPACE_SELECTION_REQUIRED",
       message: expect.any(String),
-      workspaces: [
-        { workspace_ref: workspaceRef, name: "Example", slug: "example" },
-        { workspace_ref: other.workspace_ref, name: "Other", slug: "other" },
-      ],
+      workspaces,
     });
-    expect(
-      (
-        await h.request(
-          "/v1/workspace/business",
-          "PATCH",
-          { expected_version: 1, name: "Changed" },
-          { "x-lifty-workspace": "foreign" },
-        )
-      ).status,
-    ).toBe(403);
-    expect(h.rpc).not.toHaveBeenCalled();
-    expect(
-      (
-        await h.request("/v1/workspace/business", "GET", undefined, {
-          "x-lifty-workspace": "example",
-        })
-      ).status,
-    ).toBe(200);
-    expect(h.rpc).toHaveBeenCalledExactlyOnceWith(
-      "get_lifty_business_profile",
-      { p_workspace_id: workspaceRef },
+    const foreign = await harness(null, { code: "PT403", message: "lifty_workspace_forbidden" }).request(
+      "/v1/workspace/business",
+      "PATCH",
+      { expected_version: 1, name: "Changed" },
+      { "x-lifty-workspace": "foreign" },
     );
+    expect(foreign.status).toBe(403);
+    expect((await foreign.json()).error.code).toBe("WORKSPACE_FORBIDDEN");
   });
   it("allows a missing workspace read and refuses storing a setup draft before creation", async () => {
-    const h = harness({ workspace: null, profile: null }, null, {
-      listMemberWorkspaces: async () => ({ workspaces: [] }),
-    });
+    const h = harness({ workspace: null, profile: null });
     expect(await (await h.request("/v1/workspace/business")).json()).toEqual({
       workspace: null,
       profile: null,
     });
-    expect(
-      (
-        await h.request("/v1/workspace/setup/draft", "PATCH", {
-          expected_version: 0,
-          draft: draftFixture,
-          generated_criteria: null,
-        })
-      ).status,
-    ).toBe(409);
-    expect(h.rpc).toHaveBeenCalledOnce();
+    const draft = await harness(null, { code: "PT409", message: "WORKSPACE_NOT_READY" }).request(
+      "/v1/workspace/setup/draft",
+      "PATCH",
+      { expected_version: 0, draft: draftFixture, generated_criteria: null },
+    );
+    expect(draft.status).toBe(409);
+    expect((await draft.json()).error.code).toBe("WORKSPACE_NOT_READY");
   });
   it("preserves partial lanes and independently required criteria input without provider fields", async () => {
     const h = harness(rpcNames.get_lifty_targeting);
@@ -293,7 +294,7 @@ describe("typed Business direct HTTP boundary", () => {
       (await h.request("/v1/workspace/targeting", "PATCH", body)).status,
     ).toBe(200);
     expect(h.rpc).toHaveBeenCalledExactlyOnceWith("patch_lifty_targeting", {
-      p_workspace_id: workspaceRef,
+      p_workspace_id: null,
       p_payload: body,
     });
     for (const invalid of [
@@ -304,12 +305,10 @@ describe("typed Business direct HTTP boundary", () => {
           {
             id: laneFixture.id,
             company: {
-              employees: {
-                ranges: [
-                  { min: 100, max: 200 },
-                  { min: 10, max: 20 },
-                ],
-              },
+              employees: [
+                { min: 100, max: 200 },
+                { min: 10, max: 20 },
+              ],
             },
           },
         ],
@@ -340,7 +339,7 @@ describe("typed Business direct HTTP boundary", () => {
     ).toBe(200);
     expect(h.rpc).toHaveBeenCalledExactlyOnceWith(
       "patch_lifty_commercial_voice",
-      { p_workspace_id: workspaceRef, p_payload: body },
+      { p_workspace_id: null, p_payload: body },
     );
     expect(
       (
@@ -352,7 +351,7 @@ describe("typed Business direct HTTP boundary", () => {
     ).toBe(422);
     expect(h.rpc).toHaveBeenCalledOnce();
   });
-  it("stores a server draft and refuses generated criteria bound to the wrong resulting version", async () => {
+  it("stores a server draft and refuses client-bound draft versions in generated criteria", async () => {
     const h = harness({ ...draftGetFixture, version: 2 });
     expect(
       (
@@ -364,20 +363,22 @@ describe("typed Business direct HTTP boundary", () => {
       ).status,
     ).toBe(200);
     expect(h.rpc).toHaveBeenCalledExactlyOnceWith("save_lifty_setup_draft", {
-      p_workspace_id: workspaceRef,
+      p_workspace_id: null,
       p_payload: {
         expected_version: 1,
         draft: draftFixture,
         generated_criteria: null,
       },
     });
+    // The server binds generated criteria to the draft version it saves;
+    // clients send only the profile and base versions they generated from.
     const { version: _, updated_at: __, ...generated } = criteriaFixture;
     const response = await h.request("/v1/workspace/setup/draft", "PATCH", {
       expected_version: 1,
       draft: draftFixture,
       generated_criteria: {
         ...generated,
-        source_versions: { ...generated.source_versions, draft_version: 1 },
+        source_versions: { profile_version: 1, base_version: "base-v1", draft_version: 2 },
       },
     });
     expect(response.status).toBe(422);
@@ -403,7 +404,7 @@ describe("typed Business direct HTTP boundary", () => {
       /Apollo|Unipile|HeyReach|Smartlead|Mailivery/i,
     );
     expect(h.rpc).toHaveBeenCalledExactlyOnceWith("get_lifty_setup_context", {
-      p_workspace_id: workspaceRef,
+      p_workspace_id: null,
     });
   });
   it("submits the exact saved draft version and replays its receipt; discard after submission stays forbidden", async () => {
@@ -428,7 +429,7 @@ describe("typed Business direct HTTP boundary", () => {
       ).toEqual(receipt);
     expect(h.rpc.mock.calls[0]).toEqual([
       "submit_lifty_setup",
-      { p_workspace_id: workspaceRef, p_expected_draft_version: 2 },
+      { p_workspace_id: null, p_expected_draft_version: 2 },
     ]);
     expect(h.rpc.mock.calls[1]).toEqual(h.rpc.mock.calls[0]);
     const forbidden = harness(null, {
@@ -440,7 +441,7 @@ describe("typed Business direct HTTP boundary", () => {
     ).toBe(409);
     expect(forbidden.rpc).toHaveBeenCalledExactlyOnceWith(
       "discard_lifty_setup_draft",
-      { p_workspace_id: workspaceRef },
+      { p_workspace_id: null },
     );
   });
   it("rejects hostile output instead of serializing it and retains stale source conflicts", async () => {
@@ -538,7 +539,6 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
         "setup_patch_draft",
         "setup_delete_draft",
         "setup_generation_context",
-        "workspace_retire",
         "account_delete",
       ]),
     );
@@ -579,7 +579,13 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
       gates: null,
       saved: null,
     });
-    expect(h.rpc.mock.calls.map(([name]) => name)).toEqual([
+    const resumed = await (await h.request("/v1/workspace/next-step")).json();
+    expect(resumed.actions[0]).toContain("sample_review_post with body {}");
+    expect(resumed.actions.join("\n")).not.toContain(
+      "only after the founder asks",
+    );
+    expect(resumed.guide.task).toBe("step-sample");
+    expect(h.rpc.mock.calls.map(([name]) => name).slice(0, 4)).toEqual([
       "get_lifty_business_profile",
       "get_lifty_targeting",
       "get_lifty_research_criteria",
@@ -596,7 +602,7 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
     expect(await response.text()).not.toContain("private provider failure");
     expect(h.rpc).toHaveBeenCalledOnce();
   });
-  it("keeps Business checkpoint until confirmation and reports retired lifecycle without new work", async () => {
+  it("keeps Business checkpoint until confirmation and reports suspended lifecycle without new work", async () => {
     const h = harness({
       ...get,
       profile: {
@@ -612,11 +618,11 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
     expect(h.rpc).toHaveBeenCalledOnce();
     const retired = harness({
       ...get,
-      workspace: { ...identity, state: "retired" },
+      workspace: { ...identity, state: "suspended" },
     });
     expect(
       await (await retired.request("/v1/workspace/next-step")).json(),
-    ).toMatchObject({ state: "blocked", reason: "workspace_retired" });
+    ).toMatchObject({ state: "blocked", reason: "workspace_suspended" });
     expect(retired.rpc).toHaveBeenCalledOnce();
   });
 });
@@ -881,7 +887,13 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
         reason: "sample_ready_for_founder_review",
         section: "leads",
       });
-      expect(result.actions[1]).toContain(message);
+      expect(result.actions[2]).toContain(message);
+      expect(result.actions[3]).toContain(
+        "Close Section 1 in at most six lines",
+      );
+      expect(result.actions[3]).toContain("set up LinkedIn outreach now");
+      expect(result.guide).toMatchObject({ task: "step-review" });
+      expect(result.guide.instructions).toContain('If "not now", accept');
       expect(write).not.toHaveBeenCalled();
     },
   );
@@ -895,7 +907,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
     });
     const result = await (await h.request("/v1/workspace/next-step")).json();
     expect(result.state).toBe("review");
-    expect(result.actions[1]).toContain("currently unavailable");
+    expect(result.actions[2]).toContain("currently unavailable");
     expect(JSON.stringify(result)).not.toContain("secret");
   });
 });
@@ -982,7 +994,7 @@ describe("summary keeps independent tenant-scoped state", () => {
     "WORKSPACE_CHANGED",
     "WORKSPACE_UNAVAILABLE",
     "WORKSPACE_MISSING",
-    "WORKSPACE_AMBIGUOUS",
+    "WORKSPACE_SELECTION_REQUIRED",
     "WORKSPACE_SUSPENDED",
   ])("does not hide scope conflict %s", async (code) => {
     const h = harness(undefined, null, {

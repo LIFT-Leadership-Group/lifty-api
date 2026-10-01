@@ -1,4 +1,3 @@
-import { selectWorkspace } from "./workspace-selection.js";
 import type { AppDependencies, AuthSession } from "./app.js";
 import { getAgentContext } from "./agent-context.js";
 import {
@@ -9,7 +8,6 @@ import {
   SetupStatusSchema,
   type SetupGatesSchema,
 } from "./business-contracts.js";
-import { resolveBusinessWorkspace } from "./business-workspace.js";
 import { NextStepSchema, type NextStep } from "./next-step-contracts.js";
 import {
   RunStatusSchema,
@@ -29,21 +27,20 @@ const tool = (
 type Reads = Pick<
   AppDependencies,
   | "businessOperation"
-  | "listMemberWorkspaces"
   | "getRunStatus"
   | "workspaceCampaign"
   | "getHubspotConnection"
   | "getCrmSyncStatus"
 >;
+// The session forwards the caller's workspace selection; every read below
+// resolves the same workspace through the shared database rule.
 export async function getNextStep(
   deps: Reads,
   session: AuthSession,
-  selection?: string,
 ): Promise<NextStep> {
-  const target = await resolveBusinessWorkspace(deps, session, selection);
-  const ref = target?.workspace_ref ?? null;
-  const read = (key: string) => deps.businessOperation(session, key, ref);
+  const read = (key: string) => deps.businessOperation(session, key);
   const business = BusinessGetSchema.parse(await read("business.get"));
+  const ref = business.workspace?.workspace_ref ?? null;
   let saved: Record<string, unknown> | null = null;
   const response = (
     state: NextStep["state"],
@@ -56,7 +53,13 @@ export async function getNextStep(
     gates: z.infer<typeof SetupGatesSchema> | null = null,
     section: NextStep["section"] = "leads",
   ) => {
-    const guide = getAgentContext(context);
+    const guide = getAgentContext(
+      context === "sample-review"
+        ? state === "review"
+          ? "step-review"
+          : "step-sample"
+        : context,
+    );
     if (!guide) throw new Error("Missing next-step guide");
     return NextStepSchema.parse({
       state,
@@ -89,16 +92,6 @@ export async function getNextStep(
       code: "WORKSPACE_FORBIDDEN",
       message: "The resource does not belong to the selected workspace.",
     });
-  if (business.workspace.state === "retired")
-    return response(
-      "blocked",
-      "business",
-      "workspace_retired",
-      [
-        "This workspace is retired. Retained records remain readable; new work cannot start.",
-      ],
-      [tool("business", "get")],
-    );
   if (business.workspace.state === "suspended")
     return response(
       "blocked",
@@ -162,7 +155,7 @@ export async function getNextStep(
         "interview",
         "confirmed_interview_needed",
         [
-          "Resume the workspace server draft. Ask only its next missing gate, leading with a hypothesis; save every confirmed block with setup_patch_draft and the returned expected_version. Empty disqualifiers or parked motions are valid explicit decisions.",
+          "Resume the workspace server draft. Ask only its next missing gate, leading with a hypothesis; save every confirmed block with setup_patch_draft and the returned expected_version. Exclusions need at least one evidence-based disqualifier or an excluded industry code filter; an empty parked-motions list is a valid decision.",
           "When gates are complete, call next_step.",
         ],
         [tool("setup", "get_draft"), tool("setup", "patch_draft")],
@@ -194,7 +187,7 @@ export async function getNextStep(
   }
   // Resource heads are authoritative even when configured outside setup.
   const run = RunStatusSchema.parse(
-    await deps.getRunStatus(selectWorkspace(session, ref!)),
+    await deps.getRunStatus(session),
   );
   if (run.state !== "none" && run.workspace.workspace_ref !== ref)
     throw new PublicError({
@@ -208,7 +201,10 @@ export async function getNextStep(
       "sample-review",
       "sample_not_started",
       [
-        "Business is configured. Offer the initial sample with sample_review_post only after the founder asks to start; then follow its exact run_ref with sample_review_progress. This never activates recurring research or outreach.",
+        "sample_review_post with body {} and keep its run_ref. The first-run endpoint enforces platform discovery limits; when exhausted, give its actual reset time.",
+        "Tell the founder you are finding and researching five matching people, that it takes a few minutes, and that you will share each one as it lands.",
+        "sample_review_progress with run_ref, then the returned cursor and wait_seconds 25 until terminal. Keep one request open and narrate each new lead in one line.",
+        "When terminal, call next_step. This bounded initial sample does not activate recurring research or outreach.",
       ],
       ["sample_review_post", "sample_review_progress"],
       "sample-review",
@@ -219,7 +215,9 @@ export async function getNextStep(
       "sample-review",
       "sample_pending",
       [
-        `Follow sample_review_progress for run_ref ${run.run_ref}, one bounded request at a time. Narrate new researched people; never POST to check progress.`,
+        `sample_review_progress with run_ref ${run.run_ref}, then the returned cursor and wait_seconds 25 until terminal. Narrate each newly researched lead in one line.`,
+        "One request at a time: no sleeps and never POST again to check progress.",
+        "When terminal, call next_step.",
       ],
       ["sample_review_progress"],
       "sample-review",
@@ -231,9 +229,16 @@ export async function getNextStep(
       "sample-review",
       "sample_failed",
       [
-        "Read the exact research failure and explain its blocker. Retain saved results and retry only when the failure and founder intent allow it.",
+        "sample_review_get to read the failure and any saved evidence. Explain it plainly. A technical research failure can be retried once with sample_review_post; exhausted discovery gives its actual reset time.",
+        "For a failed acquisition, use sample_review_recovery_status with the exact workspace and first-run refs. Request verification with sample_review_recovery and the current expected_acquisition_ref; restart only after verified terminal evidence and an explicit founder request.",
+        "Offer to continue with outreach setup using saved leads while the search waits.",
       ],
-      ["sample_review_get"],
+      [
+        "sample_review_get",
+        "sample_review_post",
+        "sample_review_recovery_status",
+        "sample_review_recovery",
+      ],
       "sample-review",
       run,
     );
@@ -252,7 +257,7 @@ export async function getNextStep(
   if (campaign.state === "unconfigured") {
     const crm = await readComponent(async () =>
       HubspotConnectionStatusSchema.parse(
-        await deps.getHubspotConnection(selectWorkspace(session, ref!)),
+        await deps.getHubspotConnection(session),
       ),
     );
     let crmAction =
@@ -267,7 +272,7 @@ export async function getNextStep(
       else {
         const sync = await readComponent(async () => {
           const value = CrmSyncStatusSchema.parse(
-            await deps.getCrmSyncStatus(selectWorkspace(session, ref!)),
+            await deps.getCrmSyncStatus(session),
           );
           if (value.state !== "none" && value.workspace.workspace_ref !== ref)
             throw new PublicError({
@@ -283,7 +288,7 @@ export async function getNextStep(
             "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
         else if (sync.value.state === "none")
           crmAction =
-            "The CRM connection is saved and nothing is synced yet. Offer to sync these leads only after a separate explicit request.";
+            "The CRM connection is saved and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_sync_start, then crm_sync_status.";
         else if (["queued", "running"].includes(sync.value.state))
           crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
         else if (sync.value.state === "succeeded")
@@ -297,10 +302,21 @@ export async function getNextStep(
       "sample-review",
       "sample_ready_for_founder_review",
       [
-        "Show the researched people and evidence. Ask whether the targeting is confirmed or what should change. A leads-only workspace can stay here; CRM sync and outreach are optional and require a separate request.",
+        "Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps. Include lower-fit profiles and explain their mismatch.",
+        "Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample.",
         crmAction,
+        "Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach now; yes: summary_context task campaigns. A leads-only founder can stop here. If not now, accept it and do not ask again this session.",
       ],
-      ["sample_review_get", "summary_context"],
+      [
+        "sample_review_get",
+        "crm_get",
+        "crm_post",
+        "crm_mapping_context",
+        "crm_patch",
+        "crm_sync_start",
+        "crm_sync_status",
+        "summary_context",
+      ],
       "sample-review",
       run,
     );

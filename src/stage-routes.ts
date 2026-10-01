@@ -1,4 +1,3 @@
-import { resolveBusinessWorkspace } from "./business-workspace.js";
 import { businessEntries, validateBusinessRequest } from "./business-operations.js";
 import { readSenderRoster, readSenderSignatures, saveSenderSignature, SenderSignatureRequest } from "./sender-choice.js";
 import { getWorkspaceSummary, readComponent } from "./workspace-summary.js";
@@ -29,7 +28,7 @@ import {
   CampaignStagePatchSchema, CampaignStageQuerySchema, CampaignStageRequestSchema,
    ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
   NotificationStagePatchSchema, SendingAccountDisconnectSchema, SendingAccountQuerySchema,
-  SendingAccountStartSchema, SummaryQuerySchema, StageErrorSchema, stageOperations,
+  SendingAccountStartSchema, StageErrorSchema, stageOperations,
 } from "./stage-contracts.js";
 
 const Empty = z.object({}).strict();
@@ -70,7 +69,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
   app.get("/v1/workspace/next-step", async context => {
     parse(Empty, context.req.query());
     context.header("cache-control", "no-store");
-    return context.json(await getNextStep(dependencies, context.get("authSession"), context.req.header("x-lifty-workspace")));
+    return context.json(await getNextStep(dependencies, context.get("authSession")));
   });
   // The operation catalog is also the route inventory: request/response and RPC
   // owners are identical across HTTP, MCP and API-owned guidance.
@@ -79,17 +78,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       context.header("cache-control", "no-store");
       validateBusinessRequest(Empty, context.req.query(), definition.code);
       const session = context.get("authSession");
-      const selection = context.req.header("x-lifty-workspace");
-      let ref: string | null = null;
-      {
-        const target = await resolveBusinessWorkspace(dependencies, session, selection);
-        ref = target?.workspace_ref ?? null;
-        if (!ref && !["business.get", "business.post"].includes(key)) throw new PublicError({ status: 409, code: "WORKSPACE_NOT_READY", message: "Create the workspace before configuring Business." });
-      }
       const body = ["POST", "PATCH"].includes(definition.method) ? validateBusinessRequest(definition.request, await readBody(context, definition.code), definition.code) : undefined;
-      const result = definition.response.parse(await dependencies.businessOperation(session, key, ref, body));
-      const responseRef = "workspace_ref" in result ? result.workspace_ref : "workspace" in result && result.workspace ? result.workspace.workspace_ref : null;
-      if (ref && responseRef !== ref && key !== "business.post") throw forbidden();
+      const result = definition.response.parse(await dependencies.businessOperation(session, key, body));
       return context.json(result, key === "business.post" && "created" in result && result.created ? 201 : 200);
     };
     app.on(definition.method, definition.route, handler);
@@ -235,13 +225,13 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       : forward(context, "POST", "/v1/linkedin/disconnect", { workspace: current, confirm: true });
   });
 
-  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "workspace", "account"].includes(stage))) {
+  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account"].includes(stage))) {
     app.get(`/v1/workspace/${stage}`, async context => {
       context.header("cache-control", "no-store");
       const session = context.get("authSession");
       if (stage === "summary") {
-        const query = parse(SummaryQuerySchema, context.req.query());
-        return context.json(await getWorkspaceSummary(dependencies, session, query.workspace ?? context.req.header("x-lifty-workspace")));
+        parse(Empty, context.req.query());
+        return context.json(await getWorkspaceSummary(dependencies, session));
       }
       const current = await workspace(context);
       if (stage === "crm" || stage === "notifications") {

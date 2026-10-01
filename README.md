@@ -31,19 +31,21 @@ their bootstrap behavior. The context envelope remains `lifty-context.v1`.
 
 Business state is stored in workspace-scoped resources: commercial profile,
 neutral targeting lanes, research criteria and commercial voice. PATCH uses
-integer `expected_version` compare-and-swap and commits synchronously. Persona
-changes must carry criteria regenerated from the current sources and commit
-both resources atomically. Validation failures return bounded repair issues;
-conflicts return `current_version` without overwriting another writer.
+integer `expected_version` compare-and-swap and commits synchronously. The
+server assigns lane and persona ids; a lane change without id adds a lane and
+`{id, remove: true}` removes one. Persona changes must carry regenerated
+criteria and commit both resources atomically. The server records the source
+versions of every criteria revision. Validation failures return bounded repair
+issues; conflicts return `current_version` without overwriting another writer.
 
 Setup uses a server draft with its own version. `setup_generation_context`
 returns the actual current Scout base and API-owned guidance after login.
 Submission creates targeting and criteria in one transaction; an exact retry
 returns the existing receipt. Login, profile edits and setup never start
-research, connect an account or activate outreach. Multiple memberships require
-an explicit `x-lifty-workspace` UUID or slug, including Business creation.
-Retired workspaces keep their records and memberships; selecting a retired
-workspace for creation produces or replays its related successor.
+research, connect an account or activate outreach. One membership is selected
+implicitly. Several memberships require `x-lifty-workspace` (UUID or slug) on
+every authenticated call, reads and writes alike; the session forwards it to
+the database, which applies this one rule for every Lifty RPC.
 
 Edit public guidance in `src/agent-context/`. The CLI fetches fresh context,
 resolves a catalog operation and transports its request/response. It owns no
@@ -59,7 +61,7 @@ CLI before or alongside this API cutover; v5 is deliberately retired.
 - `GET /cli/auth` — hosted sign-in and loopback CLI authorization
 - `GET /v1/workspace/business`, `POST …/business`, `PATCH …/business` — typed profile and explicit workspace creation
 - `GET /v1/workspace/targeting`, `PATCH …/targeting` — versioned neutral targeting lanes
-- `GET /v1/workspace/research-criteria`, `PATCH …/research-criteria` — criteria, input contract and qualification policy
+- `GET /v1/workspace/research-criteria`, `PATCH …/research-criteria` — criteria text and research fields
 - `GET /v1/workspace/commercial-voice`, `PATCH …/commercial-voice` — independently versioned tone and rules
 - `GET /v1/workspace/setup/draft`, `PATCH …/setup/draft`, `DELETE …/setup/draft` — server draft with CAS
 - `GET /v1/workspace/setup/context` — authenticated Scout base and setup generation guidance
@@ -476,12 +478,17 @@ and 15–45 minute spacing. There are no extra steps or editable schedules.
 
 ### Workspace retirement
 
-Retirement archives the workspace and returns `state:"retired"`. It keeps
-membership, Business revisions, campaign/research history and sending budgets.
-Active connections and unresolved revocations must be disconnected or resolved
-before retirement; retained LinkedIn history alone does not prevent archival.
-Business reads stay available, while mutations and new runs are blocked.
-Account deletion remains a separate action.
+Customers cannot delete a workspace, and the customer catalog has no delete
+operation. Only a LIFT admin (`profiles.is_admin`) calls
+`POST /v1/workspaces/{workspace_ref}/retire`; other callers receive 403
+`WORKSPACE_FORBIDDEN`. A workspace with history (leads, campaigns, research runs
+or Business changes) is rejected with 409 `WORKSPACE_HISTORY_RETAINED`, even for
+an admin. There is no archive, restore or purge. A successful delete returns
+`state:"deleted"`.
+It requires exact workspace identity, disconnection and resolution of pending
+revocations; retained LinkedIn account/history guards still apply. Consumed
+sending budgets are preserved. Retirement is separate from Business and does
+not depend on the email service key. Account deletion remains a separate action.
 
 ### Deployment and acceptance
 

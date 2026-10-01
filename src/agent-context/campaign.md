@@ -473,12 +473,11 @@ without approval of the exact recipient, account and copy.
   exact recipient/copy for individual campaigns. Preparation never sends.
 - Never request, print or summarize tokens, keys, callback payloads or credentials.
 - Never disconnect without the founder's explicit yes in this conversation.
-- Configuration changes use the relevant stage's PATCH and generated-artifact
-  workflow where that stage requires one. Campaign graph/mode/overlay edits use
-  campaign modify. Do not repeat first onboarding for an already-configured workspace.
-- Multi-lane and protected-prompt restrictions stay in force; do not combine
-  lanes, replace hand-tuned prompts or route around a rejection.
+- Configuration changes use the owning resource's versioned PATCH. Campaign
+  graph/mode/overlay edits use campaign modify. Do not submit setup again for
+  an already-configured workspace or route around a rejection.
 
-Before new discovery, GET capacity for actual used/reserved/remaining slots and
-its reset time. Exhaustion does not prevent account setup, saved-lead review or
-drafting; never bypass reservations through retries, dry runs or manual inserts.
+Discovery limits are enforced by the research operations, which report
+exhaustion with its reset time. Exhaustion does not prevent account setup,
+saved-lead review or drafting; never bypass limits through retries, dry runs
+or manual inserts.

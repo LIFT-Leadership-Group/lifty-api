@@ -1,7 +1,17 @@
 # Targeting
 
-Read every saved search lane. Targeting owns the people/company search filters and stable personas. Use neutral fields from the operation schema; apply known exclusions as search filters before research costs budget. NAICS industry_codes and excluded_industry_codes use the public 2–6 digit standard; validate codes against the official NAICS reference at https://www.census.gov/naics/ . Personas have stable id, name, titles and optional persona_type; their role and organizational tell belong to setup criteria inputs.
+Targeting owns the people and company search filters and the personas. Read every saved lane before editing. Filter first: research costs time and budget, so an exclusion a search filter can express belongs here before any research runs (excluded_industry_codes, company.employees, locations). Explain that to the founder in one sentence. Only exclusions that need evidence go to the research criteria.
 
-PATCH lanes by id and expected_version. Only supplied fields change, including partial company fields; preserve every omitted lane/filter, NAICS code and domain. Allocation and data-quality knobs are platform policy. Employees supports a simple min/max range or ordered non-overlapping ranges for existing searches. Null clears a filter. Changed filters affect the next discovery, and already found people remain deduplicated.
+A lane has personas, seniorities, person_locations and company `{locations, industries, industry_codes, excluded_industry_codes, domains, employees, keywords}`. Lanes have no names; the server assigns lane and persona ids. NAICS industry_codes and excluded_industry_codes use the public 2–6 digit standard; validate codes against the official NAICS reference at https://www.census.gov/naics/ . company.employees is always a list of ordered, non-overlapping `{min, max}` ranges; max null means no ceiling. A persona is `{id, name, titles, persona_type}`; its role and organizational tell belong to the criteria inputs. Allocation and data-quality settings are platform policy, not targeting. Follow references.configuration for each filter's meaning.
 
-A persona change needs explicitly regenerated_criteria with its expected version and source versions in the same request; both writes are atomic. Filter edits regenerate nothing. After calibration, when evidence repeatedly disqualifies people for a filterable reason, propose the relevant filter and explain why it avoids wasted research. Initial creation belongs to setup; targeting is never deleted or activated here.
+PATCH sends expected_version and lanes:
+
+- `{id, ...fields}` changes that lane; omitted fields, including omitted company keys, stay as they are. Null clears a filter.
+- A lane without id is added (personas required); the server assigns its id.
+- `{id, remove: true}` removes that lane and carries no other keys. At least one lane must remain.
+
+Lanes you do not list stay unchanged. personas, when given, replaces that lane's list: keep each existing persona's id to preserve its identity; a persona without id is new.
+
+A persona change (added, removed, renamed, titles or type changed) needs regenerated_criteria in the same PATCH, because the criteria describe the personas: both change together or neither does. regenerated_criteria carries the criteria expected_version and the regenerated text and/or research_fields; author it with references.configuration. Without it the server returns CRITERIA_REGENERATION_REQUIRED and writes nothing. Filter-only edits regenerate nothing.
+
+Changed filters affect the next discovery; people already found are not repeated. After calibration, when several people were disqualified for a reason a filter could cover, propose that filter and explain that it keeps research on people who can fit (references.calibration). On VERSION_CONFLICT read the latest targeting and reapply only the intended change. Initial creation belongs to setup; targeting is never deleted or activated here.

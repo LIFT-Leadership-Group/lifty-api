@@ -8,7 +8,6 @@ import {
   VoiceGetSchema,
   SetupStatusSchema,
 } from "./business-contracts.js";
-import { resolveBusinessWorkspace } from "./business-workspace.js";
 import { WorkspaceStatusSchema } from "./contracts.js";
 import { EmailConnectionStatus } from "./email-contracts.js";
 import { LinkedinConnectionStatus } from "./linkedin-contracts.js";
@@ -16,7 +15,6 @@ import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { PublicError } from "./errors.js";
 import { EmailAccountsResult } from "./email-accounts-contracts.js";
 import type { MemberWorkspacesOutput } from "./member-workspaces.js";
-import { selectWorkspace } from "./workspace-selection.js";
 
 export const readResult = <T extends z.ZodType>(schema: T) =>
   z.discriminatedUnion("status", [
@@ -35,7 +33,7 @@ const WORKSPACE_SCOPE_CONFLICTS = new Set([
   "WORKSPACE_CHANGED",
   "WORKSPACE_UNAVAILABLE",
   "WORKSPACE_MISSING",
-  "WORKSPACE_AMBIGUOUS",
+  "WORKSPACE_SELECTION_REQUIRED",
   "WORKSPACE_SUSPENDED",
 ]);
 // Never convert an authentication/scope failure into an incomplete success.
@@ -250,20 +248,22 @@ export const WorkspaceSummarySchema = z
   })
   .strict();
 type MemberWorkspace = MemberWorkspacesOutput["workspaces"][number];
+// The session forwards the caller's workspace selection; every read resolves
+// the same workspace through the shared database rule.
 export async function getWorkspaceSummary(
   deps: AppDependencies,
   session: AuthSession,
-  selection?: string,
 ) {
-  // LIF-1138: a selected membership is read through the database's read-only
-  // selection. Reads that take the workspace explicitly keep the plain session.
-  const target = await resolveBusinessWorkspace(deps, session, selection);
-  const reads = target
-    ? selectWorkspace(session, target.workspace_ref)
-    : session;
+  const reads = session;
+  const state = WorkspaceStatusSchema.parse(await deps.getWorkspace(reads));
+  const target =
+    state.state === "needs_workspace"
+      ? null
+      : ((await deps.listMemberWorkspaces(session)).workspaces.find(
+          (item) => item.workspace_ref === state.workspace.workspace_ref,
+        ) ?? null);
   const client = target !== null && !target.self_service;
   const self_service = target?.self_service ?? null;
-  const state = WorkspaceStatusSchema.parse(await deps.getWorkspace(reads));
   const detail_operations = {
     business: "business.get",
     email: "sending-accounts.get channel=email",
@@ -289,13 +289,6 @@ export async function getWorkspaceSummary(
       detail_operations,
     });
   const current = state.workspace.workspace_ref;
-  if (target && current !== target.workspace_ref)
-    throw new PublicError({
-      status: 409,
-      code: "WORKSPACE_CHANGED",
-      message:
-        "The selected workspace changed while reading. Retry the summary.",
-    });
   const [
     business,
     targeting,
@@ -311,7 +304,7 @@ export async function getWorkspaceSummary(
   ] = await Promise.all([
     readComponent(async () => {
       const value = BusinessGetSchema.parse(
-        await deps.businessOperation(session, "business.get", current),
+        await deps.businessOperation(session, "business.get"),
       );
       if (value.workspace?.workspace_ref !== current || !value.profile)
         throw new PublicError({
@@ -325,7 +318,7 @@ export async function getWorkspaceSummary(
       async () =>
         scoped(
           TargetingGetSchema.parse(
-            await deps.businessOperation(session, "targeting.get", current),
+            await deps.businessOperation(session, "targeting.get"),
           ),
           current,
         ).targeting,
@@ -334,11 +327,7 @@ export async function getWorkspaceSummary(
       async () =>
         scoped(
           CriteriaGetSchema.parse(
-            await deps.businessOperation(
-              session,
-              "research-criteria.get",
-              current,
-            ),
+            await deps.businessOperation(session, "research-criteria.get"),
           ),
           current,
         ).criteria,
@@ -347,11 +336,7 @@ export async function getWorkspaceSummary(
       async () =>
         scoped(
           VoiceGetSchema.parse(
-            await deps.businessOperation(
-              session,
-              "commercial-voice.get",
-              current,
-            ),
+            await deps.businessOperation(session, "commercial-voice.get"),
           ),
           current,
         ).voice,
@@ -444,7 +429,7 @@ export async function getWorkspaceSummary(
     readComponent(async () =>
       scoped(
         SetupStatusSchema.parse(
-          await deps.businessOperation(session, "setup.status", current),
+          await deps.businessOperation(session, "setup.status"),
         ),
         current,
       ),

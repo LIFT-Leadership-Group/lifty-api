@@ -1,3 +1,4 @@
+import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult, type AcquisitionRecoveryInput, type AcquisitionRecoveryOutput } from "./acquisition-recovery.js";
 import { RepairIssueSchema } from "./business-contracts.js";
 import { executeBusinessOperation } from "./business-operations.js";
 import { createConfirmationRouter, invalidConfirmation, type ConfirmationAdapters, type ConfirmationAdapter, type ConfirmationLog } from "./connection-confirmation.js";
@@ -86,6 +87,7 @@ export interface AppDependencies {
   receiveClientEmailV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
   authorizeClientEmail: (state:string)=>Promise<string>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
+  acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
   deleteOwnLogin(session: AuthSession, input: DeleteLoginInput): Promise<DeleteLoginOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
@@ -114,7 +116,7 @@ export interface AppDependencies {
   getEmailAccountAttempt(session:AuthSession,input:EmailAccountStatusInput):Promise<EmailAccountStatusOutput>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
-  businessOperation(session: AuthSession, key: string, workspaceRef: string | null, payload?: unknown): Promise<unknown>;
+  businessOperation(session: AuthSession, key: string, payload?: unknown): Promise<unknown>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
   listMemberWorkspaces(session: AuthSession): Promise<MemberWorkspacesOutput>;
   startRun(session: AuthSession): Promise<StartRunResult>;
@@ -256,6 +258,42 @@ async function readRequestTextWithinLimit(
 }
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}",
+    operationId: "getAcquisitionRecovery",
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ workspace_ref: z.uuid(), first_run_ref: z.uuid() }) },
+    responses: {
+      200: JsonResponse(AcquisitionRecoveryStatus),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      403: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+  app.openAPIRegistry.registerPath({
+    method: "post",
+    path: "/v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}",
+    operationId: "requestOrRestartAcquisition",
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ workspace_ref: z.uuid(), first_run_ref: z.uuid() }),
+      body: {
+        required: true,
+        content: { "application/json": { schema: AcquisitionRecoveryBody } },
+      },
+    },
+    responses: {
+      200: JsonResponse(z.union([AcquisitionRecoveryStatus, AcquisitionRestartResult])),
+      400: JsonResponse(ErrorResponseSchema),
+      401: JsonResponse(ErrorResponseSchema),
+      403: JsonResponse(ErrorResponseSchema),
+      409: JsonResponse(ErrorResponseSchema),
+      502: JsonResponse(ErrorResponseSchema),
+    },
+  });
+
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -674,6 +712,7 @@ const defaultDependencies: AppDependencies = {
   getEmailAccountAttempt: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account setup could not be verified. Keep the same attempt reference."}); },
   denyHubspotCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
   denySlackCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
+  acquisitionRecovery: async () => { throw new PublicError({status:503,code:"ACQUISITION_RECOVERY_UNAVAILABLE",message:"Research recovery is not configured."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
   deleteOwnLogin: async () => { throw new PublicError({status:503,code:"LOGIN_DELETION_UNAVAILABLE",message:"Login deletion is not configured yet."}); },
   workspaceCampaign: async () => { throw new PublicError({ status: 503, code: "WORKSPACE_CAMPAIGN_NOT_CONFIGURED", message: "Workspace sequences are not configured yet." }); },
@@ -1413,6 +1452,54 @@ export function createApp(
       return context.json(NotificationTestResultSchema.parse(result));
     },
   );
+
+  app.get("/v1/workspaces/:workspace_ref/research/recovery/:first_run_ref", async (context) => {
+    context.header("cache-control", "no-store");
+    const refs = z.object({
+      workspace_ref: z.uuid(),
+      first_run_ref: z.uuid(),
+    }).safeParse(context.req.param());
+    if (!refs.success) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Choose exact workspace and first-run references.");
+    }
+    const result = await dependencies.acquisitionRecovery(context.get("authSession"), {
+      ...refs.data,
+      operation: "status",
+    });
+    return context.json(AcquisitionRecoveryStatus.parse(result));
+  });
+  app.post("/v1/workspaces/:workspace_ref/research/recovery/:first_run_ref", async (context) => {
+    context.header("cache-control", "no-store");
+    const refs = z.object({
+      workspace_ref: z.uuid(),
+      first_run_ref: z.uuid(),
+    }).safeParse(context.req.param());
+    if (!refs.success) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Choose exact workspace and first-run references.");
+    }
+    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
+    if (!raw.ok) {
+      return errorJson(context, 413, "INVALID_REQUEST", "Recovery request is too large.");
+    }
+    let body: unknown;
+    try {
+      body = JSON.parse(raw.text);
+    } catch {
+      return errorJson(context, 400, "INVALID_REQUEST", "Provide one recovery request as JSON.");
+    }
+    const parsed = AcquisitionRecoveryBody.safeParse(body);
+    if (!parsed.success) {
+      return errorJson(context, 400, "INVALID_REQUEST", "Choose recovery request or restart with the exact acquisition reference.");
+    }
+    const result = await dependencies.acquisitionRecovery(context.get("authSession"), {
+      ...refs.data,
+      ...parsed.data,
+    });
+    const schema = parsed.data.operation === "restart"
+      ? AcquisitionRestartResult
+      : AcquisitionRecoveryStatus;
+    return context.json(schema.parse(result));
+  });
 
   app.post("/v1/workspaces/:workspace_ref/retire", async (context) => {
     context.header("cache-control", "no-store");

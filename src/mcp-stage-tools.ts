@@ -20,7 +20,7 @@ const campaignReads = campaignReadOperations;
 const splitCampaigns = splitCampaignOperations;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
 const openWorld = new Set(["sample-review.post", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
-  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test"]);
+  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test", "sample-review.recovery"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.

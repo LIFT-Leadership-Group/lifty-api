@@ -26,7 +26,6 @@ export const membershipFixture = {
 };
 export const laneFixture = {
   id: "33333333-3333-4333-8333-333333333333",
-  name: "Founders",
   personas: [
     {
       id: "44444444-4444-4444-8444-444444444444",
@@ -43,7 +42,7 @@ export const laneFixture = {
     industry_codes: ["5415"],
     excluded_industry_codes: ["5241"],
     domains: null,
-    employees: { min: 11, max: 200 },
+    employees: [{ min: 11, max: 200 }],
     keywords: "B2B SaaS",
   },
 };
@@ -51,29 +50,28 @@ export const criteriaFixture = {
   version: 1,
   updated_at: "2026-10-01T18:00:00Z",
   text: "## ICP gate\n" + "Evidence based criteria. ".repeat(20),
-  input_contract: { version: 1, fields: [] },
-  qualification_policy: "person_first",
-  hand_tuned: false,
+  research_fields: [
+    { key: "role_start_date", description: "Start date of the lead's current role.", type: "text" as const },
+  ],
   source_versions: {
     profile_version: 1,
     targeting_version: 1,
     base_version: "base-v1",
   },
 };
+const { id: _laneId, personas: lanePersonas, ...laneFilters } = laneFixture;
 export const draftFixture = {
-  targeting: { lanes: [laneFixture] },
+  targeting: {
+    lanes: [{ ...laneFilters, personas: lanePersonas.map(({ id: _id, ...persona }) => persona) }],
+  },
   criteria_inputs: {
-    disqualifiers: [],
+    primary_motion: { name: "Find customers" },
+    disqualifiers: ["Already uses an in-house research team"],
+    size: null,
+    broad_search_confirmed: false,
     operating_state: "Founder owns sales",
-    primary_motion: { name: "Find customers", why_now: "New service" },
     parked_motions: [],
-    personas: [
-      {
-        persona_id: laneFixture.personas[0]!.id,
-        role: "decision_maker",
-        tell: "Leads sales",
-      },
-    ],
+    personas: [{ name: "Founder", role: "decision_maker", tell: "Leads sales" }],
   },
   evidence: [
     { kind: "founder_statement", text: "Founder confirmed the market" },

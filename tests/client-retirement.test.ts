@@ -3,7 +3,7 @@ import { createApp } from "../src/app.js";
 
 const current = "lifty-cli-context.v6";
 const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5"];
-const tasks = ["setup", "account", "workspace", "campaign", "stages", "business", "targeting", "research-criteria",
+const tasks = ["setup", "account", "campaign", "stages", "business", "targeting", "research-criteria",
   "sample-review", "commercial-voice", "crm", "sending-accounts", "campaigns", "notifications"];
 
 describe("retired client contracts", () => {

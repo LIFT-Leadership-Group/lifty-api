@@ -1,3 +1,4 @@
+import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
 import { createOAuthConfirmation } from "./oauth-confirmation.js";
 import { openHubspotConnectIntent } from "./hubspot-state.js";
 import { openSlackConnectIntent } from "./slack-state.js";
@@ -40,7 +41,7 @@ import {
   createSupabaseAuthenticator,
   createSupabaseReadinessCheck,
 } from "./supabase-auth.js";
-import { createCrmSyncTrigger, createCrmMappingTrigger, createFirstRunTrigger, createIntegrationRevocationTrigger, createNotificationDeliveryTrigger } from "./trigger-client.js";
+import { createAcquisitionVerificationTrigger, createCrmSyncTrigger, createCrmMappingTrigger, createFirstRunTrigger, createIntegrationRevocationTrigger, createNotificationDeliveryTrigger } from "./trigger-client.js";
 import { disconnectIntegration, getCrmSyncStatus, getRunStatus, getWorkspaceStatus, getNotificationConfig, listSlackNotificationChannels, upsertNotificationDestination, setNotificationRoute, enqueueNotificationTest, startCrmSyncRun, startRun } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
@@ -134,6 +135,7 @@ export function createProductionApp(config: ServiceConfig) {
     getRunStatus: session => getRunStatus(session, config.dashboardOrigin),
     getRunProgress: createRunProgressReader(),
     enqueueFirstRun: createFirstRunTrigger(config.trigger),
+    acquisitionRecovery: createAcquisitionRecoveryOperations({enqueueVerification:createAcquisitionVerificationTrigger(config.trigger),enqueueFirstRun:createFirstRunTrigger(config.trigger)}),
     startCrmSyncRun,
     getCrmSyncStatus,
     enqueueCrmSync: createCrmSyncTrigger(config.trigger),
