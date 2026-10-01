@@ -17,6 +17,7 @@ const upstreamErrors = {
   invalid_attempt:{status:400,code:"EMAIL_ATTEMPT_INVALID",message:"This connection attempt is invalid or expired. Check the workspace's email accounts before requesting a new link."},
   new_accounts_require_v2:{status:409,code:"CLIENT_UPDATE_REQUIRED",message:"Update Lifty and request a fresh connection link. New accounts use the Lifty-branded connection flow."},
   use_current_connection_flow:{status:409,code:"CLIENT_UPDATE_REQUIRED",message:"Update Lifty to check or reconnect this account through its current connection flow."},
+  unipile_v1_retired:{status:409,code:"EMAIL_V1_RETIRED",message:"This mailbox still uses Lifty's previous email connection, which no longer issues links. Keep it connected; LIFT moves it to the new Lifty sign-in."},
 } as const;
 const claimsSchema = z.object({v:z.literal(1),workspace_id:z.uuid(),workspace_slug:EmailAccountsRequest.shape.workspace,
   sender_id:z.uuid(),channel:z.literal("email"),identity:z.email().max(254),iat:z.number().int().nonnegative(),

@@ -25,6 +25,7 @@ type Snapshot=z.infer<typeof Snapshot>;
 type Claims=z.infer<typeof Claims>;
 interface RpcClient {rpc(name:string,args:Record<string,unknown>):Promise<{data:unknown;error:unknown}>}
 const errors:Record<string,{status:number;code:string;message:string}>={
+  email_v1_retired:{status:409,code:"EMAIL_V1_RETIRED",message:"This mailbox still uses Lifty's previous email connection, which no longer issues links. Keep it connected; LIFT moves it to the new Lifty sign-in."},
   client_update_required:{status:409,code:"CLIENT_UPDATE_REQUIRED",message:"Update Lifty and request a fresh link. New accounts use the Lifty-branded connection flow."},
   new_accounts_require_v2:{status:503,code:"EMAIL_V2_UNAVAILABLE",message:"Lifty's connection service is not ready for new accounts. Try again later."},
   client_email_workspace_forbidden:{status:403,code:"EMAIL_WORKSPACE_FORBIDDEN",message:"Choose a workspace you belong to."},
@@ -108,7 +109,8 @@ export function createClientEmailOperations(settings:EmailConnectSettings) {
     const parsed=EmailAccountConnectRequest.parse(input);
     // Version negotiation happens before native attempt creation in the DB.
     const raw=await rpc("start",{workspace:parsed.workspace,sender_ref:parsed.sender_ref,email:parsed.email,allow_v2:parsed.protocol_version===2},session);
-    if(z.object({legacy:z.literal(true)}).safeParse(raw).success)return legacy.connect(session,parsed);
+    // LIF-1183: client email never falls back to a V1 link, even from an older database.
+    if(z.object({legacy:z.literal(true)}).safeParse(raw).success)fail("email_v1_retired");
     const row=Snapshot.parse(raw);
     if(!sameWorkspace(parsed.workspace,row) || row.sender_ref!==parsed.sender_ref || row.email!==parsed.email)fail();
     requireV2(row);
