@@ -11,7 +11,8 @@ import { pathToFileURL } from "node:url";
 import { createApp } from "../dist/app.js";
 import { PublicError } from "../dist/errors.js";
 
-const cliRoot = path.resolve(process.argv[2] ?? "../lif-898-cli");
+if (!process.argv[2]) throw Error("Supply the absolute CLI source checkout");
+const cliRoot = path.resolve(process.argv[2]);
 const scenario = process.argv[3] ?? "saved";
 if (!["saved", "confirmed", "retry"].includes(scenario)) throw Error("Unknown scenario");
 const root = await realpath(await mkdtemp(path.join(tmpdir(), "lifty-fresh-session-")));
@@ -19,8 +20,15 @@ const project = path.join(root, "project"), authHome = path.join(root, "auth");
 await mkdir(project); await mkdir(authHome); await mkdir(path.join(authHome, ".lifty"), { mode: 0o700 });
 const id = "22222222-2222-4222-8222-222222222222", ref = "33333333-3333-4333-8333-333333333333", version = `sha256:${"a".repeat(64)}`;
 const workspace = { state: "ready_for_connections", workspace: { workspace_ref: id, name: "lifty-gtm" }, next_action: null };
-const website = { workspace_ref: id, version, website_url: scenario === "confirmed" ? "https://liftygtm.com/" : null,
-  candidates: ["https://liftygtm.com/", "https://liftleadershipgroup.com/"].map(url => ({ url, source: "saved_onboarding_research", confirmed: false })) };
+const profile = {version:1,updated_at:"2026-10-01T18:00:00Z",name:"lifty-gtm",website_url:{text:"https://liftygtm.com/",provenance:scenario === "confirmed" ? "confirmed" : "inferred",...(scenario === "confirmed" ? {} : {source:"public_research"})},one_liner:null,description:null,value_proposition:{text:"Less manual research",provenance:"confirmed"},offerings:[{text:"Prospect research",provenance:"confirmed"}],problems_solved:[{text:"Manual research takes time",provenance:"confirmed"}],confirmation:{complete:true,missing:[]}};
+const lane = {id:ref,name:"Founders",personas:[{id:ref,name:"Founder",titles:["Founder"],persona_type:null}],seniorities:null,person_locations:null,company:{locations:null,industries:null,industry_codes:null,excluded_industry_codes:null,domains:null,employees:{min:1,max:200},keywords:null}};
+const businessReads = {
+  "business.get":{workspace:{workspace_ref:id,name:profile.name,state:workspace.state},profile},
+  "targeting.get":{workspace_ref:id,targeting:{version:1,updated_at:profile.updated_at,lanes:[lane]}},
+  "research-criteria.get":{workspace_ref:id,criteria:{version:1,updated_at:profile.updated_at,text:"Evidence-based criteria. ".repeat(20),input_contract:null,qualification_policy:"person_first",hand_tuned:false,source_versions:{profile_version:1,base_version:"fixture-base"}}},
+  "commercial-voice.get":{workspace_ref:id,voice:{version:0,updated_at:profile.updated_at,tone:null,rules:[]}},
+  "setup.status":{workspace_ref:id,state:"none"},
+};
 const campaign = { workspace_ref: id, state: "paused", outreach_enabled: false, version_ref: ref, digest: "a".repeat(64),
   configuration: { name: "Lifty founder-led outbound — email", audience: { policy: "qualified_ab_v1", lead_ids: null, includes_future_leads: true }, linkedin: null,
     email: { connection_ref: ref, sender: "juan@liftleadershipgroup.com", steps: ["Prospecting", "Who owns prospecting?", "Check fit", "Keep control", "Leave it here?"].map(subject => ({ subject, text: "Hi {{first_name}}, this is saved approved copy for {{company_name}}. Juan" })), delays_days: [0,3,4,4,4] },
@@ -30,8 +38,11 @@ const campaign = { workspace_ref: id, state: "paused", outreach_enabled: false, 
 let emailReads = 0;
 const app = createApp({ authenticate: async req => req.headers.get("authorization") === "Bearer fixture-session" ? { ok: true, session: { userId: "fixture", client: {} } } : { ok: false, reason: "invalid_session" },
   getWorkspace: async () => workspace,
-  getBusinessWebsite: async () => website,
-  getConfig: async () => ({ workspace_ref: id, config: { workspace: { version, name: "lifty-gtm", description: "Lifty helps founder-led B2B companies research prospects and run outbound.", daily_discovery_target: 10 }, tone: { version, values: { identity: "Juan" } } } }),
+  listMemberWorkspaces:async()=>({workspaces:[{workspace_ref:id,slug:"lifty-gtm",name:profile.name,active:true,founder_default:true,self_service:true}]}),
+  businessOperation:async(_session,key,selected)=>{if(!key.endsWith(".get")&&key!=="setup.status")throw Error("fixture forbids writes");if(selected!==id)throw Error("fixture requires workspace scope");return businessReads[key];},
+  getRunStatus:async()=>({state:"none"}),
+  getHubspotConnection:async()=>({provider:"hubspot",status:"not_connected"}),
+  getCrmSyncStatus:async()=>({state:"none"}),
   getEmailConnection: async () => {
     if (scenario === "retry" && emailReads++ === 0) throw new PublicError({ status: 502, code: "EMAIL_UNAVAILABLE", message: "Fixture transient failure" });
     return { provider: "unipile", channel: "email", workspace_ref: id, status: "connected", email: "juan@liftleadershipgroup.com", mailbox_use: "personal", daily_limit: 10, warmup_required: false, sending_enabled: false, connection_ref: ref, intent_ref: null, failure_code: null };
@@ -46,7 +57,6 @@ const server = createServer(async (req, res) => {
   await writeFile(path.join(root, "requests.json"), JSON.stringify(calls, null, 2));
   if (req.method !== "GET") { res.writeHead(403, { "content-type": "application/json" }); res.end(JSON.stringify({ error: { code: "FIXTURE_WRITE_FORBIDDEN", message: "Read-only evaluation." } })); return; }
   if (url.pathname === "/auth/v1/user") { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ id: ref, email: "juan@liftleadershipgroup.com" })); return; }
-  if (url.pathname === "/v1/status") { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ workspace: { state: "ready_for_connections", workspace_ref: id, name: "lifty-gtm" }, onboarding: { state: "imported", submission_ref: ref, submitted_at: new Date().toISOString() }, configuration: { icp_version: 1 }, run: { state: "none" }, config_update: { state: "none" }, integrations: { hubspot: { available: false, connected: false }, unipile: { available: true, connected: true } } })); return; }
   try {
     const result = await app.request(url.pathname + url.search, { headers: req.headers });
     res.writeHead(result.status, Object.fromEntries(result.headers)); res.end(await result.text());

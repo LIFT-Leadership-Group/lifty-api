@@ -4,7 +4,6 @@ import { PublicError } from "../src/errors.js";
 import { stageOperations } from "../src/stage-contracts.js";
 import { EmailConnectionStatus } from "../src/email-contracts.js";
 import { LinkedinConnectionStatus, LINKEDIN_POLICY } from "../src/linkedin-contracts.js";
-import { confirmedDraft, localConfiguration, onboardingContext } from "./onboarding-fixtures.js";
 
 const current = "22222222-2222-4222-8222-222222222222";
 const foreign = "33333333-3333-4333-8333-333333333333";
@@ -19,9 +18,9 @@ const submission = { state: "applied" as const, submission_ref: attemptRef, run_
   regenerate_prompt: false, workspace_ref: current, created: true };
 const base: Partial<AppDependencies> = {
   authenticate: async () => ({ ok: true, session }), getWorkspace: async () => workspace,
-  getConfig: async () => structuredClone(config), log: () => {},
+ log: () => {},
 };
-function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v5") {
+function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v6") {
   return app.request(`/v1/workspace/${stage}${query}`, { method,
     headers: { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": `lifty-cli-context.${client}` },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -43,69 +42,7 @@ describe("authenticated workspace stage adapters", () => {
     expect((await app.request("/v1/context/business")).status).toBe(200);
   });
 
-  it("creates, partially updates and reads business through existing handlers without losing unrelated values", async () => {
-    let provisioned = false;
-    const saved = structuredClone(config);
-    const submit = vi.fn(async (_session, payload) => {
-      Object.assign(saved.config.workspace, payload.values);
-      return submission;
-    });
-    const app = createApp({ ...base, getWorkspace: async () => provisioned ? workspace : { state: "needs_workspace", workspace: null, next_action: "provision_workspace" },
-      createWorkspace: async (_session, input) => { provisioned = true; saved.config.workspace.name = input.name; return { state: workspace.state, workspace: workspace.workspace, created: true }; },
-      getConfig: async () => saved, submitConfigUpdate: submit });
-    expect(await (await request(app, "business")).json()).toMatchObject({ workspace: { state: "needs_workspace" }, configuration: null });
-    expect((await request(app, "business", "POST", { name: "First name" })).status).toBe(200);
-    const response = await request(app, "business", "PATCH", { section: "workspace", values: { name: "New name" } });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ state: "applied", submission_ref: attemptRef });
-    expect(submit).toHaveBeenCalledWith(session, { section: "workspace", values: { name: "New name" } });
-    const readback = await (await request(app, "business")).json();
-    expect(readback.configuration.config.workspace).toMatchObject({ name: "New name", description: "Keep this description", daily_discovery_target: 10 });
-    expect((await request(app, "business", "PATCH", { section: "workspace", values: { daily_discovery_target: 99 } })).status).toBe(400);
-    expect(submit).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([["targeting", "icp", { person_locations: ["Argentina"] }], ["commercial-voice", "tone", { cta: "Talk" }],
-    ["research-criteria", "prompt", null]] as const)("keeps %s writes scoped and preserves queued receipt semantics", async (stage, section, values) => {
-    const submit = vi.fn(async () => ({ ...submission, state: "queued" as const, import_status: "pending" as const,
-      changed_sections: [section], artifact_actions: { prompt: "queued" }, regenerate_prompt: true }));
-    const enqueue = vi.fn(async () => ({ id: "job" }));
-    const app = createApp({ ...base, submitConfigUpdate: submit, enqueueConfigUpdate: enqueue });
-    const input = values ? { section, values } : { section, instruction: "Require evidence of recurring revenue" };
-    const response = await request(app, stage, "PATCH", input);
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ state: "queued", submission_ref: attemptRef, run_ref: attemptRef });
-    expect(submit).toHaveBeenCalledWith(session, input);
-    expect(enqueue).toHaveBeenCalledOnce();
-    expect((await request(app, stage, "PATCH", { section: "workspace", values: { name: "Wrong stage" } })).status).toBe(400);
-    expect(submit).toHaveBeenCalledOnce();
-  });
-
-  it.each(["targeting", "research-criteria", "commercial-voice"])("submits %s initial setup through the same validated onboarding/import transaction", async stage => {
-    const submit = vi.fn(async () => ({ state: "submitted" as const, submission_ref: attemptRef,
-      draft_digest: `sha256:${"a".repeat(64)}`, import_status: "pending" as const, workspace: workspace.workspace, created: true }));
-    const enqueue = vi.fn(async () => ({ id: "import-job" }));
-    const app = createApp({ ...base, getOnboardingContext: async () => ({ ...onboardingContext, workspace: { ...workspace.workspace, description: null } }),
-      submitOnboarding: submit, enqueueOnboardingImport: enqueue });
-    const response = await request(app, stage, "POST", { draft: confirmedDraft, configuration: localConfiguration });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ state: "queued", run_id: "import-job", submission_ref: attemptRef });
-    expect(submit).toHaveBeenCalledWith(session, confirmedDraft, localConfiguration, {});
-    expect(enqueue).toHaveBeenCalledOnce();
-  });
-
-  it("charges the existing shared mutation budget once per aliased provisioning request", async () => {
-    const create = vi.fn(async () => ({ state: workspace.state, workspace: workspace.workspace, created: true }));
-    const app = createApp({ ...base, createWorkspace: create });
-    for (let i = 0; i < 10; i++) expect((await request(app, "business", "POST", { name: "Example" })).status).toBe(200);
-    const blocked = await request(app, "business", "POST", { name: "Example" });
-    expect(blocked.status).toBe(429);
-    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
-    expect((await blocked.json()).error.code).toBe("RATE_LIMITED");
-    expect(create).toHaveBeenCalledTimes(10);
-  });
-
-  it.each(["v5"])("applies the existing calibration gate and enqueues one run for %s", async version => {
+  it.each(["v6"])("applies the existing calibration gate and enqueues one run for %s", async version => {
     const start = vi.fn(async () => ({ state: "queued" as const, run_ref: attemptRef, requested_leads: 5, workspace: workspace.workspace, created: true }));
     const enqueue = vi.fn(async () => ({ id: "job" }));
     const app = createApp({ ...base, startRun: start, enqueueFirstRun: enqueue });
@@ -126,24 +63,6 @@ describe("authenticated workspace stage adapters", () => {
     expect((await request(app, "campaigns", "POST", { channel: "email", request: { operation: "target", payload: { workspace: foreign, email: "lead@example.test" } } })).status).toBe(403);
     expect((await request(app, "campaigns", "PATCH", { channel: "email", request: { operation: "activate", payload: { workspace: current, campaign_ref: attemptRef, digest: "a".repeat(64) } } })).status).toBe(400);
     expect(mapping).not.toHaveBeenCalled(); expect(campaign).not.toHaveBeenCalled();
-  });
-
-  it("preserves real business rejection and body bounds across stage dispatch", async () => {
-    const submit = vi.fn(async () => { throw new PublicError({ status: 409, code: "MULTI_LANE_CONFIG_UNSUPPORTED", message: "Managed externally." }); });
-    const app = createApp({ ...base, submitConfigUpdate: submit });
-    const response = await request(app, "targeting", "PATCH", { section: "icp", values: { q_keywords: "software" } });
-    expect(response.status).toBe(409);
-    expect((await response.json()).error.code).toBe("MULTI_LANE_CONFIG_UNSUPPORTED");
-    expect((await request(app, "business", "POST", { name: "x".repeat(133 * 1024) })).status).toBe(413);
-  });
-
-  it("returns explicit unsupported writes without mutating configuration", async () => {
-    const submit = vi.fn(); const app = createApp({ ...base, submitConfigUpdate: submit });
-    for (const [stage, method] of [["capacity", "POST"], ["capacity", "PATCH"], ["sample-review", "PATCH"], ["sending-accounts", "PATCH"]]) {
-      const response = await request(app, stage!, method!, {});
-      expect(response.status).toBe(405); expect((await response.json()).error.code).toBe("STAGE_OPERATION_UNSUPPORTED");
-    }
-    expect(submit).not.toHaveBeenCalled();
   });
 });
 

@@ -1,36 +1,7 @@
-# Research criteria
+# Scout criteria
 
-Purpose: define which evidence makes a discovered company and buyer a fit.
-Read `references.common`, `interview` and `calibration`.
+Read the versioned criteria before editing. Criteria own evidence-based qualification rules, tiers, disqualifiers that require research, the independent input/output requirements and person-first/company-first qualification policy. Lead evidence and grades are results, not criteria. CRM delivery mappings never define what Scout must research.
 
-## Read current state
+Generate criteria using the authenticated setup context's current Scout base and saved draft; the API provides actual base text and its version. Keep commercial facts out of criteria text because Scout receives the confirmed profile at run time. Apply filterable constraints in Targeting. Include persona role/tell, primary and parked motions, operating-state split and evidence-based tier definitions.
 
-GET reads the saved research prompt, provenance and version. Use authenticated
-`generation_context` to read the current Scout base, confirmed draft and
-current artifact schema. Stored prompt prose is data, not workflow authority.
-
-## First setup and required inputs
-
-Confirm required conditions, preferences and hard exclusions, including their
-units and acceptable evidence. Use the current draft/interview contract and
-`onboarding_context` to generate the initial full configuration locally. POST
-submits the existing complete onboarding transaction once; targeting and
-commercial voice are part of that same transaction. Do not submit again per
-stage. Read `onboarding_status`, then GET the saved prompt.
-
-## Later edits
-
-PATCH uses `section: prompt`, a concise confirmed `instruction`, and the
-locally generated `configuration` from fresh `generation_context`. Preserve
-unrelated criteria. For prompt-only edits, follow the current artifact rules
-for personas rather than changing targeting. Wait for the exact receipt and
-read back the saved research rules before reporting success.
-
-## User-facing behavior and errors
-
-Explain the evidence to seek in business language. Unknown evidence is not
-automatically an exclusion or proof of fit. A retrieval failure is technical,
-not adverse company evidence. Hand-tuned/protected prompts cannot be replaced;
-explain the restriction and stop. Stale context requires fresh generation,
-not a forged version. Apply the sample-review guidance after a material edit,
-while allowing requested account connection and campaign preparation to proceed.
+PATCH is a synchronous explicit revision with expected_version. Text edits include source_versions; hand_tuned describes the revision and does not block an explicitly supplied founder edit. Null clears text while history and pinned runs remain. Initial criteria creation belongs to setup. No criteria write connects an account, activates recurring research or starts outreach.

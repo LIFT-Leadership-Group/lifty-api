@@ -2,7 +2,6 @@ import { createOAuthConfirmation } from "./oauth-confirmation.js";
 import { openHubspotConnectIntent } from "./hubspot-state.js";
 import { openSlackConnectIntent } from "./slack-state.js";
 import { createRunProgressReader } from "./run-progress.js";
-import { getBusinessWebsite, setBusinessWebsite } from "./business-website.js";
 import { createWorkspaceCampaignOperations } from "./workspace-campaign.js";
 import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
 import { createCrmMappingReadinessCheck } from "./crm-mapping/readiness.js";
@@ -10,9 +9,6 @@ import { createCompanyMapping } from "./company-mapping.js";
 import { createCrmMapping } from "./crm-mapping.js";
 import { createLinkedinConnectOperations } from "./linkedin-connect.js";
 import { createLinkedinCampaignOperations } from "./linkedin-campaign.js";
-import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
-import { getApolloAllowance } from "./apollo-allowance.js";
-import { apolloCredentials } from "./apollo-credentials.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { deleteOwnLogin } from "./login-deletion.js";
 import { listMemberWorkspaces } from "./member-workspaces.js";
@@ -44,39 +40,8 @@ import {
   createSupabaseAuthenticator,
   createSupabaseReadinessCheck,
 } from "./supabase-auth.js";
-import {
-  createConfigUpdateTrigger,
-  createCrmSyncTrigger,
-  createCrmMappingTrigger,
-  createFirstRunTrigger,
-  createAcquisitionVerificationTrigger,
-  createIntegrationRevocationTrigger,
-  createNotificationDeliveryTrigger,
-  createOnboardingImportTrigger,
-} from "./trigger-client.js";
-import {
-  createWorkspace,
-  disconnectIntegration,
-  getConfig,
-  getConfigUpdateContext,
-  getConfigUpdateStatus,
-  resolveConfigUpdate,
-  getCrmSyncStatus,
-  getOnboardingContext,
-  getOnboardingStatus,
-  getRunStatus,
-  getWorkspaceStatus,
-  getNotificationConfig,
-  listSlackNotificationChannels,
-  upsertNotificationDestination,
-  setNotificationRoute,
-  enqueueNotificationTest,
-  requeueConfigUpdate,
-  startCrmSyncRun,
-  startRun,
-  submitConfigUpdate,
-  submitOnboarding,
-} from "./workspace-operations.js";
+import { createCrmSyncTrigger, createCrmMappingTrigger, createFirstRunTrigger, createIntegrationRevocationTrigger, createNotificationDeliveryTrigger } from "./trigger-client.js";
+import { disconnectIntegration, getCrmSyncStatus, getRunStatus, getWorkspaceStatus, getNotificationConfig, listSlackNotificationChannels, upsertNotificationDestination, setNotificationRoute, enqueueNotificationTest, startCrmSyncRun, startRun } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
   const linkedin = config.linkedin ? createLinkedinConnectOperations(config.linkedin) : null;
@@ -135,12 +100,6 @@ export function createProductionApp(config: ServiceConfig) {
     ...(warmupSetup ? {warmupSetup} : {}),
     ...(config.unipileV2HostedAuthOrigins ? {unipileV2HostedAuthOrigins:config.unipileV2HostedAuthOrigins} : {}),
     ...(config.unipileHostedAuthOrigin ? { unipileHostedAuthOrigin: config.unipileHostedAuthOrigin } : {}),
-    acquisitionRecovery: createAcquisitionRecoveryOperations({
-      enqueueVerification: createAcquisitionVerificationTrigger(config.trigger),
-      enqueueFirstRun: createFirstRunTrigger(config.trigger),
-    }),
-    getApolloAllowance,
-    apolloCredentials,
     ...((config.email?.serverKey ?? config.linkedin?.serverKey) ? { workspaceCampaign: createWorkspaceCampaignOperations((config.email?.serverKey ?? config.linkedin?.serverKey)!) } : {}),
     ...(linkedin ? {
       linkedinCampaign: createLinkedinCampaignOperations(config.linkedin!.serverKey),
@@ -155,8 +114,6 @@ export function createProductionApp(config: ServiceConfig) {
       emailAvailable: true,
       emailAuthorizationOrigin: new URL(config.email!.publicBaseUrl).origin,
       emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
-      retireWorkspace: createWorkspaceRetirement(config.email!.serverKey),
-      deleteOwnLogin,
       startEmailConnect: email.start,
       getEmailConnection: email.status,
       disconnectEmail: email.disconnect,
@@ -168,14 +125,11 @@ export function createProductionApp(config: ServiceConfig) {
       startEmailWarmup: warmup.start,
       changeEmailWarmup: (session, workspace, operation, connectionRef) => warmup[operation](session, workspace, connectionRef),
     } : {}),
+    retireWorkspace: createWorkspaceRetirement(),
+    deleteOwnLogin,
     authenticate: createSupabaseAuthenticator(config.supabase),
     getWorkspace: getWorkspaceStatus,
     listMemberWorkspaces,
-    createWorkspace,
-    submitOnboarding,
-    getOnboardingContext,
-    getOnboardingStatus,
-    enqueueOnboardingImport: createOnboardingImportTrigger(config.trigger),
     startRun,
     getRunStatus: session => getRunStatus(session, config.dashboardOrigin),
     getRunProgress: createRunProgressReader(),
@@ -183,14 +137,6 @@ export function createProductionApp(config: ServiceConfig) {
     startCrmSyncRun,
     getCrmSyncStatus,
     enqueueCrmSync: createCrmSyncTrigger(config.trigger),
-    getBusinessWebsite, setBusinessWebsite,
-    getConfig,
-    getConfigUpdateContext,
-    submitConfigUpdate,
-    getConfigUpdateStatus,
-    resolveConfigUpdate,
-    enqueueConfigUpdate: createConfigUpdateTrigger(config.trigger),
-    requeueConfigUpdate,
     disconnectIntegration,
     enqueueIntegrationRevocation: createIntegrationRevocationTrigger(config.trigger),
     enqueueNotificationDelivery: createNotificationDeliveryTrigger(config.trigger),

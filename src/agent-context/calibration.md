@@ -94,10 +94,10 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    outreach setup, continue that work instead of repeating the sample question.
 6. If the founder requests changes, clarify only the affected business
    decision, fetch `context targeting` or `context research-criteria`, follow its
-   generated-artifact PATCH and exact receipt/readback workflow, then repeat the
+   synchronous versioned PATCH and saved-resource readback workflow, then repeat the
    sample and review. Approval of an earlier sample never carries across
    targeting or research-criteria changes. Preserve existing connections and
-   drafts; only the sample's acceptance is stale. Do not repeat the initial onboarding POST for an existing
+   drafts; only the sample's acceptance is stale. Do not submit setup again for an existing
    configured workspace. If the stage still reports an old completed run after a material
    change, explain the blocker instead of presenting old grades as fresh.
 7. After sample acceptance (for example, "looks good"), or when the founder

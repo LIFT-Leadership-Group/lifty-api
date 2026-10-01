@@ -54,7 +54,7 @@ describe("self-service login deletion", () => {
     }
   });
   it("is a destructive connector tool on the same route", () => {
-    const tool = getStageMcpTools().find(entry => entry.name === "business_delete_login");
+    const tool = getStageMcpTools().find(entry => entry.name === "account_delete");
     expect(tool?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
     expect(JSON.stringify(tool?.inputSchema)).toContain("confirm_email");
   });

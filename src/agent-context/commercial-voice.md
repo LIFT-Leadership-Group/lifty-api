@@ -1,34 +1,7 @@
 # Commercial voice
 
-Purpose: preserve the customer's identity, value proposition and preferred
-commercial language. This is distinct from Lifty's own identity/tone Markdown.
-Read `references.common` and `interview`.
+Voice holds general writing preferences shared by every channel, campaign and reply. Read tone and rules before asking. It exists empty at version 0; capture it before the first draft in outreach setup, and from confirmed founder feedback. It is not required to finish the leads interview.
 
-## Read current state
+PATCH tone and/or rules with expected_version. Null clears tone, lists replace, omitted fields remain. Rules are do/avoid statements with founder, founder_feedback or migration source. There is no universal language or example field.
 
-GET returns saved tone values. Read `generation_context` before changes and
-reuse the founder's confirmed language/examples already present there.
-
-## First setup and required inputs
-
-Collect only missing business voice, proposition and call-to-action decisions
-required by the current draft/generation schema. Initial voice participates
-in the full first onboarding configuration: use `onboarding_context`, generate
-locally, and POST the existing `draft` plus `configuration` once. Do not repeat
-the onboarding transaction for a workspace already configured. Read the import
-receipt and the saved voice afterward.
-
-## Later edits
-
-PATCH uses `section: tone`, changed `values` (for example identity, value_prop
-or cta), and the local `configuration` required by fresh generation context.
-Preserve targeting/personas and unrelated tone fields. Wait for the update
-receipt and GET readback before saying the new voice is applied.
-
-## User-facing behavior and errors
-
-Play back the proposed wording and its business purpose; avoid a generic voice
-questionnaire when examples already answer it. Voice configuration does not
-edit or approve an existing campaign preview: use the campaign stage for exact
-copy changes and obtain fresh approval there. Respect protected prompt and
-stale generation errors; do not turn an uncertain response into another write.
+Platform writing rules always apply. Among founder preferences, campaign-specific instructions win over general voice when they conflict. When the founder corrects a draft, propose whether the correction is general or campaign-specific and save only after confirmation. New drafts read the latest voice; approved active campaigns retain their version pins. Voice never reaches Scout or regenerates research criteria.

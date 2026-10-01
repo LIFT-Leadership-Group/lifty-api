@@ -16,63 +16,58 @@ configured Hono app for programmatic use.
 
 ### Agent task context
 
-`GET /v1/context/stages` indexes the ten configuration stages. Each
-`GET /v1/context/{stage}` returns current public Markdown, references, schemas
-and named operation routes. The onboarding/workspace/campaign entry contexts
-remain available. Public context works before login and contains no tenant
-values or Scout base.
+`GET /v1/context/stages` indexes the current stages. Each
+`GET /v1/context/{stage}` returns public guidance, schemas and operation routes
+from the same catalog used by HTTP and MCP. Public context works before login
+and contains no tenant values or Scout base.
 
-The only supported client contract is `lifty-cli-context.v5`. The CLI requests
-it through the public context query parameter `client_contract` and sends
-`x-lifty-client-contract: lifty-cli-context.v5` on every authenticated API call.
-Explicit v1–v4 or unknown context profiles return HTTP 409
-`CONTEXT_CLIENT_UNSUPPORTED` with upgrade guidance. Unversioned public links
-show current documentation. After authentication, private `/v1/*` requests
-with a missing, retired or unknown contract also return 409 before business
-handlers. Invalid sessions still return 401. Health, login and provider browser
-callbacks retain their existing bootstrap/consent behavior.
+The supported client contract is `lifty-cli-context.v6`. The CLI requests it
+through the public `client_contract` query and sends
+`x-lifty-client-contract: lifty-cli-context.v6` on authenticated requests.
+Missing, retired or unknown contracts return 409 `CONTEXT_CLIENT_UNSUPPORTED`
+after authentication. Invalid sessions return 401. Public unversioned links
+show current documentation. Health, login and provider browser callbacks keep
+their bootstrap behavior. The context envelope remains `lifty-context.v1`.
 
-This intentionally retires the frozen v4 guides and older compatibility
-profiles during internal testing (LIF-896). Upgrade the installed CLI/skill
-before resuming a retired client, preserving private drafts and configuration.
-The current v5 CLI already supplies the required header, so this API change
-requires no v5 npm update. The JSON envelope remains `lifty-context.v1`; that
-format is separate from the retired client profile names.
+Business state is stored in workspace-scoped resources: commercial profile,
+neutral targeting lanes, research criteria and commercial voice. PATCH uses
+integer `expected_version` compare-and-swap and commits synchronously. Persona
+changes must carry criteria regenerated from the current sources and commit
+both resources atomically. Validation failures return bounded repair issues;
+conflicts return `current_version` without overwriting another writer.
 
-Edit task guidance in `src/agent-context/`. Stage transport fetches fresh
-context on each invocation, resolves its method/route, and passes business
-inputs/responses through. Business validation remains in the API/RPCs. Private
-context at `/v1/onboarding/context` and `/v1/config/context` supplies generation
-rules, artifact schemas and workspace fingerprints. Ordinary stage guide,
-schema and route changes work with the same v5 installed artifact. Changing
-CLI transport, bootstrap or local helpers can still require a client release.
-A content revision is not authorization to mutate a workspace.
+Setup uses a server draft with its own version. `setup_generation_context`
+returns the actual current Scout base and API-owned guidance after login.
+Submission creates targeting and criteria in one transaction; an exact retry
+returns the existing receipt. Login, profile edits and setup never start
+research, connect an account or activate outreach. Multiple memberships require
+an explicit `x-lifty-workspace` UUID or slug, including Business creation.
+Retired workspaces keep their records and memberships; selecting a retired
+workspace for creation produces or replays its related successor.
 
-Build replaces `dist/agent-context/` with the current public assets, removing
-retired guides from incremental builds. If context retrieval fails, preserve
-local work and stop dependent writes instead of using stale instructions.
+Edit public guidance in `src/agent-context/`. The CLI fetches fresh context,
+resolves a catalog operation and transports its request/response. It owns no
+Business schema, generation template or authoritative local draft. Build
+replaces `dist/agent-context/`, removing retired assets. Publish a compatible v6
+CLI before or alongside this API cutover; v5 is deliberately retired.
 
 ### Routes
 
-- `GET /healthz` — liveness
-- `GET /readyz` — process readiness after configuration and app construction
+- `GET /healthz`, `GET /readyz` — process liveness and readiness
 - `GET /openapi.json` — generated OpenAPI 3.1 contract
-- `GET /v1/context/{task}` — public task guidance for onboarding, workspace or campaign
-- `GET /cli/auth` — hosted founder sign-in and loopback CLI authorization
-- `GET /v1/workspace` — authenticated founder workspace state
-- `POST /v1/workspace` — authenticated, idempotent workspace creation at login (LIF-655)
-- `POST /v1/onboarding` — authenticated `{draft, configuration}` submission; queues deterministic validation and application of locally generated ICP/Scout configuration (LIF-851). Missing configuration fails with `LOCAL_CONFIGURATION_REQUIRED`; no server agent fallback.
-- `GET /v1/onboarding/context` — authenticated founder-scoped workspace and Scout rules for local generation; includes the contract and context versions required by the push. Includes server-owned `generation_rules` and `configuration_schema` for the local agent. Refresh and regenerate on `ONBOARDING_CONTEXT_STALE`.
-- `GET /v1/onboarding` — authenticated import status with a secret-free config summary
-- `POST /v1/workspace/runs` — start (or re-attach to) the first ICP run of five leads (LIF-657)
-- `GET /v1/workspace/runs` — run state, progress, and researched results
-- `GET /v1/status` — the aggregate overview read by `lifty status` before LIF-1137: workspace, onboarding import, first run, latest config update, and per-provider connection + last sync (LIF-669). Kept for older CLIs; current clients read `GET /v1/workspace/summary`, which includes all of it. Never touches OAuth.
-- `GET /v1/config` / `GET /v1/config/{section}` — secret-free workspace config (`icp`, `tone`, `prompt`, `workspace`), each with a version stamp
-- `PATCH /v1/config` — config update through the LIF-667 seam. Body: `{section, values}`, `{section: "prompt", instruction}`, or `{values}`. Filter/tone/workspace writes land synchronously; persona, tone, and prompt regenerations return `queued` and run through the `lifty-config-update` job (LIF-668). While one regeneration is queued any other change answers 409 `CONFIG_UPDATE_IN_FLIGHT`; re-sending the queued update re-attaches (LIF-681)
-- `GET /v1/config/updates/{submission_ref}` — poll a queued update (state, changed sections, new versions, error code)
-- `POST /v1/integrations/{provider}/connect` — mint a short-lived connect URL (`hubspot` or `slack`; `unipile` is reserved and answers 501 until its connect path exists)
-- `GET /v1/workspaces/{workspace_ref}/integrations/apollo/key-source` — current Apollo source/configuration, no credentials
-- `POST /v1/workspaces/{workspace_ref}/integrations/apollo/key-source` — `{operation:"platform_default"}` or `{operation:"own_key",api_key:"…"}`; current member of a LIFTY workspace only. Active acquisition and outstanding allowance reservations block changes. Exact retries are idempotent; previous secret identities remain intact. Requires the LIF-641 DB contract and Jobs LIF-680 reserve-before-key-load. Unipile own-key selection is not supported by this Apollo endpoint.
+- `GET /v1/context/{task}` — public stage guidance and operation catalog
+- `GET /cli/auth` — hosted sign-in and loopback CLI authorization
+- `GET /v1/workspace/business`, `POST …/business`, `PATCH …/business` — typed profile and explicit workspace creation
+- `GET /v1/workspace/targeting`, `PATCH …/targeting` — versioned neutral targeting lanes
+- `GET /v1/workspace/research-criteria`, `PATCH …/research-criteria` — criteria, input contract and qualification policy
+- `GET /v1/workspace/commercial-voice`, `PATCH …/commercial-voice` — independently versioned tone and rules
+- `GET /v1/workspace/setup/draft`, `PATCH …/setup/draft`, `DELETE …/setup/draft` — server draft with CAS
+- `GET /v1/workspace/setup/context` — authenticated Scout base and setup generation guidance
+- `POST /v1/workspace/setup`, `GET …/setup/status` — atomic submission and durable receipt
+- `GET /v1/workspace/summary`, `GET …/next-step` — independently observed resources and resumption guidance
+- `GET /v1/workspace` — authenticated workspace state
+- `POST /v1/workspace/runs`, `GET …/runs` — initial research run and results
+- `POST /v1/integrations/{provider}/connect` — short-lived connection URL
 - `POST /v1/workspaces/{workspace_ref}/integrations/slack/connect-link` — admin-only seven-day client invitation for an explicit workspace; requires membership as well as LIFT admin status
 - `GET /v1/integrations/{provider}` — secret-free connection status
 - `DELETE /v1/integrations/{provider}` — disconnect: detaches the stored grant (unusable by LIFT from that moment), deactivates the integration, clears the portal pointer, and enqueues the `lifty-integration-revoke` job that revokes the grant at the provider best-effort and deletes the secret (LIF-681); 409 while a CRM sync is in flight. Founder confirmation is the skill's job (LIF-669)
@@ -414,7 +409,6 @@ References: [Mailivery OAuth](https://mailivery.readme.io/reference/createcampai
 [Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect).
 
 
-Acquisition recovery is explicit and asynchronous: GET `/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}` reads status; POST `{operation:"request",expected_acquisition_ref:"UUID"}` requests authoritative task verification only. POST `{operation:"restart",expected_acquisition_ref:"UUID"}` restarts only the exact verified terminal acquisition, preserving the first-run cohort and historical allowance. Both mutations bind the selected workspace before SQL changes. Failed enqueue leaves its durable request/attempt intact; retry the same references. This requires the LIF-641 recovery DB/verifier deployment.
 
 ## Password recovery (LIF-837)
 
@@ -480,13 +474,14 @@ The backend owns atomic reservations: 5 invitations/day, 25 invitations in a
 rolling 7 days, 5 messages/day, weekdays 09:00–17:00 in the founder timezone,
 and 15–45 minute spacing. There are no extra steps or editable schedules.
 
-### Workspace retirement limitation
+### Workspace retirement
 
-LinkedIn v1 cannot retire a workspace with a bound LinkedIn account or retained
-LinkedIn history. Retirement returns `409 WORKSPACE_LINKEDIN_RETENTION_REQUIRED`.
-Disconnecting LinkedIn stops sending but preserves account records and historical
-sending limits; it does not remove this retirement guard. Retention-safe workspace
-retirement needs a separate change.
+Retirement archives the workspace and returns `state:"retired"`. It keeps
+membership, Business revisions, campaign/research history and sending budgets.
+Active connections and unresolved revocations must be disconnected or resolved
+before retirement; retained LinkedIn history alone does not prevent archival.
+Business reads stay available, while mutations and new runs are blocked.
+Account deletion remains a separate action.
 
 ### Deployment and acceptance
 
@@ -515,7 +510,6 @@ Provider contracts checked: [account readback](https://developer.unipile.com/ref
 [own-profile readback](https://developer.unipile.com/reference/userscontroller_getaccountownerprofile),
 [Hosted Auth](https://developer.unipile.com/docs/hosted-auth).
 
-Onboarding publication runs a deterministic linter before storing a receipt or queuing a job. A `422 LOCAL_CONFIGURATION_INVALID` response includes up to 20 `error.issues` entries with `{code, path, message, suggestion}`; paths are JSON pointers rooted at `/configuration` or `/draft`. The local agent can repair technical issues and push again. Diagnostics never include submitted targeting values or prompt text. Checks cover schema, confirmed personas/titles, employee bounds, Apollo seniorities, duplicates, required Scout sections, the 52,000 character budget, and copied global Scout instructions. Semantic fit still depends on the founder-confirmed draft.
 
 ### Company mapping for the local agent
 
@@ -537,13 +531,13 @@ Rollout: apply `20260916115048_lif858_company_api_capability.sql`, provision a c
 4. Run `npm run verify`, verify the restored Edge with an authenticated nonproduction context/apply/readback canary, and merge the reviewed rollback. Deploy its **new main SHA** by following the automatically triggered `Deploy` workflow. Use `bash scripts/digitalocean.sh deploy <full-new-main-sha>` only for an intentional manual redeploy, not alongside CI. The deployment script deliberately rejects old/non-head commits; do not bypass that protection. The company-only revert restores the previous smoke script (health, readiness, OpenAPI and failed-closed authentication); use the Edge canary as the company capability proof for this rollback, since that API revision has no native `/readyz/crm` route.
 5. Remove the maintenance flag only after readback verifies the intended workspace/portal. Existing DB mappings and provider properties remain intact. Never delete additive provider fields to simulate a rollback.
 
-Company setup guidance is served through the current v5 CRM stage context.
+Company setup guidance is served through the current v6 CRM stage context.
 Earlier client profiles are retired; the response envelope remains
 `lifty-context.v1`. The company mapping backend must be available before use.
 
 ### General CRM mapping and verified record links (LIF-897)
 
-Current v5 clients discover the full mapper through `context crm`. Its
+Current v6 clients discover the full mapper through `context crm`. Its
 `mapping_catalog`, `mapping_sources`, `mapping_preview`, `mapping_apply`,
 `property_create`, `mapping_sync` and `mapping_status` operations reuse the
 existing CRM mapping contract. The bounded company onboarding flow remains
@@ -567,7 +561,7 @@ also gates `lifty_crm_mapping_tools`; no API service-role key is introduced.
 checks the installed RPC/version/key without reading tenant data, credentials
 or HubSpot; it does not prove that the replay worker is deployed. Verify the
 Jobs task version separately and use a disposable nonproduction exact-cohort
-preview/replay/readback canary under the existing canary policy. Generic v5
+preview/replay/readback canary under the existing canary policy. Generic v6
 clients consume these API-owned operations without a new CLI business registry.
 
 ## Staged Unipile V2 connections (LIF-916)

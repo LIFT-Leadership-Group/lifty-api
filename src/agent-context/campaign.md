@@ -76,8 +76,8 @@ chosen purpose, voice and previously approved content.
   of three texts. Existing shared defaults may supply a bank when omitted;
   preparation reports missing or invalid templates. Read the saved bank before
   modifying it. Generated mode and templates are distinct supported choices.
-- This `overlay` is the campaign's **outreach** overlay. The generated onboarding
-  configuration and Scout research overlay configure discovery/research; they
+- This `overlay` is the campaign's **outreach** overlay. The typed targeting
+  resource and Scout criteria configure discovery/research; they
   do not configure outreach copy. Use campaign operations for outreach changes.
 
 An overlay should work for future recipients. Sample-specific observations are

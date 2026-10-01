@@ -19,7 +19,7 @@ export interface McpDependencies extends McpSettings {
 /** Extension point for tools backed by the same authenticated REST handlers. */
 export interface McpToolRegistry {
   tools: Tool[];
-  call(name: string, args: Record<string, unknown>, request: Request): Promise<CallToolResult>;
+  call(name: string, args: Record<string, unknown>, request: Request, session: AuthSession): Promise<CallToolResult>;
   /** The caller's own workspace memberships, reported by whoami. */
   workspaces?(session: AuthSession): Promise<MemberWorkspacesOutput>;
 }
@@ -74,7 +74,7 @@ function createMcpServer(session: AuthSession, request: Request, settings: McpSe
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     }
     if (registry?.tools.some(tool => tool.name === params.name)) {
-      const result = await registry.call(params.name, params.arguments ?? {}, request);
+      const result = await registry.call(params.name, params.arguments ?? {}, request, session);
       if (result.isError && result.structuredContent?.status === 401) {
         return { ...result, _meta: { ...result._meta, "mcp/www_authenticate": [challenge(settings) + ', error="invalid_token", error_description="The Lifty session is no longer active. Reconnect Lifty."'] } };
       }

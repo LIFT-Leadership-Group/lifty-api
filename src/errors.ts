@@ -10,12 +10,20 @@ export interface PublicErrorOptions {
   message: string;
   cause?: unknown;
   diagnostics?: UpstreamDiagnostics;
+  issues?: { code: string; path: string; message: string; suggestion: string }[];
+  current_version?: number;
+  stale_sources?: string[];
+  workspaces?: { workspace_ref: string; name: string; slug: string }[];
 }
 
 export class PublicError extends Error {
   readonly status: number;
   readonly code: string;
   readonly diagnostics: UpstreamDiagnostics | undefined;
+  readonly issues: PublicErrorOptions["issues"];
+  readonly current_version: number | undefined;
+  readonly stale_sources: string[] | undefined;
+  readonly workspaces: PublicErrorOptions["workspaces"];
 
   constructor(options: PublicErrorOptions) {
     super(options.message, { cause: options.cause });
@@ -23,5 +31,7 @@ export class PublicError extends Error {
     this.status = options.status;
     this.code = options.code;
     this.diagnostics = options.diagnostics;
+    this.issues = options.issues; this.current_version = options.current_version;
+    this.stale_sources = options.stale_sources; this.workspaces = options.workspaces;
   }
 }

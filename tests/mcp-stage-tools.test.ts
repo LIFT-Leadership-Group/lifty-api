@@ -1,3 +1,4 @@
+import { profileFixture } from "./business-fixtures.js";
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { callStageMcpTool, getStageMcpTools } from "../src/mcp-stage-tools.js";
@@ -38,7 +39,7 @@ describe("generated MCP stage operations", () => {
       }
     }
     expect(JSON.stringify(tools)).not.toContain("$schema");
-    expect(tools.find(tool => tool.name === "business_onboarding_save")!.description).toContain("One tool serves the business, targeting, research-criteria, commercial-voice stages.");
+    expect(tools.find(tool => tool.name === "setup_patch_draft")!.description).toContain("workspace draft");
     for (const alias of ["targeting_onboarding_save", "research_criteria_generation_context", "commercial_voice_onboarding_status"]) {
       expect(tools.some(tool => tool.name === alias), alias).toBe(false);
     }
@@ -56,12 +57,12 @@ describe("generated MCP stage operations", () => {
   });
 
   it("keeps authentication, current contract, validation and the shared mutation limiter in the owning REST route", async () => {
-    const create = vi.fn(async () => ({ state: "ready_for_connections" as const, workspace, created: true }));
+    const create = vi.fn(async () => ({ created:true, workspace:{...workspace,state:"ready_for_connections"},profile:profileFixture,voice:{version:0} }));
     const auth = vi.fn(async (request: Request) => request.headers.get("authorization") === "Bearer founder"
       ? { ok: true as const, session: { userId: "founder", client: {} } } : { ok: false as const, reason: "invalid_session" as const });
-    const app = createApp({ authenticate: auth, createWorkspace: create, log: () => {} });
+    const app = createApp({ authenticate: auth, listMemberWorkspaces: async()=>({workspaces:[{workspace_ref:workspace.workspace_ref,name:"Example",slug:"example",active:true,self_service:true,founder_default:true}]}), businessOperation: create, log: () => {} });
     const dispatch = (route: string, init: RequestInit) => Promise.resolve(app.request(route, init));
-    const input = { body: { name: "Example" } };
+    const input = { body: { name: "Example",website_url:null } };
     expect((await callStageMcpTool("business_post", input, new Request("https://example.test/mcp"), dispatch)).structuredContent.status).toBe(401);
     const old = incoming(); old.headers.set("x-lifty-client-contract", "lifty-cli-context.v4");
     expect((await callStageMcpTool("business_post", input, old, dispatch)).isError).toBe(true);
@@ -90,11 +91,10 @@ describe("generated MCP stage operations", () => {
     }
   });
 
-  it("keeps unlisted shared-operation aliases callable for clients with an older tool list", async () => {
-    const dispatch = vi.fn(async (_route: string, _init: RequestInit) => Response.json({ state: "none", revision: 0 }));
+  it("refuses retired onboarding aliases without dispatching", async () => {
+    const dispatch = vi.fn();
     const result = await callStageMcpTool("research_criteria_onboarding_state", {}, incoming(), dispatch);
-    expect(result.isError).toBe(false);
-    expect(dispatch.mock.calls[0]![0]).toBe("/v1/onboarding/state");
+    expect(result.isError).toBe(true); expect(result.structuredContent).toMatchObject({error:{code:"UNKNOWN_TOOL"}}); expect(dispatch).not.toHaveBeenCalled();
   });
 
   it("cannot dispatch a campaign write through a read tool or replace the route, query, or identity", async () => {
@@ -120,61 +120,6 @@ describe("generated MCP stage operations", () => {
     expect(enqueue).toHaveBeenCalledOnce();
     expect(read).not.toHaveBeenCalled();
     expect(getStageMcpTools().find(tool => tool.name === "sample_review_progress")!.annotations.readOnlyHint).toBe(true);
-  });
-
-  it("exposes every Lifty CLI API capability as a tool on the route the CLI calls", () => {
-    const tools = new Map(getStageMcpTools().map(tool => [tool.name, tool]));
-    const operationFor = (name: string) => Object.entries(stageOperations).flatMap(([stage, operations]) =>
-      Object.entries(operations).filter(([action]) => name.startsWith(`${stage.replace(/-/g, "_")}_${action}`)).map(([, operation]) => operation))[0];
-    // CLI command -> [tool, method, route]. Commands that only touch local files
-    // (install, login loopback, artifacts) have no connector equivalent.
-    const cli: Record<string, [string, string, string]> = {
-      // LIF-1137: status and summary are one read.
-      "status | get summary": ["summary_get", "GET", "/v1/workspace/summary"],
-      "disconnect hubspot": ["crm_disconnect", "POST", "/v1/workspace/crm/disconnect"],
-      "disconnect slack": ["notifications_disconnect", "POST", "/v1/workspace/notifications/disconnect"],
-      "disconnect unipile": ["sending_accounts_disconnect", "POST", "/v1/workspace/sending-accounts/disconnect"],
-      "disconnect unipile --workspace": ["sending_accounts_client_email_disconnect", "POST", "/v1/email/disconnect"],
-      "disconnect linkedin --workspace": ["sending_accounts_client_linkedin_disconnect", "POST", "/v1/linkedin/disconnect"],
-      "connect linkedin --workspace": ["sending_accounts_client_linkedin_connect", "POST", "/v1/linkedin/connect"],
-      "connect linkedin --workspace --status": ["sending_accounts_client_linkedin_status", "GET", "/v1/linkedin"],
-      "email deliverability --workspace": ["sending_accounts_deliverability", "GET", "/v1/email/deliverability"],
-      "notifications test": ["notifications_test", "POST", "/v1/notifications/destinations/{destination_ref}/test"],
-      "get allowance --workspace": ["capacity_allowance", "GET", "/v1/workspaces/{workspace_ref}/apollo/allowance"],
-      "apollo status": ["capacity_apollo_key_status", "GET", "/v1/workspaces/{workspace_ref}/integrations/apollo/key-source"],
-      "apollo platform-default": ["capacity_apollo_platform_default", "POST", "/v1/workspaces/{workspace_ref}/integrations/apollo/platform-default"],
-      "apollo recovery status": ["capacity_apollo_recovery_status", "GET", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}"],
-      "apollo recovery request|restart": ["capacity_apollo_recovery", "POST", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}"],
-      "workspace retire": ["business_retire", "POST", "/v1/workspaces/{workspace_ref}/retire"],
-      "campaign --workspace (read)": ["campaigns_client_email_read", "POST", "/v1/email/campaign"],
-      "campaign --workspace (write)": ["campaigns_client_email_write", "POST", "/v1/email/campaign"],
-      "campaign linkedin --workspace (read)": ["campaigns_client_linkedin_read", "POST", "/v1/linkedin/campaign"],
-      "campaign linkedin --workspace (write)": ["campaigns_client_linkedin_write", "POST", "/v1/linkedin/campaign"],
-      "crm companies context --workspace": ["crm_client_mapping_context", "GET", "/v1/integrations/hubspot/company-mapping/context"],
-      "crm companies apply --workspace": ["crm_client_mapping_apply", "POST", "/v1/integrations/hubspot/company-mapping"],
-    };
-    for (const [command, [name, method, route]] of Object.entries(cli)) {
-      expect(tools.has(name), command).toBe(true);
-      expect(operationFor(name), command).toMatchObject({ method, route });
-    }
-    const annotations = (name: string) => tools.get(name)!.annotations;
-    for (const name of ["crm_disconnect", "notifications_disconnect", "sending_accounts_disconnect", "business_retire",
-      "sending_accounts_client_email_disconnect", "sending_accounts_client_linkedin_disconnect", "capacity_apollo_platform_default"]) {
-      expect(annotations(name), name).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
-    }
-    for (const name of ["notifications_test", "capacity_apollo_recovery", "campaigns_client_email_write", "campaigns_client_linkedin_write"]) {
-      expect(annotations(name), name).toMatchObject({ readOnlyHint: false, openWorldHint: true });
-    }
-    for (const name of ["capacity_allowance", "capacity_apollo_key_status", "capacity_apollo_recovery_status",
-      "crm_client_mapping_context", "campaigns_client_email_read", "campaigns_client_linkedin_read"]) {
-      expect(annotations(name), name).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-    }
-    // Both GETs check provider connections and can update saved health.
-    for (const name of ["summary_get", "sending_accounts_client_linkedin_status"]) expect(annotations(name).readOnlyHint, name).toBe(false);
-    expect(tools.has("summary_status")).toBe(false);
-    // A customer-owned Apollo key is a secret and never enters a chat tool.
-    expect(JSON.stringify(tools.get("capacity_apollo_platform_default")!.inputSchema)).not.toContain("api_key");
-    expect(JSON.stringify(tools.get("capacity_apollo_recovery")!.inputSchema)).not.toContain("\"status\"");
   });
 
   it("disconnects only the current workspace through the existing handlers", async () => {
@@ -207,7 +152,7 @@ describe("generated MCP stage operations", () => {
     expect(disconnectLinkedin).toHaveBeenCalledOnce();
   });
 
-  it("keeps sends out of the client campaign read tools and Apollo keys out of the key-source tool", async () => {
+  it("keeps sends out of client campaign read tools", async () => {
     const dispatch = vi.fn(async () => Response.json({ state: "ok" }));
     const payload = { workspace: "client", campaign_ref: "11111111-1111-4111-8111-111111111111", digest: "a".repeat(64) };
     expect((await callStageMcpTool("campaigns_client_email_read", { body: { operation: "activate", payload } }, incoming(), dispatch)).isError).toBe(true);
@@ -217,14 +162,5 @@ describe("generated MCP stage operations", () => {
     expect((await callStageMcpTool("campaigns_client_email_read", { body: { operation: "status", payload } }, incoming(), dispatch)).isError).toBe(false);
     expect(dispatch).toHaveBeenCalledWith("/v1/email/campaign", expect.objectContaining({ method: "POST" }));
 
-    const credentials = vi.fn(async (_session: unknown, workspace_ref: string) => ({ workspace_ref, tool: "apollo" as const,
-      key_source: "platform_default" as const, configured: true, changed: true }));
-    const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }), apolloCredentials: credentials, log: () => {} } as never);
-    const apollo = (body: unknown) => callStageMcpTool("capacity_apollo_platform_default", { path: { workspace_ref: workspace.workspace_ref }, body },
-      incoming(), (route, init) => Promise.resolve(app.request(route, init)));
-    expect((await apollo({ operation: "own_key", api_key: "secret-value" })).structuredContent).toMatchObject({ status: 400 });
-    expect(credentials).not.toHaveBeenCalled();
-    expect((await apollo({})).structuredContent).toMatchObject({ status: 200, data: { key_source: "platform_default" } });
-    expect(credentials).toHaveBeenCalledWith(expect.anything(), workspace.workspace_ref, { operation: "platform_default" });
   });
 });

@@ -14,7 +14,7 @@ const settings = { dsn: "https://api1.unipile.com:13111", accessToken: "test-key
 const getWorkspace = async () => ({ state: "ready_for_connections" as const,
   workspace: { workspace_ref: workspace, name: "Example" }, next_action: null });
 const request = (app: ReturnType<typeof createApp>, path: string, body?: unknown) => app.request(`/v1/workspace/sending-accounts${path}`, {
-  method: body === undefined ? "GET" : "POST", headers: { authorization: "Bearer test", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v5" },
+  method: body === undefined ? "GET" : "POST", headers: { authorization: "Bearer test", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v6" },
   ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 

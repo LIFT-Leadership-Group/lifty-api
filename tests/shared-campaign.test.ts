@@ -34,7 +34,7 @@ const modify = WorkspaceCampaignRequest.parse({ operation: "modify", payload: {
 } });
 const changed = { ...saved, version_ref: nextVersion, digest: nextDigest,
   configuration: { ...shared, linkedin: { ...shared.linkedin, overlay: "Only a short greeting." } } };
-const headers = { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v5" };
+const headers = { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v6" };
 const base: Partial<AppDependencies> = {
   authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
   getWorkspace: async () => ({ state: "ready_for_connections", workspace: { workspace_ref: workspace, name: "Example" }, next_action: null }), log: () => {},
@@ -249,7 +249,7 @@ describe("shared campaign operations", () => {
   });
 
   it("resumes a generated campaign without mistaking zero fixed templates for unconfigured outreach", async () => {
-    const response = await createApp({ ...base, workspaceCampaign: async () => saved }).request("/v1/workspace/summary", { headers });
+    const response = await createApp({ ...base,listMemberWorkspaces:async()=>({workspaces:[{workspace_ref:workspace,name:"Example",slug:"example",active:true,self_service:true,founder_default:true}]}), workspaceCampaign: async () => saved }).request("/v1/workspace/summary", { headers });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ campaign: { status: "available", value: { engine: "shared_v1", compose_modes: { linkedin: "generate", email: null }, templates: { linkedin: 0, email: 0 }, preparation: { state: "pending" }, includes_future_leads: true } } });
   });

@@ -1,8 +1,7 @@
-import { OnboardingStateSchema, OnboardingSaveSchema } from "./onboarding-state.js";
+import { businessOperationDefinitions } from "./business-operations.js";
 import { SenderChoice, SenderRoster, SenderSignatureRequest, SenderSignatureResult, SenderSignatures } from "./sender-choice.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
-import { BusinessWebsiteSchema, BusinessWebsitePatchSchema } from "./business-website.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
 import {
@@ -13,21 +12,9 @@ import {
 } from "./crm-mapping/contracts.js";
 import { z } from "zod";
 import { WorkspaceCampaignConfigureRequest, WorkspaceCampaignModifyRequest, WorkspaceCampaignRequest, WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
-import {
-  ConfigUpdateGenerationContextSchema, ConfigUpdateRequestSchema, ConfigUpdateResultSchema,
-  ConfigUpdateStatusSchema, CreateWorkspaceRequestSchema, CreateWorkspaceResultSchema,
-  HubspotConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema,
-  NotificationRouteSchema, OnboardingGenerationContextSchema, OnboardingPushResultSchema,
-  OnboardingStatusSchema, RunStatusSchema, SetNotificationRouteRequestSchema,
-  SlackNotificationChannelsSchema, StartRunResultSchema, SubmitOnboardingRequestSchema,
-  UpsertNotificationDestinationRequestSchema, WorkspaceConfigSchema, WorkspaceStatusSchema,
-  StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema,
-} from "./contracts.js";
-import { ApolloCredentialResult } from "./apollo-credentials.js";
-import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult } from "./acquisition-recovery.js";
+import { HubspotConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, RunStatusSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, StartRunResultSchema, UpsertNotificationDestinationRequestSchema, WorkspaceStatusSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema } from "./contracts.js";
 import { RetireWorkspaceConfirmation, RetireWorkspaceResult } from "./workspace-retirement.js";
 import { DeleteLoginRequest, DeleteLoginResult } from "./login-deletion.js";
-import { ApolloAllowanceSchema } from "./apollo-allowance.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
 import { EmailConnectionStatus, EmailConnectRequest } from "./email-contracts.js";
@@ -39,49 +26,21 @@ import { DeliverabilityQueryParams, DeliverabilityResponse } from "./email-deliv
 import { LinkedinConnectRequest, LinkedinConnectionStatus, LinkedinDisconnectRequest, LinkedinWorkspaceRequest, LegacyLinkedinConnectResult } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult } from "./email-campaign-contracts.js";
 import { LinkedinCampaignRequest, LinkedinCampaignResult } from "./linkedin-campaign-contracts.js";
-import { LocalOnboardingConfigurationSchema, LocalConfigUpdateConfigurationSchema } from "./generated/lifty-configuration.js";
 
-// This is the transport envelope, not a client-side business registry. The API
-// publishes current operation definitions; clients pass business data unchanged.
 const JsonSchema = z.record(z.string(), z.unknown());
-const JsonPointer = z.string().regex(/^\/(?:[^~]|~[01])*$/);
-const OperationKey = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/);
-const ReceiptInput = z.object({
-  path: z.record(z.string(), JsonPointer).optional(),
-  query: z.record(z.string(), JsonPointer).optional(),
-});
-const ReceiptMatch = z.object({ receipt: JsonPointer, response: JsonPointer });
-const SubmissionRead = z.object({ operation: OperationKey, input: ReceiptInput,
-  match: z.array(ReceiptMatch).min(1).max(8).optional() });
-// A finite local-artifact submission protocol, not a stage/business registry.
-// State fields, receipt bindings, routes and readback remain API-owned.
-export const LocalSubmissionSchema = z.object({
-  version: z.literal("lifty-local-submission.v1"),
-  artifact: z.literal("onboarding-configuration"),
-  server_state: z.object({ read: OperationKey, save: OperationKey }).optional(),
-  status: SubmissionRead.extend({ state: JsonPointer,
-    pending: z.array(z.string().min(1)).min(1).max(20),
-    succeeded: z.array(z.string().min(1)).min(1).max(20),
-    failed: z.array(z.string().min(1)).min(1).max(20),
-    match: z.array(ReceiptMatch).min(1).max(8),
-    poll_interval_ms: z.number().int().min(1).max(60000),
-    timeout_ms: z.number().int().min(1).max(300000),
-  }),
-  readback: z.array(SubmissionRead).min(1).max(8),
-});
 export const StageOperationSchema = z.object({
-  method: z.enum(["GET", "POST", "PATCH"]),
+  method: z.enum(["GET", "POST", "PATCH", "DELETE"]),
   readOnly: z.boolean(),
   route: z.string().regex(/^\/v1\/[A-Za-z0-9_{}\/-]+$/),
   description: z.string().min(1),
   request: z.object({ path: JsonSchema, query: JsonSchema, body: JsonSchema.nullable() }),
   responses: z.record(z.string().regex(/^[1-5][0-9]{2}$/), JsonSchema),
-  submission: LocalSubmissionSchema.optional(),
+  cli: z.object({ operation: z.string().min(1) }).strict().optional(),
 });
 export type StageOperation = z.infer<typeof StageOperationSchema>;
 
 export const StageErrorSchema = z.object({
-  error: z.object({ code: z.string(), message: z.string(), issues: z.array(z.unknown()).optional() }),
+  error: z.object({ code: z.string(), message: z.string(), issues: z.array(z.object({code:z.string(),path:z.string(),message:z.string(),suggestion:z.string()}).strict()).optional(), current_version:z.number().int().nonnegative().optional(), stale_sources:z.array(z.string()).optional(), workspaces:z.array(z.object({workspace_ref:z.uuid(),name:z.string(),slug:z.string()}).strict()).optional() }),
   request_id: z.string(),
 });
 const Empty = z.object({}).strict();
@@ -116,48 +75,11 @@ export const SendingAccountDisconnectSchema = z.object({
   channel: z.enum(["email", "linkedin"]), confirm: z.literal(true),
 }).strict();
 const WorkspaceRefPath = z.object({ workspace_ref: z.uuid() }).strict();
-const RecoveryPath = WorkspaceRefPath.extend({ first_run_ref: z.uuid() }).strict();
-const AcquisitionRecoveryWriteSchema = z.union(AcquisitionRecoveryBody.options.slice(1) as [
-  typeof AcquisitionRecoveryBody.options[1], typeof AcquisitionRecoveryBody.options[2]]);
 const ClientEmailDisconnectSchema = z.object({ workspace: EmailConnectRequest.shape.workspace }).strict();
-export const BusinessStageSchema = z.object({
-  workspace: WorkspaceStatusSchema,
-  configuration: WorkspaceConfigSchema.nullable(),
-  website: readResult(BusinessWebsiteSchema).nullable(),
-}).strict();
-export const CapacityStageSchema = z.object({
-  configuration: WorkspaceConfigSchema,
-  allowance: ApolloAllowanceSchema,
-}).strict();
 export const NotificationStagePatchSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("destination"), values: UpsertNotificationDestinationRequestSchema }).strict(),
   z.object({ operation: z.literal("route"), values: SetNotificationRouteRequestSchema }).strict(),
 ]);
-export const BusinessStagePatchSchema = z.union([z.object({
-  section: z.literal("workspace"), values: CreateWorkspaceRequestSchema.omit({ website_url: true }).partial(),
-}).strict(), BusinessWebsitePatchSchema]);
-// Reuse generation field definitions; extra filter limits mirror the existing
-// submit_lifty_config_update RPC. Labels, weights and fingerprints stay absent.
-export const TargetingValuesSchema = LocalOnboardingConfigurationSchema.shape.icp_config
-  .omit({ label: true }).partial().extend({
-    contact_email_status: z.string().trim().min(1).max(100).optional(),
-    q_organization_domains_list: z.array(z.string().trim().min(1)).nullable().optional(),
-    max_stale_days: z.number().int().min(1).max(3650).optional(),
-    reject_extrapolated: z.boolean().optional(),
-  }).strict();
-export const TargetingStagePatchSchema = z.object({
-  section: z.literal("icp"), values: TargetingValuesSchema,
-  configuration: LocalConfigUpdateConfigurationSchema.optional(),
-}).strict();
-export const ResearchStagePatchSchema = z.object({
-  section: z.literal("prompt"), instruction: z.string().trim().min(1).max(4000),
-  configuration: LocalConfigUpdateConfigurationSchema.optional(),
-}).strict();
-export const VoiceStagePatchSchema = z.object({
-  section: z.literal("tone"),
-  values: z.record(z.string(), z.unknown()).describe("Free-form customer commercial voice values merged by the existing config RPC, for example identity, value_prop and cta. Not Lifty identity or campaign approval."),
-  configuration: LocalConfigUpdateConfigurationSchema.optional(),
-}).strict();
 const ChannelCampaignQuerySchema = z.object({
   channel: z.enum(["email", "linkedin"]), workspace: z.string().min(1), campaign_ref: z.uuid(),
   operation: z.enum(["status", "preview"]).default("status"),
@@ -201,71 +123,38 @@ function operation(method: StageOperation["method"], route: string, description:
   };
 }
 const stageRoute = (stage: string) => `/v1/workspace/${stage}`;
-const unsupported = (stage: string, method: "POST" | "PATCH", reason: string) =>
+const unsupported = (stage: string, method: "POST" | "PATCH" | "DELETE", reason: string) =>
   operation(method, stageRoute(stage), `Unsupported: ${reason} Returns 405 STAGE_OPERATION_UNSUPPORTED; no changes.`, null, Empty);
-const configRead = (stage: string, description: string) =>
-  operation("GET", stageRoute(stage), description, WorkspaceConfigSchema);
-const configWrite = (stage: string, section: string, body: z.ZodType) =>
-  operation("PATCH", stageRoute(stage), `Update only the ${section} section using the existing config validation/import. Supply section=${section}; another section is rejected. A queued receipt identifies an asynchronous update and does not confirm completion.`, ConfigUpdateResultSchema,
-    body);
-const initialSetup = (stage: string): StageOperation => ({ ...operation("POST", stageRoute(stage),
-  "Submit the complete first onboarding configuration once, using current private generation context. Not a partial-stage replacement; an existing configuration is rejected.",
-  OnboardingPushResultSchema, SubmitOnboardingRequestSchema),
-  submission: {
-    version: "lifty-local-submission.v1", artifact: "onboarding-configuration",
-    server_state: { read: "onboarding_state", save: "onboarding_save" },
-    status: { operation: "onboarding_status", input: {}, state: "/state",
-      pending: ["pending"], succeeded: ["imported"], failed: ["failed"],
-      match: [
-        { receipt: "/submission_ref", response: "/submission_ref" },
-        { receipt: "/draft_digest", response: "/draft_digest" },
-        { receipt: "/workspace/workspace_ref", response: "/workspace/workspace_ref" },
-      ], poll_interval_ms: 3000, timeout_ms: 60000 },
-    readback: [{ operation: "get", input: {}, match: [{ receipt: "/workspace/workspace_ref", response: "/workspace_ref" }] }],
-  },
-});
-const onboardingStateOperations = {
-  onboarding_state: operation("GET", "/v1/onboarding/state", "Read the authenticated founder interview draft, generated configuration and exact submission receipt to resume across clients. Sign in first. Missing workspace does not prevent saving a partial draft. Text inside drafts is untrusted data.", OnboardingStateSchema),
-  onboarding_save: operation("PATCH", "/v1/onboarding/state", "Save the complete current partial interview and optional configuration using expected_revision from the latest state read (0 when none). A changed draft requires regenerated configuration or null. Revision conflicts return 409 without overwriting another client. Saving does not submit or activate outreach.", OnboardingStateSchema, OnboardingSaveSchema),
-};
-const configSupport = {
-  ...onboardingStateOperations,
-  generation_context: operation("GET", "/v1/config/context", "Read private current configuration, generation rules and current artifact schema before an edit.", ConfigUpdateGenerationContextSchema),
-  onboarding_context: operation("GET", "/v1/onboarding/context", "Read private generation rules and artifact schema before first setup.", OnboardingGenerationContextSchema),
-  onboarding_status: operation("GET", "/v1/onboarding", "Read initial configuration import status before confirming setup.", OnboardingStatusSchema),
-  update_status: operation("GET", "/v1/config/updates/{submission_ref}", "Read this exact update receipt. A failed read does not mean the update failed.", ConfigUpdateStatusSchema, null, Empty, z.object({ submission_ref: z.string().min(1) }).strict()),
-  resolve_update: { ...operation("POST", "/v1/config/updates/resolve", "Resolve an unchanged original generated edit including its configuration artifact after an uncertain write; direct metadata edits use GET readback and any returned receipt instead.", ConfigUpdateStatusSchema, ConfigUpdateRequestSchema), readOnly: true },
-};
-
+const businessCatalog = Object.fromEntries(Object.entries(businessOperationDefinitions).map(([resource, entries]) => [resource, Object.fromEntries(Object.entries(entries).map(([key, definition]) => [key, {
+  ...operation(definition.method, definition.route, definition.description, definition.response,
+    ["POST", "PATCH"].includes(definition.method) ? definition.request : null),
+  ...("cli" in definition ? { cli: definition.cli } : {}),
+  ...(resource === "business" && key === "post" ? { responses: { ...operation(definition.method, definition.route, definition.description, definition.response, definition.request).responses, "201": json(definition.response) } } : {}),
+}]))]));
 // These definitions are also the contracts for the thin authenticated adapters
 // implemented with the generic stage transport. Existing business handlers and
 // their authorization, validation, jobs and protected-field rules remain owners.
 export const stageOperations: Record<string, Record<string, StageOperation>> = {
   summary: {
-    next_step: operation("GET", "/v1/workspace/next-step", "Read the next onboarding step when starting or resuming setup. Returns saved interview, configuration, import, research and campaign progress together with the complete stage guide. Does not start work, accept a sample or authorize sending.", NextStepSchema),
+    next_step: operation("GET", "/v1/workspace/next-step", "Read the next step from saved Business resources, setup draft, research and campaign receipts together with the current stage guide. Does not start work, accept a sample or authorize sending.", NextStepSchema),
     context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for a specific requested Lifty stage.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
-    get: { ...operation("GET", stageRoute("summary"), "Refresh a workspace's complete state after approval: business, website, saved setup and ICP version, onboarding import, first research run, pending configuration update, HubSpot and its last sync, email (or the mailbox list of a LIFT-managed client workspace), LinkedIn and the saved campaign. Without workspace it describes the caller's default; pass one of the caller's own workspaces by slug or reference to read that one instead. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema, null, SummaryQuerySchema), readOnly: false },
+    get: { ...operation("GET", stageRoute("summary"), "Refresh the selected workspace's typed Business resources and versions, immutable setup receipt, first research run, HubSpot and its last sync, email (or the mailbox list of a LIFT-managed client workspace), LinkedIn and the saved campaign. Without workspace it describes the caller's default; pass one of the caller's own workspaces by slug or reference to read that one instead. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema, null, SummaryQuerySchema), readOnly: false },
     post: unsupported("summary", "POST", "Use the summary GET operation; its connection checks can change saved provider state."),
     patch: unsupported("summary", "PATCH", "Use the summary GET operation; its connection checks can change saved provider state."),
   },
-  business: {
-    ...onboardingStateOperations,
-    get: operation("GET", stageRoute("business"), "Read workspace existence and saved business name/description and confirmed website with unconfirmed research candidates; configuration is null before provisioning.", BusinessStageSchema),
-    post: operation("POST", stageRoute("business"), "Provision the authenticated founder's workspace using the existing create operation.", CreateWorkspaceResultSchema, CreateWorkspaceRequestSchema),
-    patch: operation("PATCH", stageRoute("business"), "Update name/description with section=workspace, or the confirmed primary website with section=website and its current expected_version. Website updates are immediate; read back after uncertain writes. No campaign changes.", z.union([ConfigUpdateResultSchema, BusinessWebsiteSchema]), BusinessStagePatchSchema),
-    update_status: configSupport.update_status,
-    delete_login: operation("POST", "/v1/me/delete", "Permanently delete your own Lifty login. Requires the exact email of the signed-in login and no remaining workspace membership: retire or leave every workspace first. Deletes nobody else. Irreversible.", DeleteLoginResult, DeleteLoginRequest),
-    retire: operation("POST", "/v1/workspaces/{workspace_ref}/retire", "Permanently delete a LIFTY-created workspace you belong to. Requires its exact ID, slug and name. Disconnect email and HubSpot first; a workspace with LinkedIn history cannot be retired. Mailbox send counters are preserved. Irreversible.", RetireWorkspaceResult, RetireWorkspaceConfirmation, Empty, WorkspaceRefPath),
-  },
-  targeting: { get: configRead("targeting", "Read saved ICP/personas; versions and lane allocation are read-only."), post: initialSetup("targeting"), patch: configWrite("targeting", "icp", TargetingStagePatchSchema), ...configSupport },
-  "research-criteria": { get: configRead("research-criteria", "Read the saved research prompt and provenance; protected prompts remain read-only."), post: initialSetup("research-criteria"), patch: configWrite("research-criteria", "prompt", ResearchStagePatchSchema), ...configSupport },
+  business: { ...businessCatalog.business!, delete: unsupported("business", "DELETE", "Profile revisions and pinned history are retained. Retire the workspace through its lifecycle operation.") },
+  targeting: { ...businessCatalog.targeting!, post: unsupported("targeting", "POST", "Setup creates targeting together with criteria."), delete: unsupported("targeting", "DELETE", "Search activation belongs to the research schedule; targeting history is retained.") },
+  "research-criteria": { ...businessCatalog["research-criteria"]!, post: unsupported("research-criteria", "POST", "Setup creates criteria together with targeting."), delete: unsupported("research-criteria", "DELETE", "Use PATCH to clear criteria; pinned history is retained.") },
+  setup: businessCatalog.setup!,
+  workspace: { retire: operation("POST", "/v1/workspaces/{workspace_ref}/retire", "Retire the selected workspace with exact identity confirmation while preserving retained history and budgets.", RetireWorkspaceResult, RetireWorkspaceConfirmation, Empty, WorkspaceRefPath) },
+  account: { delete: operation("POST", "/v1/me/delete", "Delete your own login only after all memberships and retained-history restrictions are resolved.", DeleteLoginResult, DeleteLoginRequest) },
   "sample-review": {
     progress: operation("GET", "/v1/workspace/runs/progress", "Wait up to 25 seconds for a change to this exact run. Pass the last cursor to resume. Returns the complete current bounded cohort, live research count and terminal state; not a persisted event history. Read-only and reauthorized on each poll.", RunProgressSchema, null, RunProgressQuerySchema),
     get: operation("GET", stageRoute("sample-review"), "Read the existing cohort, grades and run state; no persisted approval ledger.", RunStatusSchema),
     post: operation("POST", stageRoute("sample-review"), "Start/retrieve the existing bounded initial run; no repeated discovery waves or new approval store.", StartRunResultSchema, Empty),
     patch: unsupported("sample-review", "PATCH", "Grades, historical evidence and sample approval are not writable configuration."),
   },
-  "commercial-voice": { get: configRead("commercial-voice", "Read the customer's saved commercial tone; distinct from Lifty's identity."), post: initialSetup("commercial-voice"), patch: configWrite("commercial-voice", "tone", VoiceStagePatchSchema), ...configSupport },
+  "commercial-voice": { ...businessCatalog["commercial-voice"]!, post: unsupported("commercial-voice", "POST", "Empty voice exists at version 0 from workspace creation."), delete: unsupported("commercial-voice", "DELETE", "Use PATCH to clear values; pinned history is retained.") },
   crm: {
     sync_start: operation("POST", "/v1/integrations/hubspot/sync", "Queue the current workspace's CRM sync after the founder requests record delivery. Returns a run_ref for the asynchronous sync; this writes CRM records, never outreach.", StartCrmSyncResultSchema, Empty),
     sync_status: operation("GET", "/v1/integrations/hubspot/sync", "Read the latest CRM sync receipt, identified by its run_ref. A different run cannot prove an earlier sync completed. This read never starts or repeats a sync.", CrmSyncStatusSchema),
@@ -321,15 +210,5 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     channels: operation("GET", "/v1/notifications/slack/channels", "Read Slack channels currently available to Lifty before choosing a destination.", SlackNotificationChannelsSchema),
     test: operation("POST", "/v1/notifications/destinations/{destination_ref}/test", "Send one test notification to a saved Slack destination. Posts a visible message in that channel; it does not change routes or authorize outreach.", NotificationTestResultSchema, Empty, Empty, z.object({ destination_ref: z.uuid() }).strict()),
     disconnect: operation("POST", "/v1/workspace/notifications/disconnect", "Disconnect Slack from the current workspace. Notifications stop until Slack is reconnected; saved destinations and routes are not deleted.", DisconnectResponseSchema, Empty),
-  },
-  capacity: {
-    get: operation("GET", stageRoute("capacity"), "Read workspace daily discovery target and actual weekly allowance including used, reserved, remaining and reset time.", CapacityStageSchema),
-    allowance: operation("GET", "/v1/workspaces/{workspace_ref}/apollo/allowance", "Read the weekly discovery allowance of an explicitly named workspace you belong to: limit, used, reserved, remaining, key source and reset time.", ApolloAllowanceSchema, null, Empty, WorkspaceRefPath),
-    apollo_key_status: operation("GET", "/v1/workspaces/{workspace_ref}/integrations/apollo/key-source", "Read whether a workspace you belong to uses the platform Apollo key or its own key. Never returns the key.", ApolloCredentialResult, null, Empty, WorkspaceRefPath),
-    apollo_platform_default: operation("POST", "/v1/workspaces/{workspace_ref}/integrations/apollo/platform-default", "Switch a workspace you belong to back to the platform Apollo key. Blocked while discovery or enrichment is in progress. A customer-owned key cannot be entered here.", ApolloCredentialResult, Empty, Empty, WorkspaceRefPath),
-    apollo_recovery_status: operation("GET", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}", "Read the Apollo acquisition recovery state of an exact failed first run: current acquisition, attempt, whether a restart is allowed and the blocker.", AcquisitionRecoveryStatus, null, Empty, RecoveryPath),
-    apollo_recovery: operation("POST", "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}", "For an exact failed first run, request verification that its acquisition finished, or restart acquisition once verification allows it. Requires the current acquisition reference. Restart queues new Apollo discovery; acquired leads and allowance history are kept.", z.union([AcquisitionRecoveryStatus, AcquisitionRestartResult]), AcquisitionRecoveryWriteSchema, Empty, RecoveryPath),
-    post: unsupported("capacity", "POST", "Capacity is platform-managed; there is no capacity setup operation."),
-    patch: unsupported("capacity", "PATCH", "Operating target, lane weights, provider limits and allowance counters are read-only."),
   },
 };

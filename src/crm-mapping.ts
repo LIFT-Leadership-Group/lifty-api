@@ -21,7 +21,7 @@ const responses: Record<CrmMappingAction, z.ZodType> = {
 };
 
 export class CrmMappingError extends PublicError {
-  constructor(code: string, status: number, readonly issues: z.infer<typeof IssueSchema>[] = []) {
+  constructor(code: string, status: number, override readonly issues: z.infer<typeof IssueSchema>[] = []) {
     super({ code, status, message: code === "WORKSPACE_UNSUPPORTED"
       ? "CRM mapping is available once HubSpot is connected as this workspace's CRM. Connect HubSpot first."
       : code === "HUBSPOT_NOT_CONNECTED" ? "HubSpot is not connected to this workspace. Connect HubSpot first."

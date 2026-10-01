@@ -1,3 +1,4 @@
+import { operationToolNames, campaignReadOperations, splitCampaignOperations } from "./operation-names.js";
 import { z } from "zod";
 import { STAGE_CLIENT_CONTRACT } from "./agent-context.js";
 import { stageOperations, type StageOperation } from "./stage-contracts.js";
@@ -12,14 +13,14 @@ export interface StageMcpTool {
 }
 interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool; campaignRead?: boolean }
 export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Response>;
-const campaignReads = new Set(["status", "preview", "placement-status", "placement-preview"]);
+const campaignReads = campaignReadOperations;
 // Campaign operations that mix reads and sends become separate read and write
 // tools. The stage POST nests its operation under request; the individual
 // channel routes carry it at the top level.
-const splitCampaigns = new Set(["post", "client_email", "client_linkedin"]);
+const splitCampaigns = splitCampaignOperations;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
 const openWorld = new Set(["sample-review.post", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
-  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test", "capacity.apollo_recovery"]);
+  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.
@@ -69,8 +70,7 @@ function entries(): Entry[] {
     const variants = stage === "campaigns" && splitCampaigns.has(action) ? [true, false] : [undefined];
     return variants.map(campaignRead => {
       const read = campaignRead ?? operation.readOnly;
-      const name = stage === "summary" && action === "next_step" ? "next_step"
-        : `${stage.replace(/-/g, "_")}_${action}${campaignRead === undefined ? "" : read ? "_read" : "_write"}`;
+      const name = operationToolNames(stage, action)[campaignRead === false ? 1 : 0]!;
       const label = title(name);
       const body = campaignRead === undefined ? operation.request.body : campaignBody(operation.request.body!, campaignRead);
       if (operation.request.body && !body) throw new Error(`Empty MCP request variant: ${name}`);
@@ -79,7 +79,7 @@ function entries(): Entry[] {
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${campaignRead === undefined ? "" : read ? " This tool accepts only status and preview operations." : " This tool changes campaign state and excludes status and preview operations."}${read ? "" : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
+      const description = `${operation.description}${campaignRead === undefined ? "" : read ? " This tool accepts only status and preview operations." : " This tool changes campaign state and excludes status and preview operations."}${read ? "" : ["business", "targeting", "research-criteria", "commercial-voice", "setup"].includes(stage) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
       return { stage, action, operation,
         ...(campaignRead === undefined ? {} : { campaignRead }),
         tool: { name, title: label, description,
@@ -92,9 +92,8 @@ function entries(): Entry[] {
   }));
 }
 
-// Several stages publish the same operation (onboarding state, generation
-// context, import and update receipts). List it once under its first stage;
-// the other names stay callable for clients holding an older tool list.
+// Shared operation routes are listed once under their first stage. Every
+// callable name is derived from a current catalog entry.
 export const getStageMcpTools = (): StageMcpTool[] => {
   const all = entries();
   const key = (entry: Entry) => `${entry.operation.method} ${entry.operation.route} ${entry.campaignRead ?? ""}`;
@@ -154,7 +153,7 @@ export async function callStageMcpTool(name: string, args: unknown, request: Req
   const headers = new Headers({ accept: "application/json", "x-lifty-client-contract": STAGE_CLIENT_CONTRACT });
   // The MCP adapter is a current API client. The caller cannot override its
   // contract, impersonate another principal, or supply a route/origin.
-  for (const key of ["authorization", "x-request-id"]) {
+  for (const key of ["authorization", "x-request-id", "x-lifty-workspace"]) {
     const value = request.headers.get(key);
     if (value) headers.set(key, value);
   }

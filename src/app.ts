@@ -1,15 +1,13 @@
+import { RepairIssueSchema } from "./business-contracts.js";
+import { executeBusinessOperation } from "./business-operations.js";
 import { createConfirmationRouter, invalidConfirmation, type ConfirmationAdapters, type ConfirmationAdapter, type ConfirmationLog } from "./connection-confirmation.js";
-import { OnboardingStateSchema, OnboardingSaveSchema, SubmissionOptionsSchema, getOnboardingState, saveOnboardingState, type OnboardingState, type OnboardingSave, type SubmissionOptions } from "./onboarding-state.js";
 import { RunProgressQuerySchema, RunProgressSchema, type RunProgressQuery, type RunProgress } from "./run-progress.js";
-import type { BusinessWebsite, BusinessWebsitePatch } from "./business-website.js";
 import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
 import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
 import { CrmMappingError } from "./crm-mapping.js";
-import { LocalConfigUpdateConfigurationSchema, lintLocalConfigUpdateConfiguration, CONFIG_UPDATE_GENERATION_RULES } from "./generated/lifty-configuration.js";
 import { registerStageRoutes } from "./stage-routes.js";
 import { handleMcpRequest, mcpResourceMetadata, type McpDependencies } from "./mcp.js";
 import { getStageMcpTools, callStageMcpTool } from "./mcp-stage-tools.js";
-import { lintOnboardingDraft } from "./onboarding-draft.js";
 import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
 import { type ConnectionReturnResult } from "./connection-return-page.js";
 import { hostedReturnError, type HostedReturnError } from "./hosted-return-error.js";
@@ -25,100 +23,16 @@ import {
   CompanyMappingReceiptSchema,
   CompanyMappingError,
 } from "./company-mapping.js";
-import {
-  AcquisitionRecoveryBody,
-  AcquisitionRecoveryStatus,
-  AcquisitionRestartResult,
-  type AcquisitionRecoveryInput,
-  type AcquisitionRecoveryOutput,
-} from "./acquisition-recovery.js";
-import { ApolloAllowanceSchema, type ApolloAllowance } from "./apollo-allowance.js";
-import { ApolloCredentialChoice, ApolloCredentialResult, type ApolloCredentialInput, type ApolloCredentialOutput } from "./apollo-credentials.js";
 import { RetireWorkspaceRequest, RetireWorkspaceConfirmation, RetireWorkspaceResult, type RetireWorkspaceInput, type RetireWorkspaceOutput } from "./workspace-retirement.js";
 import { DeleteLoginRequest, DeleteLoginResult, type DeleteLoginInput, type DeleteLoginOutput } from "./login-deletion.js";
 import { MemberWorkspacesResult, type MemberWorkspacesOutput } from "./member-workspaces.js";
-import { hubspotOverview, onboardingOverview, runOverview } from "./workspace-summary.js";
+
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
-import { lintLocalOnboardingConfiguration, OnboardingLintIssueSchema, onboardingRepairIssues, ONBOARDING_GENERATION_RULES, type OnboardingLintIssue } from "./onboarding-lint.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-
-import {
-  ConfigUpdateContextSchema,
-  ConfigUpdateGenerationContextSchema,
-  type ConfigUpdateContext,
-  ConfigSectionSchema,
-  ConfigUpdateRequestSchema,
-  ConfigUpdateResultSchema,
-  ConfigUpdateStatusSchema,
-  CreateWorkspaceRequestSchema,
-  CreateWorkspaceResultSchema,
-  type CreateWorkspaceRequest,
-  type CreateWorkspaceResult,
-  DisconnectResponseSchema,
-  IntegrationConnectionStatusSchema,
-  OnboardingContextSchema,
-  OnboardingGenerationContextSchema,
-  LocalOnboardingConfigurationSchema,
-  OnboardingPushResultSchema,
-  OnboardingStatusSchema,
-  NotificationConfigSchema,
-  NotificationDestinationSchema,
-  NotificationRouteSchema,
-  NotificationTestResultSchema,
-  SetNotificationRouteRequestSchema,
-  SlackNotificationChannelsSchema,
-  UpsertNotificationDestinationRequestSchema,
-  ProviderConnectStartSchema,
-  LegacyProviderConnectStartSchema,
-  SlackConnectLinkSchema,
-  type SlackConnectLink,
-  ProviderSchema,
-  RunStatusSchema,
-  StartRunResultSchema,
-  StartCrmSyncResultSchema,
-  CrmSyncStatusSchema,
-  SubmitOnboardingRequestSchema,
-  WorkspaceConfigSchema,
-  WorkspaceOverviewSchema,
-  type ConfigSection,
-  type ConfigUpdateRequest,
-  type ConfigUpdateStatus,
-  type ConfigUpdateSubmission,
-  type DisconnectResult,
-  type HubspotConnectStart,
-  type HubspotConnectionStatus,
-  type OnboardingContext,
-  type LocalOnboardingConfiguration,
-  type OnboardingStatus,
-  type OnboardingSubmission,
-  type NotificationConfig,
-  type NotificationDestination,
-  type NotificationRoute,
-  type NotificationTestResult,
-  type SetNotificationRouteRequest,
-  type SlackNotificationChannels,
-  type UpsertNotificationDestinationRequest,
-  type Provider,
-  type SlackConnectStart,
-  type SlackConnectionStatus,
-  type RunStatus,
-  type StartRunResult,
-  type StartCrmSyncResult,
-  type CrmSyncStatus,
-  type WorkspaceConfig,
-  WorkspaceStatusSchema,
-  type WorkspaceStatus,
-} from "./contracts.js";
-import type {
-  EnqueueConfigUpdate,
-  EnqueueCrmSync,
-  EnqueueFirstRun,
-  EnqueueIntegrationRevocation,
-  EnqueueOnboardingImport,
-  EnqueueNotificationDelivery,
-} from "./trigger-client.js";
+import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, RunStatusSchema, StartRunResultSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
+import { type EnqueueCrmSync, type EnqueueFirstRun, type EnqueueIntegrationRevocation, type EnqueueNotificationDelivery } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
   HubspotCallbackError,
@@ -158,7 +72,7 @@ export type AuthenticationResult =
   | { ok: true; session: AuthSession }
   | { ok: false; reason: "invalid_session" };
 
-export type { OnboardingPushResult, WorkspaceStatus } from "./contracts.js";
+export type { WorkspaceStatus } from "./contracts.js";
 
 export interface AppDependencies {
   openAiAppsChallenge?: string;
@@ -172,9 +86,6 @@ export interface AppDependencies {
   receiveClientEmailV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
   authorizeClientEmail: (state:string)=>Promise<string>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
-  acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
-  getApolloAllowance(session: AuthSession, workspace: string): Promise<ApolloAllowance>;
-  apolloCredentials(session: AuthSession, workspace: string, input: ApolloCredentialInput): Promise<ApolloCredentialOutput>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
   deleteOwnLogin(session: AuthSession, input: DeleteLoginInput): Promise<DeleteLoginOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
@@ -203,25 +114,9 @@ export interface AppDependencies {
   getEmailAccountAttempt(session:AuthSession,input:EmailAccountStatusInput):Promise<EmailAccountStatusOutput>;
   completeEmailCallback(state: string, body: unknown): Promise<void>;
   authenticate(request: Request): Promise<AuthenticationResult>;
-  getBusinessWebsite(session: AuthSession): Promise<BusinessWebsite>;
-  setBusinessWebsite(session: AuthSession, input: BusinessWebsitePatch): Promise<BusinessWebsite>;
+  businessOperation(session: AuthSession, key: string, workspaceRef: string | null, payload?: unknown): Promise<unknown>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
   listMemberWorkspaces(session: AuthSession): Promise<MemberWorkspacesOutput>;
-  createWorkspace(
-    session: AuthSession,
-    input: CreateWorkspaceRequest,
-  ): Promise<CreateWorkspaceResult>;
-  getOnboardingState(session: AuthSession): Promise<OnboardingState>;
-  saveOnboardingState(session: AuthSession, input: OnboardingSave): Promise<OnboardingState>;
-  submitOnboarding(
-    session: AuthSession,
-    draft: Record<string, unknown>,
-    configuration: LocalOnboardingConfiguration,
-    options?: SubmissionOptions,
-  ): Promise<OnboardingSubmission>;
-  getOnboardingContext(session: AuthSession): Promise<OnboardingContext>;
-  getOnboardingStatus(session: AuthSession): Promise<OnboardingStatus>;
-  enqueueOnboardingImport: EnqueueOnboardingImport;
   startRun(session: AuthSession): Promise<StartRunResult>;
   getRunStatus(session: AuthSession): Promise<RunStatus>;
   getRunProgress(session: AuthSession, query: RunProgressQuery, signal: AbortSignal): Promise<RunProgress>;
@@ -230,19 +125,6 @@ export interface AppDependencies {
   getCrmSyncStatus(session: AuthSession): Promise<CrmSyncStatus>;
   runCrmMapping: CrmMappingOperation;
   enqueueCrmSync: EnqueueCrmSync;
-  getConfigUpdateContext(session: AuthSession): Promise<ConfigUpdateContext>;
-  getConfig(session: AuthSession, section: ConfigSection | null): Promise<WorkspaceConfig>;
-  submitConfigUpdate(
-    session: AuthSession,
-    payload: ConfigUpdateRequest,
-  ): Promise<ConfigUpdateSubmission>;
-  resolveConfigUpdate(session: AuthSession, payload: ConfigUpdateRequest): Promise<ConfigUpdateStatus>;
-  getConfigUpdateStatus(
-    session: AuthSession,
-    submissionRef: string | null,
-  ): Promise<ConfigUpdateStatus>;
-  enqueueConfigUpdate: EnqueueConfigUpdate;
-  requeueConfigUpdate(session: AuthSession, submissionRef: string): Promise<ConfigUpdateStatus>;
   disconnectIntegration(session: AuthSession, provider: Provider): Promise<DisconnectResult>;
   enqueueIntegrationRevocation: EnqueueIntegrationRevocation;
   getNotificationConfig(session: AuthSession): Promise<NotificationConfig>;
@@ -324,7 +206,7 @@ const ErrorResponseSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
-    issues: z.array(OnboardingLintIssueSchema).max(20).optional(),
+    issues: z.array(RepairIssueSchema).max(20).optional(),
   }),
   request_id: z.string(),
 });
@@ -374,48 +256,6 @@ async function readRequestTextWithinLimit(
 }
 
 function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
-  app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}",
-    operationId: "getAcquisitionRecovery",
-    security: [{ bearerAuth: [] }],
-    request: { params: z.object({ workspace_ref: z.uuid(), first_run_ref: z.uuid() }) },
-    responses: {
-      200: JsonResponse(AcquisitionRecoveryStatus),
-      400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      403: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "post",
-    path: "/v1/workspaces/{workspace_ref}/apollo/recovery/{first_run_ref}",
-    operationId: "requestOrRestartAcquisition",
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: z.object({ workspace_ref: z.uuid(), first_run_ref: z.uuid() }),
-      body: {
-        required: true,
-        content: { "application/json": { schema: AcquisitionRecoveryBody } },
-      },
-    },
-    responses: {
-      200: JsonResponse(z.union([AcquisitionRecoveryStatus, AcquisitionRestartResult])),
-      400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      403: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/apollo/allowance",operationId:"getApolloAllowance",security:[{bearerAuth:[]}],request:{params:z.object({workspace_ref:z.uuid()})},responses:{200:JsonResponse(ApolloAllowanceSchema),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({method:"get",path:"/v1/workspaces/{workspace_ref}/integrations/apollo/key-source",operationId:"getApolloCredentialChoice",security:[{bearerAuth:[]}],
-    request:{params:z.object({workspace_ref:z.uuid()})},
-    responses:{200:JsonResponse(ApolloCredentialResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/integrations/apollo/key-source",operationId:"setApolloCredentialChoice",security:[{bearerAuth:[]}],
-    request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:ApolloCredentialChoice}}}},
-    responses:{200:JsonResponse(ApolloCredentialResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/workspaces/{workspace_ref}/retire",operationId:"retireWorkspace",security:[{bearerAuth:[]}],
     request:{params:z.object({workspace_ref:z.uuid()}),body:{required:true,content:{"application/json":{schema:RetireWorkspaceConfirmation}}}},
     responses:{200:JsonResponse(RetireWorkspaceResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -524,108 +364,11 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   });
   app.openAPIRegistry.registerPath({
     method: "get",
-    path: "/v1/status",
-    operationId: "getStatus",
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: JsonResponse(WorkspaceOverviewSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get",
     path: "/v1/workspace",
     operationId: "getWorkspaceStatus",
     security: [{ bearerAuth: [] }],
     responses: {
       200: JsonResponse(WorkspaceStatusSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "post",
-    path: "/v1/workspace",
-    operationId: "createWorkspace",
-    security: [{ bearerAuth: [] }],
-    request: {
-      body: {
-        required: true,
-        content: { "application/json": { schema: CreateWorkspaceRequestSchema } },
-      },
-    },
-    responses: {
-      200: JsonResponse(CreateWorkspaceResultSchema),
-      400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      429: JsonResponse(ErrorResponseSchema),
-      413: JsonResponse(ErrorResponseSchema),
-      422: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get", path: "/v1/onboarding/state", operationId: "getOnboardingState",
-    security: [{ bearerAuth: [] }], responses: { 200: JsonResponse(OnboardingStateSchema),
-      401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "patch", path: "/v1/onboarding/state", operationId: "saveOnboardingState",
-    security: [{ bearerAuth: [] }], request: { body: { required: true, content: { "application/json": { schema: OnboardingSaveSchema } } } },
-    responses: { 200: JsonResponse(OnboardingStateSchema), 400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 413: JsonResponse(ErrorResponseSchema),
-      422: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "post",
-    path: "/v1/onboarding",
-    operationId: "submitOnboarding",
-    security: [{ bearerAuth: [] }],
-    request: {
-      body: {
-        required: true,
-        content: { "application/json": { schema: SubmitOnboardingRequestSchema } },
-      },
-    },
-    responses: {
-      200: JsonResponse(OnboardingPushResultSchema),
-      400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      429: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      413: JsonResponse(ErrorResponseSchema),
-      422: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get", path: "/v1/config/context", operationId: "getConfigUpdateContext",
-    security: [{ bearerAuth: [] }], responses: {
-      200: JsonResponse(ConfigUpdateGenerationContextSchema), 401: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/onboarding/context",
-    operationId: "getOnboardingContext",
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: JsonResponse(OnboardingGenerationContextSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/onboarding",
-    operationId: "getOnboardingStatus",
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: JsonResponse(OnboardingStatusSchema),
       401: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
@@ -652,84 +395,6 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     responses: {
       200: JsonResponse(RunStatusSchema),
       401: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/config",
-    operationId: "getConfig",
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: JsonResponse(WorkspaceConfigSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/config/{section}",
-    operationId: "getConfigSection",
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: z.object({
-        section: ConfigSectionSchema.openapi({ param: { name: "section", in: "path" } }),
-      }),
-    },
-    responses: {
-      200: JsonResponse(WorkspaceConfigSchema),
-      400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "patch",
-    path: "/v1/config",
-    operationId: "updateConfig",
-    security: [{ bearerAuth: [] }],
-    request: {
-      body: {
-        required: true,
-        content: { "application/json": { schema: ConfigUpdateRequestSchema } },
-      },
-    },
-    responses: {
-      200: JsonResponse(ConfigUpdateResultSchema),
-      400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      413: JsonResponse(ErrorResponseSchema),
-      422: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "post", path: "/v1/config/updates/resolve", operationId: "resolveConfigUpdate",
-    security: [{ bearerAuth: [] }],
-    description: "Read the status of the exact original local update without changing or enqueueing it.",
-    request: { body: { required: true, content: { "application/json": { schema: ConfigUpdateRequestSchema } } } },
-    responses: { 200: JsonResponse(ConfigUpdateStatusSchema), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 413: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema) },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/config/updates/{submission_ref}",
-    operationId: "getConfigUpdateStatus",
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: z.object({
-        submission_ref: SubmissionRefSchema.openapi({
-          param: { name: "submission_ref", in: "path" },
-        }),
-      }),
-    },
-    responses: {
-      200: JsonResponse(ConfigUpdateStatusSchema),
-      400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      404: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
   });
@@ -957,7 +622,7 @@ function errorJson(
   status: ContentfulStatusCode,
   code: string,
   message: string,
-  issues?: OnboardingLintIssue[],
+  issues?: z.infer<typeof RepairIssueSchema>[],
 ): Response {
   return context.json(
     { error: { code, message, ...(issues ? { issues } : {}) }, request_id: context.get("requestId") },
@@ -1009,15 +674,6 @@ const defaultDependencies: AppDependencies = {
   getEmailAccountAttempt: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account setup could not be verified. Keep the same attempt reference."}); },
   denyHubspotCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
   denySlackCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
-  getApolloAllowance: async () => { throw new PublicError({status:503,code:"APOLLO_ALLOWANCE_UNAVAILABLE",message:"Apollo allowance is not configured yet."}); },
-  acquisitionRecovery: async () => {
-    throw new PublicError({
-      status: 503,
-      code: "ACQUISITION_RECOVERY_UNAVAILABLE",
-      message: "Acquisition recovery is not configured.",
-    });
-  },
-  apolloCredentials: async () => { throw new PublicError({status:503,code:"APOLLO_CREDENTIAL_UNAVAILABLE",message:"Apollo credential configuration is unavailable."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
   deleteOwnLogin: async () => { throw new PublicError({status:503,code:"LOGIN_DELETION_UNAVAILABLE",message:"Login deletion is not configured yet."}); },
   workspaceCampaign: async () => { throw new PublicError({ status: 503, code: "WORKSPACE_CAMPAIGN_NOT_CONFIGURED", message: "Workspace sequences are not configured yet." }); },
@@ -1042,29 +698,11 @@ const defaultDependencies: AppDependencies = {
   authorizeEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   completeEmailCallback: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
-  getBusinessWebsite: async () => { throw new Error("getBusinessWebsite is not configured"); },
-  setBusinessWebsite: async () => { throw new Error("setBusinessWebsite is not configured"); },
+  businessOperation: executeBusinessOperation,
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
   },
   listMemberWorkspaces: async () => { throw new PublicError({status:503,code:"WORKSPACES_UNAVAILABLE",message:"Workspace listing is not configured yet."}); },
-  createWorkspace: async () => {
-    throw new Error("createWorkspace is not configured");
-  },
-  getOnboardingState,
-  saveOnboardingState,
-  submitOnboarding: async () => {
-    throw new Error("submitOnboarding is not configured");
-  },
-  getOnboardingContext: async () => {
-    throw new Error("getOnboardingContext is not configured");
-  },
-  getOnboardingStatus: async () => {
-    throw new Error("getOnboardingStatus is not configured");
-  },
-  enqueueOnboardingImport: async () => {
-    throw new Error("enqueueOnboardingImport is not configured");
-  },
   startRun: async () => {
     throw new Error("startRun is not configured");
   },
@@ -1084,23 +722,6 @@ const defaultDependencies: AppDependencies = {
   },
   enqueueCrmSync: async () => {
     throw new Error("enqueueCrmSync is not configured");
-  },
-  getConfig: async () => {
-    throw new Error("getConfig is not configured");
-  },
-  getConfigUpdateContext: async () => { throw new Error("getConfigUpdateContext is not configured"); },
-  submitConfigUpdate: async () => {
-    throw new Error("submitConfigUpdate is not configured");
-  },
-  resolveConfigUpdate: async () => { throw new Error("resolveConfigUpdate is not configured"); },
-  getConfigUpdateStatus: async () => {
-    throw new Error("getConfigUpdateStatus is not configured");
-  },
-  enqueueConfigUpdate: async () => {
-    throw new Error("enqueueConfigUpdate is not configured");
-  },
-  requeueConfigUpdate: async () => {
-    throw new Error("requeueConfigUpdate is not configured");
   },
   disconnectIntegration: async () => {
     throw new Error("disconnectIntegration is not configured");
@@ -1170,6 +791,7 @@ export function createApp(
   overrides: Partial<AppDependencies> = {},
 ): OpenAPIHono<AppEnvironment> {
   const dependencies = { ...defaultDependencies, ...overrides };
+  const trustedMcpRequests = new WeakMap<Request, AuthSession>();
   const hostedAuthOrigin = parseHostedAuthOrigin(dependencies.unipileHostedAuthOrigin);
   const v2HostedAuthOrigins=dependencies.unipileV2HostedAuthOrigins.map(origin=>parseHostedAuthOrigin(origin));
   if(v2HostedAuthOrigins.includes(UNIPILE_HOSTED_AUTH_ORIGIN))throw new Error("V2 hosted origins cannot include V1.");
@@ -1211,7 +833,10 @@ export function createApp(
     }
     app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp, {
       tools: getStageMcpTools(),
-      call: (name, args, request) => callStageMcpTool(name, args, request, (route, init) => Promise.resolve(app.request(route, init))),
+      call: (name, args, request, session) => callStageMcpTool(name, args, request, (route, init) => {
+        const internal = new Request(new URL(route, request.url), init); trustedMcpRequests.set(internal, session);
+        return Promise.resolve(app.fetch(internal));
+      }),
       workspaces: session => dependencies.listMemberWorkspaces(session),
     }));
     app.get("/oauth/consent", context => {
@@ -1529,9 +1154,11 @@ export function createApp(
     return context.json(
       {
         error: { code: publicError.code, message: publicError.message,
-          ...(publicError instanceof CompanyMappingError || publicError instanceof CrmMappingError ? { issues: publicError.issues } : {}),
-          ...(context.req.path === "/v1/onboarding" && onboardingRepairIssues(publicError.code)
-            ? { issues: onboardingRepairIssues(publicError.code) } : {}),
+          ...(publicError.issues ? { issues: publicError.issues } : {}),
+          ...(publicError.current_version === undefined ? {} : { current_version: publicError.current_version }),
+          ...(publicError.stale_sources ? { stale_sources: publicError.stale_sources } : {}),
+          ...(publicError.workspaces ? { workspaces: publicError.workspaces } : {}),
+
         },
         request_id: context.get("requestId"),
       },
@@ -1568,7 +1195,9 @@ export function createApp(
 
   app.use("/v1/*", async (context, next) => {
     if (context.req.path.startsWith("/v1/workspace/crm/")) context.header("cache-control", "no-store");
-    const authentication = await dependencies.authenticate(context.req.raw);
+    const trusted = trustedMcpRequests.get(context.req.raw);
+    trustedMcpRequests.delete(context.req.raw);
+    const authentication = trusted ? { ok: true as const, session: trusted } : await dependencies.authenticate(context.req.raw);
     if (!authentication.ok) {
       return context.json(
         {
@@ -1592,7 +1221,7 @@ export function createApp(
   // Expired entries are removed on access, without a process-owning timer.
   app.use("/v1/*", async (context, next) => {
     if (context.req.method !== "POST" || ![
-      "/v1/workspace", "/v1/onboarding", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/accounts/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
+      "/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/accounts/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
       "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
       "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync",
     ].includes(context.req.path)) return next();
@@ -1615,258 +1244,11 @@ export function createApp(
 
   registerStageRoutes(app, dependencies);
 
-  // Retained for CLI versions before LIF-1137, whose `lifty status` reads this
-  // overview. Current clients read the workspace summary, which includes it.
-  app.get("/v1/status", async (context) => {
-    const session = context.get("authSession");
-    const workspace = await dependencies.getWorkspace(session);
-    if (workspace.state === "needs_workspace") {
-      return context.json(
-        WorkspaceOverviewSchema.parse({
-          workspace: { state: "needs_workspace" },
-          onboarding: { state: "none" },
-          configuration: { icp_version: null },
-          run: { state: "none" },
-          config_update: { state: "none" },
-          integrations: {
-            hubspot: {
-              available: true,
-              connected: false,
-              portal_id: null,
-              hub_domain: null,
-              connected_at: null,
-              reconnect_required: false,
-              sync_pending: false,
-              last_sync_at: null,
-              last_sync: { state: "none" },
-            },
-            unipile: { available: false, connected: false },
-          },
-        }),
-      );
-    }
-
-    const [onboarding, config, run, sync, hubspot, configUpdate, email] = await Promise.all([
-      dependencies.getOnboardingStatus(session),
-      dependencies.getConfig(session, "icp").then(
-        (value) => ({ icp_version: value.config.icp?.version ?? null }),
-        (error: unknown) => {
-          if (error instanceof PublicError && error.code === "MULTI_LANE_CONFIG_UNSUPPORTED") {
-            return { icp_version: null, managed_externally: true };
-          }
-          throw error;
-        },
-      ),
-      dependencies.getRunStatus(session),
-      dependencies.getCrmSyncStatus(session),
-      dependencies.getHubspotConnection(session),
-      dependencies.getConfigUpdateStatus(session, null),
-      dependencies.emailAvailable ? dependencies.getEmailConnection(session, workspace.workspace.workspace_ref) : Promise.resolve(null),
-    ]);
-
-    return context.json(
-      WorkspaceOverviewSchema.parse({
-        workspace: {
-          state: workspace.state,
-          workspace_ref: workspace.workspace.workspace_ref,
-          name: workspace.workspace.name,
-        },
-        onboarding: onboardingOverview(onboarding),
-        configuration: config,
-        run: runOverview(run),
-        config_update: configUpdate,
-        integrations: {
-          hubspot: hubspotOverview(hubspot, sync),
-          unipile: { available: dependencies.emailAvailable, connected: email?.status === "connected" },
-        },
-      }),
-    );
-  });
-
   // ---------------------------------------------------------------- workspace
 
   app.get("/v1/workspace", async (context) => {
     const result = await dependencies.getWorkspace(context.get("authSession"));
     return context.json(WorkspaceStatusSchema.parse(result));
-  });
-
-  app.post("/v1/workspace", async (context) => {
-    const declaredLength = Number(context.req.header("content-length"));
-    if (
-      Number.isFinite(declaredLength)
-      && declaredLength > MAX_CREATE_WORKSPACE_BYTES
-    ) {
-      return errorJson(
-        context,
-        413,
-        "PAYLOAD_TOO_LARGE",
-        "The workspace request exceeds 16 KiB.",
-      );
-    }
-    const requestBody = await readRequestTextWithinLimit(
-      context.req.raw,
-      MAX_CREATE_WORKSPACE_BYTES,
-    );
-    if (!requestBody.ok) {
-      return errorJson(
-        context,
-        413,
-        "PAYLOAD_TOO_LARGE",
-        "The workspace request exceeds 16 KiB.",
-      );
-    }
-
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(requestBody.text);
-    } catch {
-      parsedJson = null;
-    }
-    const body = CreateWorkspaceRequestSchema.safeParse(parsedJson);
-    if (!body.success) {
-      return errorJson(
-        context,
-        400,
-        "INVALID_REQUEST",
-        "The workspace request must contain a non-empty name and an optional description.",
-      );
-    }
-
-    const result = await dependencies.createWorkspace(
-      context.get("authSession"),
-      body.data,
-    );
-    return context.json(CreateWorkspaceResultSchema.parse(result));
-  });
-
-  app.get("/v1/onboarding/state", async context => {
-    context.header("cache-control", "no-store");
-    return context.json(OnboardingStateSchema.parse(await dependencies.getOnboardingState(context.get("authSession"))));
-  });
-  app.patch("/v1/onboarding/state", async context => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, MAX_REQUEST_BYTES);
-    if (!raw.ok) return errorJson(context, 413, "PAYLOAD_TOO_LARGE", "The saved onboarding state exceeds 132 KiB.");
-    let value: unknown;
-    try { value = JSON.parse(raw.text); } catch { value = null; }
-    const input = OnboardingSaveSchema.safeParse(value);
-    if (!input.success) return errorJson(context, 400, "INVALID_REQUEST", "Supply expected_revision, draft, and configuration (or null) using the current state schema.");
-    if (input.data.configuration !== null) {
-      const issues = lintOnboardingDraft(input.data.draft);
-      const lint = lintLocalOnboardingConfiguration(input.data.configuration, input.data.draft, undefined, { requireDiscoveryIntent: true });
-      if (issues.length || !lint.success) return errorJson(context, 422, "ONBOARDING_DRAFT_INVALID", "Save a partial interview with configuration null, or repair the confirmed draft and its bound configuration.", issues.length ? issues : !lint.success ? lint.issues : []);
-    }
-    return context.json(OnboardingStateSchema.parse(await dependencies.saveOnboardingState(context.get("authSession"), input.data)));
-  });
-
-  app.post("/v1/onboarding", async (context) => {
-    const declaredLength = Number(context.req.header("content-length"));
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
-      return errorJson(
-        context,
-        413,
-        "PAYLOAD_TOO_LARGE",
-        "The onboarding push exceeds 132 KiB.",
-      );
-    }
-    const requestBody = await readRequestTextWithinLimit(
-      context.req.raw,
-      MAX_REQUEST_BYTES,
-    );
-    if (!requestBody.ok) {
-      return errorJson(
-        context,
-        413,
-        "PAYLOAD_TOO_LARGE",
-        "The onboarding push exceeds 132 KiB.",
-      );
-    }
-
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(requestBody.text);
-    } catch {
-      parsedJson = null;
-    }
-    const envelope = z.object({
-      draft: z.record(z.string(), z.unknown()),
-      configuration: z.unknown().optional(),
-      ...SubmissionOptionsSchema.shape,
-    }).strict().safeParse(parsedJson);
-    if (!envelope.success) {
-      return errorJson(context, 400, "INVALID_REQUEST",
-        "The onboarding push must contain JSON objects named draft and configuration.");
-    }
-    if (envelope.data.configuration == null) {
-      return errorJson(context, 422, "LOCAL_CONFIGURATION_REQUIRED",
-        "Read the current onboarding context and include the generated configuration with this submission. CLI users should update LIFTY and its onboarding skill first.");
-    }
-    const lint = lintLocalOnboardingConfiguration(envelope.data.configuration, envelope.data.draft, undefined, {
-      requireDiscoveryIntent: true,
-    });
-    if (!lint.success) {
-      return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
-        "Repair the local configuration using these issues and push it again.", lint.issues);
-    }
-    const generationContext = await dependencies.getOnboardingContext(context.get("authSession"));
-    const contextualLint = lintLocalOnboardingConfiguration(lint.configuration, envelope.data.draft, generationContext.scout_global_base);
-    if (!contextualLint.success) {
-      return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID",
-        "Repair the local configuration using these issues and push it again.", contextualLint.issues);
-    }
-    // Writers only protect local artifacts. The current server validates full
-    // confirmation/readiness semantics for every client before persistence.
-    const draftIssues = lintOnboardingDraft(envelope.data.draft);
-    if (draftIssues.length) return errorJson(context, 422, "ONBOARDING_DRAFT_INVALID",
-      "Repair the confirmed draft using the current API schema before submitting configuration.", draftIssues);
-
-    const submission = await dependencies.submitOnboarding(
-      context.get("authSession"),
-      envelope.data.draft,
-      lint.configuration,
-      SubmissionOptionsSchema.parse({ ...(envelope.data.idempotency_key === undefined ? {} : { idempotency_key: envelope.data.idempotency_key }), ...(envelope.data.expected_revision === undefined ? {} : { expected_revision: envelope.data.expected_revision }) }),
-    );
-
-    // An already-imported draft needs no run; anything else gets exactly one.
-    // A previously failed import must not dedupe onto its dead run.
-    let runId: string | null = null;
-    if (submission.import_status !== "imported") {
-      const run = await dependencies.enqueueOnboardingImport(
-        submission.submission_ref,
-        { fresh: submission.import_status === "failed" },
-      );
-      runId = run.id;
-    }
-
-    return context.json(
-      OnboardingPushResultSchema.parse({
-        state: submission.import_status === "imported" ? "imported" : "queued",
-        run_id: runId,
-        submission_ref: submission.submission_ref,
-        draft_digest: submission.draft_digest,
-        workspace: submission.workspace,
-        created: submission.created,
-      }),
-    );
-  });
-
-  app.get("/v1/onboarding/context", async (context) => {
-    context.header("cache-control", "no-store");
-    const result = await dependencies.getOnboardingContext(context.get("authSession"));
-    return context.json(OnboardingGenerationContextSchema.parse({
-      ...OnboardingContextSchema.parse(result),
-      // Defense in depth while older databases still return the execution base.
-      scout_global_base: null,
-      generation_rules: ONBOARDING_GENERATION_RULES,
-      configuration_schema: z.toJSONSchema(LocalOnboardingConfigurationSchema),
-    }));
-  });
-
-  app.get("/v1/onboarding", async (context) => {
-    const result = await dependencies.getOnboardingStatus(
-      context.get("authSession"),
-    );
-    return context.json(OnboardingStatusSchema.parse(result));
   });
 
   app.post("/v1/workspace/runs", async (context) => {
@@ -1900,201 +1282,6 @@ export function createApp(
   app.get("/v1/workspace/runs", async (context) => {
     const result = await dependencies.getRunStatus(context.get("authSession"));
     return context.json(RunStatusSchema.parse(result));
-  });
-
-  // ---------------------------------------------------------------- config
-
-  app.get("/v1/config", async (context) => {
-    const result = await dependencies.getConfig(context.get("authSession"), null);
-    return context.json(WorkspaceConfigSchema.parse(result));
-  });
-
-  app.get("/v1/config/context", async (context) => {
-    context.set("operationStage", "config_context");
-    context.header("cache-control", "no-store");
-    const result = await dependencies.getConfigUpdateContext(context.get("authSession"));
-    return context.json(ConfigUpdateGenerationContextSchema.parse({
-      ...ConfigUpdateContextSchema.parse(result), scout_global_base: null,
-      generation_rules: CONFIG_UPDATE_GENERATION_RULES,
-      configuration_schema: z.toJSONSchema(LocalConfigUpdateConfigurationSchema),
-    }));
-  });
-
-  // Exact-payload lookup is a scoped read. Never enqueue, re-lint against a
-  // newer context, or return the saved private artifact from this endpoint.
-  app.post("/v1/config/updates/resolve", async (context) => {
-    context.header("cache-control", "no-store");
-    context.set("operationStage", "config_resolve");
-    const requestBody = await readRequestTextWithinLimit(context.req.raw, MAX_REQUEST_BYTES);
-    if (!requestBody.ok) return errorJson(context, 413, "PAYLOAD_TOO_LARGE", "The config update exceeds 132 KiB.");
-    let input: unknown;
-    try { input = JSON.parse(requestBody.text); } catch { input = null; }
-    const body = ConfigUpdateRequestSchema.safeParse(input);
-    if (!body.success || !body.data.configuration) return errorJson(context, 400, "INVALID_REQUEST", "Use the exact original update with its local configuration artifact.");
-    return context.json(ConfigUpdateStatusSchema.parse(await dependencies.resolveConfigUpdate(context.get("authSession"), body.data)));
-  });
-
-  // Registered before `/v1/config/:section` so the literal segment wins.
-  app.get("/v1/config/updates/:submission_ref", async (context) => {
-    context.set("operationStage", "config_status");
-    const ref = SubmissionRefSchema.safeParse(context.req.param("submission_ref"));
-    if (!ref.success) {
-      return errorJson(
-        context,
-        400,
-        "INVALID_REQUEST",
-        "The config update reference must be a UUID.",
-      );
-    }
-    const result = await dependencies.getConfigUpdateStatus(
-      context.get("authSession"),
-      ref.data,
-    );
-    return context.json(ConfigUpdateStatusSchema.parse(result));
-  });
-
-  app.get("/v1/config/:section", async (context) => {
-    const section = ConfigSectionSchema.safeParse(
-      (context.req.param("section") ?? "").toLowerCase(),
-    );
-    if (!section.success) {
-      return errorJson(
-        context,
-        400,
-        "INVALID_REQUEST",
-        "The config section must be one of icp, tone, prompt, workspace.",
-      );
-    }
-    const result = await dependencies.getConfig(context.get("authSession"), section.data);
-    return context.json(WorkspaceConfigSchema.parse(result));
-  });
-
-  app.patch("/v1/config", async (context) => {
-    context.set("operationStage", "config_validate");
-    const declaredLength = Number(context.req.header("content-length"));
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
-      return errorJson(
-        context,
-        413,
-        "PAYLOAD_TOO_LARGE",
-        "The config update exceeds 132 KiB.",
-      );
-    }
-    const requestBody = await readRequestTextWithinLimit(
-      context.req.raw,
-      MAX_REQUEST_BYTES,
-    );
-    if (!requestBody.ok) {
-      return errorJson(
-        context,
-        413,
-        "PAYLOAD_TOO_LARGE",
-        "The config update exceeds 132 KiB.",
-      );
-    }
-
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(requestBody.text);
-    } catch {
-      parsedJson = null;
-    }
-    const body = ConfigUpdateRequestSchema.safeParse(parsedJson);
-    if (!body.success) {
-      if (parsedJson && typeof parsedJson === "object" && "configuration" in parsedJson
-        && !LocalConfigUpdateConfigurationSchema.safeParse(parsedJson.configuration).success) {
-        const lint = lintLocalConfigUpdateConfiguration(parsedJson.configuration, {});
-        if (!lint.success) return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID", "Repair the local update artifact using the published schema.", lint.issues);
-      }
-      return errorJson(
-        context,
-        400,
-        "INVALID_REQUEST",
-        "The config update must be {section, values}, {section: \"prompt\", instruction}, or {values}.",
-      );
-    }
-
-    if (body.data.configuration) {
-      context.set("operationStage", "config_context");
-      const current = await dependencies.getConfigUpdateContext(context.get("authSession"));
-      const request = body.data;
-      // A mismatched version can be an exact imported retry. SQL distinguishes
-      // that replay from a new stale artifact before any write; validate fresh
-      // artifacts against the current snapshot only.
-      if (request.configuration?.context_version === current.context_version) {
-        const patch = "section" in request ? request.section === "icp" ? request.values : {} : request.values.icp;
-        const desiredIcp = { ...current.current_config.config.icp, ...(patch && typeof patch === "object" && !Array.isArray(patch) ? patch : {}) };
-        const lint = lintLocalConfigUpdateConfiguration(request.configuration, desiredIcp, current.scout_global_base);
-        if (!lint.success) return errorJson(context, 422, "LOCAL_CONFIGURATION_INVALID", "Repair the local update using these issues and submit it again.", lint.issues.map(issue => ({ ...issue,
-          path: issue.path.replace("/desired_icp", "section" in request && request.section === "icp" ? "/values" : "/values/icp"),
-      })));
-      }
-    }
-
-    context.set("operationStage", "config_submit");
-    const submission = await dependencies.submitConfigUpdate(
-      context.get("authSession"),
-      body.data,
-    );
-
-    // Simple metadata already landed. Generated configuration is stored as a
-    // pending submission; its fields and artifacts publish together at import.
-    // Anything flagged for regeneration gets exactly one job; a replay of a
-    // still-pending digest re-enqueues idempotently (self-healing a lost
-    // enqueue), and a previously failed regeneration gets a fresh run keyed on
-    // the requeue stamp, so a lost enqueue after a requeue is also healed.
-    let state = submission.state;
-    let runRef = submission.run_ref;
-    const regenerates = submission.regenerate_icp || submission.regenerate_prompt;
-    if (regenerates && submission.import_status !== "imported") {
-      let requeuedAt = submission.requeued_at ?? null;
-      if (submission.import_status === "failed") {
-        // Reset the row before the job runs, so the founder's poll never
-        // reads the previous failure while the retry lands behind it.
-        context.set("operationStage", "config_requeue");
-        const requeued = await dependencies.requeueConfigUpdate(
-          context.get("authSession"),
-          submission.submission_ref,
-        );
-        requeuedAt = requeued.state === "none"
-          ? new Date().toISOString()
-          : requeued.requeued_at ?? new Date().toISOString();
-      }
-      context.set("operationStage", "config_enqueue");
-      await dependencies.enqueueConfigUpdate(submission.submission_ref, { requeuedAt });
-      state = "queued";
-      runRef = submission.submission_ref;
-    }
-
-    // A historical synchronous filter-only receipt can carry a lane version
-    // only in readback; preserve that compatible receipt projection.
-    let icpVersion = submission.icp_version ?? null;
-    if (
-      icpVersion === null
-      && state !== "queued"
-      && submission.artifact_actions.icp === "applied"
-    ) {
-      context.set("operationStage", "config_readback");
-      const config = await dependencies.getConfig(context.get("authSession"), "icp");
-      icpVersion = config.config.icp?.version ?? null;
-    }
-
-    return context.json(
-      ConfigUpdateResultSchema.parse({
-        state,
-        submission_ref: submission.submission_ref,
-        run_ref: runRef,
-        import_status: submission.import_status,
-        changed_sections: submission.changed_sections,
-        artifact_actions: submission.artifact_actions,
-        workspace_ref: submission.workspace_ref,
-        created: submission.created,
-        icp_version: icpVersion,
-        prompt_chars: submission.prompt_chars ?? null,
-        prompt_version: submission.prompt_version ?? null,
-        error_code: state === "queued" ? null : submission.error_code ?? null,
-      }),
-    );
   });
 
   app.get("/v1/integrations/hubspot/company-mapping/context", async (context) => {
@@ -2226,79 +1413,6 @@ export function createApp(
       return context.json(NotificationTestResultSchema.parse(result));
     },
   );
-
-  app.get("/v1/workspaces/:workspace_ref/apollo/recovery/:first_run_ref", async (context) => {
-    context.header("cache-control", "no-store");
-    const refs = z.object({
-      workspace_ref: z.uuid(),
-      first_run_ref: z.uuid(),
-    }).safeParse(context.req.param());
-    if (!refs.success) {
-      return errorJson(context, 400, "INVALID_REQUEST", "Choose exact workspace and first-run references.");
-    }
-    const result = await dependencies.acquisitionRecovery(context.get("authSession"), {
-      ...refs.data,
-      operation: "status",
-    });
-    return context.json(AcquisitionRecoveryStatus.parse(result));
-  });
-  app.post("/v1/workspaces/:workspace_ref/apollo/recovery/:first_run_ref", async (context) => {
-    context.header("cache-control", "no-store");
-    const refs = z.object({
-      workspace_ref: z.uuid(),
-      first_run_ref: z.uuid(),
-    }).safeParse(context.req.param());
-    if (!refs.success) {
-      return errorJson(context, 400, "INVALID_REQUEST", "Choose exact workspace and first-run references.");
-    }
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) {
-      return errorJson(context, 413, "INVALID_REQUEST", "Recovery request is too large.");
-    }
-    let body: unknown;
-    try {
-      body = JSON.parse(raw.text);
-    } catch {
-      return errorJson(context, 400, "INVALID_REQUEST", "Provide one recovery request as JSON.");
-    }
-    const parsed = AcquisitionRecoveryBody.safeParse(body);
-    if (!parsed.success) {
-      return errorJson(context, 400, "INVALID_REQUEST", "Choose recovery request or restart with the exact acquisition reference.");
-    }
-    const result = await dependencies.acquisitionRecovery(context.get("authSession"), {
-      ...refs.data,
-      ...parsed.data,
-    });
-    const schema = parsed.data.operation === "restart"
-      ? AcquisitionRestartResult
-      : AcquisitionRecoveryStatus;
-    return context.json(schema.parse(result));
-  });
-
-  app.get("/v1/workspaces/:workspace_ref/apollo/allowance", async context => {
-    context.header("cache-control","no-store");
-    const parsed=z.uuid().safeParse(context.req.param("workspace_ref"));
-    if(!parsed.success)return errorJson(context,400,"INVALID_WORKSPACE","Choose a valid workspace ID.");
-    return context.json(ApolloAllowanceSchema.parse(await dependencies.getApolloAllowance(context.get("authSession"),parsed.data)));
-  });
-  app.get("/v1/workspaces/:workspace_ref/integrations/apollo/key-source", async (context) => {
-    context.header("cache-control", "no-store");
-    const workspace = z.uuid().safeParse(context.req.param("workspace_ref"));
-    if (!workspace.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a valid workspace.");
-    return context.json(ApolloCredentialResult.parse(await dependencies.apolloCredentials(context.get("authSession"), workspace.data, {operation:"status"})));
-  });
-  app.post("/v1/workspaces/:workspace_ref/integrations/apollo/key-source", async (context) => {
-    context.header("cache-control", "no-store");
-    const workspace = z.uuid().safeParse(context.req.param("workspace_ref"));
-    if (!workspace.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a valid workspace.");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 8192);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Apollo credential request is too large.");
-    let body: unknown;
-    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide one Apollo credential choice as JSON."); }
-    const choice = ApolloCredentialChoice.safeParse(body);
-    if (!choice.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose platform_default or provide your own Apollo key.");
-    return context.json(ApolloCredentialResult.parse(await dependencies.apolloCredentials(context.get("authSession"), workspace.data, choice.data)));
-  });
 
   app.post("/v1/workspaces/:workspace_ref/retire", async (context) => {
     context.header("cache-control", "no-store");

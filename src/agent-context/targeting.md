@@ -1,44 +1,7 @@
-# Targeting / ICP
+# Targeting
 
-Purpose: translate confirmed buyer and company criteria into supported
-discovery fields. Read `references.common`, `interview` and `calibration`.
+Read every saved search lane. Targeting owns the people/company search filters and stable personas. Use neutral fields from the operation schema; apply known exclusions as search filters before research costs budget. NAICS industry_codes and excluded_industry_codes use the public 2–6 digit standard; validate codes against the official NAICS reference at https://www.census.gov/naics/ . Personas have stable id, name, titles and optional persona_type; their role and organizational tell belong to setup criteria inputs.
 
-## Read current state
+PATCH lanes by id and expected_version. Only supplied fields change, including partial company fields; preserve every omitted lane/filter, NAICS code and domain. Allocation and data-quality knobs are platform policy. Employees supports a simple min/max range or ordered non-overlapping ranges for existing searches. Null clears a filter. Changed filters affect the next discovery, and already found people remain deduplicated.
 
-GET reads the saved ICP/personas. Read `generation_context` before edits to
-obtain current configuration, confirmed draft, generation rules and artifact
-schema. Existing values answer questions; shared schemas do not.
-
-## First setup and required inputs
-
-Obtain only missing company, buyer, geography, size/unit, persona and exclusion
-decisions described by the current draft schema. Read `onboarding_context` and
-generate the configuration locally against its current schema. Stage POST
-uses the existing full onboarding submission (`draft` and `configuration`),
-once for the initial setup; it is not a partial-stage write. Research criteria
-and commercial voice share that initial transaction. Follow
-`references.configuration`: save through `onboarding_save`, submit the exact saved
-pair with its revision and stable key, follow `onboarding_status`, then GET
-saved targeting. A lost response reuses the original key and content. Never
-repeat the initial submission per stage.
-
-## Later edits
-
-PATCH uses `section: icp`, changed `values`, and the locally generated
-`configuration` required by the authenticated generation contract. Supported
-criteria are person/company locations, industries, employee ranges, seniorities,
-personas, generic keywords, email status, staleness and extrapolation settings.
-Use the runtime schema/rules for exact fields. Persona lists replace the full
-list, so preserve confirmed personas when changing filters only. Confirm the
-applied receipt and read back saved targeting before reviewing a new sample.
-
-## User-facing behavior and errors
-
-Distinguish buyer geography from company headquarters. ARR/revenue is not
-headcount; use an employee proxy only with founder agreement. Industry labels
-do not prove native provider filtering; keywords are not Boolean search.
-Explain any intentionally unrestricted native search before applying it.
-Lane labels, allocation weights, versions and digests are read-only. Respect
-multi-lane management restrictions and stale-context errors. Preserve unrelated
-criteria and the A/B/C evidence rubric. A poor sample warrants diagnosis and a
-confirmed adjustment, not repeated unchanged discovery or invented fit.
+A persona change needs explicitly regenerated_criteria with its expected version and source versions in the same request; both writes are atomic. Filter edits regenerate nothing. After calibration, when evidence repeatedly disqualifies people for a filterable reason, propose the relevant filter and explain why it avoids wasted research. Initial creation belongs to setup; targeting is never deleted or activated here.
