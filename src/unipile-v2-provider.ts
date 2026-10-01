@@ -84,8 +84,10 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
       application_id: account.application_id, account_scope_id: account.account_scope_id ?? null,
       user_id: account.user_id, owner_profile_id: null, v1_account_id: account.metadata.v1_account_id ?? null};
     const products = account.metadata.products_connection_status;
-    const healthy = !account.is_locked && account.status === "running"
-      && (!products || Object.values(products).every(status => status === "running"));
+    const gmailStatus = products ? products.gmail : account.status;
+    const healthy = !account.is_locked && (channel === "email"
+      ? ["running", "partial", "degraded"].includes(account.status) && gmailStatus === "running"
+      : account.status === "running" && (!products || Object.values(products).every(status => status === "running")));
     const healthStatus: LinkedinIdentity["healthStatus"] = account.is_locked ? "locked" : healthy ? "running"
       : account.status === "disconnected" ? "disconnected" : account.status === "errored" || account.status === "degraded" ? "errored" : "unknown";
     return {account, verifiedTransport, healthy, healthStatus};
@@ -112,15 +114,19 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     if (account.provider !== "google") fail("UNIPILE_MAILBOX_UNVERIFIABLE", 409);
     // An unhealthy provider may reject profile calls. A previously verified
     // mailbox can still be reported unhealthy without inventing fresh proof.
+    const gmailStatus = account.metadata.products_connection_status?.gmail ?? account.status;
+    const healthStatus = account.is_locked ? "locked" : healthy ? "running"
+      : account.status === "disconnected" || gmailStatus === "disconnected" ? "disconnected"
+      : account.status === "errored" || gmailStatus === "errored" ? "errored" : "unknown";
     if (!healthy && expectedEmail) return {accountId:transport.canonical_account_id ?? accountId,
-      email:expectedEmail.toLowerCase(),type:"GOOGLE_OAUTH" as const,healthy:false,verifiedTransport};
+      email:expectedEmail.toLowerCase(),type:"GOOGLE_OAUTH" as const,healthy:false,healthStatus,verifiedTransport};
     const parsed = Senders.safeParse(await request(`${encodeURIComponent(accountId)}/email-senders`));
     if (!parsed.success || parsed.data.next_cursor || (parsed.data.total_count !== undefined && parsed.data.total_count !== parsed.data.data.length)) fail();
     const primaries = parsed.data.data.filter(sender => sender.is_primary);
     if (primaries.length !== 1 || primaries[0]!.verification_status !== "verified") fail("UNIPILE_MAILBOX_UNVERIFIABLE", 409);
     const email = primaries[0]!.email.toLowerCase();
     if (expectedEmail && expectedEmail.toLowerCase() !== email) fail("UNIPILE_IDENTITY_MISMATCH", 409);
-    return {accountId: transport.canonical_account_id ?? accountId, email, type: "GOOGLE_OAUTH" as const, healthy, verifiedTransport};
+    return {accountId: transport.canonical_account_id ?? accountId, email, type: "GOOGLE_OAUTH" as const, healthy, healthStatus, verifiedTransport};
   }
   async function readLinkedinIdentity(accountId: string, transport: UnipileTransport, expectedProfileId?: string | null) {
     const {account, verifiedTransport, healthy, healthStatus} = await readAccount(accountId, transport, "linkedin");

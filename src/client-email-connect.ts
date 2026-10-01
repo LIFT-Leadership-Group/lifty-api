@@ -152,13 +152,27 @@ export function createClientEmailOperations(settings:EmailConnectSettings) {
     }
     let healthy=false;
     if(row.connection_ref && row.account_id){
-      try {healthy=(await identity(row,row.transport.account_id ?? row.account_id)).healthy;}
+      let verified:Awaited<ReturnType<ReturnType<typeof createUnipileV2Provider>["readEmailIdentity"]>>|undefined;
+      try {
+        if(row.transport.api_version==="v2"){
+          verified=await requireV2(row).readEmailIdentity(row.transport.account_id ?? row.account_id,row.transport,row.email);
+          healthy=verified.healthy;
+        }else healthy=(await identity(row,row.account_id)).healthy;
+      }
       catch(error){if(!(error instanceof PublicError) || !["UNIPILE_ACCOUNT_NOT_FOUND","UNIPILE_IDENTITY_MISMATCH"].includes(error.code))throw error;}
+      const verifiedAt=new Date().toISOString();
       // A provider call is not authority to disclose a connection after its
       // member was revoked or its route changed while that call was in flight.
       const fresh=Snapshot.parse(await rpc("status",request,session));
       if(fresh.connection_ref!==row.connection_ref || fresh.email!==row.email || fresh.account_id!==row.account_id
         || JSON.stringify(fresh.transport)!==JSON.stringify(row.transport))fail();row=fresh;verify();
+      if(row.transport.api_version==="v2" && verified){
+        const reconciled=Snapshot.parse(await rpc("health",{workspace:parsed.workspace,connection_ref:row.connection_ref,
+          email:verified.email,status:verified.healthStatus,observed_at:verifiedAt,
+          verified_transport:verified.verifiedTransport,transport_generation:row.transport.generation},session));
+        if(reconciled.connection_ref!==row.connection_ref || reconciled.email!==row.email || reconciled.account_id!==row.account_id
+          || JSON.stringify(reconciled.transport)!==JSON.stringify(row.transport))fail();row=reconciled;verify();
+      }
       if(row.connection_status!=="connected")healthy=false;
     }
     return EmailAccountStatusResult.parse({provider:"unipile",channel:"email",workspace_ref:row.workspace_ref,sender_ref:row.sender_ref,email:row.email,
