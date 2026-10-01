@@ -172,8 +172,12 @@ export function createClientEmailOperations(settings:EmailConnectSettings) {
         const reconciled=Snapshot.parse(await rpc("health",{workspace:parsed.workspace,connection_ref:row.connection_ref,
           email:verified.email,status:verified.healthStatus,observed_at:verifiedAt,
           verified_transport:verified.verifiedTransport,transport_generation:row.transport.generation},session));
-        if(reconciled.connection_ref!==row.connection_ref || reconciled.email!==row.email || reconciled.account_id!==row.account_id
-          || JSON.stringify(reconciled.transport)!==JSON.stringify(row.transport))fail();row=reconciled;verify();
+        // Health reads by connection, so its snapshot has no attempt fields to
+        // correlate. `row` already passed verify(); take only what health decides.
+        if(reconciled.connection_ref!==row.connection_ref || reconciled.workspace_ref!==row.workspace_ref || reconciled.sender_ref!==row.sender_ref
+          || reconciled.email!==row.email || reconciled.account_id!==row.account_id
+          || JSON.stringify(reconciled.transport)!==JSON.stringify(row.transport))fail();
+        row={...row,connection_status:reconciled.connection_status,campaign_send_paused:reconciled.campaign_send_paused};
       }
       if(row.connection_status!=="connected")healthy=false;
     }

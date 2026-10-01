@@ -80,7 +80,7 @@ export function renderConfirmationPage(flow:ConnectionFlow, valid=true) {
   return renderLiftyPage({title:valid?'Checking your connection':'Connection needs attention',content:
     `<section id="confirmation" data-label="${label}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin','client-email'].includes(flow)?'intent':'state'}" aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${valid?'Checking your connection':'Connection needs attention'}</h1><p id="confirmation-detail" class="intro">${valid?'Lifty is verifying your '+label+' connection. This page will update automatically.':'Return to Lifty to check this attempt and get the next step.'}</p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
 }
-export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string};
+export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string};
 export function createConfirmationRouter(flow:ConnectionFlow, adapter:ConfirmationAdapter, options:{prefix?:string;origin?:string;log?:(event:ConfirmationLog)=>void}={}) {
   const app=new Hono();
   const path=CONNECTION_FLOWS[flow].path.slice((options.prefix??'').length);
@@ -104,7 +104,7 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
     if(c.req.header('x-lifty-connection')!=='1'||!c.req.header('content-type')?.startsWith('application/json')
       ||c.req.header('sec-fetch-site')==='cross-site'||(supplied!==origin&&!(supplied==='null'&&c.req.header('sec-fetch-site')==='same-origin')))
       return c.json(invalidConfirmation(),403);
-    const started=Date.now();const execution:{signal:AbortSignal;upstream_status?:number;upstream_outcome?:string}={signal:AbortSignal.timeout(stage==='process'?45000:8000)};let correlation='invalid',validated=false;let result:ConfirmationResult=pendingConfirmation(), status=200;
+    const started=Date.now();const execution:{signal:AbortSignal;upstream_status?:number;upstream_outcome?:string}={signal:AbortSignal.timeout(stage==='process'?45000:8000)};let correlation='invalid',validated=false,providerError:string|undefined;let result:ConfirmationResult=pendingConfirmation(), status=200;
     try {
       const reader=c.req.raw.body?.getReader();if(!reader)return c.json(invalidConfirmation(),400);
       const cancel=()=>{void reader.cancel().catch(()=>{});};execution.signal.addEventListener('abort',cancel,{once:true});
@@ -118,6 +118,9 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
       if(stage==='status'&&(input.code||input.denied))return c.json(invalidConfirmation(),400);
       adapter.validate(input,c);
       validated=true;
+      // A provider's error code (e.g. api/already_exists) is an untrusted hint but
+      // the only record of why an attempt failed. Log codes only, never free text.
+      if(input.errorType&&/^[a-z0-9_]{1,40}(\/[a-z0-9_]{1,40})?$/.test(input.errorType))providerError=input.errorType;
       const handler=stage==='process'?adapter.process:adapter.status;
       if(!handler)return c.json(invalidConfirmation(),400);
       // The handler remains awaited; request cancellation never launches an
@@ -128,7 +131,7 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
       else if(error instanceof PublicError&&error.status>=400&&error.status<500&&error.code!=='WARMUP_SETUP_UNAVAILABLE')result=invalidConfirmation();
       else status=202;
     }
-    options.log?.({flow,stage,outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{})});
+    options.log?.({flow,stage,outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{}),...(providerError?{provider_error:providerError}:{})});
     return c.json(result,status===202?202:200);
   });
   return app;

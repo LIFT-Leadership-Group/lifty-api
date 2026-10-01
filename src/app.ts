@@ -308,6 +308,7 @@ export interface LogEvent {
   upstream_operation?: string;
   upstream_code?: string;
   upstream_kind?: string;
+  provider_error?: string;
 }
 
 export type AppEnvironment = {
@@ -1193,7 +1194,7 @@ export function createApp(
 
   const logConfirmation=(event:ConfirmationLog)=>dependencies.log({level:"warn",event:"connection_confirmation",request_id:event.correlation,method:"POST",
     path:`connection/${event.flow}`,error_code:event.outcome,status:event.status,stage:event.stage,elapsed_ms:event.elapsed_ms,
-    ...(event.upstream_status===undefined?{}:{upstream_code:String(event.upstream_status)}),...(event.upstream_outcome?{upstream_kind:event.upstream_outcome}:{})});
+    ...(event.upstream_status===undefined?{}:{upstream_code:String(event.upstream_status)}),...(event.upstream_outcome?{upstream_kind:event.upstream_outcome}:{}),...(event.provider_error?{provider_error:event.provider_error}:{})});
   if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup,logConfirmation));
   app.get("/favicon.ico", (context) => context.body(new Uint8Array(favicon).buffer, 200, {
     "content-type": "image/x-icon",
