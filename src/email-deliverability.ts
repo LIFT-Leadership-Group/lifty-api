@@ -297,8 +297,6 @@ const controlReasons: Record<string, string> = {
   sender_inactive: "The sender for this connection is inactive.",
   connection_unavailable: "The connection is not connected.",
   channel_paused: "Email is paused for this workspace.",
-  pilot_cohort_unconfigured: "Direct Unipile sending is held until LIFT's email pilot cohort is configured.",
-  pilot_cohort_excluded: "This lead is outside the configured email pilot cohort.",
   sender_mailbox_ineligible: "This inbox hasn't passed its warmup and placement checks for sending.",
   owner_mismatch: "The lead belongs to a different sender.",
 };
