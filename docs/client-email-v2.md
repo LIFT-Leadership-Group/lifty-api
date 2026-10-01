@@ -8,8 +8,10 @@ profile, replace another mailbox, or enable sending or warmup.
 
 `POST /v1/email/accounts/connect` accepts `workspace`, `sender_ref`, `email` and
 `protocol_version: 2`. New accounts return a signed Lifty API URL under
-`/unipile/client-email/start`; existing V1 connections retain their original
-reconnect URL. Older clients receive `CLIENT_UPDATE_REQUIRED` for new accounts.
+`/unipile/client-email/start`. A mailbox whose connection is still V1 gets
+`EMAIL_V1_RETIRED` (LIF-1183): no V1 link is issued for client email. It keeps
+sending while connected; moving it to V2 is an operator handoff (LIF-1184).
+Older clients receive `CLIENT_UPDATE_REQUIRED` for new accounts.
 The legacy Edge endpoint also rejects new V1 issuance and unopened legacy
 creation links. Already-opened legacy consent callbacks retain their expiry.
 

@@ -49,7 +49,7 @@ function fixture() {
     }});
   return {ops,session,calls,network,row:()=>row,setRow:(change:Record<string,unknown>)=>{row={...row,...change};},
     healthResponse:(status:"connected"|"disconnected")=>{healthResponse=status;},
-    revoke:()=>{rpcFailure="email_workspace_forbidden";},unhealthy:()=>{healthy=false;},mismatch:()=>{providerEmail="other@example.test";},revokeDuringRead:()=>{revokedAfterRead=true;}};
+    revoke:()=>{rpcFailure="email_workspace_forbidden";},retireV1:()=>{rpcFailure="email_v1_retired";},unhealthy:()=>{healthy=false;},mismatch:()=>{providerEmail="other@example.test";},revokeDuringRead:()=>{revokedAfterRead=true;}};
 }
 const start=(h:ReturnType<typeof fixture>)=>h.ops.connect(h.session,{workspace:"lift",sender_ref:sender,email,protocol_version:2});
 it("issues a Lifty URL for the selected existing client sender without creating a provider account",async()=>{
@@ -63,6 +63,11 @@ it("issues a Lifty URL for the selected existing client sender without creating 
 it("old clients get an explicit update requirement before provider authorization",async()=>{
   const h=fixture();
   await expect(h.ops.connect(h.session,{workspace:"lift",sender_ref:sender,email})).rejects.toMatchObject({code:"CLIENT_UPDATE_REQUIRED"});
+  expect(h.network).toEqual([]);
+});
+it("a client mailbox still on V1 gets an explicit retirement and never a V1 link",async()=>{
+  const h=fixture();h.retireV1();
+  await expect(start(h)).rejects.toMatchObject({code:"EMAIL_V1_RETIRED"});
   expect(h.network).toEqual([]);
 });
 it("creates only a branded V2 Google link and retains its signed authorization correlation",async()=>{
