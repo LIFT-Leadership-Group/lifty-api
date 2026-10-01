@@ -27,7 +27,7 @@ function harness(options:{account?:unknown;senders?:unknown;profile?:unknown;lin
 describe("Unipile V2 authenticated contract",()=>{
   it("retains canonical legacy identity after exact application/scope/owner/alias readback",async()=>{
     const h=harness();
-    expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toEqual({accountId:"legacy_account",email,type:"GOOGLE_OAUTH",healthy:true,
+    expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toEqual({accountId:"legacy_account",email,type:"GOOGLE_OAUTH",healthy:true,healthStatus:"running",
       verifiedTransport:{api_version:"v2",account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",owner_profile_id:null,v1_account_id:"legacy_account"}});
     expect(h.calls.map(c=>c.url)).toEqual(["https://api.unipile.com/v2/accounts/acc_test","https://api.unipile.com/v2/acc_test/email-senders"]);
   });
@@ -59,8 +59,13 @@ describe("Unipile V2 authenticated contract",()=>{
   it("rejects an alias even when a provider profile contains it",async()=>{
     await expect(harness().provider.readEmailIdentity("acc_test",transport,"alias@example.test")).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
   });
-  it.each([{status:"partial"},{status:"degraded"},{status:"disconnected"},{status:"errored"},{is_locked:true},{metadata:{...account.metadata,products_connection_status:{gmail:"disconnected"}}}])("never reports unhealthy account as running %j",async(change)=>{
+  it.each([{status:"disconnected"},{status:"errored"},{is_locked:true},{metadata:{...account.metadata,products_connection_status:{gmail:"disconnected"}}},{metadata:{...account.metadata,products_connection_status:{google_calendar:"running"}}}])("never reports unhealthy Gmail as running %j",async(change)=>{
     expect((await harness({account:{...account,...change}}).provider.readEmailIdentity("acc_test",transport,email)).healthy).toBe(false);
+  });
+  it.each(["partial","degraded"])("verifies Gmail independently of %s Calendar health",async(status)=>{
+    const h=harness({account:{...account,status,metadata:{...account.metadata,products_connection_status:{gmail:"running",google_calendar:"errored"}}}});
+    expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toMatchObject({healthy:true,healthStatus:"running",email});
+    expect(h.calls).toHaveLength(2);
   });
   it("uses an independent self profile for LinkedIn identity",async()=>{
     const h=harness({account:{...account,provider:"linkedin"}});

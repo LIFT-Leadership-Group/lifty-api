@@ -12,6 +12,7 @@ function fixture() {
     authorization_received:false,authorization_account_id:null,return_error:null,campaign_send_paused:null,connection_status:null};
   const calls:{operation:string;payload:Record<string,unknown>}[]=[],network:{url:string;body:Record<string,unknown>|null}[]=[];
   let rpcFailure:string|null=null,healthy=true,providerEmail=email,revokedAfterRead=false;
+  let healthResponse:"connected"|"disconnected"|null=null;
   async function rpc(_name:string,args:Record<string,unknown>){
     const op=String(args.p_operation),payload=args.p_payload as Record<string,unknown>;calls.push({operation:op,payload});
     if(rpcFailure)return {data:null,error:{message:rpcFailure,code:"PT403"}};
@@ -19,6 +20,7 @@ function fixture() {
     if(op==="issue_link"){if(row.state!=="pending")return {data:{claimed:false},error:null};row.state="issuing";return {data:{claimed:true},error:null};}
     if(op==="save_link"){row.hosted_url=payload.url;row.state="ready";}
     if(op==="return_error")row.return_error=payload.return_error;
+    if(op==="health" && healthResponse)row={...row,connection_status:healthResponse,campaign_send_paused:true};
     if(op==="complete"){
       row={...row,state:"completed",connection_ref:connection,account_id:"acc_native",campaign_send_paused:true,connection_status:"connected",
         transport:{...transport,connection_ref:connection,canonical_account_id:"acc_native",account_id:"acc_native",user_id:"native-owner",generation:1}};
@@ -46,6 +48,7 @@ function fixture() {
       throw Error(`Unexpected network boundary: ${url}`);
     }});
   return {ops,session,calls,network,row:()=>row,setRow:(change:Record<string,unknown>)=>{row={...row,...change};},
+    healthResponse:(status:"connected"|"disconnected")=>{healthResponse=status;},
     revoke:()=>{rpcFailure="email_workspace_forbidden";},unhealthy:()=>{healthy=false;},mismatch:()=>{providerEmail="other@example.test";},revokeDuringRead:()=>{revokedAfterRead=true;}};
 }
 const start=(h:ReturnType<typeof fixture>)=>h.ops.connect(h.session,{workspace:"lift",sender_ref:sender,email,protocol_version:2});
@@ -93,6 +96,23 @@ it("mailbox mismatch never completes, even after a signed authorization",async()
   const h=fixture(),link=await start(h);await h.ops.authorize(link.attempt_ref);h.setRow({authorization_received:true,authorization_account_id:"acc_native"});h.mismatch();
   await expect(h.ops.status(h.session,{workspace:"lift",attempt_ref:link.attempt_ref})).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
   expect(h.calls.some(x=>x.operation==="complete")).toBe(false);
+});
+it.each(["connected","disconnected"] as const)("durable status sends fresh mailbox proof and honors the server's %s recovery decision",async(status)=>{
+  const h=fixture(),link=await start(h);await h.ops.authorize(link.attempt_ref);
+  h.setRow({authorization_received:true,authorization_account_id:"acc_native"});
+  await h.ops.status(h.session,{workspace:"lift",attempt_ref:link.attempt_ref});
+  h.setRow({connection_status:"disconnected"});h.healthResponse(status);h.calls.length=0;
+  expect(await h.ops.status(h.session,{workspace:"lift",connection_ref:connection})).toMatchObject({status:status==="connected" ? "connected" : "needs_reconnect",campaign_send_paused:true});
+  expect(h.calls.find(x=>x.operation==="health")?.payload).toMatchObject({workspace:"lift",connection_ref:connection,email,status:"running",
+    transport_generation:1,verified_transport:{api_version:"v2",application_id:"app_lifty",account_id:"acc_native",user_id:"native-owner",v1_account_id:null}});
+  expect(h.calls.map(x=>x.operation)).toEqual(["status","status","health"]);
+});
+it("a foreign provider mailbox never reaches health reconciliation",async()=>{
+  const h=fixture(),link=await start(h);await h.ops.authorize(link.attempt_ref);
+  h.setRow({authorization_received:true,authorization_account_id:"acc_native"});await h.ops.status(h.session,{workspace:"lift",attempt_ref:link.attempt_ref});
+  h.mismatch();h.calls.length=0;
+  expect(await h.ops.status(h.session,{workspace:"lift",connection_ref:connection})).toMatchObject({status:"needs_reconnect"});
+  expect(h.calls.some(x=>x.operation==="health")).toBe(false);
 });
 it("issuer, membership and route authority are checked again before returning a provider-backed status",async()=>{
   const h=fixture(),link=await start(h);

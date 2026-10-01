@@ -23,6 +23,18 @@ completion. It supports a fresh provider check after the one-hour sign-in link
 expires. Provider health and current database authorization are both required
 for `connected`; account inventory alone is not a health check.
 
+LIF-1175 adds verified recovery for a retained V2 Gmail that was disconnected by
+a transient provider failure. Status reads verify the exact account and primary
+mailbox, then reconcile through the caller-authorized database boundary. A signed
+running webhook uses the same evidence and recovery rule. Gmail health is
+independent of Calendar health. Manual disconnects and terminal provider failures
+require explicit reconnect; recovery leaves sending paused and warmup unchanged.
+
+Deploy the Functions migration
+`20261001210001_lif1175_verified_email_health.sql` and compatible V2 receiver before
+this API revision. The new `health` RPC operation is required for retained V2
+status reads. Existing V1 status behavior is unchanged.
+
 ## Release order
 
 1. Merge the Functions change and follow its existing database workflow. Both
