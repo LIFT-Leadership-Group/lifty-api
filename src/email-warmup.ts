@@ -6,6 +6,7 @@ import {
   StoredWarmupStatus, WarmupStartResult, WarmupStatus, WarmupWorkspaceRequest,
   type WarmupOperation, type WarmupWorkspaceInput,
 } from "./email-warmup-contracts.js";
+import { checkWarmupDns, WARMUP_DNS_RECORDS, type WarmupDnsRecord, type WarmupDnsResolver } from "./warmup-dns.js";
 
 export interface MailiverySettings {
   apiKey: string;
@@ -18,6 +19,8 @@ export interface EmailWarmupSettings {
   now?: () => Date;
   requestId?: () => string;
   timeoutMs?: number;
+  /** DNS seam for the check before a setup link is issued; defaults to node:dns. */
+  dns?: WarmupDnsResolver;
 }
 interface RpcClient { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }
 
@@ -54,6 +57,33 @@ export const blockingMessages: Record<string, string> = {
   warmup_setup_pending: "Mailivery setup may still be completing. Removal stays pending until Lifty can verify and clean up the campaign; it will not create another warmup. Contact support if this persists.",
 };
 
+// Jobs holds a new Mailivery campaign before start while the mailbox domain
+// lacks valid SPF, DMARC or MX, naming the failing records in the reason:
+// dns_invalid_dmarc, dns_invalid_spf_dmarc_mx (lift-gtm-jobs warmup-reconcile).
+const DNS_HOLD = /^dns_invalid((?:_(?:spf|dmarc|mx))+)$/;
+const DNS_LABELS: Record<WarmupDnsRecord, string> = { spf: "SPF", dmarc: "DMARC", mx: "MX" };
+const dnsLabels = (records: readonly WarmupDnsRecord[]) => WARMUP_DNS_RECORDS.filter(id => records.includes(id)).map(id => DNS_LABELS[id]);
+
+/** The record labels a pre-start DNS hold names, or null for any other reason. */
+export function dnsHoldRecords(code: string | null | undefined): string[] | null {
+  const match = code ? DNS_HOLD.exec(code) : null;
+  return match ? dnsLabels(match[1]!.slice(1).split("_") as WarmupDnsRecord[]) : null;
+}
+
+/** "<domain> has no valid DMARC record. Add it with your DNS provider." plus the DMARC starter record. */
+function dnsProblem(labels: readonly string[], domain = "the mailbox domain"): string {
+  const list = labels.length < 2 ? labels.join("") : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+  return `${domain} has no valid ${list} ${labels.length < 2 ? "record" : "records"}. Add ${labels.length < 2 ? "it" : "them"} with your DNS provider.`
+    + (labels.includes("DMARC") ? " For a new domain, a TXT record named _dmarc with v=DMARC1; p=none; is enough." : "");
+}
+
+/** Founder text for a stored blocking reason; undefined when Lifty has none. */
+export function blockingMessage(code: string): string | undefined {
+  const records = dnsHoldRecords(code);
+  if (!records) return Object.hasOwn(blockingMessages, code) ? blockingMessages[code] : undefined;
+  return `Warmup hasn't started: ${dnsProblem(records)} Lifty checks again every few minutes and starts warmup on its own once all three pass.`;
+}
+
 const stateLabels: Record<WarmupStatus["state"], string> = {
   not_started: "Not started",
   link_issued: "Waiting for you to connect the mailbox in Mailivery",
@@ -65,11 +95,12 @@ const stateLabels: Record<WarmupStatus["state"], string> = {
 };
 
 // A pending remove wins over pause/resume in the database, so it wins here too.
-function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"]): string {
-  if (state === "removed" || state === "not_started" || !requested) return stateLabels[state];
+function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"], reason: string | null): string {
+  const current = state === "pending_consent" && dnsHoldRecords(reason) ? "Waiting for valid DNS records" : stateLabels[state];
+  if (state === "removed" || state === "not_started" || !requested) return current;
   if (requested === "remove") return "Removing warmup at the next check";
   if (requested === "pause") return state === "paused" ? stateLabels.paused : "Pausing warmup at the next check";
-  return state === "paused" ? "Resuming warmup at the next check" : stateLabels[state];
+  return state === "paused" ? "Resuming warmup at the next check" : current;
 }
 
 function mapRpcError(error: unknown): never {
@@ -102,7 +133,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
   const reasonCode = storedReason ?? (state === "pending_consent" ? "microsoft_consent_pending" : null);
   const blocking = reasonCode ? {
     code: reasonCode,
-    message: blockingMessages[reasonCode] ?? "Warmup has a problem Lifty can't describe yet. Check status again later.",
+    message: blockingMessage(reasonCode) ?? "Warmup has a problem Lifty can't describe yet. Check status again later.",
   } : null;
   let goLive: WarmupStatus["recommended_go_live"];
   if (stored.connection_ref !== undefined) {
@@ -150,7 +181,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
     warmup_required: stored.mailbox_use === "outreach",
     required_active_days: required,
     state,
-    state_label: label(state, binding?.requested_action ?? null),
+    state_label: label(state, binding?.requested_action ?? null, storedReason),
     requested_action: binding?.requested_action ?? null,
     blocking_reason: blocking,
     active_days: activeDays,
@@ -223,6 +254,14 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
     return signed;
   }
 
+  async function requireWarmupDns(email: string): Promise<void> {
+    const domain = email.slice(email.lastIndexOf("@") + 1).trim().toLowerCase();
+    if (!domain) return;
+    const { invalid } = await checkWarmupDns(domain, settings.dns ? { resolver: settings.dns } : {});
+    if (invalid.length) throw new PublicError({ status: 409, code: "EMAIL_WARMUP_DNS_INVALID",
+      message: `Lifty didn't create a warmup link: ${dnsProblem(dnsLabels(invalid), domain)} Run warmup start again once DNS is published. Nothing was changed.` });
+  }
+
   async function status(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStatus> {
     const input = WarmupWorkspaceRequest.parse({ workspace, ...(connectionRef === undefined ? {} : { connection_ref: connectionRef }) });
     return presentWarmupStatus(await rpc(session, "status", input), now());
@@ -233,13 +272,20 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
     // Explicit client connections may only use the branded Google OAuth flow.
     // Check before the start RPC writes a binding; never fall back to hosted forms.
     if (input.connection_ref !== undefined && !settings.issueSetupLink) throw notConfigured();
+    // Read-only: decides whether start would issue a link before anything is written.
+    const current = await rpc(session, "status", input);
+    const state = current.binding?.state;
+    const linkNext = !state || state === "removed" || state === "link_issued";
     if (!mailivery) {
       // Without the provider key nothing is written; an existing bound warmup is still reported.
-      const current = await rpc(session, "status", input);
-      const state = current.binding?.state;
-      if (!state || state === "removed" || state === "link_issued") throw notConfigured();
+      if (linkNext) throw notConfigured();
       return WarmupStartResult.parse({ ...presentWarmupStatus(current, now()), connect_url: null, expires_at: null });
     }
+    // Mailivery pauses warmup on a domain without valid SPF, DMARC and MX, so
+    // the founder publishes them before consent. Only a verified missing or
+    // invalid record refuses; an unanswered lookup issues the link and the
+    // Jobs pre-start hold still guards the campaign.
+    if (linkNext && current.email) await requireWarmupDns(current.email);
     const stored = await rpc(session, "start", input);
     if (!stored.binding || stored.email === null) throw new PublicError({ status: 502, code: "EMAIL_WARMUP_UNAVAILABLE", message: "LIFTY could not prepare warmup. Retry shortly." });
     // Only an unbound binding gets a form. pending_consent already has a bound

@@ -234,6 +234,9 @@ describe("warmup states", () => {
     expect(mailivery(item => { item.binding!.state = "paused"; }).status).toMatchObject({ code: "paused" });
     const consent = mailivery(item => { item.binding!.state = "pending_consent"; });
     expect(consent.status).toMatchObject({ code: "pending", reasons: [{ code: "microsoft_consent_pending" }] });
+    const dns = mailivery(item => { item.binding!.state = "pending_consent"; item.binding!.blocking_reason = "dns_invalid_dmarc"; });
+    expect(dns.status).toMatchObject({ code: "pending", label: "Waiting for valid DNS records",
+      reasons: [{ code: "dns_invalid_dmarc", message: expect.stringMatching(/no valid DMARC record/) }] });
     expect(mailivery(item => { item.binding!.requested_action = "resume"; item.binding!.state = "paused"; }).status.reasons)
       .toEqual([{ code: "resume_requested", message: "Resuming warmup at the next check." }]);
     const stale = mailivery(item => { item.evidence!.observed_at = "2026-09-27T00:00:00Z"; });

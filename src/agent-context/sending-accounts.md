@@ -188,7 +188,10 @@ After the founder finishes, read `warmup_status` again. The state moves from
 waiting for the Mailivery connection to warming after Lifty's next check.
 `warmup_start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
 verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
-another Lifty workspace already warms the same mailbox. After a removal,
+another Lifty workspace already warms the same mailbox. It fails with
+`EMAIL_WARMUP_DNS_INVALID`, without creating a link, when the mailbox domain
+has no valid SPF, DMARC or MX record. Tell the founder which record the
+message names and call `warmup_start` again once it is published. After a removal,
 status shows `Removed`; `warmup_start` can set up a new warmup with a new link only
 when previous provider creation is resolved. An ambiguous handoff is never
 retried automatically: check status and involve support, rather than trying
