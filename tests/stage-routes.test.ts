@@ -12,7 +12,6 @@ const nextAttempt = "44444444-4444-4444-8444-444444444444";
 const expires = "2099-09-16T22:00:00Z";
 const session: AuthSession = { userId: "founder", client: {} };
 const workspace = { state: "ready_for_connections" as const, workspace: { workspace_ref: current, name: "Example" }, next_action: null };
-const config = { workspace_ref: current, config: { workspace: { version: `sha256:${"a".repeat(64)}`, name: "Example", description: "Keep this description", daily_discovery_target: 10 } } };
 const submission = { state: "applied" as const, submission_ref: attemptRef, run_ref: null, import_status: "imported" as const,
   changed_sections: ["workspace" as const], artifact_actions: { workspace: "applied" }, regenerate_icp: false,
   regenerate_prompt: false, workspace_ref: current, created: true };
@@ -20,7 +19,7 @@ const base: Partial<AppDependencies> = {
   authenticate: async () => ({ ok: true, session }), getWorkspace: async () => workspace,
  log: () => {},
 };
-function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v6") {
+function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v7") {
   return app.request(`/v1/workspace/${stage}${query}`, { method,
     headers: { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": `lifty-cli-context.${client}` },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -42,14 +41,14 @@ describe("authenticated workspace stage adapters", () => {
     expect((await app.request("/v1/context/business")).status).toBe(200);
   });
 
-  it.each(["v6"])("applies the existing calibration gate and enqueues one run for %s", async version => {
+  it.each(["v7"])("applies the existing calibration gate and enqueues one run for %s", async version => {
     const start = vi.fn(async () => ({ state: "queued" as const, run_ref: attemptRef, requested_leads: 5, workspace: workspace.workspace, created: true }));
     const enqueue = vi.fn(async () => ({ id: "job" }));
     const app = createApp({ ...base, startRun: start, enqueueFirstRun: enqueue });
     expect((await request(app, "sample-review", "POST", {}, "", version)).status).toBe(200);
     expect(enqueue).toHaveBeenCalledExactlyOnceWith(attemptRef, 0);
-    expect((await request(app, "sample-review", "POST", {}, "", "v3")).status).toBe(409);
-    expect(start).toHaveBeenCalledOnce();
+    expect((await request(app, "sample-review", "POST", {}, "", "v6")).status).toBe(409);
+    expect(start).toHaveBeenCalledExactlyOnceWith(session);
   });
 
   it("rejects foreign current-workspace selectors before any CRM or campaign operation", async () => {

@@ -28,7 +28,8 @@ import { randomBytes } from "node:crypto";
 import { createApp } from "./app.js";
 import { renderCliAuthPage } from "./cli-auth-page.js";
 import { renderPasswordRecoveryPage } from "./password-recovery-page.js";
-import { loadConfig, type ServiceConfig } from "./config.js";
+import { DEFAULT_DASHBOARD_ORIGIN, loadConfig, type ServiceConfig } from "./config.js";
+import { executeResearchOperation } from "./research-operations.js";
 import { PublicError } from "./errors.js";
 import { createHubspotConnectOperations } from "./hubspot-connect.js";
 import { buildAuthorizationUrl } from "./hubspot-oauth.js";
@@ -133,6 +134,7 @@ export function createProductionApp(config: ServiceConfig) {
     listMemberWorkspaces,
     startRun,
     getRunStatus: session => getRunStatus(session, config.dashboardOrigin),
+    researchOperation: (session, key, input) => executeResearchOperation(session, key, input, config.dashboardOrigin ?? DEFAULT_DASHBOARD_ORIGIN),
     getRunProgress: createRunProgressReader(),
     enqueueFirstRun: createFirstRunTrigger(config.trigger),
     acquisitionRecovery: createAcquisitionRecoveryOperations({enqueueVerification:createAcquisitionVerificationTrigger(config.trigger),enqueueFirstRun:createFirstRunTrigger(config.trigger)}),

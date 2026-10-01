@@ -214,7 +214,7 @@ describe("LIFTY API", () => {
     const enqueued:unknown[]=[];
     const result={...startRunFixture(false),attempt:2};
     const app=createApp({authenticate:async()=>({ok:true,session:{userId:"founder",client:{}}}),startRun:async()=>result,enqueueFirstRun:async(runId,attempt)=>{enqueued.push({runId,attempt});return {id:"wake"};}});
-    const response=await app.request("/v1/workspace/runs",{method:"POST",headers:{"x-lifty-client-contract":"lifty-cli-context.v6"}});
+    const response=await app.request("/v1/workspace/sample-review",{method:"POST",headers:{"x-lifty-client-contract":"lifty-cli-context.v7"}});
     expect(response.status).toBe(200);expect(await response.json()).toEqual(result);
     expect(enqueued).toEqual([{runId:result.run_ref,attempt:2}]);
   });
@@ -233,9 +233,9 @@ describe("LIFTY API", () => {
       },
     });
 
-    const response = await app.request("/v1/workspace/runs", {
+    const response = await app.request("/v1/workspace/sample-review", {
       method: "POST",
-      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v6" },
+      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v7" },
     });
 
     expect(response.status).toBe(200);
@@ -257,9 +257,9 @@ describe("LIFTY API", () => {
       },
     });
 
-    const response = await app.request("/v1/workspace/runs", {
+    const response = await app.request("/v1/workspace/sample-review", {
       method: "POST",
-      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v6" },
+      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v7" },
     });
 
     expect(response.status).toBe(200);
@@ -297,8 +297,8 @@ describe("LIFTY API", () => {
       getRunStatus: async () => status,
     });
 
-    const response = await app.request("/v1/workspace/runs", {
-      headers: { authorization: "Bearer valid-token" },
+    const response = await app.request("/v1/workspace/sample-review", {
+      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v7" },
     });
 
     expect(response.status).toBe(200);

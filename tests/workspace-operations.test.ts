@@ -219,30 +219,28 @@ describe("first run operations", () => {
       workspace: { workspace_ref: "ws_opaque", name: "Example" },
       created: true,
     };
-    const calls: string[] = [];
+    const calls: Array<{ name: string; args?: unknown }> = [];
     const client = {
-      rpc: async (name: string) => {
-        calls.push(name);
+      rpc: async (name: string, args?: unknown) => {
+        calls.push({ name, args });
         return { data: expected, error: null };
       },
     };
 
     await expect(startRun({ userId: "founder-123", client })).resolves.toEqual(expected);
-    expect(calls).toEqual(["start_lifty_run"]);
+    expect(calls).toEqual([{ name: "start_lifty_run", args: { p_workspace_id: null } }]);
   });
 
-  it("maps a not-configured start to a push-first error", async () => {
-    const client = {
-      rpc: async () => ({
-        data: null,
-        error: { code: "PT409", message: "lifty_run_not_configured" },
-      }),
-    };
-
-    await expect(startRun({ userId: "founder-123", client })).rejects.toMatchObject({
-      status: 409,
-      code: "RUN_NOT_CONFIGURED",
-    });
+  it.each([
+    [{ code: "PT409", message: "lifty_run_not_configured" }, { status: 409, code: "RUN_NOT_CONFIGURED" }],
+    [{ code: "PT409", message: "RESEARCH_LIMIT_REACHED", details: JSON.stringify({ resets_at: "2026-10-05T00:00:00+00:00", internal: "x" }) },
+      { status: 409, code: "RESEARCH_LIMIT_REACHED", resets_at: "2026-10-05T00:00:00+00:00" }],
+    [{ code: "PT409", message: "lifty_apollo_allowance_exhausted", details: "{\"provider\":\"secret\"}" }, { status: 502, code: "SAMPLE_REVIEW_UNAVAILABLE", resets_at: undefined }],
+  ])("maps typed start errors to public codes without internal causes: %j", async (error, expected) => {
+    const client = { rpc: async () => ({ data: null, error }) };
+    const failure = await startRun({ userId: "founder-123", client }).catch(caught => caught);
+    expect(failure).toMatchObject(expected);
+    expect(JSON.stringify({ code: failure.code, message: failure.message, resets_at: failure.resets_at })).not.toMatch(/apollo|allowance|secret|internal/i);
   });
 
   it("builds research links only for verified lead IDs with available workspace research", async () => {

@@ -6,7 +6,7 @@ describe("CRM record links", () => {
   it("advertises authenticated read-only exact cohort links", async () => {
     const context = await (
       await createApp().request(
-        "/v1/context/crm?client_contract=lifty-cli-context.v6",
+        "/v1/context/crm?client_contract=lifty-cli-context.v7",
       )
     ).json();
     expect(context.operations.records).toMatchObject({
@@ -36,7 +36,7 @@ describe("CRM record links", () => {
       {
         headers: {
           authorization: "Bearer founder",
-          "x-lifty-client-contract": "lifty-cli-context.v6",
+          "x-lifty-client-contract": "lifty-cli-context.v7",
         },
       },
     );

@@ -15,7 +15,7 @@ import {
   type StageOperation,
 } from "./stage-contracts.js";
 
-export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v6";
+export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v7";
 export const CLIENT_UPGRADE_MESSAGE = `Update the installed LIFTY CLI and skill to ${STAGE_CLIENT_CONTRACT}. Earlier client contracts are retired. Reload the updated client; setup resumes from the server draft.`;
 export const AgentContextSchema = z.object({
   format: z.literal("lifty-context.v1"),
@@ -87,6 +87,11 @@ const documents = {
 const readGuide = (name: string) =>
   readFileSync(new URL(`./agent-context/${name}.md`, import.meta.url), "utf8");
 const configuration = readGuide("configuration");
+// The CLI noun after "lifty <verb> <resource>"; a noun equal to the verb is implicit.
+function cliNoun(key: string, op: StageOperation) {
+  const noun = op.cli?.operation ?? key;
+  return noun === op.method.toLowerCase() ? "" : ` ${noun}`;
+}
 function operationGuide(
   stage: string,
   operations: Record<string, StageOperation>,
@@ -99,7 +104,7 @@ function operationGuide(
       )
       .map(
         ([key, op]) =>
-          `- lifty ${op.method.toLowerCase()} ${stage}${op.cli?.operation ? ` ${op.cli.operation}` : ["get", "post", "patch", "delete"].includes(key) ? "" : ` ${key}`} → ${op.method} ${op.route}; MCP ${operationToolNames(stage, key).join(" / ")}`,
+          `- lifty ${op.method.toLowerCase()} ${stage}${cliNoun(key, op)} → ${op.method} ${op.route}; MCP ${operationToolNames(stage, key).join(" / ")}`,
       )
       .join("\n")
   );

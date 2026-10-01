@@ -19,7 +19,7 @@ describe("platform remediation", () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(100_000);
     try {
       const app = createApp({ authenticate: async (request) => ({ ok: true, session: { ...session, userId: request.headers.get("x-test-user") ?? "founder" } }), log: () => {} });
-      const paths = ["/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/runs"];
+      const paths = ["/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/sample-review"];
       for (let index = 0; index < 10; index++) {
         const response = await app.request(paths[index % 3]!, { method: "POST" });
         expect(response.status).not.toBe(429);

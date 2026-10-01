@@ -8,13 +8,14 @@ import {
   VoiceGetSchema,
   SetupStatusSchema,
 } from "./business-contracts.js";
-import { WorkspaceStatusSchema } from "./contracts.js";
+import { RunErrorCodeSchema, WorkspaceStatusSchema } from "./contracts.js";
 import { EmailConnectionStatus } from "./email-contracts.js";
 import { LinkedinConnectionStatus } from "./linkedin-contracts.js";
 import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { PublicError } from "./errors.js";
 import { EmailAccountsResult } from "./email-accounts-contracts.js";
 import type { MemberWorkspacesOutput } from "./member-workspaces.js";
+import { ResearchScheduleSchema } from "./research-operations.js";
 
 export const readResult = <T extends z.ZodType>(schema: T) =>
   z.discriminatedUnion("status", [
@@ -113,7 +114,7 @@ const SummaryRunSchema = z.discriminatedUnion("state", [
       requested_leads: z.number().int().positive(),
       leads_discovered: z.number().int().nonnegative().nullable(),
       leads_researched: z.number().int().nonnegative().nullable(),
-      error_code: z.string().nullable(),
+      error_code: RunErrorCodeSchema.nullable(),
       started_at: z.string().min(1),
       completed_at: z.string().nullable(),
     })
@@ -231,6 +232,9 @@ export const WorkspaceSummarySchema = z
     ).nullable(),
     setup_status: readResult(SetupStatusSchema).nullable(),
     run: readResult(SummaryRunSchema).nullable(),
+    research_schedule: readResult(
+      ResearchScheduleSchema.pick({ state: true, weekly_target: true, effective_target: true }),
+    ).nullable(),
     crm: readResult(SummaryCrmSchema).nullable(),
     email: readResult(Account).nullable(),
     linkedin: readResult(Account).nullable(),
@@ -285,6 +289,7 @@ export async function getWorkspaceSummary(
       campaign: null,
       setup_status: null,
       run: null,
+      research_schedule: null,
       crm: null,
       detail_operations,
     });
@@ -299,6 +304,7 @@ export async function getWorkspaceSummary(
     campaign,
     setup_status,
     run,
+    research_schedule,
     crm,
     mailboxes,
   ] = await Promise.all([
@@ -439,6 +445,13 @@ export async function getWorkspaceSummary(
       if (value.state !== "none") scoped(value.workspace, current);
       return runOverview(value);
     }),
+    // A failed read is unknown (retry_read), never paused or zero.
+    readComponent(async () => {
+      const { state, weekly_target, effective_target } = ResearchScheduleSchema.parse(
+        await deps.researchOperation(session, "research-schedule.get", { query: {}, body: undefined }),
+      );
+      return { state, weekly_target, effective_target };
+    }),
     readComponent(async () => {
       const [hubspot, sync] = await Promise.all([
         deps.getHubspotConnection(reads),
@@ -521,6 +534,7 @@ export async function getWorkspaceSummary(
     campaign,
     setup_status,
     run,
+    research_schedule,
     crm,
     detail_operations,
   });

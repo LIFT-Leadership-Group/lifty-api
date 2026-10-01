@@ -59,7 +59,7 @@ and wait. Reuse an explicit choice; a connected account does not choose its
 channel. Keep disconnected channels available as connection options. Explain
 the requested journey, current/future audience and stop-on-reply before writing
 copy. Ask only for missing intent or required account declarations. Pending
-calibration or exhausted discovery allowance does not prevent drafting.
+calibration or a reached weekly research limit does not prevent drafting.
 
 ## Composition and outreach overlay
 
@@ -477,7 +477,6 @@ without approval of the exact recipient, account and copy.
   graph/mode/overlay edits use campaign modify. Do not submit setup again for
   an already-configured workspace or route around a rejection.
 
-Discovery limits are enforced by the research operations, which report
-exhaustion with its reset time. Exhaustion does not prevent account setup,
-saved-lead review or drafting; never bypass limits through retries, dry runs
-or manual inserts.
+Weekly research volume and its reset time are on `research-schedule status`.
+A reached limit does not prevent account setup, saved-lead review or drafting;
+never work around it through retries, dry runs or manual inserts.

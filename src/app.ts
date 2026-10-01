@@ -1,8 +1,10 @@
 import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult, type AcquisitionRecoveryInput, type AcquisitionRecoveryOutput } from "./acquisition-recovery.js";
 import { RepairIssueSchema } from "./business-contracts.js";
 import { executeBusinessOperation } from "./business-operations.js";
+import { executeResearchOperation } from "./research-operations.js";
+import { DEFAULT_DASHBOARD_ORIGIN } from "./config.js";
 import { createConfirmationRouter, invalidConfirmation, type ConfirmationAdapters, type ConfirmationAdapter, type ConfirmationLog } from "./connection-confirmation.js";
-import { RunProgressQuerySchema, RunProgressSchema, type RunProgressQuery, type RunProgress } from "./run-progress.js";
+import type { RunProgressQuery, RunProgress } from "./run-progress.js";
 import type { WorkspaceCampaignInput, WorkspaceCampaignOutput } from "./workspace-campaign-contracts.js";
 import type { CrmMappingOperation } from "./crm-mapping/contracts.js";
 import { CrmMappingError } from "./crm-mapping.js";
@@ -32,7 +34,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, RunStatusSchema, StartRunResultSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
+import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
 import { type EnqueueCrmSync, type EnqueueFirstRun, type EnqueueIntegrationRevocation, type EnqueueNotificationDelivery } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
@@ -119,6 +121,9 @@ export interface AppDependencies {
   businessOperation(session: AuthSession, key: string, payload?: unknown): Promise<unknown>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
   listMemberWorkspaces(session: AuthSession): Promise<MemberWorkspacesOutput>;
+  // Research schedule, weekly status and lead list (LIF-1174). Like every
+  // stage RPC, the workspace is the one the database selects for the session.
+  researchOperation(session: AuthSession, key: string, input: { query: Record<string, unknown>; body: unknown }): Promise<unknown>;
   startRun(session: AuthSession): Promise<StartRunResult>;
   getRunStatus(session: AuthSession): Promise<RunStatus>;
   getRunProgress(session: AuthSession, query: RunProgressQuery, signal: AbortSignal): Promise<RunProgress>;
@@ -209,6 +214,9 @@ const ErrorResponseSchema = z.object({
     code: z.string(),
     message: z.string(),
     issues: z.array(RepairIssueSchema).max(20).optional(),
+    current_version: z.number().int().nonnegative().optional(),
+    limit: z.number().int().positive().optional(),
+    resets_at: z.string().optional(),
   }),
   request_id: z.string(),
 });
@@ -407,31 +415,6 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     security: [{ bearerAuth: [] }],
     responses: {
       200: JsonResponse(WorkspaceStatusSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "post",
-    path: "/v1/workspace/runs",
-    operationId: "startRun",
-    security: [{ bearerAuth: [] }],
-    request: { headers: z.object({ "x-lifty-client-contract": z.literal(STAGE_CLIENT_CONTRACT) }) },
-    responses: {
-      200: JsonResponse(StartRunResultSchema),
-      401: JsonResponse(ErrorResponseSchema),
-      429: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema),
-    },
-  });
-  app.openAPIRegistry.registerPath({
-    method: "get",
-    path: "/v1/workspace/runs",
-    operationId: "getRunStatus",
-    security: [{ bearerAuth: [] }],
-    responses: {
-      200: JsonResponse(RunStatusSchema),
       401: JsonResponse(ErrorResponseSchema),
       502: JsonResponse(ErrorResponseSchema),
     },
@@ -738,6 +721,7 @@ const defaultDependencies: AppDependencies = {
   completeEmailCallback: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
   businessOperation: executeBusinessOperation,
+  researchOperation: (session, key, input) => executeResearchOperation(session, key, input, DEFAULT_DASHBOARD_ORIGIN),
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
   },
@@ -1197,6 +1181,8 @@ export function createApp(
           ...(publicError.current_version === undefined ? {} : { current_version: publicError.current_version }),
           ...(publicError.stale_sources ? { stale_sources: publicError.stale_sources } : {}),
           ...(publicError.workspaces ? { workspaces: publicError.workspaces } : {}),
+          ...(publicError.limit === undefined ? {} : { limit: publicError.limit }),
+          ...(publicError.resets_at === undefined ? {} : { resets_at: publicError.resets_at }),
 
         },
         request_id: context.get("requestId"),
@@ -1260,7 +1246,7 @@ export function createApp(
   // Expired entries are removed on access, without a process-owning timer.
   app.use("/v1/*", async (context, next) => {
     if (context.req.method !== "POST" || ![
-      "/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/runs", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/accounts/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
+      "/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/sample-review", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/accounts/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
       "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
       "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync",
     ].includes(context.req.path)) return next();
@@ -1288,39 +1274,6 @@ export function createApp(
   app.get("/v1/workspace", async (context) => {
     const result = await dependencies.getWorkspace(context.get("authSession"));
     return context.json(WorkspaceStatusSchema.parse(result));
-  });
-
-  app.post("/v1/workspace/runs", async (context) => {
-    const result = StartRunResultSchema.parse(await dependencies.startRun(context.get("authSession")));
-    // A quality checkpoint is terminal until targeting changes. Reattaching
-    // returns its saved cohort without starting another acquisition job.
-    if (result.state === "failed") return context.json(result);
-    // Enqueue active starts, including re-attachments: the run-and-attempt-scoped
-    // idempotency key makes it a no-op when the run is already enqueued and
-    // self-heals an enqueue lost after the ledger insert.
-    await dependencies.enqueueFirstRun(result.run_ref, result.attempt ?? 0);
-    return context.json(StartRunResultSchema.parse(result));
-  });
-
-  app.openAPIRegistry.registerPath({
-    method: "get", path: "/v1/workspace/runs/progress", operationId: "getRunProgress", security: [{ bearerAuth: [] }],
-    request: { query: RunProgressQuerySchema },
-    responses: { 200: JsonResponse(RunProgressSchema), 400: JsonResponse(ErrorResponseSchema),
-      401: JsonResponse(ErrorResponseSchema), 404: JsonResponse(ErrorResponseSchema),
-      409: JsonResponse(ErrorResponseSchema), 429: JsonResponse(ErrorResponseSchema),
-      502: JsonResponse(ErrorResponseSchema), 504: JsonResponse(ErrorResponseSchema) },
-  });
-  app.get("/v1/workspace/runs/progress", async (context) => {
-    context.header("cache-control", "no-store");
-    const query = RunProgressQuerySchema.safeParse(context.req.query());
-    if (!query.success) return errorJson(context, 400, "INVALID_REQUEST", "Supply a run_ref, optional cursor and wait_seconds from 0 to 25.");
-    const result = await dependencies.getRunProgress(context.get("authSession"), query.data, context.req.raw.signal);
-    return context.json(RunProgressSchema.parse(result));
-  });
-
-  app.get("/v1/workspace/runs", async (context) => {
-    const result = await dependencies.getRunStatus(context.get("authSession"));
-    return context.json(RunStatusSchema.parse(result));
   });
 
   app.get("/v1/integrations/hubspot/company-mapping/context", async (context) => {

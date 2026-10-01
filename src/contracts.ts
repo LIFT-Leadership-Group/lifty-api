@@ -34,6 +34,15 @@ const RunStartFields = {
 };
 
 const CalibrationPolicySchema = z.enum(["tier_a_v1", "qualified_ab_v1", "researched_v1"]);
+// Customer reasons for a failed sample. The database keeps the internal cause
+// for operators; provider and capacity details never reach this field.
+export const RunErrorCodeSchema = z.enum([
+  "calibration_sample_incomplete",
+  "calibration_review_required",
+  "research_failed",
+  "search_exhausted",
+  "research_limit_reached",
+]);
 
 export const StartRunResultSchema = z.discriminatedUnion("state", [
   z.object({
@@ -76,7 +85,7 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
       leads_discovered: z.number().int().nonnegative().nullable(),
       calibration_policy: CalibrationPolicySchema.optional(),
       leads_researched: z.number().int().nonnegative().nullable(),
-      error_code: z.string().nullable(),
+      error_code: RunErrorCodeSchema.nullable(),
       started_at: z.string().min(1),
       completed_at: z.string().nullable(),
       workspace: WorkspaceReferenceSchema,

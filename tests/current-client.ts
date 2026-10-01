@@ -11,7 +11,7 @@ export function createCurrentClient(...args: Parameters<typeof createApp>) {
     request: (...[input, init, ...rest]: Parameters<typeof app.request>) => {
       const headers = new Headers(input instanceof Request ? input.headers : undefined);
       new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
-      if (!headers.has("x-lifty-client-contract")) headers.set("x-lifty-client-contract", "lifty-cli-context.v6");
+      if (!headers.has("x-lifty-client-contract")) headers.set("x-lifty-client-contract", "lifty-cli-context.v7");
       return app.request(input, { ...init, headers }, ...rest);
     },
   };

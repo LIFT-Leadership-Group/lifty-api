@@ -21,9 +21,9 @@ configured Hono app for programmatic use.
 from the same catalog used by HTTP and MCP. Public context works before login
 and contains no tenant values or Scout base.
 
-The supported client contract is `lifty-cli-context.v6`. The CLI requests it
+The supported client contract is `lifty-cli-context.v7`. The CLI requests it
 through the public `client_contract` query and sends
-`x-lifty-client-contract: lifty-cli-context.v6` on authenticated requests.
+`x-lifty-client-contract: lifty-cli-context.v7` on authenticated requests.
 Missing, retired or unknown contracts return 409 `CONTEXT_CLIENT_UNSUPPORTED`
 after authentication. Invalid sessions return 401. Public unversioned links
 show current documentation. Health, login and provider browser callbacks keep
@@ -50,8 +50,20 @@ the database, which applies this one rule for every Lifty RPC.
 Edit public guidance in `src/agent-context/`. The CLI fetches fresh context,
 resolves a catalog operation and transports its request/response. It owns no
 Business schema, generation template or authoritative local draft. Build
-replaces `dist/agent-context/`, removing retired assets. Publish a compatible v6
-CLI before or alongside this API cutover; v5 is deliberately retired.
+replaces `dist/agent-context/`, removing retired assets. Publish a compatible v7
+CLI before or alongside this API cutover; v6 is deliberately retired.
+
+Weekly research (LIF-1174) is one schedule per workspace: `weekly_target` plus
+active or paused, with CAS `expected_version`. The plan's weekly research limit
+(25 free, 100 paid, 150 managed) is read-only; a Monday 00:00 UTC week counts
+each person once, when their first research completes, and includes the
+five-person sample. Weekly status, the calibration sample and the lead list
+read the same ledger. Like every stage, these RPCs select the workspace in the
+database from the forwarded `x-lifty-workspace` header. Typed RPC errors map
+through one table in `src/rpc-errors.ts`; an unknown code is a 502
+"unavailable", never a leaked internal reason. Failed sample reasons are
+`calibration_sample_incomplete`, `calibration_review_required`,
+`research_failed`, `search_exhausted` and `research_limit_reached`.
 
 ### Routes
 
@@ -68,7 +80,10 @@ CLI before or alongside this API cutover; v5 is deliberately retired.
 - `POST /v1/workspace/setup`, `GET …/setup/status` — atomic submission and durable receipt
 - `GET /v1/workspace/summary`, `GET …/next-step` — independently observed resources and resumption guidance
 - `GET /v1/workspace` — authenticated workspace state
-- `POST /v1/workspace/runs`, `GET …/runs` — initial research run and results
+- `POST /v1/workspace/sample-review`, `GET …/sample-review`, `GET /v1/workspace/runs/progress` — five-person calibration sample, its results and bounded progress
+- `GET /v1/workspace/research-schedule`, `PATCH …/research-schedule`, `POST …/research-schedule/activate`, `POST …/research-schedule/pause`, `GET …/research-schedule/status` — weekly research schedule and weekly status
+- `GET /v1/workspace/leads` — researched leads, newest first, with grade/week filters and an opaque cursor
+- `GET /v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}`, `POST …` — operator-only acquisition recovery for a failed first run; not in the customer catalog, MCP tools or CLI. The database allows only LIFT admins
 - `POST /v1/integrations/{provider}/connect` — short-lived connection URL
 - `POST /v1/workspaces/{workspace_ref}/integrations/slack/connect-link` — admin-only seven-day client invitation for an explicit workspace; requires membership as well as LIFT admin status
 - `GET /v1/integrations/{provider}` — secret-free connection status

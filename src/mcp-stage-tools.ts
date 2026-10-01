@@ -19,8 +19,8 @@ const campaignReads = campaignReadOperations;
 // channel routes carry it at the top level.
 const splitCampaigns = splitCampaignOperations;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
-const openWorld = new Set(["sample-review.post", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
-  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test", "sample-review.recovery"]);
+const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
+  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.
@@ -79,7 +79,7 @@ function entries(): Entry[] {
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${campaignRead === undefined ? "" : read ? " This tool accepts only status and preview operations." : " This tool changes campaign state and excludes status and preview operations."}${read ? "" : ["business", "targeting", "research-criteria", "commercial-voice", "setup"].includes(stage) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
+      const description = `${operation.description}${campaignRead === undefined ? "" : read ? " This tool accepts only status and preview operations." : " This tool changes campaign state and excludes status and preview operations."}${read ? "" : ["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule"].includes(stage) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
       return { stage, action, operation,
         ...(campaignRead === undefined ? {} : { campaignRead }),
         tool: { name, title: label, description,
@@ -107,9 +107,11 @@ export const getStageMcpTools = (): StageMcpTool[] => {
   });
 };
 
+const QueryScalar = z.union([z.string(), z.number().finite(), z.boolean()]);
 const Envelope = z.object({
   path: z.record(z.string(), z.string().regex(/^[A-Za-z0-9_-]+$/)).default({}),
-  query: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).default({}),
+  // Array values become repeated parameters, as the CLI sends them.
+  query: z.record(z.string(), z.union([QueryScalar, z.array(QueryScalar).min(1).max(20)])).default({}),
   body: z.unknown().optional(),
 }).strict();
 function propertyNames(schema: JsonSchema): Set<string> {
@@ -149,7 +151,8 @@ export async function callStageMcpTool(name: string, args: unknown, request: Req
     return value ? encodeURIComponent(value) : "";
   });
   if (missingPath) return invalid();
-  const query = new URLSearchParams(Object.entries(input.query).map(([key, value]) => [key, String(value)]));
+  const query = new URLSearchParams(Object.entries(input.query).flatMap(([key, value]) =>
+    (Array.isArray(value) ? value : [value]).map(item => [key, String(item)])));
   const headers = new Headers({ accept: "application/json", "x-lifty-client-contract": STAGE_CLIENT_CONTRACT });
   // The MCP adapter is a current API client. The caller cannot override its
   // contract, impersonate another principal, or supply a route/origin.

@@ -289,5 +289,5 @@ Lifty reconnects that account instead of creating another one, and a mailbox
 held live by another workspace fails before any link is issued. Never interpret a failed read as disconnected or a
 previous connected grant as the new attempt. A verified connection does not
 authorize any email, message or invitation; use campaign previews and explicit
-approval/activation before sending. Connection can proceed while sample review
-or new-discovery allowance is blocked.
+approval/activation before sending. Connection can proceed while the sample
+or new research is waiting for the weekly reset.

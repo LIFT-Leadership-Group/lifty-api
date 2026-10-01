@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
 import { createApp } from "../src/app.js";
+import { getStageMcpTools } from "../src/mcp-stage-tools.js";
+import { RPC_ERROR_MESSAGES } from "../src/rpc-errors.js";
 import {
   getAgentContext,
   STAGE_CLIENT_CONTRACT,
@@ -221,5 +224,38 @@ describe("runtime context discovery and connection handoff", () => {
     expect(getAgentContext("sending-accounts")!.instructions).toContain(
       "hosted email",
     );
+  });
+});
+
+// LIF-1174: the acquisition provider and the retired volume knobs never reach
+// a customer surface. Operators see provider details in logs and alerts only.
+describe("customer surfaces name no provider or retired volume knob", () => {
+  const retired = /apollo|allowance|capacity|daily_discovery_target|pipeline_active|tier_1|tier_2/i;
+  const source = (dir: string): string[] => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })
+    .flatMap(entry => entry.isDirectory() ? source(`${dir}${entry.name}/`)
+      : entry.name.endsWith(".ts") ? [readFileSync(new URL(`${dir}${entry.name}`, import.meta.url), "utf8")] : []);
+  // Every public error code a route or adapter can return.
+  const publicCodes = source("../src/").flatMap(text => [
+    ...text.matchAll(/\bcode:\s*"([A-Z][A-Z0-9_]+)"/g),
+    ...text.matchAll(/errorJson\([^,]+,\s*\d+,\s*"([A-Z][A-Z0-9_]+)"/g),
+  ].map(match => match[1]!));
+  it("scans the catalog, MCP tools, every guide and every public error code", () => {
+    const guides = readdirSync(new URL("../src/agent-context/", import.meta.url)).filter(name => name.endsWith(".md"));
+    expect(guides).toEqual(expect.arrayContaining(["research-schedule.md", "leads.md"]));
+    const surfaces: Record<string, string> = {
+      catalog: JSON.stringify(stageOperations),
+      mcp: JSON.stringify(getStageMcpTools()),
+      rpc_errors: JSON.stringify(RPC_ERROR_MESSAGES),
+      public_codes: publicCodes.join(" "),
+      ...Object.fromEntries(["stages", "campaign", ...Object.keys(stageOperations)].map(task => [`context:${task}`, JSON.stringify(getAgentContext(task))])),
+      ...Object.fromEntries(guides.map(name => [name, readFileSync(new URL(`../src/agent-context/${name}`, import.meta.url), "utf8")])),
+    };
+    // The scanner must actually see codes, or an empty scan would pass.
+    expect(publicCodes).toEqual(expect.arrayContaining(["RESEARCH_STATUS_UNAVAILABLE", "LEADS_UNAVAILABLE", "STAGE_OPERATION_UNSUPPORTED"]));
+    for (const [name, text] of Object.entries(surfaces)) expect(text.match(retired)?.[0], name).toBeUndefined();
+  });
+  it("keeps the sample's operations to get, post and progress", () => {
+    expect(Object.keys(stageOperations["sample-review"]!).sort()).toEqual(["get", "post", "progress"]);
+    expect(getStageMcpTools().map(tool => tool.name).filter(name => /recovery|capacity|allowance|apollo/.test(name))).toEqual([]);
   });
 });

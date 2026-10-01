@@ -118,6 +118,13 @@ the runtime environment of the App Platform app (`SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_JWKS_URL`). HubSpot app credentials and
 `PUBLIC_BASE_URL` are also owned by that DigitalOcean runtime.
 
+The LIF-1174 API revision (client contract v7) requires the Functions migration
+that adds the research schedule, weekly ledger and the `p_workspace_id` forms of
+`start_lifty_run`, `get_lifty_run_status` and `get_lifty_run_progress`. Deploy
+that migration first; an older database makes these operations return 502
+"unavailable", never a guessed state. Weekly research links use
+`LIFTY_DASHBOARD_ORIGIN`, the same owner as sample research links.
+
 ## DigitalOcean staging
 
 The sole hosted runtime is the `lifty-api-staging` App Platform app. The
@@ -171,4 +178,4 @@ restore a v5-only API against new resource writes without an explicit plan.
 
 ## Request limits
 
-`POST /v1/workspace/business`, `POST /v1/workspace/setup`, and `POST /v1/workspace/runs` share a budget of ten requests per authenticated user per minute per API process. Exhaustion returns 429 `RATE_LIMITED` with `Retry-After`. The in-memory budget resets on restart and is not shared across replicas. Per-IP and fleet-wide limiting belong at ingress. Reads and OAuth callbacks do not consume this budget.
+`POST /v1/workspace/business`, `POST /v1/workspace/setup`, and `POST /v1/workspace/sample-review` share a budget of ten requests per authenticated user per minute per API process. Exhaustion returns 429 `RATE_LIMITED` with `Retry-After`. The in-memory budget resets on restart and is not shared across replicas. Per-IP and fleet-wide limiting belong at ingress. Reads and OAuth callbacks do not consume this budget.

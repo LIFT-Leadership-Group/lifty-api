@@ -18,12 +18,38 @@ import { readComponent } from "./workspace-summary.js";
 import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { PublicError } from "./errors.js";
 import { z } from "zod";
-import { businessOperationDefinitions } from "./business-operations.js";
-// Tool ids follow the same operation catalog used by HTTP and MCP.
-const tool = (
-  resource: keyof typeof businessOperationDefinitions,
-  operation: string,
-) => `${resource.replace(/-/g, "_")}_${operation}`;
+import { stageOperations } from "./stage-contracts.js";
+import { operationToolNames } from "./operation-names.js";
+import type { RunErrorCodeSchema } from "./contracts.js";
+// Tool ids are derived from the operation catalog used by HTTP and MCP; a
+// retired operation fails here instead of being recommended.
+const tool = (resource: string, operation: string) => {
+  if (!stageOperations[resource]?.[operation]) throw new Error(`Unknown catalog operation ${resource}.${operation}`);
+  return operationToolNames(resource, operation)[0]!;
+};
+// Customer reasons for a failed sample and the one next move for each.
+const sampleFailures: Record<z.infer<typeof RunErrorCodeSchema>, { action: string; tools: string[] }> = {
+  research_limit_reached: {
+    action: `This week's research limit was reached. Read ${tool("research-schedule", "status")} and give the founder its resets_at; start the sample again with ${tool("sample-review", "post")} after that time. Volume does not carry over and the limit is not raised by retrying.`,
+    tools: [tool("research-schedule", "status"), tool("sample-review", "post")],
+  },
+  search_exhausted: {
+    action: `The search ran out of new matching people. Propose one specific wider targeting change; after the founder agrees, save it with ${tool("targeting", "patch")} and its expected_version, then start a new sample with ${tool("sample-review", "post")}.`,
+    tools: [tool("targeting", "get"), tool("targeting", "patch"), tool("sample-review", "post")],
+  },
+  research_failed: {
+    action: `Research failed for a technical reason. Retry once with ${tool("sample-review", "post")}; it reuses the saved people and completed research. If it fails again, tell the founder LIFT is looking into it.`,
+    tools: [tool("sample-review", "post")],
+  },
+  calibration_sample_incomplete: {
+    action: `Some people lack current research, a valid profile URL or a fit rationale. Explain the gap, then retry once with ${tool("sample-review", "post")}; it reuses the saved people.`,
+    tools: [tool("sample-review", "post")],
+  },
+  calibration_review_required: {
+    action: `This older sample stopped for a grade check that no longer applies. ${tool("sample-review", "post")} reviews the same saved people under the current policy without new research.`,
+    tools: [tool("sample-review", "post")],
+  },
+};
 type Reads = Pick<
   AppDependencies,
   | "businessOperation"
@@ -201,12 +227,12 @@ export async function getNextStep(
       "sample-review",
       "sample_not_started",
       [
-        "sample_review_post with body {} and keep its run_ref. The first-run endpoint enforces platform discovery limits; when exhausted, give its actual reset time.",
+        `${tool("sample-review", "post")} with body {} and keep its run_ref. The sample uses five people of this week's research volume; with fewer than five left it returns RESEARCH_LIMIT_REACHED and resets_at: give the founder that reset time.`,
         "Tell the founder you are finding and researching five matching people, that it takes a few minutes, and that you will share each one as it lands.",
-        "sample_review_progress with run_ref, then the returned cursor and wait_seconds 25 until terminal. Keep one request open and narrate each new lead in one line.",
-        "When terminal, call next_step. This bounded initial sample does not activate recurring research or outreach.",
+        `${tool("sample-review", "progress")} with run_ref, then the returned cursor and wait_seconds 25 until terminal. Keep one request open and narrate each new lead in one line.`,
+        "When terminal, call next_step. This bounded initial sample does not activate weekly research or outreach.",
       ],
-      ["sample_review_post", "sample_review_progress"],
+      [tool("sample-review", "post"), tool("sample-review", "progress")],
       "sample-review",
     );
   if (["queued", "running"].includes(run.state))
@@ -215,33 +241,30 @@ export async function getNextStep(
       "sample-review",
       "sample_pending",
       [
-        `sample_review_progress with run_ref ${run.run_ref}, then the returned cursor and wait_seconds 25 until terminal. Narrate each newly researched lead in one line.`,
+        `${tool("sample-review", "progress")} with run_ref ${run.run_ref}, then the returned cursor and wait_seconds 25 until terminal. Narrate each newly researched lead in one line.`,
         "One request at a time: no sleeps and never POST again to check progress.",
         "When terminal, call next_step.",
       ],
-      ["sample_review_progress"],
+      [tool("sample-review", "progress")],
       "sample-review",
       run,
     );
-  if (run.state === "failed")
+  if (run.state === "failed") {
+    const failure = sampleFailures[run.error_code ?? "research_failed"];
     return response(
       "blocked",
       "sample-review",
       "sample_failed",
       [
-        "sample_review_get to read the failure and any saved evidence. Explain it plainly. A technical research failure can be retried once with sample_review_post; exhausted discovery gives its actual reset time.",
-        "For a failed acquisition, use sample_review_recovery_status with the exact workspace and first-run refs. Request verification with sample_review_recovery and the current expected_acquisition_ref; restart only after verified terminal evidence and an explicit founder request.",
-        "Offer to continue with outreach setup using saved leads while the search waits.",
+        `The sample stopped with reason ${run.error_code ?? "research_failed"}. Read ${tool("sample-review", "get")} for the saved people and explain the reason plainly.`,
+        failure.action,
+        "Saved leads stay usable; outreach setup does not have to wait for the sample.",
       ],
-      [
-        "sample_review_get",
-        "sample_review_post",
-        "sample_review_recovery_status",
-        "sample_review_recovery",
-      ],
+      [tool("sample-review", "get"), ...failure.tools],
       "sample-review",
       run,
     );
+  }
   const campaign = WorkspaceCampaignResult.parse(
     await deps.workspaceCampaign(session, {
       operation: "status",
@@ -308,14 +331,14 @@ export async function getNextStep(
         "Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach now; yes: summary_context task campaigns. A leads-only founder can stop here. If not now, accept it and do not ask again this session.",
       ],
       [
-        "sample_review_get",
-        "crm_get",
-        "crm_post",
-        "crm_mapping_context",
-        "crm_patch",
-        "crm_sync_start",
-        "crm_sync_status",
-        "summary_context",
+        tool("sample-review", "get"),
+        tool("crm", "get"),
+        tool("crm", "post"),
+        tool("crm", "mapping_context"),
+        tool("crm", "patch"),
+        tool("crm", "sync_start"),
+        tool("crm", "sync_status"),
+        tool("summary", "context"),
       ],
       "sample-review",
       run,
@@ -340,7 +363,7 @@ export async function getNextStep(
     [
       "Read campaigns_get for the saved campaign and relevant blockers. Resume, prepare or activate only with explicit founder approval; Business changes never activate outreach.",
     ],
-    ["campaigns_get", "summary_context"],
+    [tool("campaigns", "get"), tool("summary", "context")],
     "summary",
     {
       state: campaign.state,

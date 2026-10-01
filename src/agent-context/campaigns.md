@@ -67,6 +67,6 @@ no preview can be composed until the sender's signature is saved (follow the
 `sending-accounts` signature steps). An unsupported graph does not
 become executable because structural validation succeeded. Preserve receipts
 and read after uncertain writes. Never treat saved preview examples as sends.
-Pending calibration or exhausted discovery allowance does not prevent drafting.
+Pending calibration or a reached weekly research limit does not prevent drafting.
 If shared workspace operations are unavailable, retain the draft and explain
 the limitation; do not silently fall back to individual campaigns.

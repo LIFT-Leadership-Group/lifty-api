@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
+import { rpcFailure } from "./rpc-errors.js";
 import * as contracts from "./business-contracts.js";
 const Empty = z.object({}).strict();
 export const businessOperationDefinitions = {
@@ -205,48 +206,9 @@ export function validateBusinessRequest(
     issues,
   });
 }
-const messages: Record<string, string> = {
-  VERSION_CONFLICT:
-    "The resource changed. Read its current version and apply your intended edit again.",
-  WORKSPACE_FORBIDDEN: "You do not belong to this workspace.",
-  WORKSPACE_SELECTION_REQUIRED:
-    "You belong to several workspaces. Choose one with the x-lifty-workspace header (--workspace in the CLI).",
-  WORKSPACE_SUSPENDED: "This workspace is suspended. Contact LIFT support.",
-  WORKSPACE_NOT_READY: "Create a workspace before configuring Business.",
-  ALREADY_CONFIGURED:
-    "This workspace already has a setup from another draft version.",
-  SETUP_ALREADY_SUBMITTED: "The submitted setup draft is immutable.",
-  SETUP_STALE:
-    "The profile or Scout base changed. Read setup context and generate fresh criteria.",
-  PROFILE_CONFIRMATION_REQUIRED:
-    "Confirm the value proposition, offerings and problems solved before submitting setup.",
-  SETUP_REQUIRED: "Complete initial setup before editing targeting.",
-  TARGETING_LANE_UNKNOWN:
-    "This lane is absent from the current targeting. Read the lane ids, or omit id to add a lane.",
-  VERSION_REQUIRED: "Supply the current expected_version from a resource read.",
-  CRITERIA_REGENERATION_REQUIRED:
-    "Persona changes need regenerated criteria and its expected_version in the same request.",
-  PROFILE_INVALID: "Repair the commercial profile fields.",
-  TARGETING_INVALID: "Repair the targeting fields.",
-  CRITERIA_INVALID: "Repair the Scout criteria fields.",
-  VOICE_INVALID: "Repair the voice fields.",
-  SETUP_DRAFT_INVALID: "Repair the setup draft fields.",
-  SETUP_INVALID:
-    "Complete the setup gates and generated criteria before submission.",
-};
-// Database tokens shared with the rest of the Lifty RPCs map to public codes.
-const aliases: Record<string, string> = {
-  LIFTY_WORKSPACE_AMBIGUOUS: "WORKSPACE_SELECTION_REQUIRED",
-  LIFTY_WORKSPACE_FORBIDDEN: "WORKSPACE_FORBIDDEN",
-};
-const statusFor = (code: string) =>
-  code === "WORKSPACE_FORBIDDEN"
-    ? 403
-    : code === "TARGETING_LANE_UNKNOWN" || code === "VERSION_REQUIRED" || code.endsWith("INVALID")
-      ? 422
-      : 409;
 // The workspace is resolved in the database by the shared selection rule from
-// the x-lifty-workspace header the session client forwards.
+// the x-lifty-workspace header the session client forwards. Typed database
+// errors map through the one table in rpc-errors.ts.
 export async function executeBusinessOperation(
   session: AuthSession,
   key: string,
@@ -260,6 +222,12 @@ export async function executeBusinessOperation(
       : key === "setup.post"
         ? { p_workspace_id: null, p_expected_draft_version: (payload as { expected_draft_version: number }).expected_draft_version }
         : { p_workspace_id: null, ...(entry.definition.method === "PATCH" ? { p_payload: payload } : {}) };
+  const unavailable = {
+    operation: entry.definition.rpc,
+    code: "BUSINESS_UNAVAILABLE",
+    message:
+      "Business state could not be verified. Read the resource before retrying a write.",
+  };
   let result: { data: unknown; error: unknown };
   try {
     result = await (
@@ -268,14 +236,9 @@ export async function executeBusinessOperation(
       }
     ).rpc(entry.definition.rpc, args);
   } catch (cause) {
-    throw new PublicError({
-      status: 502,
-      code: "BUSINESS_UNAVAILABLE",
-      message: "Business state could not be verified. Read the resource before retrying a write.",
-      cause,
-    });
+    throw rpcFailure(cause, unavailable);
   }
-  if (result.error) throw businessError(result.error);
+  if (result.error) throw rpcFailure(result.error, unavailable);
   const context =
     key === "setup.generation_context"
       ? contracts.SetupContextDataSchema.safeParse(result.data)
@@ -304,39 +267,3 @@ export async function executeBusinessOperation(
   return parsed.data;
 }
 
-function businessError(raw: unknown): PublicError {
-  const error = raw as { message?: string; code?: string; details?: string };
-  const token = error.message?.toUpperCase() ?? "";
-  const code = aliases[token] ?? token;
-  let detail: Record<string, unknown> = {};
-  try {
-    const parsed: unknown = JSON.parse(error.details ?? "{}");
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) detail = parsed as Record<string, unknown>;
-  } catch {
-    /* never expose raw provider diagnostics */
-  }
-  if (!Object.hasOwn(messages, code))
-    return error.code === "PT401"
-      ? new PublicError({ status: 401, code: "UNAUTHORIZED", message: "Sign in again." })
-      : new PublicError({
-          status: 502,
-          code: "BUSINESS_UNAVAILABLE",
-          message: "Business state could not be verified. Read the resource before retrying a write.",
-        });
-  const issues = z.array(contracts.RepairIssueSchema).max(20).safeParse(detail.issues);
-  const current = z.number().int().nonnegative().safeParse(detail.current_version);
-  const stale = z.array(z.enum(["profile", "draft", "base"])).max(3).safeParse(detail.stale_sources);
-  const workspaces = z
-    .array(z.object({ workspace_ref: z.uuid(), name: z.string(), slug: z.string() }).strip())
-    .max(100)
-    .safeParse(detail.workspaces);
-  return new PublicError({
-    status: statusFor(code),
-    code,
-    message: messages[code]!,
-    ...(issues.success ? { issues: issues.data } : {}),
-    ...(current.success ? { current_version: current.data } : {}),
-    ...(stale.success ? { stale_sources: stale.data } : {}),
-    ...(workspaces.success ? { workspaces: workspaces.data } : {}),
-  });
-}

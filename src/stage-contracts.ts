@@ -1,5 +1,5 @@
-import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult } from "./acquisition-recovery.js";
 import { businessOperationDefinitions } from "./business-operations.js";
+import { researchOperationDefinitions } from "./research-operations.js";
 import { SenderChoice, SenderRoster, SenderSignatureRequest, SenderSignatureResult, SenderSignatures } from "./sender-choice.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
@@ -40,11 +40,9 @@ export const StageOperationSchema = z.object({
 export type StageOperation = z.infer<typeof StageOperationSchema>;
 
 export const StageErrorSchema = z.object({
-  error: z.object({ code: z.string(), message: z.string(), issues: z.array(z.object({code:z.string(),path:z.string(),message:z.string(),suggestion:z.string()}).strict()).optional(), current_version:z.number().int().nonnegative().optional(), stale_sources:z.array(z.string()).optional(), workspaces:z.array(z.object({workspace_ref:z.uuid(),name:z.string(),slug:z.string()}).strict()).optional() }),
+  error: z.object({ code: z.string(), message: z.string(), issues: z.array(z.object({code:z.string(),path:z.string(),message:z.string(),suggestion:z.string()}).strict()).optional(), current_version:z.number().int().nonnegative().optional(), stale_sources:z.array(z.string()).optional(), workspaces:z.array(z.object({workspace_ref:z.uuid(),name:z.string(),slug:z.string()}).strict()).optional(), limit:z.number().int().positive().optional(), resets_at:z.iso.datetime({ offset: true }).optional() }),
   request_id: z.string(),
 });
-const RecoveryPath = z.object({workspace_ref:z.uuid(),first_run_ref:z.uuid()}).strict();
-const AcquisitionRecoveryWriteSchema = z.union([AcquisitionRecoveryBody.options[1],AcquisitionRecoveryBody.options[2]]);
 const Empty = z.object({}).strict();
 // LIF-1138: one of the caller's own workspaces, by slug or reference.
 const AttemptRef = z.uuid();
@@ -132,6 +130,10 @@ const businessCatalog = Object.fromEntries(Object.entries(businessOperationDefin
   ...("cli" in definition ? { cli: definition.cli } : {}),
   ...(resource === "business" && key === "post" ? { responses: { ...operation(definition.method, definition.route, definition.description, definition.response, definition.request).responses, "201": json(definition.response) } } : {}),
 }]))]));
+const researchCatalog = Object.fromEntries(Object.entries(researchOperationDefinitions).map(([resource, entries]) => [resource, Object.fromEntries(Object.entries(entries).map(([key, definition]) => [key, {
+  ...operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query),
+  ...("cli" in definition ? { cli: definition.cli } : {}),
+}]))]));
 // These definitions are also the contracts for the thin authenticated adapters
 // implemented with the generic stage transport. Existing business handlers and
 // their authorization, validation, jobs and protected-field rules remain owners.
@@ -149,12 +151,20 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   setup: businessCatalog.setup!,
   account: { delete: operation("POST", "/v1/me/delete", "Delete your own login only after all memberships and retained-history restrictions are resolved.", DeleteLoginResult, DeleteLoginRequest) },
   "sample-review": {
-    recovery_status: {...operation("GET","/v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}","Read recovery state of an exact failed first research run: current acquisition, attempt, restart permission and blocker.",AcquisitionRecoveryStatus,null,Empty,RecoveryPath),cli:{operation:"recovery"}},
-    recovery: {...operation("POST","/v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}","For an exact failed first run, request terminal verification or explicitly restart only after verification allows it. Requires the current acquisition reference; durable attempts and consumed budgets are preserved.",z.union([AcquisitionRecoveryStatus,AcquisitionRestartResult]),AcquisitionRecoveryWriteSchema,Empty,RecoveryPath),cli:{operation:"recovery"}},
-    progress: operation("GET", "/v1/workspace/runs/progress", "Wait up to 25 seconds for a change to this exact run. Pass the last cursor to resume. Returns the complete current bounded cohort, live research count and terminal state; not a persisted event history. Read-only and reauthorized on each poll.", RunProgressSchema, null, RunProgressQuerySchema),
-    get: operation("GET", stageRoute("sample-review"), "Read the existing cohort, grades and run state; no persisted approval ledger.", RunStatusSchema),
-    post: operation("POST", stageRoute("sample-review"), "Start/retrieve the existing bounded initial run; no repeated discovery waves or new approval store.", StartRunResultSchema, Empty),
-    patch: unsupported("sample-review", "PATCH", "Grades, historical evidence and sample approval are not writable configuration."),
+    progress: operation("GET", "/v1/workspace/runs/progress", "Wait up to 25 seconds for a change to this exact run. Pass the last cursor to resume. Returns the complete current bounded cohort, live research count and terminal state; not a persisted event history. A failed run's error_code is a customer reason. Read-only and reauthorized on each poll.", RunProgressSchema, null, RunProgressQuerySchema),
+    get: operation("GET", stageRoute("sample-review"), "Read the current sample: its five people, grades, run state and, when failed, the customer reason in error_code. No persisted approval ledger.", RunStatusSchema),
+    post: operation("POST", stageRoute("sample-review"), "Start or re-attach the five-person sample for the current targeting. It uses five people of this week's research volume; with fewer than five left it returns RESEARCH_LIMIT_REACHED and resets_at and starts nothing. A retry reuses saved people. Never activates weekly research, CRM sync or outreach.", StartRunResultSchema, Empty),
+  },
+  "research-schedule": {
+    ...researchCatalog["research-schedule"]!,
+    post: unsupported("research-schedule", "POST", "The schedule exists from workspace creation; use activate or pause."),
+    delete: unsupported("research-schedule", "DELETE", "The schedule has no delete; pause it to stop new research."),
+  },
+  leads: {
+    ...researchCatalog.leads!,
+    post: unsupported("leads", "POST", "Leads are research results; Lifty creates them."),
+    patch: unsupported("leads", "PATCH", "Lead detail and feedback live in the dashboard."),
+    delete: unsupported("leads", "DELETE", "Researched leads and their history are retained."),
   },
   "commercial-voice": { ...businessCatalog["commercial-voice"]!, post: unsupported("commercial-voice", "POST", "Empty voice exists at version 0 from workspace creation."), delete: unsupported("commercial-voice", "DELETE", "Use PATCH to clear values; pinned history is retained.") },
   crm: {

@@ -2,6 +2,8 @@
 import type { AuthSession } from "./app.js";
 import { DisconnectResultSchema, type DisconnectResult, type Provider, RunStatusSchema, type RunStatus, StartRunResultSchema, type StartRunResult, StartCrmSyncResultSchema, type StartCrmSyncResult, CrmSyncStatusSchema, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus, NotificationConfigSchema, type NotificationConfig, NotificationDestinationSchema, type NotificationDestination, NotificationRouteSchema, type NotificationRoute, NotificationTestResultSchema, type NotificationTestResult, SetNotificationRouteRequestSchema, type SetNotificationRouteRequest, SlackNotificationChannelsSchema, type SlackNotificationChannels, UpsertNotificationDestinationRequestSchema, type UpsertNotificationDestinationRequest } from "./contracts.js";
 import { PublicError } from "./errors.js";
+import { rpcFailure } from "./rpc-errors.js";
+import { DEFAULT_DASHBOARD_ORIGIN } from "./config.js";
 
 interface RpcClient {
   rpc<T>(
@@ -62,42 +64,6 @@ function mapRpcError(error: unknown): PublicError {
       status: 409,
       code: "WORKSPACE_ALREADY_EXISTS",
       message: "This account already has a LIFTY workspace.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_not_configured")) {
-    return new PublicError({
-      status: 409,
-      code: "RUN_NOT_CONFIGURED",
-      message: "This workspace has no configuration yet. Complete Business setup first.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_already_completed")) {
-    return new PublicError({
-      status: 409,
-      code: "RUN_ALREADY_COMPLETED",
-      message: "The first research run already exists for this workspace. Read its status instead of starting another.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_workspace_suspended")) {
-    return new PublicError({
-      status: 409,
-      code: "WORKSPACE_SUSPENDED",
-      message: "This workspace is suspended. Contact LIFT support.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_unavailable")) {
-    return new PublicError({
-      status: 409,
-      code: "RUN_UNAVAILABLE",
-      message: "LIFTY cannot start a run for this workspace right now. Contact LIFT support.",
       cause: error,
     });
   }
@@ -264,14 +230,21 @@ export async function getWorkspaceStatus(
   return parsed.data;
 }
 
+// Calibration runs use the workspace the database selects for the session
+// (shared rule, p_workspace_id null); it also enforces suspension and the
+// weekly research limit.
+const runUnavailable = (operation: string) => ({
+  operation,
+  code: "SAMPLE_REVIEW_UNAVAILABLE",
+  message: "The research sample could not be verified. Read sample-review before retrying.",
+});
+
 export async function startRun(session: AuthSession): Promise<StartRunResult> {
   const { data, error } = await getRpcClient(session).rpc<StartRunResult>(
     "start_lifty_run",
+    { p_workspace_id: null },
   );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
+  if (error) throw rpcFailure(error, runUnavailable("start_lifty_run"));
 
   const parsed = StartRunResultSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
@@ -280,14 +253,12 @@ export async function startRun(session: AuthSession): Promise<StartRunResult> {
   return parsed.data;
 }
 
-export async function getRunStatus(session: AuthSession, dashboardOrigin = "https://liftygtm.com"): Promise<RunStatus> {
+export async function getRunStatus(session: AuthSession, dashboardOrigin = DEFAULT_DASHBOARD_ORIGIN): Promise<RunStatus> {
   const { data, error } = await getRpcClient(session).rpc<RunStatus>(
     "get_lifty_run_status",
+    { p_workspace_id: null },
   );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
+  if (error) throw rpcFailure(error, runUnavailable("get_lifty_run_status"));
 
   const parsed = RunStatusSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {

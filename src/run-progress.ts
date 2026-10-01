@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
+import { rpcFailure } from "./rpc-errors.js";
+import { RunErrorCodeSchema } from "./contracts.js";
 
 const Cursor = z.string().regex(/^rp1_[a-f0-9]{64}$/);
 export const RunProgressQuerySchema = z.object({
@@ -18,7 +20,7 @@ export const RunProgressSnapshotSchema = z.object({
   state: z.enum(["queued", "running", "succeeded", "failed"]),
   requested_leads: z.number().int().min(1).max(25),
   leads_discovered: z.number().int().nonnegative(), leads_researched: z.number().int().min(0).max(25),
-  error_code: z.enum(["calibration_sample_incomplete", "calibration_review_required", "research_failed"]).nullable(),
+  error_code: RunErrorCodeSchema.nullable(),
   leads: z.array(Lead).max(25),
 }).strict();
 export const RunProgressSchema = RunProgressSnapshotSchema.extend({
@@ -40,20 +42,8 @@ function pause(milliseconds: number, signal: AbortSignal): Promise<void> {
     signal.addEventListener("abort", abort, { once: true });
   });
 }
-function failure(error: unknown): PublicError {
-  const code = (error as { code?: unknown } | null)?.code;
-  if (code === "PT401" || code === "PGRST301" || code === "PGRST303") return new PublicError({
-    status: 401, code: "UNAUTHORIZED", message: "A valid Lifty session is required.", cause: error,
-  });
-  if (code === "PT404") return new PublicError({
-    status: 404, code: "RUN_NOT_FOUND", message: "This research run is unavailable in your current workspace.", cause: error,
-  });
-  if (code === "PT409") return new PublicError({
-    status: 409, code: "RUN_PROGRESS_UNAVAILABLE", message: "Research progress is unavailable for the current workspace or cohort.", cause: error,
-  });
-  return new PublicError({ status: 502, code: "RUN_PROGRESS_UNAVAILABLE",
-    message: "Research progress could not be read. Retry the same run and cursor.", cause: error });
-}
+const failure = (error: unknown) => rpcFailure(error, { operation: "get_lifty_run_progress",
+  code: "RUN_PROGRESS_UNAVAILABLE", message: "Research progress could not be read. Retry the same run and cursor." });
 
 /** A complete current snapshot, not a replay log. No state or history is cached:
  * every poll repeats the authenticated RPC's current workspace/run checks. */
@@ -75,7 +65,7 @@ export function createRunProgressReader() {
       for (let reads = 0; reads < 14; reads++) {
         signal.throwIfAborted();
         const { data, error } = await (session.client as RpcClient)
-          .rpc("get_lifty_run_progress", { p_run_ref: input.run_ref }).abortSignal(signal);
+          .rpc("get_lifty_run_progress", { p_run_ref: input.run_ref, p_workspace_id: null }).abortSignal(signal);
         signal.throwIfAborted();
         if (error) throw failure(error);
         const parsed = RunProgressSnapshotSchema.safeParse(data);

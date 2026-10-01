@@ -6,6 +6,10 @@ import {
   STAGE_CLIENT_CONTRACT,
 } from "../src/agent-context.js";
 import { getStageMcpTools, callStageMcpTool } from "../src/mcp-stage-tools.js";
+import { stageOperations } from "../src/stage-contracts.js";
+import { getRunStatus, startRun } from "../src/workspace-operations.js";
+import { createRunProgressReader } from "../src/run-progress.js";
+import { DEFAULT_DASHBOARD_ORIGIN } from "../src/config.js";
 import {
   profileFixture,
   membershipFixture,
@@ -26,7 +30,67 @@ const identity = {
   state: "ready_for_connections",
 };
 const get = { workspace: identity, profile: profileFixture };
+const limitFixture = {
+  weekly_research_limit: 25,
+  source: "free",
+  effective_from: "2026-09-01T00:00:00+00:00",
+};
+const scheduleFixture = {
+  version: 1,
+  state: "paused",
+  weekly_target: 20,
+  limit: limitFixture,
+  effective_target: 20,
+  updated_at: "2026-10-01T18:00:00+00:00",
+  updated_by: null,
+};
+const statusFixture = {
+  week_start: "2026-09-28",
+  resets_at: "2026-10-05T00:00:00+00:00",
+  state: "active",
+  policy_version: 1,
+  limit: limitFixture,
+  effective_target: 20,
+  completed: 7,
+  qualified: 4,
+  reserved: 5,
+  remaining: 8,
+  daily: [
+    { date: "2026-09-28", completed: 2 },
+    { date: "2026-09-29", completed: 5 },
+    { date: "2026-09-30", completed: 0 },
+  ],
+  shortfall: null,
+};
+const leadRef = "55555555-5555-4555-8555-555555555555";
+const leadsFixture = {
+  items: [
+    {
+      lead_ref: leadRef,
+      name: "Ada",
+      title: "CEO",
+      company: "Example",
+      linkedin_url: "https://www.linkedin.com/in/ada",
+      grade: "A",
+      fit_rationale: "Owns sales.",
+      researched_at: "2026-09-29T10:00:00+00:00",
+    },
+  ],
+  next_cursor: "MjAyNi0wOS0yOXw1NTU1",
+};
+const sampleRun = "66666666-6666-4666-8666-666666666666";
+const sampleWorkspace = { workspace_ref: workspaceRef, name: "Example" };
 const rpcNames: Record<string, unknown> = {
+  get_lifty_research_schedule: scheduleFixture,
+  patch_lifty_research_schedule: { ...scheduleFixture, version: 2 },
+  activate_lifty_research_schedule: { ...scheduleFixture, version: 2, state: "active" },
+  pause_lifty_research_schedule: scheduleFixture,
+  get_lifty_research_status: statusFixture,
+  list_lifty_leads: leadsFixture,
+  get_lifty_run_status: { state: "none" },
+  start_lifty_run: { state: "queued", run_ref: sampleRun, requested_leads: 5, workspace: sampleWorkspace, created: true, attempt: 0 },
+  get_lifty_run_progress: { run_ref: sampleRun, attempt: 0, workspace_ref: workspaceRef, state: "queued", requested_leads: 5,
+    leads_discovered: 0, leads_researched: 0, error_code: null, leads: [] },
   get_lifty_business_profile: get,
   get_lifty_targeting: {
     workspace_ref: workspaceRef,
@@ -57,10 +121,11 @@ function harness(
   error: unknown = null,
   options: Partial<AppDependencies> = {},
 ) {
-  const rpc = vi.fn(async (name: string, _args?: unknown) => ({
-    data: reply ?? rpcNames[name],
-    error,
-  }));
+  // Awaitable like a PostgREST builder, including the progress reader's abortSignal.
+  const rpc = vi.fn((name: string, _args?: unknown) => {
+    const result = Promise.resolve({ data: reply ?? rpcNames[name], error });
+    return Object.assign(result, { abortSignal: () => result });
+  });
   const authenticate = vi.fn(async () => ({
     ok: true as const,
     session: { userId: "founder", client: { rpc } },
@@ -502,6 +567,9 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
       "research-criteria",
       "commercial-voice",
       "setup",
+      "research-schedule",
+      "leads",
+      "sample-review",
     ]) {
       const context = getAgentContext(task)!;
       expect(context.revision).toMatch(/^sha256:/);
@@ -528,6 +596,9 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
       "/v1/config/context",
       "/v1/workspace",
       "/v1/workspaces/22222222-2222-4222-8222-222222222222/integrations/apollo/key-source",
+      "/v1/workspace/runs",
+      "/v1/workspace/capacity",
+      `/v1/workspaces/${workspaceRef}/apollo/recovery/${sampleRun}`,
     ]) {
       const response = await h.request(path, "POST", {});
       expect(response.status, path).toBe(404);
@@ -626,6 +697,166 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
     expect(retired.rpc).toHaveBeenCalledOnce();
   });
 });
+
+// The run reads go through their production RPC adapters so the arguments
+// they send are observable.
+const runAdapters: Partial<AppDependencies> = {
+  getRunStatus: (session) => getRunStatus(session),
+  startRun,
+  getRunProgress: createRunProgressReader(),
+  enqueueFirstRun: async () => ({ id: "job" }),
+};
+const resolvedOperations = [
+  ["GET", "/v1/workspace/research-schedule", undefined, "get_lifty_research_schedule"],
+  ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 20 }, "patch_lifty_research_schedule"],
+  ["POST", "/v1/workspace/research-schedule/activate", { expected_version: 1 }, "activate_lifty_research_schedule"],
+  ["POST", "/v1/workspace/research-schedule/pause", { expected_version: 1 }, "pause_lifty_research_schedule"],
+  ["GET", "/v1/workspace/research-schedule/status?week=2026-09-28", undefined, "get_lifty_research_status"],
+  ["GET", "/v1/workspace/leads?grade=A&grade=B&limit=10", undefined, "list_lifty_leads"],
+  ["GET", "/v1/workspace/sample-review", undefined, "get_lifty_run_status"],
+  ["POST", "/v1/workspace/sample-review", {}, "start_lifty_run"],
+  ["GET", `/v1/workspace/runs/progress?run_ref=${sampleRun}&wait_seconds=0`, undefined, "get_lifty_run_progress"],
+] as const;
+describe("research schedule, leads and sample share one workspace rule", () => {
+  const callerWorkspaces = [
+    { workspace_ref: "11111111-1111-4111-8111-111111111111", name: "Other", slug: "other" },
+    { workspace_ref: workspaceRef, name: "Example", slug: "example" },
+  ];
+  it.each(resolvedOperations)(
+    "%s %s leaves selection to the database and reports its selection errors",
+    async (method, path, body, rpcName) => {
+      const ok = harness(undefined, null, runAdapters);
+      expect((await ok.request(path, method, body)).status).toBe(200);
+      expect(ok.rpc).toHaveBeenCalledOnce();
+      expect(ok.rpc.mock.calls[0]![0]).toBe(rpcName);
+      expect(ok.rpc.mock.calls[0]![1]).toMatchObject({ p_workspace_id: null });
+      const ambiguous = await harness(null, {
+        code: "PT409", message: "lifty_workspace_ambiguous",
+        details: JSON.stringify({ workspaces: callerWorkspaces, actor: "private" }),
+      }, runAdapters).request(path, method, body);
+      expect(ambiguous.status).toBe(409);
+      expect((await ambiguous.json()).error).toEqual({
+        code: "WORKSPACE_SELECTION_REQUIRED",
+        message: expect.any(String),
+        workspaces: callerWorkspaces,
+      });
+      const foreign = await harness(null, { code: "PT403", message: "lifty_workspace_forbidden" }, runAdapters)
+        .request(path, method, body, { "x-lifty-workspace": "foreign" });
+      expect(foreign.status).toBe(403);
+      expect((await foreign.json()).error.code).toBe("WORKSPACE_FORBIDDEN");
+    },
+  );
+  it("maps each operation's input to its RPC and builds lead links from the configured dashboard", async () => {
+    const h = harness(undefined, null, runAdapters);
+    const sent: unknown[] = [];
+    for (const [method, path, body] of resolvedOperations.slice(0, 6)) {
+      const response = await h.request(path, method, body);
+      expect(response.status, path).toBe(200);
+      sent.push(await response.json());
+    }
+    expect(h.rpc.mock.calls.map(([, args]) => args)).toEqual([
+      { p_workspace_id: null },
+      { p_workspace_id: null, p_payload: { expected_version: 1, weekly_target: 20 } },
+      { p_workspace_id: null, p_payload: { expected_version: 1 } },
+      { p_workspace_id: null, p_payload: { expected_version: 1 } },
+      { p_workspace_id: null, p_week: "2026-09-28" },
+      { p_workspace_id: null, p_query: { limit: 10, grade: ["A", "B"] } },
+    ]);
+    expect(sent[5]).toEqual({
+      ...leadsFixture,
+      items: [{ ...leadsFixture.items[0], research_url: `${DEFAULT_DASHBOARD_ORIGIN}/protected/leads/${leadRef}` }],
+    });
+    await h.request("/v1/workspace/research-schedule/status");
+    expect(h.rpc.mock.calls.at(-1)![1]).toEqual({ p_workspace_id: null, p_week: null });
+  });
+  it.each([
+    ["PATCH", "/v1/workspace/research-schedule", { weekly_target: 20 }, 422, "TARGET_INVALID", "/expected_version"],
+    ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 0 }, 422, "TARGET_INVALID", "/weekly_target"],
+    ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 2.5 }, 422, "TARGET_INVALID", "/weekly_target"],
+    ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 20, run_days: ["mon"] }, 422, "TARGET_INVALID", "/"],
+    ["POST", "/v1/workspace/research-schedule/activate", {}, 400, "INVALID_REQUEST", "/expected_version"],
+    ["POST", "/v1/workspace/research-schedule/pause", { expected_version: -1 }, 400, "INVALID_REQUEST", "/expected_version"],
+    ["GET", "/v1/workspace/research-schedule/status?week=2026-09-29", undefined, 400, "INVALID_REQUEST", "/week"],
+    ["GET", "/v1/workspace/research-schedule/status?week=29-09-2026", undefined, 400, "INVALID_REQUEST", "/week"],
+    ["GET", "/v1/workspace/research-schedule?week=2026-09-28", undefined, 400, "INVALID_REQUEST", "/"],
+    ["GET", "/v1/workspace/leads?limit=101", undefined, 400, "INVALID_REQUEST", "/limit"],
+    ["GET", "/v1/workspace/leads?grade=D", undefined, 400, "INVALID_REQUEST", "/grade/0"],
+    ["GET", "/v1/workspace/leads?cursor=not%20opaque", undefined, 400, "INVALID_REQUEST", "/cursor"],
+    ["GET", "/v1/workspace/leads?week=2026-10-01", undefined, 400, "INVALID_REQUEST", "/week"],
+    ["GET", "/v1/workspace/leads?limit=5&limit=6", undefined, 400, "INVALID_REQUEST", "/limit"],
+  ] as const)("%s %s rejects invalid input before any RPC", async (method, path, body, status, code, issuePath) => {
+    const h = harness();
+    const response = await h.request(path, method, body);
+    expect(response.status).toBe(status);
+    const { error } = await response.json();
+    expect(error.code).toBe(code);
+    expect(error.issues.map((issue: { path: string }) => issue.path)).toContain(issuePath);
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+  it.each([
+    [{ code: "PT409", message: "VERSION_CONFLICT", details: JSON.stringify({ current_version: 4, actor: "x" }) }, 409, { code: "VERSION_CONFLICT", current_version: 4 }],
+    [{ code: "PT422", message: "TARGET_ABOVE_LIMIT", details: JSON.stringify({ limit: 25 }) }, 422, { code: "TARGET_ABOVE_LIMIT", limit: 25 }],
+    [{ code: "PT422", message: "TARGET_INVALID" }, 422, { code: "TARGET_INVALID" }],
+    [{ code: "PT409", message: "RESEARCH_NOT_CONFIGURED" }, 409, { code: "RESEARCH_NOT_CONFIGURED" }],
+    [{ code: "PT409", message: "WORKSPACE_SUSPENDED" }, 409, { code: "WORKSPACE_SUSPENDED" }],
+    [{ code: "PT403", message: "lifty_workspace_forbidden" }, 403, { code: "WORKSPACE_FORBIDDEN" }],
+    [{ code: "PT409", message: "provider_quota_exceeded", details: "{\"provider\":\"secret\"}" }, 502, { code: "RESEARCH_SCHEDULE_UNAVAILABLE" }],
+    [{ code: "57014", message: "canceling statement due to statement timeout" }, 502, { code: "RESEARCH_SCHEDULE_UNAVAILABLE" }],
+  ] as const)("maps schedule RPC error %j through the shared typed mapping", async (error, status, expected) => {
+    const h = harness(null, error);
+    const response = await h.request("/v1/workspace/research-schedule", "PATCH", { expected_version: 1, weekly_target: 30 });
+    expect(response.status).toBe(status);
+    const body = await response.json();
+    expect(body.error).toEqual({ message: expect.any(String), ...expected });
+    expect(JSON.stringify(body)).not.toMatch(/secret|provider|actor|statement/);
+  });
+  it.each([
+    ["/v1/workspace/research-schedule", { ...scheduleFixture, state: "unknown" }, "RESEARCH_SCHEDULE_UNAVAILABLE"],
+    ["/v1/workspace/research-schedule/status", { ...statusFixture, completed: 8 }, "RESEARCH_STATUS_UNAVAILABLE"],
+    ["/v1/workspace/research-schedule/status", { ...statusFixture, daily: [] }, "RESEARCH_STATUS_UNAVAILABLE"],
+    ["/v1/workspace/leads", { items: [{ ...leadsFixture.items[0], grade: "D" }], next_cursor: null }, "LEADS_UNAVAILABLE"],
+  ])("reports an unverifiable %s read as unknown, never zero or paused", async (path, reply, code) => {
+    const response = await harness(reply).request(path);
+    expect(response.status).toBe(502);
+    expect((await response.json()).error.code).toBe(code);
+  });
+  it("starts the sample inside the weekly limit and returns the reset time when it is reached", async () => {
+    const enqueue = vi.fn(async () => ({ id: "job" }));
+    const h = harness(null, { code: "PT409", message: "RESEARCH_LIMIT_REACHED", details: JSON.stringify({ resets_at: "2026-10-05T00:00:00+00:00" }) },
+      { ...runAdapters, enqueueFirstRun: enqueue });
+    const response = await h.request("/v1/workspace/sample-review", "POST", {});
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toEqual({ code: "RESEARCH_LIMIT_REACHED", message: expect.any(String), resets_at: "2026-10-05T00:00:00+00:00" });
+    expect(enqueue).not.toHaveBeenCalled();
+    expect((await h.request("/v1/workspace/sample-review", "PATCH", {})).status).toBe(404);
+  });
+  it("publishes route, MCP and CLI nouns from one catalog and transports grade lists through MCP", async () => {
+    const commands = Object.entries({ "research-schedule": stageOperations["research-schedule"]!, leads: stageOperations.leads! })
+      .flatMap(([resource, operations]) => Object.entries(operations)
+        .filter(([, operation]) => !operation.responses["405"])
+        .map(([key, operation]) => [`${operation.method} ${resource} ${operation.cli?.operation ?? key}`, `${operation.method} ${operation.route}`, operationTool(resource, key)]));
+    expect(commands).toEqual([
+      ["GET research-schedule get", "GET /v1/workspace/research-schedule", "research_schedule_get"],
+      ["PATCH research-schedule patch", "PATCH /v1/workspace/research-schedule", "research_schedule_patch"],
+      ["POST research-schedule activate", "POST /v1/workspace/research-schedule/activate", "research_schedule_activate"],
+      ["POST research-schedule pause", "POST /v1/workspace/research-schedule/pause", "research_schedule_pause"],
+      ["GET research-schedule status", "GET /v1/workspace/research-schedule/status", "research_schedule_status"],
+      ["GET leads get", "GET /v1/workspace/leads", "leads_list"],
+    ]);
+    const guide = getAgentContext("research-schedule")!.instructions + getAgentContext("leads")!.instructions;
+    for (const line of ["lifty get research-schedule →", "lifty patch research-schedule →", "lifty post research-schedule activate →",
+      "lifty post research-schedule pause →", "lifty get research-schedule status →", "lifty get leads →"]) expect(guide).toContain(line);
+    expect(getStageMcpTools().find((tool) => tool.name === "research_schedule_activate")!.annotations).toMatchObject({ readOnlyHint: false, openWorldHint: true });
+    const h = harness(undefined, null, runAdapters);
+    const tool = await callStageMcpTool("leads_list", { query: { grade: ["A", "B"], week: "2026-09-28" } },
+      new Request("https://api.example.test/mcp", { headers: { authorization: "Bearer founder" } }),
+      (route, init) => Promise.resolve(h.app.request(route, init)));
+    expect(tool.structuredContent).toMatchObject({ status: 200, data: { next_cursor: leadsFixture.next_cursor } });
+    expect(h.rpc).toHaveBeenCalledExactlyOnceWith("list_lifty_leads", { p_workspace_id: null, p_query: { limit: 25, grade: ["A", "B"], week: "2026-09-28" } });
+  });
+});
+const operationTool = (resource: string, key: string) =>
+  getStageMcpTools().find((tool) => tool.name === `${resource.replace(/-/g, "_")}_${key}`)?.name;
 
 const runFixture = {
   state: "succeeded" as const,
@@ -741,7 +972,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
           ...runFixture,
           state,
           completed_at: state === "failed" ? profileFixture.updated_at : null,
-          error_code: state === "failed" ? "research_unavailable" : null,
+          error_code: state === "failed" ? "research_failed" : null,
         }),
         workspaceCampaign: campaign,
         startRun: start,
@@ -756,6 +987,38 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
         expect(result.actions[0]).toContain("run_ref run-1");
       expect(campaign).not.toHaveBeenCalled();
       expect(start).not.toHaveBeenCalled();
+    },
+  );
+  it.each([
+    ["research_limit_reached", "research_schedule_status", "resets_at"],
+    ["search_exhausted", "targeting_patch", "wider targeting"],
+    ["research_failed", "sample_review_post", "Retry once"],
+    ["calibration_sample_incomplete", "sample_review_post", "Retry once"],
+    ["calibration_review_required", "sample_review_post", "same saved people"],
+  ] as const)(
+    "explains a failed sample's %s reason with catalog tools and no recovery path",
+    async (reason, tool, guidance) => {
+      const h = harness(undefined, null, {
+        getRunStatus: async () => ({
+          ...runFixture,
+          state: "failed" as const,
+          error_code: reason,
+        }),
+      });
+      const result = await (await h.request("/v1/workspace/next-step")).json();
+      expect(result).toMatchObject({
+        state: "blocked",
+        reason: "sample_failed",
+        receipt: { error_code: reason },
+      });
+      expect(result.recommended_tools).toContain(tool);
+      const tools = new Set(getStageMcpTools().map((item) => item.name));
+      for (const name of result.recommended_tools)
+        expect(tools.has(name), name).toBe(true);
+      expect(result.actions.join(" ").toLowerCase()).toContain(guidance.toLowerCase());
+      expect(JSON.stringify(result.actions)).not.toMatch(
+        /recovery|apollo|allowance|capacity/i,
+      );
     },
   );
   it.each([
@@ -933,6 +1196,10 @@ describe("summary keeps independent tenant-scoped state", () => {
         status: "available",
         value: { state: "succeeded", leads_researched: 4 },
       },
+      research_schedule: {
+        status: "available",
+        value: { state: "paused", weekly_target: 20, effective_target: 20 },
+      },
       crm: {
         status: "available",
         value: {
@@ -951,11 +1218,14 @@ describe("summary keeps independent tenant-scoped state", () => {
     expect(result).not.toHaveProperty("onboarding");
     expect(result.run.value).not.toHaveProperty("leads");
   });
-  it("keeps unrelated reads available when research, email ownership or voice cannot be read", async () => {
+  it("keeps unrelated reads available when research, schedule, email ownership or voice cannot be read", async () => {
     const h = harness(undefined, null, {
       ...summaryReads,
       getRunStatus: async () => {
         throw Error("secret research error");
+      },
+      researchOperation: async () => {
+        throw new PublicError({ status: 502, code: "RESEARCH_SCHEDULE_UNAVAILABLE", message: "secret schedule" });
       },
       getEmailConnection: async () => {
         throw new PublicError({
@@ -971,6 +1241,10 @@ describe("summary keeps independent tenant-scoped state", () => {
       next_action: "retry_read",
     });
     expect(result.email).toEqual({
+      status: "unavailable",
+      next_action: "retry_read",
+    });
+    expect(result.research_schedule).toEqual({
       status: "unavailable",
       next_action: "retry_read",
     });
