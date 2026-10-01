@@ -54,6 +54,14 @@ it('bounds stalled dependency work and preserves a pending result',async()=>{
   expect(logs).toMatchObject([{upstream_outcome:'timeout',outcome:'pending',elapsed_ms:8000}]);
   expect(JSON.stringify(logs)).not.toContain('PRIVATE');
 });
+it('logs the provider error code from a failed return, never its free text',async()=>{
+  const logs:{provider_error?:string}[]=[];
+  const router=createConfirmationRouter('client-email',{validate:()=>{},status:async()=>({status:'failed',reason:'provider'})},{log:e=>logs.push(e)});
+  for(const errorType of ['api/account_restricted','PRIVATE detail from provider'])
+    await router.request('https://api.lifty.test/unipile/v2/client-email/return/status',{method:'POST',headers,body:JSON.stringify({state:'capability',errorType})});
+  expect(logs.map(x=>x.provider_error)).toEqual(['api/account_restricted',undefined]);
+  expect(JSON.stringify(logs)).not.toContain('PRIVATE');
+});
 it('rejects cross-origin requests, extra fields, oversized input and secrets on status',async()=>{
   const work=vi.fn(async()=>({status:'pending' as const}));
   const router=createConfirmationRouter('slack',{validate:()=>{},status:work,process:work});
