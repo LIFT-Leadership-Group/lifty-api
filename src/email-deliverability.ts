@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import { REQUIRED_WARMUP_ACTIVE_DAYS } from "./email-warmup-contracts.js";
-import { addUtcDays, blockingMessages, checkValue } from "./email-warmup.js";
+import { addUtcDays, blockingMessage, checkValue, dnsHoldRecords } from "./email-warmup.js";
 import {
   DELIVERABILITY_DETAIL_MAX_REPORTS, DELIVERABILITY_SCHEMA_VERSION, DeliverabilityQuery, DeliverabilityResponse, DeliverabilitySource,
   type Campaign, type DeliverabilityMailbox, type DeliverabilityQueryInput, type PlacementDetail, type PlacementTest, type Reason,
@@ -222,7 +222,7 @@ function mailiveryWarmup(item: SourceMailivery, connection: SourceConnection | u
   const reasons: Reason[] = [];
   const blocking = binding?.blocking_reason && /^[a-z][a-z0-9_]{0,63}$/.test(binding.blocking_reason) ? binding.blocking_reason
     : binding?.state === "pending_consent" ? "microsoft_consent_pending" : null;
-  if (blocking) reasons.push(reason(blocking, blockingMessages[blocking] ?? "Warmup has a problem Lifty can't describe yet."));
+  if (blocking) reasons.push(reason(blocking, blockingMessage(blocking) ?? "Warmup has a problem Lifty can't describe yet."));
   if (binding?.requested_action === "pause") reasons.push(reason("pause_requested", "Pausing warmup at the next check."));
   if (binding?.requested_action === "resume") reasons.push(reason("resume_requested", "Resuming warmup at the next check."));
   if (binding?.requested_action === "remove") reasons.push(reason("remove_requested", "Removing warmup at the next check."));
@@ -233,7 +233,9 @@ function mailiveryWarmup(item: SourceMailivery, connection: SourceConnection | u
   switch (binding?.state) {
     case "warming": state = make("active", "Warming", blocking || evidence?.healthy === false ? "warn" : "ok", "Mailivery is warming this inbox.", reasons); break;
     case "link_issued": state = make("pending", "Waiting for mailbox connection", "watch", "Warmup starts after the mailbox is connected in Mailivery.", reasons); break;
-    case "pending_consent": state = make("pending", "Waiting for Microsoft consent", "watch", "Warmup starts after Microsoft consent is finished in Mailivery.", reasons); break;
+    case "pending_consent": state = dnsHoldRecords(blocking)
+      ? make("pending", "Waiting for valid DNS records", "warn", "Warmup starts on its own once the mailbox domain has valid SPF, DMARC and MX records.", reasons)
+      : make("pending", "Waiting for Microsoft consent", "watch", "Warmup starts after Microsoft consent is finished in Mailivery.", reasons); break;
     case "paused": state = make("paused", "Paused", "warn", "Mailivery warmup is paused. Paused days don't count toward the warmup period.", reasons); break;
     case "problem": state = make("problem", "Needs attention", "bad", "Mailivery warmup has a problem. Days with a problem don't count.", reasons); break;
     case "removed": state = make("not_running", "Removed", "muted", "Mailivery warmup was removed for this inbox.", reasons); break;

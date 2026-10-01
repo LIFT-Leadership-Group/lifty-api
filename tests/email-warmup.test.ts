@@ -116,6 +116,17 @@ describe("warmup status presentation", () => {
     expect(JSON.stringify(status)).not.toContain(sender);
   });
 
+  it("names the records a pre-start DNS hold is waiting for", () => {
+    const dmarc = presentWarmupStatus(stored({}, { state: "pending_consent", blocking_reason: "dns_invalid_dmarc",
+      last_readback_at: null, snapshot: null }), now);
+    expect(dmarc.state_label).toBe("Waiting for valid DNS records");
+    expect(dmarc.blocking_reason).toEqual({ code: "dns_invalid_dmarc",
+      message: expect.stringMatching(/no valid DMARC record\. .*_dmarc.*starts warmup on its own/) });
+    // WarmupStatus caps the message at 300 characters; the longest variant must fit.
+    const all = presentWarmupStatus(stored({}, { state: "pending_consent", blocking_reason: "dns_invalid_spf_dmarc_mx", snapshot: null }), now);
+    expect(all.blocking_reason!.message).toMatch(/no valid SPF, DMARC and MX records\. Add them/);
+  });
+
   it("gives unknown blocking reasons a generic sentence", () => {
     const status = presentWarmupStatus(stored({}, { state: "problem", blocking_reason: "provider_quirk" }), now);
     expect(status.blocking_reason).toEqual({ code: "provider_quirk", message: expect.stringContaining("can't describe") });

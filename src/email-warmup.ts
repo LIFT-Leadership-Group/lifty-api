@@ -54,6 +54,28 @@ export const blockingMessages: Record<string, string> = {
   warmup_setup_pending: "Mailivery setup may still be completing. Removal stays pending until Lifty can verify and clean up the campaign; it will not create another warmup. Contact support if this persists.",
 };
 
+// Jobs holds a new Mailivery campaign before start while the mailbox domain
+// lacks valid SPF, DMARC or MX, naming the failing records in the reason:
+// dns_invalid_dmarc, dns_invalid_spf_dmarc_mx (lift-gtm-jobs warmup-reconcile).
+const DNS_HOLD = /^dns_invalid((?:_(?:spf|dmarc|mx))+)$/;
+const DNS_LABELS: Record<string, string> = { spf: "SPF", dmarc: "DMARC", mx: "MX" };
+
+/** The record labels a pre-start DNS hold names, or null for any other reason. */
+export function dnsHoldRecords(code: string | null | undefined): string[] | null {
+  const match = code ? DNS_HOLD.exec(code) : null;
+  return match ? [...new Set(match[1]!.slice(1).split("_"))].map(record => DNS_LABELS[record]!) : null;
+}
+
+/** Founder text for a stored blocking reason; undefined when Lifty has none. */
+export function blockingMessage(code: string): string | undefined {
+  const records = dnsHoldRecords(code);
+  if (!records) return Object.hasOwn(blockingMessages, code) ? blockingMessages[code] : undefined;
+  const list = records.length < 2 ? records.join("") : `${records.slice(0, -1).join(", ")} and ${records.at(-1)}`;
+  return `Warmup hasn't started: the mailbox domain has no valid ${list} ${records.length < 2 ? "record" : "records"}. Add ${records.length < 2 ? "it" : "them"} with your DNS provider.`
+    + (records.includes("DMARC") ? " For a new domain, a TXT record named _dmarc with v=DMARC1; p=none; is enough." : "")
+    + " Lifty checks again every few minutes and starts warmup on its own once all three pass.";
+}
+
 const stateLabels: Record<WarmupStatus["state"], string> = {
   not_started: "Not started",
   link_issued: "Waiting for you to connect the mailbox in Mailivery",
@@ -65,11 +87,12 @@ const stateLabels: Record<WarmupStatus["state"], string> = {
 };
 
 // A pending remove wins over pause/resume in the database, so it wins here too.
-function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"]): string {
-  if (state === "removed" || state === "not_started" || !requested) return stateLabels[state];
+function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"], reason: string | null): string {
+  const current = state === "pending_consent" && dnsHoldRecords(reason) ? "Waiting for valid DNS records" : stateLabels[state];
+  if (state === "removed" || state === "not_started" || !requested) return current;
   if (requested === "remove") return "Removing warmup at the next check";
   if (requested === "pause") return state === "paused" ? stateLabels.paused : "Pausing warmup at the next check";
-  return state === "paused" ? "Resuming warmup at the next check" : stateLabels[state];
+  return state === "paused" ? "Resuming warmup at the next check" : current;
 }
 
 function mapRpcError(error: unknown): never {
@@ -102,7 +125,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
   const reasonCode = storedReason ?? (state === "pending_consent" ? "microsoft_consent_pending" : null);
   const blocking = reasonCode ? {
     code: reasonCode,
-    message: blockingMessages[reasonCode] ?? "Warmup has a problem Lifty can't describe yet. Check status again later.",
+    message: blockingMessage(reasonCode) ?? "Warmup has a problem Lifty can't describe yet. Check status again later.",
   } : null;
   let goLive: WarmupStatus["recommended_go_live"];
   if (stored.connection_ref !== undefined) {
@@ -150,7 +173,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
     warmup_required: stored.mailbox_use === "outreach",
     required_active_days: required,
     state,
-    state_label: label(state, binding?.requested_action ?? null),
+    state_label: label(state, binding?.requested_action ?? null, storedReason),
     requested_action: binding?.requested_action ?? null,
     blocking_reason: blocking,
     active_days: activeDays,
