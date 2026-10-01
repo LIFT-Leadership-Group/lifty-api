@@ -25,6 +25,9 @@ function fixture() {
       row={...row,state:"completed",connection_ref:connection,account_id:"acc_native",campaign_send_paused:true,connection_status:"connected",
         transport:{...transport,connection_ref:connection,canonical_account_id:"acc_native",account_id:"acc_native",user_id:"native-owner",generation:1}};
     }
+    // Like the database, a read by connection carries no attempt fields.
+    if(payload.connection_ref)return {data:{...structuredClone(row),intent_ref:null,issuer_user_id:null,expires_at:null,hosted_url:null,
+      state:row.connection_status,authorization_received:false,authorization_account_id:null,return_error:null},error:null};
     return {data:structuredClone(row),error:null};
   }
   const session={userId:user,client:{rpc}};
