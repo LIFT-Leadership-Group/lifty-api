@@ -1,20 +1,29 @@
 {
-  "bindings": [
-    {
-      "binding_ref": "507601a4-2bea-4309-8ac0-78104951ed43",
-      "pending_runs": 1,
-      "revision_ref": "02dbabcc-4e62-42c0-b77b-74c0594a52c8",
-      "admitted_runs": 1,
-      "prepared_runs": 0,
-      "continuing_runs": 1,
-      "recorded_gate_reasons": []
-    }
-  ],
   "workspace": {
     "name": "LIF1188 Contract",
     "state": "ready_for_connections",
-    "workspace_ref": "b139419b-d84b-490e-965c-567f5d904c75"
+    "workspace_ref": "b4c08e54-c08d-4c81-9a94-2939259020c0"
   },
-  "campaign_ref": "07a164c6-f3a4-4973-9507-70df5f5b388e",
-  "intent_active": false
+  "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0",
+  "intent_active": true,
+  "executable_versions": [
+    {
+      "revision_ref": "9d510623-6ba2-4a1a-8c24-34973999556a",
+      "pending_journeys": 0,
+      "started_journeys": 1,
+      "prepared_journeys": 1,
+      "continuing_journeys": 0,
+      "recorded_gate_reasons": [],
+      "executable_version_ref": "26962373-4ee1-45a6-8e92-227f4e957589"
+    },
+    {
+      "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96",
+      "pending_journeys": 1,
+      "started_journeys": 1,
+      "prepared_journeys": 0,
+      "continuing_journeys": 1,
+      "recorded_gate_reasons": [],
+      "executable_version_ref": "db1f2f3c-7e19-4042-aa19-efe78259b8ed"
+    }
+  ]
 }

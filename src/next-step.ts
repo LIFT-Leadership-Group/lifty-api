@@ -337,7 +337,7 @@ export async function getNextStep(
   }
   return response(
     "action_required", "campaign", "campaigns_saved",
-    ["Read campaigns_get and journeys_get for the exact saved drafts, approvals, binding and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent."],
+    ["Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent."],
     [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")], "campaigns",
     { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) }, null, "outreach",
   );

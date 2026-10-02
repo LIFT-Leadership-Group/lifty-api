@@ -6,19 +6,19 @@
       "channel": "linkedin",
       "content": "Original bytes",
       "is_draft": true,
-      "lead_ref": "df75ee6d-0719-487b-bc3d-5da1633962f2",
-      "sender_id": "8473f5a7-469a-45c0-9f01-195e16e3bbdd",
-      "created_at": "2026-10-02T17:35:53.469187+00:00",
-      "message_ref": "a7b1b3eb-5d49-4118-bb85-0912bea23b8c",
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:04:59.594581+00:00",
+      "message_ref": "b25c0ff2-cb3c-4604-8d2c-fa74d5ccce12",
       "review_status": "pending",
-      "source_digest": "885917e2fe3f2a091a9131b1720bbfe9540e11d80a0c8c25b513acce32d27a4e",
+      "source_digest": "6aeae7c2dcebd74ca1df2d3b6e7d535c54dea0cb3921494cbd400d58f6194e5c",
       "sender_version": 1,
       "source_message_ref": null
     },
     "workspace": {
       "name": "LIF1188 Contract",
       "state": "ready_for_connections",
-      "workspace_ref": "5633e480-1164-4c12-94e5-ff4f9ce13c43"
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
     }
   },
   "message_revision": {
@@ -28,19 +28,19 @@
       "channel": "linkedin",
       "content": "Corrected saved draft",
       "is_draft": true,
-      "lead_ref": "df75ee6d-0719-487b-bc3d-5da1633962f2",
-      "sender_id": "8473f5a7-469a-45c0-9f01-195e16e3bbdd",
-      "created_at": "2026-10-02T17:35:53.579398+00:00",
-      "message_ref": "5b2e2b3c-04ca-4f85-82e2-c57c3a535d85",
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:04:59.731701+00:00",
+      "message_ref": "68035975-8c8a-4f97-ab5d-e364e64767aa",
       "review_status": "pending",
-      "source_digest": "6cd6b04b594220d93e7d18ba6f9eda8a51a8962ea4be83aa69e616fd7f3e5dd3",
+      "source_digest": "2f06f71390628c15a69731e18920651287a365300902206b4ba2fd2df69ed575",
       "sender_version": 1,
-      "source_message_ref": "a7b1b3eb-5d49-4118-bb85-0912bea23b8c"
+      "source_message_ref": "b25c0ff2-cb3c-4604-8d2c-fa74d5ccce12"
     },
     "workspace": {
       "name": "LIF1188 Contract",
       "state": "ready_for_connections",
-      "workspace_ref": "5633e480-1164-4c12-94e5-ff4f9ce13c43"
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
     }
   },
   "email_original": {
@@ -81,19 +81,19 @@
       "channel": "email",
       "content": "Saved sequence",
       "is_draft": true,
-      "lead_ref": "df75ee6d-0719-487b-bc3d-5da1633962f2",
-      "sender_id": "8473f5a7-469a-45c0-9f01-195e16e3bbdd",
-      "created_at": "2026-10-02T17:35:54.427829+00:00",
-      "message_ref": "e25fd348-2529-40f1-ba87-0dba0bbffd23",
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:05:00.767499+00:00",
+      "message_ref": "9b87be9d-982c-4cce-a61d-e4833acf3fcf",
       "review_status": "pending",
-      "source_digest": "0d4452d2dc64742babc36937579c4c297dd5812a9ac095634b870ee3547bf7fa",
+      "source_digest": "33286c0fdb2651564a53faa8fb1b3e23f6a9b5760cc112165bbcfadc708a7447",
       "sender_version": 1,
       "source_message_ref": null
     },
     "workspace": {
       "name": "LIF1188 Contract",
       "state": "ready_for_connections",
-      "workspace_ref": "5633e480-1164-4c12-94e5-ff4f9ce13c43"
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
     }
   },
   "email_revision": {
@@ -134,19 +134,19 @@
       "channel": "email",
       "content": "Saved sequence",
       "is_draft": true,
-      "lead_ref": "df75ee6d-0719-487b-bc3d-5da1633962f2",
-      "sender_id": "8473f5a7-469a-45c0-9f01-195e16e3bbdd",
-      "created_at": "2026-10-02T17:35:54.543455+00:00",
-      "message_ref": "04c34993-78a3-4a23-8145-6bb1a49a193a",
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:05:00.901175+00:00",
+      "message_ref": "27f5eca3-0145-4cb6-828f-9a3fd50a0e03",
       "review_status": "pending",
-      "source_digest": "eef70490bb0d3f215d09611a87e5aed5df0c8d66c18876ad62e4976d1a64f026",
+      "source_digest": "c3a437b4b22efd01d536baf6fbdca2fc85d40f61b001ce401271fc3ead2e5de6",
       "sender_version": 1,
-      "source_message_ref": "e25fd348-2529-40f1-ba87-0dba0bbffd23"
+      "source_message_ref": "9b87be9d-982c-4cce-a61d-e4833acf3fcf"
     },
     "workspace": {
       "name": "LIF1188 Contract",
       "state": "ready_for_connections",
-      "workspace_ref": "5633e480-1164-4c12-94e5-ff4f9ce13c43"
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
     }
   }
 }

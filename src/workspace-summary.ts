@@ -65,11 +65,12 @@ function scoped<T extends { workspace_ref: string }>(
 const Campaign = z.object({
   campaigns_next_cursor: z.uuid().nullable(), journeys_next_cursor: z.uuid().nullable(),
   campaigns: z.array(z.object({ campaign_ref: z.uuid(), journey_ref: z.uuid(), version: z.number().int().positive(),
-    name: z.string(), channel: z.enum(["email", "linkedin"]), state: z.enum(["active", "paused"]),
-    effective_revision: ExactRevisionSchema.nullable(), draft_revision: ExactRevisionSchema, draft_approved: z.boolean(),
+    name: z.string(), channel: z.enum(["email", "linkedin"]), state: z.enum(["inactive", "active", "paused"]),
+    active_revision: ExactRevisionSchema.nullable(), draft_revision: ExactRevisionSchema, draft_approved: z.boolean(),
   }).strict()).max(100),
   journeys: z.array(z.object({ journey_ref: z.uuid(), version: z.number().int().positive(), name: z.string(),
-    active_binding: JourneysSchema.shape.journeys.element.shape.active_binding, draft_revision: ExactRevisionSchema, draft_approved: z.boolean(),
+    active_revision: ExactRevisionSchema.nullable(), executable_version: JourneysSchema.shape.journeys.element.shape.executable_version,
+    draft_revision: ExactRevisionSchema, draft_approved: z.boolean(),
   }).strict()).max(100),
 }).strict();
 const SummaryRunSchema = z.discriminatedUnion("state", [
@@ -296,9 +297,11 @@ export async function getWorkspaceSummary(
       return {
         campaigns_next_cursor: campaigns.next_cursor, journeys_next_cursor: journeys.next_cursor,
         campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version,
-          name: value.name, channel: value.channel, state: value.state, effective_revision: value.effective_revision ? { revision_ref: value.effective_revision.revision_ref, digest: value.effective_revision.digest } : null,
+          name: value.name, channel: value.channel, state: value.state, active_revision: value.active_revision ? { revision_ref: value.active_revision.revision_ref, digest: value.active_revision.digest } : null,
           draft_revision: { revision_ref: value.draft_revision.revision_ref, digest: value.draft_revision.digest }, draft_approved: value.draft_revision.approval !== null })),
-        journeys: journeys.journeys.map(value => ({ journey_ref: value.journey_ref, version: value.version, name: value.name, active_binding: value.active_binding,
+        journeys: journeys.journeys.map(value => ({ journey_ref: value.journey_ref, version: value.version, name: value.name,
+          active_revision: value.active_revision ? { revision_ref: value.active_revision.revision_ref, digest: value.active_revision.digest } : null,
+          executable_version: value.executable_version,
           draft_revision: { revision_ref: value.draft_revision.revision_ref, digest: value.draft_revision.digest }, draft_approved: value.draft_revision.approval !== null })),
       };
     }),

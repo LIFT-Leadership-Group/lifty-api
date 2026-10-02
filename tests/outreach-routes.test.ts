@@ -4,7 +4,7 @@ import { STAGE_CLIENT_CONTRACT, getAgentContext } from "../src/agent-context.js"
 import { executeOutreachOperation, outreachEntries } from "../src/outreach-operations.js";
 import { getStageMcpTools, callStageMcpTool } from "../src/mcp-stage-tools.js";
 
-import { journeyRef, campaignRef, revisionRef, senderId, workspace, digest, policy, journeyPolicy, revision, binding, journey, campaign, journeySummary, campaignSummary } from "./outreach-fixtures.js";
+import { journeyRef, campaignRef, revisionRef, senderId, workspace, digest, policy, journeyPolicy, revision, executableVersion, journey, campaign, journeySummary, campaignSummary } from "./outreach-fixtures.js";
 function harness(result: (name: string, args: Record<string, unknown>) => unknown) {
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
     try { return { data: result(name, args), error: null }; } catch (error) { return { data: null, error }; }
@@ -20,17 +20,16 @@ describe("canonical Outreach member transport", () => {
   it("routes every catalog operation to its exact RPC without a second workspace selector", async () => {
     const h = harness(name => name === "get_lifty_journeys" ? { workspace, journeys: [journeySummary], next_cursor: null }
       : name === "get_lifty_campaigns" ? { workspace, campaigns: [campaignSummary], next_cursor: null }
-        : name === "activate_lifty_journey" ? { workspace, journey: { ...journey, active_binding: binding } }
+        : name === "activate_lifty_journey" ? { workspace, journey: { ...journey, active_revision: revision(journeyPolicy, true), executable_version: executableVersion } }
           : name.includes("journey") ? { workspace, journey: name === "publish_lifty_journey" ? { ...journey, draft_revision: revision(journeyPolicy, true), revisions: [revision(journeyPolicy, true)] } : journey }
-            : name === "activate_lifty_campaign" ? { workspace, campaign: { ...campaign, state: "active", effective_revision: revision(policy, true) }, journey: { ...journey, active_binding: binding } }
+            : name === "activate_lifty_campaign" ? { workspace, campaign: { ...campaign, state: "active", active_revision: revision(policy, true) }, journey: { ...journey, executable_version: executableVersion } }
               : { workspace, campaign: name === "publish_lifty_campaign" ? { ...campaign, draft_revision: revision(policy, true), revisions: [revision(policy, true)] } : campaign });
     for (const { action, resource, definition } of outreachEntries().filter(entry => entry.action !== "runtime" && !entry.action.startsWith("tests_") && !entry.action.startsWith("message_") && entry.action !== "test_detail")) {
       const ref = resource === "journeys" ? journeyRef : campaignRef;
       const body = action === "post" ? resource === "journeys" ? { name: "Journey", policy: journeyPolicy } : { name: "LinkedIn", journey_ref: journeyRef, channel: "linkedin", policy }
         : action === "draft_patch" ? { expected_version: 1, revision_ref: revisionRef, changes: resource === "journeys" ? { audience: { kind: "qualified" } } : { instructions: "New instructions" } }
           : action === "pause" ? { expected_version: 1 }
-            : action === "publish" || action === "activate" ? { expected_version: 1, revision_ref: revisionRef, digest,
-              ...(action !== "activate" ? {} : resource === "journeys" ? { campaigns: [{ campaign_ref: campaignRef, revision_ref: revisionRef, digest }] } : { expected_journey_version: 1 }) } : undefined;
+            : action === "publish" || action === "activate" ? { expected_version: 1, revision_ref: revisionRef, digest } : undefined;
       const response = await h.request(definition.method, definition.route.replace(/\{[^}]+\}/g, ref), body);
       expect(response.status, `${resource}.${action}`).toBe(definition.success);
       expect(h.rpc).toHaveBeenLastCalledWith(definition.rpc, { p_workspace_id: null,
@@ -56,33 +55,42 @@ describe("canonical Outreach member transport", () => {
     for (const body of [{ expected_version: 0, revision_ref: revisionRef, digest }, { expected_version: 1.5, revision_ref: revisionRef, digest },
       { expected_version: 1, revision_ref: revisionRef, digest, provider: "vendor" }])
       expect((await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/publish`, body)).status).toBe(422);
+    // No customer-supplied binding: activation names only the exact revision.
     expect((await h.request("POST", `/v1/workspace/journeys/${journeyRef}/activate`, { expected_version: 1, revision_ref: revisionRef, digest,
-      campaigns: [{ campaign_ref: campaignRef, revision_ref: revisionRef, digest }, { campaign_ref: campaignRef, revision_ref: revisionRef, digest }] })).status).toBe(422);
+      campaigns: [{ campaign_ref: campaignRef, revision_ref: revisionRef, digest }] })).status).toBe(422);
+    expect((await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 1, expected_journey_version: 1, revision_ref: revisionRef, digest })).status).toBe(422);
     expect((await h.request("GET", "/v1/workspace/campaigns/not-an-id")).status).toBe(400);
     expect(h.rpc).not.toHaveBeenCalled();
   });
-  it("publication and activation use different exact contracts; approval alone does not select binding or intent", async () => {
+  it("publication and activation use different exact contracts; approval alone selects nothing and grants no intent", async () => {
     const published = { ...campaign, version: 2, draft_revision: revision(policy, true), revisions: [revision(policy, true)] };
     const h = harness(name => name === "publish_lifty_campaign" ? { workspace, campaign: published }
-      : { workspace, campaign: { ...published, version: 3, state: "active", effective_revision: revision(policy, true) }, journey: { ...journey, version: 2, active_binding: binding } });
+      : { workspace, campaign: { ...published, version: 3, state: "active", active_revision: revision(policy, true) }, journey: { ...journey, executable_version: executableVersion } });
     const pub = await (await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/publish`, { expected_version: 1, revision_ref: revisionRef, digest })).json();
-    expect(pub.campaign).toMatchObject({ state: "paused", effective_revision: null, draft_revision: { approval: { actor_ref: senderId } } });
-    const activated = await (await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 2, expected_journey_version: 1, revision_ref: revisionRef, digest })).json();
-    expect(activated.journey.active_binding).toEqual(binding); expect(activated.campaign.state).toBe("active");
+    expect(pub.campaign).toMatchObject({ state: "inactive", active_revision: null, draft_revision: { approval: { actor_ref: senderId } } });
+    const activated = await (await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 2, revision_ref: revisionRef, digest })).json();
+    expect(activated.journey.executable_version).toEqual(executableVersion); expect(activated.campaign.state).toBe("active");
     expect(h.rpc.mock.calls.map(call => call[0])).toEqual(["publish_lifty_campaign", "activate_lifty_campaign"]);
   });
-  it("never confirms a wrong approval digest, paused activation or mismatched binding", async () => {
+  it("never confirms a wrong approval digest, an unselected or paused activation, or a version pinning another revision", async () => {
+    const other = { ...executableVersion, campaigns: [{ ...executableVersion.campaigns[0]!, revision: { revision_ref: senderId, digest } }] };
     for (const receipt of [
       { workspace, campaign },
-      { workspace, campaign: { ...campaign, state: "active", effective_revision: revision(policy, true) }, journey },
-      { workspace, campaign: { ...campaign, state: "paused", effective_revision: revision(policy, true) }, journey: { ...journey, active_binding: binding } },
+      { workspace, campaign: { ...campaign, state: "active", active_revision: revision(policy, false) }, journey },
+      { workspace, campaign: { ...campaign, state: "paused", active_revision: revision(policy, true) }, journey },
+      { workspace, campaign: { ...campaign, state: "active", active_revision: revision(policy, true) }, journey: { ...journey, executable_version: other } },
     ]) {
       const h = harness(() => receipt);
-      const result = await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 1, expected_journey_version: 1, revision_ref: revisionRef, digest });
+      const result = await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 1, revision_ref: revisionRef, digest });
       expect(result.status).toBe(502);
     }
+    // A dependent Campaign may be selected while it waits outside the version.
+    const waiting = harness(() => ({ workspace, campaign: { ...campaign, state: "active", active_revision: revision(policy, true) }, journey }));
+    expect((await waiting.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 1, revision_ref: revisionRef, digest })).status).toBe(200);
     const h = harness(() => ({ workspace, campaign: { ...campaign, revisions: [{ ...revision(policy, true), digest: "b".repeat(64) }] } }));
     expect((await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/publish`, { expected_version: 1, revision_ref: revisionRef, digest })).status).toBe(502);
+    const journeyActivation = harness(() => ({ workspace, journey: { ...journey, active_revision: revision(journeyPolicy, false) } }));
+    expect((await journeyActivation.request("POST", `/v1/workspace/journeys/${journeyRef}/activate`, { expected_version: 1, revision_ref: revisionRef, digest })).status).toBe(502);
   });
   it("catalog and MCP expose implemented routes; old aliases and pending editor routes are unavailable", async () => {
     const tools = getStageMcpTools();

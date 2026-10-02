@@ -5,7 +5,7 @@ import { CampaignTestResultSchema, CampaignTestsSchema } from "../src/outreach-c
 import fixtures from "./outreach-test-sql-fixtures.json" with { type: "json" };
 const test = fixtures.test_pending.test;
 const body = { request_ref: test.request_ref, expected_version: 1, revision_ref: test.revision_ref, digest: test.digest,
-  sample: { lead_refs: [test.samples[0]!.lead_ref] } };
+  sample: { lead_refs: test.samples.map(sample => sample.lead_ref) } };
 function harness(result: unknown) {
   const rpc = vi.fn(async () => ({ data: result, error: null }));
   const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: { rpc } } }), log: () => {} });
@@ -40,8 +40,11 @@ describe("isolated saved campaign tests", () => {
       expect((await h.request("POST", `/v1/workspace/campaigns/${test.campaign_ref}/tests`, body)).status).toBe(502);
     }
   });
-  it("parses actual SQL queued/completed/baseline receipts and bounded discovery", () => {
-    for (const value of [fixtures.test_pending, fixtures.test_completed, fixtures.baseline_candidate])
+  it("parses actual SQL queued/completed/comparison receipts and bounded discovery", () => {
+    const compared = fixtures.comparison.test.samples;
+    expect(compared.every(sample => sample.baseline_output !== null)).toBe(true);
+    expect(compared.some(sample => sample.changes.includes("research_changed"))).toBe(true);
+    for (const value of [fixtures.test_pending, fixtures.test_completed, fixtures.comparison])
       expect(CampaignTestResultSchema.safeParse(value)).toMatchObject({ success: true });
     expect(CampaignTestsSchema.safeParse(fixtures.tests_list)).toMatchObject({ success: true });
   });
