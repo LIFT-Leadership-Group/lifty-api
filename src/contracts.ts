@@ -185,7 +185,7 @@ export const IntegrationConnectionStatusSchema = z.union([
 export const NotificationTypeSchema = z.enum([
   "reply.requires_action",
   "meeting.booked",
-  "integration.disconnected",
+  "sending_account.needs_reconnect",
   "system.test",
 ]);
 

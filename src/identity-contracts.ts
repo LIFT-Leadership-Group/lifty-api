@@ -14,7 +14,10 @@ export const SenderName = z.string().trim().min(1).max(200).regex(/^[^\u0000-\u0
   .refine(value => !["linkedin", "email"].includes(value.toLowerCase()), "Use the person's name, not a channel or address.");
 // The founder's own words: plain text, https links only. The database
 // normalizes line endings and surrounding whitespace and stores at most 500.
-export const Signature = z.string().min(1).max(500);
+export const Signature = z.string().min(1).refine(value => [...value].length <= 500);
+// Keep the original input for the single SQL normalizer. CRLF and surrounding
+// whitespace are normalized before the 500-character limit is applied.
+const SignatureInput = z.string().describe("Plain text; 1–500 characters after line-ending and surrounding-whitespace normalization. Links must use https.");
 export const BookingUrl = z.url({ protocol: /^https$/ }).max(2048);
 
 const Declaration = z.union([
@@ -75,12 +78,12 @@ export const ConnectResultSchema = ConnectStartSchema.extend({ connection_url: z
 
 export const IdPath = z.object({ id: Id }).strict();
 export const SenderCreateSchema = z.object({
-  name: SenderName, signature: Signature.optional(), booking_url: BookingUrl.optional(),
+  name: SenderName, signature: SignatureInput.optional(), booking_url: BookingUrl.optional(),
 }).strict();
 export const SenderPatchSchema = z.object({
   expected_version: Version,
   name: SenderName.optional(),
-  signature: Signature.nullable().optional(),
+  signature: SignatureInput.nullable().optional(),
   booking_url: BookingUrl.nullable().optional(),
 }).strict().refine(value => value.name !== undefined || value.signature !== undefined || value.booking_url !== undefined,
   { message: "Change at least one of name, signature or booking_url.", path: [] });

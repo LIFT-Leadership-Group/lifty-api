@@ -22,7 +22,7 @@ export type ExpectedIdentity = { email: string } | { profile_id: string } | null
 export type VerifiedAuthorization =
   | { api_version: "v2"; application_id: string; account_scope_id: string | null; account_id: string; user_id: string; email: string }
   | { api_version: "v2"; application_id: string; account_scope_id: string | null; account_id: string; user_id: string; profile_id: string; profile_url?: string };
-/** The authorization is for another mailbox/profile, or cannot prove one. */
+/** The authorization proves a different mailbox/profile or binding. */
 export class IdentityMismatch extends Error {}
 
 export interface AccountProviderSettings {
@@ -50,7 +50,7 @@ export function createAccountProvider(settings: AccountProviderSettings) {
       generation: value.generation, hosted_auth_origin: origin ?? value.hosted_auth_origin ?? "" };
   }
   const identityError = (error: unknown) => error instanceof PublicError
-    && ["UNIPILE_IDENTITY_MISMATCH", "UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code);
+    && error.code === "UNIPILE_IDENTITY_MISMATCH";
 
   return {
     async createLink(input: { channel: "email" | "linkedin"; state: string; redirectUri: string; expiresAt: string; transport: ProviderTransport }) {
@@ -83,7 +83,7 @@ export function createAccountProvider(settings: AccountProviderSettings) {
           ...(identity.profileUrl ? { profile_url: identity.profileUrl } : {}) };
       } catch (error) {
         if (identityError(error)) throw new IdentityMismatch();
-        if (error instanceof PublicError && error.code === "UNIPILE_ACCOUNT_NOT_FOUND") return null;
+        if (error instanceof PublicError && ["UNIPILE_ACCOUNT_NOT_FOUND", "UNIPILE_MAILBOX_UNVERIFIABLE"].includes(error.code)) return null;
         throw error;
       }
     },

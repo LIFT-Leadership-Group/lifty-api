@@ -10,7 +10,7 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   INVALID_REQUEST: "Repair the request using the current operation schema.",
   WORKSPACE_FORBIDDEN: "You do not belong to this workspace.",
   WORKSPACE_SELECTION_REQUIRED:
-    "You belong to several workspaces. Choose one with the x-lifty-workspace header (--workspace in the CLI).",
+    "You belong to several workspaces. Choose one with the x-lifty-workspace header (lifty use <workspace> in the CLI).",
   WORKSPACE_SUSPENDED: "This workspace is suspended. Contact LIFT support.",
   WORKSPACE_NOT_READY: "Create a workspace before continuing.",
   VERSION_CONFLICT:

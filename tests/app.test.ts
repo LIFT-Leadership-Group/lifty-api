@@ -715,12 +715,12 @@ describe("LIFTY API notification configuration", () => {
     notification_types: [
       "reply.requires_action",
       "meeting.booked",
-      "integration.disconnected",
+      "sending_account.needs_reconnect",
       "system.test",
     ] as Array<
       | "reply.requires_action"
       | "meeting.booked"
-      | "integration.disconnected"
+      | "sending_account.needs_reconnect"
       | "system.test"
     >,
     slack: {

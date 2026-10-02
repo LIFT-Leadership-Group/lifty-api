@@ -39,9 +39,9 @@ const snapshot = (db: Db, extra: Record<string, unknown> = {}) => ({
   transport: db.transport,
   authorization: { ...db.authorization, event_id: null, at: null }, ...extra });
 
-interface Provider { senders: string; accountStatus: number; deleteStatus: number; calls: string[]; bodies: Record<string, unknown>[] }
+interface Provider { verificationStatus: "verified" | "pending"; senders: string; accountStatus: number; deleteStatus: number; calls: string[]; bodies: Record<string, unknown>[] }
 function stub(db: Db, provider: Partial<Provider> = {}) {
-  const p: Provider = { senders: "ana@example.test", accountStatus: 200, deleteStatus: 200, calls: [], bodies: [], ...provider };
+  const p: Provider = { verificationStatus: "verified", senders: "ana@example.test", accountStatus: 200, deleteStatus: 200, calls: [], bodies: [], ...provider };
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
     if (url.origin === "https://api.unipile.com") {
@@ -49,7 +49,7 @@ function stub(db: Db, provider: Partial<Provider> = {}) {
       if (url.pathname === "/v2/auth/link") { p.bodies.push(JSON.parse(String(init!.body))); return Response.json({ object: "HostedAuthLink", link: hostedLink }); }
       if (init?.method === "DELETE") return new Response("{}", { status: p.deleteStatus });
       if (p.accountStatus !== 200) return new Response("PRIVATE provider body", { status: p.accountStatus });
-      if (url.pathname.endsWith("/email-senders")) return Response.json({ data: [{ object: "EmailSender", email: p.senders, is_primary: true, verification_status: "verified" }] });
+      if (url.pathname.endsWith("/email-senders")) return Response.json({ data: [{ object: "EmailSender", email: p.senders, is_primary: true, verification_status: p.verificationStatus }] });
       return Response.json({ object: "Account", id: "acc_new", application_id: "app_test", account_scope_id: null, user_id: "user-1",
         provider: "google", status: "running", is_locked: false, metadata: { products_connection_status: { gmail: "running" } } });
     }
@@ -195,6 +195,21 @@ describe("shared confirmation for sending accounts", () => {
     expect(db.payloads.complete).toEqual({ attempt_id: attemptId, verified: { api_version: "v2", application_id: "app_test",
       account_scope_id: null, account_id: "acc_new", user_id: "user-1", email: "ana@example.test" } });
     expect(provider.calls).toEqual(["GET /v2/accounts/acc_new", "GET /v2/acc_new/email-senders"]);
+  });
+
+  it("keeps an unverified primary mailbox pending and accepts later verified evidence", async () => {
+    const db = attemptDb(); db.expected_identity = { email: "ana@example.test" };
+    db.authorization = { received: true, account_id: "acc_new", return_error: null };
+    const { provider } = stub(db, { verificationStatus: "pending" });
+    const server = app();
+    const pending = await server.request("/connect/email/return/status", status("email", intent()));
+    expect(await pending.json()).toEqual({ status: "pending" });
+    expect(db.ops).not.toContain("fail");
+    expect(db.ops).not.toContain("complete");
+    provider.verificationStatus = "verified";
+    const confirmed = await server.request("/connect/email/return/status", status("email", intent()));
+    expect(await confirmed.json()).toMatchObject({ status: "connected" });
+    expect(db.ops.filter(op => op === "complete")).toHaveLength(1);
   });
 
   it("fails a reconnect authorized by another mailbox and keeps provider outages pending", async () => {

@@ -48,7 +48,7 @@ function mapRpcError(error: unknown): PublicError {
   const message = typeof candidate?.message === "string" ? candidate.message : "";
   if (code === "PT409" && message.includes("lifty_workspace_ambiguous")) {
     return new PublicError({ status: 409, code: "WORKSPACE_SELECTION_REQUIRED",
-      message: "You belong to several workspaces. Choose one with the x-lifty-workspace header (--workspace in the CLI).", cause: error });
+      message: "You belong to several workspaces. Choose one with the x-lifty-workspace header (lifty use <workspace> in the CLI).", cause: error });
   }
   if (code === "PT403" && message.includes("lifty_workspace_forbidden")) {
     return new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN",

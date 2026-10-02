@@ -78,7 +78,6 @@ describe("Identity member routes", () => {
     ["POST", "/v1/workspace/senders", { name: "ana@example.test" }, 422, "SENDER_INVALID"],
     ["POST", "/v1/workspace/senders", { name: "LinkedIn" }, 422, "SENDER_INVALID"],
     ["POST", "/v1/workspace/senders", { name: "Ana", timezone: "UTC" }, 422, "SENDER_INVALID"],
-    ["PATCH", `/v1/workspace/senders/${senderId}`, { expected_version: 1, signature: "x".repeat(501) }, 422, "SENDER_INVALID"],
     ["PATCH", `/v1/workspace/senders/${senderId}`, { expected_version: 1 }, 422, "SENDER_INVALID"],
     ["PATCH", `/v1/workspace/senders/${senderId}`, { expected_version: 1, booking_url: "http://cal.example/ana" }, 422, "SENDER_INVALID"],
     ["PATCH", "/v1/workspace/senders/not-an-id", { expected_version: 1, name: "Ana" }, 400, "INVALID_REQUEST"],
