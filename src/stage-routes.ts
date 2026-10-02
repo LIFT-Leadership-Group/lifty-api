@@ -1,3 +1,4 @@
+import { outreachEntries, validateOutreachInput } from "./outreach-operations.js";
 import { businessEntries, validateBusinessRequest } from "./business-operations.js";
 import { researchEntries, validateResearchInput } from "./research-operations.js";
 import { identityEntries, validateIdentityInput } from "./identity-operations.js";
@@ -14,7 +15,6 @@ import {
   type CrmMappingAction,
 } from "./crm-mapping/contracts.js";
 import { z } from "zod";
-import { workspaceCampaignResultFor } from "./workspace-campaign-contracts.js";
 import type { Context } from "hono";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppDependencies, AppEnvironment } from "./app.js";
@@ -24,7 +24,6 @@ import { CompanyPlanSchema } from "./company-mapping/contract.js";
 import { HubspotConnectionStatusSchema, NotificationConfigSchema, RunStatusSchema, StartRunResultSchema, WorkspaceStatusSchema } from "./contracts.js";
 import {
   AuthorizationRequiredSchema,
-  CampaignStagePatchSchema, CampaignStageQuerySchema, CampaignStageRequestSchema,
   ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
   NotificationStagePatchSchema, StageErrorSchema, stageOperations,
 } from "./stage-contracts.js";
@@ -136,6 +135,21 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         ...(definition.success === 202 ? { 202: { description: "Accounts blocked; access removal at the provider is not yet confirmed. Repeat the request to finish it.", content: { "application/json": { schema: definition.response } } } } : {}),
         ...Object.fromEntries([400, 401, 403, 404, 409, 413, 422, 429, 502, 503].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) },
     });
+  }
+  for (const { key, definition } of outreachEntries()) {
+    app.on(definition.method, definition.route.replace(/\{([^}]+)\}/g, ":$1"), async context => {
+      context.header("cache-control", "no-store");
+      const path = validateOutreachInput(definition.path, context.req.param(), { status: 400, code: "INVALID_REQUEST" }) as Record<string, string>;
+      const query = validateOutreachInput(definition.query, context.req.query(), { status: 400, code: "INVALID_REQUEST" }) as Record<string, unknown>;
+      const body = definition.request ? validateOutreachInput(definition.request, await readBody(context, definition.invalid.code), definition.invalid) : undefined;
+      const result = definition.response.parse(await dependencies.outreachOperation(context.get("authSession"), key, { path, query, body }));
+      return context.json(result, definition.success);
+    });
+    app.openAPIRegistry.registerPath({ method: definition.method.toLowerCase() as "get" | "post" | "patch", path: definition.route,
+      security: [{ bearerAuth: [] }], request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }),
+        ...(definition.path instanceof z.ZodObject && Object.keys(definition.path.shape).length ? { params: definition.path } : {}), query: definition.query as z.ZodObject, ...(definition.request ? { body: { required: true, content: { "application/json": { schema: definition.request } } } } : {}) },
+      responses: { [definition.success]: { description: definition.description, content: { "application/json": { schema: definition.response } } },
+        ...Object.fromEntries([400,401,403,404,409,413,422,429,502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) } });
   }
   // Calibration sample: the run RPCs select the workspace like every stage.
   app.get("/v1/workspace/sample-review", async context => {
@@ -271,7 +285,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     });
   }
 
-  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads", "senders", "sending-accounts"].includes(stage))) {
+  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads", "senders", "sending-accounts", "journeys", "campaigns"].includes(stage))) {
     app.get(`/v1/workspace/${stage}`, async context => {
       context.header("cache-control", "no-store");
       const session = context.get("authSession");
@@ -286,16 +300,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         return stage === "crm" ? context.json(HubspotConnectionStatusSchema.parse(await dependencies.getHubspotConnection(session)))
           : context.json(NotificationConfigSchema.parse(await dependencies.getNotificationConfig(session)));
       }
-      if (stage === "campaigns") {
-        const query = parse(CampaignStageQuerySchema, context.req.query());
-        if ("scope" in query) {
-          const input = { operation: query.operation, payload: { workspace: current } };
-          return context.json(workspaceCampaignResultFor(input, await dependencies.workspaceCampaign(session, input)));
-        }
-        if (query.workspace !== current) throw forbidden();
-        return forward(context, "POST", query.channel === "email" ? "/v1/email/campaign" : "/v1/linkedin/campaign",
-          { operation: query.operation, payload: { workspace: current, campaign_ref: query.campaign_ref } });
-      }
+
       parse(Empty, context.req.query());
       throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This operation is not available." });
     });
@@ -307,13 +312,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
 
       const current = await workspace(context);
       const session = context.get("authSession");
-      if (stage === "campaigns") {
-        const input = parse(CampaignStageRequestSchema, body);
-        if (input.request.payload.workspace !== current) throw forbidden();
-        if ("scope" in input) return context.json(workspaceCampaignResultFor(input.request,
-          await dependencies.workspaceCampaign(context.get("authSession"), input.request)));
-        return forward(context, "POST", input.channel === "email" ? "/v1/email/campaign" : "/v1/linkedin/campaign", input.request);
-      }
+
       parse(Empty, body);
       if (stage === "crm") return context.json(authorization(await dependencies.startHubspotConnect(session)));
       if (stage === "notifications") return context.json(authorization(await dependencies.startSlackConnect(session)));
@@ -332,13 +331,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         if (plan.workspace_ref !== current) throw forbidden();
         return forward(context, "POST", "/v1/integrations/hubspot/company-mapping", plan);
       }
-      if (stage === "campaigns") {
-        const input = parse(CampaignStagePatchSchema, body);
-        if (input.request.payload.workspace !== current) throw forbidden();
-        if ("scope" in input) return context.json(workspaceCampaignResultFor(input.request,
-          await dependencies.workspaceCampaign(context.get("authSession"), input.request)));
-        return forward(context, "POST", input.channel === "email" ? "/v1/email/campaign" : "/v1/linkedin/campaign", input.request);
-      }
+
       if (stage === "notifications") {
         const input = parse(NotificationStagePatchSchema, body);
         return forward(context, "PUT", input.operation === "destination" ? "/v1/notifications/destinations/slack" : "/v1/notifications/routes", input.values);

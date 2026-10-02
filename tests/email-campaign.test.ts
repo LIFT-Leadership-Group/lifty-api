@@ -55,7 +55,15 @@ describe("campaign authenticated narrow capability", () => {
     const h = harness({data:{...preview,server_key:secret,content:{...preview.content,provider_access_token:secret},replies:[{message_ref:reference,received_at:"2026-09-14T22:00:00Z",provider_message_id:"provider-private",event_ref:reference}]},error:null});
     const response = await h.app.request("/v1/email/campaign", post(request()));
     const text = await response.text();
-    expect(response.status).toBe(200); expect(text).not.toContain(secret); expect(text).not.toContain("provider-private");
+    expect(response.status).toBe(200); expect(text).not.toContain(secret); expect(text).not.toContain("provider-private"); expect(JSON.parse(text).content).not.toHaveProperty("provider");
+  });
+  it("masks named vendors in historical blockers while retaining exact recovery refs", async () => {
+    const h = harness({ data: { ...preview, blockers: ["email_smartlead_unavailable"] }, error: null });
+    const response = await h.app.request("/v1/email/campaign", post(request()));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data).toMatchObject({ campaign_ref: reference, version_ref: preview.version_ref, digest, blockers: ["email_delivery_unavailable"] });
+    expect(JSON.stringify(data)).not.toMatch(/smartlead|unipile/i);
   });
   it("fails closed on invalid cap and does not echo provider/database failures", async () => {
     for (const response of [{data:{...preview,content:{...preview.content,daily_limit:11}},error:null},{data:null,error:{code:"XX000",message:secret}}]) {
@@ -65,7 +73,7 @@ describe("campaign authenticated narrow capability", () => {
   });
   it("does not retry ambiguous mutations, and preserves digest on repeated requests", async () => {
     const h = harness();
-    const body = request("approve",{digest});
+    const body = request("cancel",{digest,confirm_cancel:true});
     await h.app.request("/v1/email/campaign",post(body)); await h.app.request("/v1/email/campaign",post(body));
     expect(h.rpc.mock.calls[0]).toEqual(h.rpc.mock.calls[1]);
     const failing = vi.fn(async () => {throw new Error(secret);});
@@ -75,7 +83,7 @@ describe("campaign authenticated narrow capability", () => {
   it("reports warmup, placement, suppression and stale approval without activating a connection", async () => {
     for (const message of ["email_warmup_required","email_placement_required","email_target_suppressed","email_approval_stale"]) {
       const h = harness({data:null,error:{code:"PT409",message}});
-      expect((await h.app.request("/v1/email/campaign",post(request("activate",{digest})))).status).toBe(409);
+      expect((await h.app.request("/v1/email/campaign",post(request("placement",{digest})))).status).toBe(409);
       expect(h.rpc).toHaveBeenCalledTimes(1);
     }
   });
@@ -291,7 +299,7 @@ describe("durable recovery and cancellation",()=>{
 
 
 describe("physical mailbox identity blocker contract",()=>{
-  it.each(["approve", "activate", "placement"])("preserves safe409 for %s without exposing principal details",async operation=>{
+  it.each(["placement"])("preserves safe409 for %s without exposing principal details",async operation=>{
     const privateId="private-mailbox-principal-fixture";
     const h=harness({data:null,error:{code:"PT409",message:"email_principal_unavailable",details:privateId,hint:"provider-proof-private"}});
     const req=request(operation,{digest});
@@ -316,7 +324,7 @@ describe("physical mailbox identity blocker contract",()=>{
   });
   it("preserves existing sender identity mismatch behavior",async()=>{
     const h=harness({data:null,error:{code:"PT409",message:"email_sender_identity_mismatch"}});
-    const res=await h.app.request("/v1/email/campaign",post(request("activate",{digest})));
+    const res=await h.app.request("/v1/email/campaign",post(request("preview")));
     expect(res.status).toBe(409);expect((await res.json()).error).toEqual({code:"EMAIL_SENDER_IDENTITY_MISMATCH",message:"The connected account no longer matches the approved sender."});
   });
 });

@@ -3,7 +3,6 @@ import { createOAuthConfirmation } from "./oauth-confirmation.js";
 import { openHubspotConnectIntent } from "./hubspot-state.js";
 import { openSlackConnectIntent } from "./slack-state.js";
 import { createRunProgressReader } from "./run-progress.js";
-import { createWorkspaceCampaignOperations } from "./workspace-campaign.js";
 import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
 import { createCrmMappingReadinessCheck } from "./crm-mapping/readiness.js";
 import { createCompanyMapping } from "./company-mapping.js";
@@ -91,7 +90,6 @@ export function createProductionApp(config: ServiceConfig) {
     getEmailPlacement: placement.status,
     startEmailPlacement: placement.start,
     ...(warmupSetup ? {warmupSetup} : {}),
-    ...((emailKey ?? linkedinKey) ? { workspaceCampaign: createWorkspaceCampaignOperations((emailKey ?? linkedinKey)!) } : {}),
     ...(linkedinKey ? { linkedinCampaign: createLinkedinCampaignOperations(linkedinKey) } : {}),
     ...(emailKey ? {
       emailCampaign: createEmailCampaignOperations(emailKey),

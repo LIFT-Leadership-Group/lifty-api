@@ -1,4 +1,4 @@
-import { operationToolNames, campaignReadOperations, splitCampaignOperations } from "./operation-names.js";
+import { operationToolNames } from "./operation-names.js";
 import { z } from "zod";
 import { STAGE_CLIENT_CONTRACT } from "./agent-context.js";
 import { stageOperations, type StageOperation } from "./stage-contracts.js";
@@ -11,20 +11,15 @@ export interface StageMcpTool {
   inputSchema: { type: "object"; properties: Record<string, object>; required: string[]; additionalProperties: false };
   annotations: { title: string; readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean };
 }
-interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool; campaignRead?: boolean }
+interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool }
 export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Response>;
-const campaignReads = campaignReadOperations;
-// Campaign operations that mix reads and sends become separate read and write
-// tools. The stage POST nests its operation under request; the individual
-// channel routes carry it at the top level.
-const splitCampaigns = splitCampaignOperations;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
-const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
+const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate",
   "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
   // Removing Lifty's access at the account provider.
   "sending-accounts.disconnect", "senders.delete"]);
 // Creating a resource changes nothing that exists.
-const nonDestructive = new Set(["business.post", "senders.post"]);
+const nonDestructive = new Set(["business.post", "senders.post", "journeys.post", "campaigns.post"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.
@@ -39,63 +34,26 @@ const title = (value: string) => value.replace(/[-_]/g, " ").replace(/\b\w/g, le
 const WorkspaceKey = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/);
 const WorkspaceProperty = { type: "string", pattern: "^[A-Za-z0-9_-]{1,100}$", description: "The user's chosen workspace; send on every call." };
 
-// Split the existing discriminated request, including nested channel unions.
-// Every field still comes from the REST contract; there is no second schema.
-function campaignBody(schema: JsonSchema, read: boolean): JsonSchema | null {
-  const result = { ...schema };
-  for (const union of ["anyOf", "oneOf"] as const) {
-    const branches = schema[union];
-    if (Array.isArray(branches)) {
-      const filtered = branches.filter(plainObject).map(branch => campaignBody(branch, read)).filter(value => value !== null);
-      if (!filtered.length) return null;
-      result[union] = filtered;
-    }
-  }
-  if (plainObject(schema.properties)) {
-    const properties = { ...schema.properties };
-    const operation = properties.operation;
-    if (plainObject(operation)) {
-      const values = Array.isArray(operation.enum) ? operation.enum : [operation.const];
-      const allowed = values.filter(value => typeof value === "string" && campaignReads.has(value) === read);
-      if (!allowed.length) return null;
-      const { const: _constant, enum: _enum, ...rest } = operation;
-      properties.operation = { ...rest, enum: allowed };
-    }
-    if (plainObject(properties.request)) {
-      const request = campaignBody(properties.request, read);
-      if (!request) return null;
-      properties.request = request;
-    }
-    result.properties = properties;
-  }
-  return result;
-}
-
 function entries(): Entry[] {
   return Object.entries(stageOperations).flatMap(([stage, operations]) => Object.entries(operations).flatMap(([action, operation]) => {
     // Published unsupported REST verbs are not actions a founder can perform.
     if (!Object.keys(operation.responses).some(status => status.startsWith("2"))) return [];
-    const variants = stage === "campaigns" && splitCampaigns.has(action) ? [true, false] : [undefined];
-    return variants.map(campaignRead => {
-      const read = campaignRead ?? operation.readOnly;
-      const name = operationToolNames(stage, action)[campaignRead === false ? 1 : 0]!;
+    const read = operation.readOnly;
+    const name = operationToolNames(stage, action)[0]!;
       const label = title(name);
-      const body = campaignRead === undefined ? operation.request.body : campaignBody(operation.request.body!, campaignRead);
-      if (operation.request.body && !body) throw new Error(`Empty MCP request variant: ${name}`);
+      const body = operation.request.body;
       const properties: Record<string, object> = { workspace: WorkspaceProperty,
         path: withoutDialect(operation.request.path) as object, query: withoutDialect(operation.request.query) as object };
       const required: string[] = [];
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${campaignRead === undefined ? "" : read ? " This tool accepts only status and preview operations." : " This tool changes campaign state and excludes status and preview operations."}${read ? "" : ["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule"].includes(stage) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
-      return { stage, action, operation,
-        ...(campaignRead === undefined ? {} : { campaignRead }),
+      const description = `${operation.description}${read ? "" : ["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule", "journeys", "campaigns"].includes(stage) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
+      return [{ stage, action, operation,
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },
           annotations: { title: label, readOnlyHint: read, destructiveHint: !read && !nonDestructive.has(`${stage}.${action}`),
-            openWorldHint: !read && openWorld.has(`${stage}.${action}`) } } };
-    });
+            openWorldHint: !read && openWorld.has(`${stage}.${action}`) } } }];
   }));
 }
 
@@ -103,7 +61,7 @@ function entries(): Entry[] {
 // callable name is derived from a current catalog entry.
 export const getStageMcpTools = (): StageMcpTool[] => {
   const all = entries();
-  const key = (entry: Entry) => `${entry.operation.method} ${entry.operation.route} ${entry.campaignRead ?? ""}`;
+  const key = (entry: Entry) => `${entry.operation.method} ${entry.operation.route}`;
   const stages = new Map<string, string[]>();
   for (const entry of all) stages.set(key(entry), [...(stages.get(key(entry)) ?? []), entry.stage]);
   const listed = new Set<string>();
@@ -147,11 +105,6 @@ export async function callStageMcpTool(name: string, args: unknown, request: Req
   const queryNames = propertyNames(operation.request.query);
   if (Object.keys(input.path).some(key => !pathNames.has(key)) || Object.keys(input.query).some(key => !queryNames.has(key))) return invalid();
   if (!operation.request.body && input.body !== undefined) return invalid();
-  if (entry.campaignRead !== undefined) {
-    const request = plainObject(input.body) && entry.action === "post" ? input.body.request : input.body;
-    if (!plainObject(request) || typeof request.operation !== "string"
-      || campaignReads.has(request.operation) !== entry.campaignRead) return invalid();
-  }
   let missingPath = false;
   const route = operation.route.replace(/\{([^}]+)\}/g, (_, key: string) => {
     const value = input.path[key];

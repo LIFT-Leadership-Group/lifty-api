@@ -3,7 +3,7 @@ import { createApp } from "../src/app.js";
 
 const current = "lifty-cli-context.v8";
 const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7"];
-const tasks = ["setup", "account", "campaign", "stages", "business", "targeting", "research-criteria",
+const tasks = ["setup", "account", "journeys", "stages", "business", "targeting", "research-criteria",
   "sample-review", "commercial-voice", "crm", "senders", "sending-accounts", "campaigns", "notifications"];
 
 describe("retired client contracts", () => {
@@ -44,7 +44,7 @@ describe("retired client contracts", () => {
     expect(business).not.toHaveBeenCalled();
   });
 
-  it("keeps v5 context and authenticated stage reads usable", async () => {
+  it("keeps current context and authenticated stage reads usable", async () => {
     const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
       listMemberWorkspaces: async () => ({workspaces:[]}), businessOperation: async () => ({workspace:null,profile:null}) });
     for (const task of tasks) {

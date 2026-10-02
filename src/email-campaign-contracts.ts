@@ -28,6 +28,9 @@ export const EmailCampaignRequest = z.discriminatedUnion("operation", [
   request("suppress", { workspace, lead_ref: reference }),
   request("provider", { workspace, channel: z.enum(["email", "linkedin"]), provider: z.enum(["unipile", "smartlead", "heyreach"]) }),
 ]);
+// Retained historical receipts and Email-owned placement consent only.
+export const HistoricalEmailCampaignRequest = z.union(EmailCampaignRequest.options.filter(option =>
+  ["preview", "status", "pause", "cancel", "suppress", "placement", "placement-status", "placement-preview", "placement-confirm"].includes(option.shape.operation.value)) as [typeof EmailCampaignRequest.options[number], ...typeof EmailCampaignRequest.options[number][]]);
 export type EmailCampaignInput = z.infer<typeof EmailCampaignRequest>;
 
 const state = z.enum(["draft", "approved", "active", "paused", "completed", "replied", "suppressed", "canceled"]);

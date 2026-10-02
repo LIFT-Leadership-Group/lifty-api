@@ -2,12 +2,6 @@ import { operationToolNames } from "./operation-names.js";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { EmailCampaignRequest } from "./email-campaign-contracts.js";
-import { LinkedinCampaignRequest } from "./linkedin-campaign-contracts.js";
-import {
-  WorkspaceCampaignRequest,
-  WorkspaceCampaignResult,
-} from "./workspace-campaign-contracts.js";
 import {
   StageErrorSchema,
   StageOperationSchema,
@@ -66,23 +60,7 @@ const documents = {
     schemas: {},
     references: { calibration, company_mapping: companyMapping },
   },
-  campaign: {
-    instructions: readFileSync(
-      new URL("./agent-context/campaign.md", import.meta.url),
-      "utf8",
-    ),
-    schemas: {
-      workspace_campaign: z.toJSONSchema(WorkspaceCampaignRequest, {
-        io: "input",
-      }),
-      workspace_campaign_result: z.toJSONSchema(WorkspaceCampaignResult),
-      email_campaign: z.toJSONSchema(EmailCampaignRequest, { io: "input" }),
-      linkedin_campaign: z.toJSONSchema(LinkedinCampaignRequest, {
-        io: "input",
-      }),
-    },
-    references: { calibration, writing, anti_slop: antiSlop },
-  },
+
 };
 const readGuide = (name: string) =>
   readFileSync(new URL(`./agent-context/${name}.md`, import.meta.url), "utf8");
@@ -134,8 +112,8 @@ const stageDocuments = Object.fromEntries(
         ...(["targeting", "research-criteria", "sample-review"].includes(stage)
           ? { calibration }
           : {}),
-        ...(stage === "campaigns"
-          ? { campaign: readGuide("campaign"), writing, anti_slop: antiSlop }
+        ...(["campaigns", "journeys"].includes(stage)
+          ? { campaign: readGuide("campaigns"), writing, anti_slop: antiSlop }
           : {}),
         ...(stage === "crm" ? { company_mapping: companyMapping } : {}),
       },

@@ -53,6 +53,12 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   LINKEDIN_ALREADY_CONNECTED: "This sender already has a LinkedIn account. Reconnect that account instead of connecting another.",
   CONNECTION_ATTEMPT_NOT_FOUND: "This connection attempt is not available in the selected workspace.",
   CONNECT_UNAVAILABLE: "Lifty cannot open a sign-in for this account right now. Try again later or contact LIFT support.",
+  OUTREACH_INVALID: "Repair the audience, graph or campaign fields using the current schema.",
+  OUTREACH_RESOURCE_FORBIDDEN: "This outreach resource is unavailable in the selected workspace.",
+  OUTREACH_REVISION_MISMATCH: "Read the resource and use its exact revision and digest.",
+  OUTREACH_APPROVAL_REQUIRED: "Publish the exact chosen revision before activating it.",
+  OUTREACH_CONFIGURATION_REQUIRED: "Save and approve the complete journey and its campaign revisions, then activate that exact journey binding.",
+  OUTREACH_SENDER_CONFLICT: "The lead's assigned person is not permitted for this campaign. Preserve its assignment and resolve the conflict.",
   // Calibration sample runs.
   RUN_NOT_CONFIGURED:
     "Save targeting and research criteria before starting the sample.",

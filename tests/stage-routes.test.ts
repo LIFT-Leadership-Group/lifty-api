@@ -48,9 +48,9 @@ describe("authenticated workspace stage adapters", () => {
       type_values: { top_target: "Top", prospect: "Prospect" }, tier_values: { A: "A", B: "B", C: "C", "Non-ICP": "Non-ICP" }, allow_schema_changes: false };
     expect((await request(app, "crm", "PATCH", plan)).status).toBe(403);
     expect((await request(app, "crm/mapping-context", "GET", undefined, `?workspace_ref=${foreign}`)).status).toBe(400);
-    expect((await request(app, "campaigns", "GET", undefined, `?channel=email&workspace=${foreign}&campaign_ref=${attemptRef}`)).status).toBe(403);
-    expect((await request(app, "campaigns", "POST", { channel: "email", request: { operation: "target", payload: { workspace: foreign, email: "lead@example.test" } } })).status).toBe(403);
-    expect((await request(app, "campaigns", "PATCH", { channel: "email", request: { operation: "activate", payload: { workspace: current, campaign_ref: attemptRef, digest: "a".repeat(64) } } })).status).toBe(400);
+    expect((await request(app, "campaigns", "GET", undefined, `?channel=email&workspace=${foreign}&campaign_ref=${attemptRef}`)).status).toBe(400);
+    expect((await request(app, "campaigns", "POST", { channel: "email", request: { operation: "target", payload: { workspace: foreign, email: "lead@example.test" } } })).status).toBe(422);
+    expect((await request(app, "campaigns", "PATCH", { channel: "email", request: { operation: "activate", payload: { workspace: current, campaign_ref: attemptRef, digest: "a".repeat(64) } } })).status).toBe(404);
     expect(mapping).not.toHaveBeenCalled(); expect(campaign).not.toHaveBeenCalled();
   });
 });

@@ -6,12 +6,11 @@ Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
 wording unless they ask to change it. If they already accepted one channel,
 keep that channel exactly and only rewrite the channel they asked to change. Keep the current campaign contract's
-message count, fields, personalization and approval rules. For shared_v1 the
-graph defines the sequence and the outreach overlay defines reusable writing
-instructions. A founder-requested single greeting stays a single greeting: do
+message count, fields, personalization and approval rules. The campaign owns its sequence and reusable writing
+instructions; the journey graph owns cross-channel entry and dependencies. A founder-requested single greeting stays a single greeting: do
 not add a question, pitch or follow-up to satisfy the examples below. In generate
 mode review the reusable policy and saved per-lead examples; no fixed text array
-is required. In templates mode use the existing channel Markdown bank.
+is required. In templates mode use the saved step templates.
 The multi-step examples below apply only when those steps exist in the graph.
 
 ## Use the saved context
