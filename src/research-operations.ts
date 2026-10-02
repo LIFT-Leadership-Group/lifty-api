@@ -198,7 +198,7 @@ export const researchOperationDefinitions = {
       },
       args: ({ query }) => ({ p_week: query.week ?? null }),
       description:
-        "Read one Monday-to-Monday UTC week (default: the current week): completed and qualified people, reservations, remaining volume, a per-day breakdown that adds up to completed, the reset time and, for a closed week under target, the shortfall reason.",
+        "Read one Monday-to-Monday UTC week (default: the current week): completed and qualified people, reservations, remaining volume, a per-day breakdown that adds up to completed, the reset time and, for a closed week under target that the workspace existed for in full, the shortfall reason (paused when the schedule was paused at any time in the week).",
     },
   },
   leads: {

@@ -60,7 +60,8 @@ version the latest admission used. After a change, a newer `policy_version`
 shows the platform has adopted it.
 
 A closed week below its effective target has `shortfall` with a count and a
-reason:
+reason, once the workspace existed for the whole week (its first, partial week
+and any week before it have none):
 
 - `search_exhausted`: the targeting ran out of new matching people. Suggest
   one specific way to widen targeting.
