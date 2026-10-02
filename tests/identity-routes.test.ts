@@ -74,6 +74,17 @@ describe("Identity member routes", () => {
     expect(h.effects.revoke).not.toHaveBeenCalled();
   });
 
+  it("preserves signature input for SQL normalization and accepts its 500-character Unicode result", async () => {
+    const raw = "  " + "😀".repeat(498) + "\r\nA  ";
+    const normalized = "😀".repeat(498) + "\nA";
+    const h = harness(() => ({ workspace, sender: { ...sender, signature: normalized } }));
+    const response = await h.request("PATCH", `/v1/workspace/senders/${senderId}`, { expected_version: 1, signature: raw });
+    expect(response.status).toBe(200);
+    expect((await response.json()).sender.signature).toBe(normalized);
+    expect(h.calls).toEqual([{ name: "patch_lifty_sender", args: { p_workspace_id: null, p_sender_id: senderId,
+      p_payload: { expected_version: 1, signature: raw } } }]);
+  });
+
   it.each([
     ["POST", "/v1/workspace/senders", { name: "ana@example.test" }, 422, "SENDER_INVALID"],
     ["POST", "/v1/workspace/senders", { name: "LinkedIn" }, 422, "SENDER_INVALID"],
