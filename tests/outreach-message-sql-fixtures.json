@@ -1,0 +1,152 @@
+{
+  "message_original": {
+    "message": {
+      "steps": null,
+      "status": "draft",
+      "channel": "linkedin",
+      "content": "Original bytes",
+      "is_draft": true,
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:04:59.594581+00:00",
+      "message_ref": "b25c0ff2-cb3c-4604-8d2c-fa74d5ccce12",
+      "review_status": "pending",
+      "source_digest": "6aeae7c2dcebd74ca1df2d3b6e7d535c54dea0cb3921494cbd400d58f6194e5c",
+      "sender_version": 1,
+      "source_message_ref": null
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
+    }
+  },
+  "message_revision": {
+    "message": {
+      "steps": null,
+      "status": "draft",
+      "channel": "linkedin",
+      "content": "Corrected saved draft",
+      "is_draft": true,
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:04:59.731701+00:00",
+      "message_ref": "68035975-8c8a-4f97-ab5d-e364e64767aa",
+      "review_status": "pending",
+      "source_digest": "2f06f71390628c15a69731e18920651287a365300902206b4ba2fd2df69ed575",
+      "sender_version": 1,
+      "source_message_ref": "b25c0ff2-cb3c-4604-8d2c-fa74d5ccce12"
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
+    }
+  },
+  "email_original": {
+    "message": {
+      "steps": [
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 1
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 2
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 3
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 4
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 5
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 6
+        }
+      ],
+      "status": "draft",
+      "channel": "email",
+      "content": "Saved sequence",
+      "is_draft": true,
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:05:00.767499+00:00",
+      "message_ref": "9b87be9d-982c-4cce-a61d-e4833acf3fcf",
+      "review_status": "pending",
+      "source_digest": "33286c0fdb2651564a53faa8fb1b3e23f6a9b5760cc112165bbcfadc708a7447",
+      "sender_version": 1,
+      "source_message_ref": null
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
+    }
+  },
+  "email_revision": {
+    "message": {
+      "steps": [
+        {
+          "text": "Corrected body\n\nRegards, Pinned Person",
+          "subject": "Corrected subject",
+          "position": 1
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 2
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 3
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 4
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 5
+        },
+        {
+          "text": "Corrected final body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 6
+        }
+      ],
+      "status": "draft",
+      "channel": "email",
+      "content": "Saved sequence",
+      "is_draft": true,
+      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
+      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
+      "created_at": "2026-10-02T20:05:00.901175+00:00",
+      "message_ref": "27f5eca3-0145-4cb6-828f-9a3fd50a0e03",
+      "review_status": "pending",
+      "source_digest": "c3a437b4b22efd01d536baf6fbdca2fc85d40f61b001ce401271fc3ead2e5de6",
+      "sender_version": 1,
+      "source_message_ref": "9b87be9d-982c-4cce-a61d-e4833acf3fcf"
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
+    }
+  }
+}

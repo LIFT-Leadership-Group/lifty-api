@@ -1,3 +1,4 @@
+import { outreachOperationDefinitions } from "./outreach-operations.js";
 import { businessOperationDefinitions } from "./business-operations.js";
 import { researchOperationDefinitions } from "./research-operations.js";
 import { identityOperationDefinitions } from "./identity-operations.js";
@@ -12,7 +13,6 @@ import {
   CrmMappingSyncRequestSchema, CrmMappingSyncSchema, CrmMappingStatusQuerySchema, CrmMappingStatusSchema,
 } from "./crm-mapping/contracts.js";
 import { z } from "zod";
-import { WorkspaceCampaignConfigureRequest, WorkspaceCampaignModifyRequest, WorkspaceCampaignRequest, WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { HubspotConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, RunStatusSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, StartRunResultSchema, UpsertNotificationDestinationRequestSchema, WorkspaceStatusSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema } from "./contracts.js";
 import { DeleteLoginRequest, DeleteLoginResult } from "./login-deletion.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
@@ -61,31 +61,6 @@ export const NotificationStagePatchSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("destination"), values: UpsertNotificationDestinationRequestSchema }).strict(),
   z.object({ operation: z.literal("route"), values: SetNotificationRouteRequestSchema }).strict(),
 ]);
-const ChannelCampaignQuerySchema = z.object({
-  channel: z.enum(["email", "linkedin"]), workspace: z.string().min(1), campaign_ref: z.uuid(),
-  operation: z.enum(["status", "preview"]).default("status"),
-}).strict();
-const ChannelCampaignRequestSchema = z.discriminatedUnion("channel", [
-  z.object({ channel: z.literal("email"), request: EmailCampaignRequest }).strict(),
-  z.object({ channel: z.literal("linkedin"), request: LinkedinCampaignRequest }).strict(),
-]);
-const ChannelCampaignPatchSchema = z.discriminatedUnion("channel", [
-  z.object({ channel: z.literal("email"), request: z.intersection(EmailCampaignRequest,
-    z.object({ operation: z.literal("prepare"), payload: z.object({ campaign_ref: z.uuid() }).passthrough() }).passthrough()) }).strict(),
-  z.object({ channel: z.literal("linkedin"), request: z.intersection(LinkedinCampaignRequest,
-    z.object({ operation: z.literal("prepare"), payload: z.object({ campaign_ref: z.uuid() }).passthrough() }).passthrough()) }).strict(),
-]);
-
-export const CampaignStageQuerySchema = z.union([
-  z.object({ scope: z.literal("workspace").default("workspace"), operation: z.enum(["status", "preview"]).default("status") }).strict(),
-  ChannelCampaignQuerySchema,
-]);
-export const CampaignStageRequestSchema = z.union([
-  z.object({ scope: z.literal("workspace"), request: WorkspaceCampaignRequest }).strict(), ChannelCampaignRequestSchema,
-]);
-export const CampaignStagePatchSchema = z.union([
-  z.object({ scope: z.literal("workspace"), request: z.union([WorkspaceCampaignModifyRequest, WorkspaceCampaignConfigureRequest, WorkspaceCampaignRequest.options[1]]) }).strict(), ChannelCampaignPatchSchema,
-]);
 
 function json(schema: z.ZodType, io: "input" | "output" = "output") {
   return z.toJSONSchema(schema, { io });
@@ -121,6 +96,12 @@ const identityCatalog = Object.fromEntries(Object.entries(identityOperationDefin
   return [key, { ...base, ...("cli" in definition ? { cli: definition.cli } : {}),
     responses: definition.success === 201 ? { "201": success, ...errors } : definition.success === 202 ? { "200": success, "202": success, ...errors } : base.responses }];
 }))]));
+const outreachCatalog = Object.fromEntries(Object.entries(outreachOperationDefinitions).map(([resource, entries]) => [resource,
+  Object.fromEntries(Object.entries(entries).map(([key, definition]) => {
+    const base = operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query, definition.path);
+    const { "200": _ok, ...errors } = base.responses;
+    return [key, { ...base, cli: definition.cli, responses: { [definition.success]: json(definition.response), ...errors } }];
+  }))]));
 // Public guide of an Identity stage; `lifty context <stage>` and the MCP tool read the same document.
 const stageContext = (stage: string, description: string) => ({ ...operation("GET", `/v1/context/${stage}`, description, z.record(z.string(), z.unknown())), cli: { operation: "context" } });
 const researchCatalog = Object.fromEntries(Object.entries(researchOperationDefinitions).map(([resource, entries]) => [resource, Object.fromEntries(Object.entries(entries).map(([key, definition]) => [key, {
@@ -194,13 +175,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     placement_start: operation("POST","/v1/email/placement/start","Queue one Mailivery placement test for a warmed mailbox only after the user explicitly agrees: Mailivery sends the given subject/body from that mailbox to roughly 20-40 of its seed inboxes and uses one test credit. Use the first email of the real sequence. A retried start returns the open test. The result never releases a mailbox or starts campaigns.",ConnectionPlacementStatus,PlacementStartRequest),
     ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and mailbox (connection_ref = sending account id). Warmup resume never releases outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),
   },
-  campaigns: {
-    get: operation("GET", stageRoute("campaigns"), "Read the saved workspace graph, composition policy, current/future audience and preparation state by default. Previews are saved recipient examples. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),
-    post: operation("POST", stageRoute("campaigns"), "Configure a shared_v1 campaign graph, compose modes and outreach overlays; omission of lead_ids covers current and future eligible leads. Activation requires the exact prepared version/digest and informed confirmation. Configuration does not send. Legacy prepare and individual operations remain compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStageRequestSchema),
-    client_email: operation("POST", "/v1/email/campaign", "Run an individual email campaign operation for an explicitly named workspace you belong to. Activation requires the exact prepared digest and sends from that workspace's connected mailbox.", EmailCampaignResult, EmailCampaignRequest),
-    client_linkedin: operation("POST", "/v1/linkedin/campaign", "Run an individual LinkedIn campaign operation for an explicitly named workspace you belong to. Activation requires the exact prepared digest and acts from that workspace's connected LinkedIn account.", LinkedinCampaignResult, LinkedinCampaignRequest),
-    patch: operation("PATCH", stageRoute("campaigns"), "Modify only requested fields using the saved version_ref and digest. Nested channel fields merge; arrays replace; null removes a channel, audience override, start override or template_bank. Material changes pause automatic outreach and require fresh preparation and activation. Legacy prepare remains compatible.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), CampaignStagePatchSchema),
-  },
+  ...outreachCatalog,
   notifications: {
     get: operation("GET", stageRoute("notifications"), "Read notification routes/destinations and Slack state, or verify the exact Slack attempt_ref.", z.union([NotificationConfigSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),
     post: operation("POST", stageRoute("notifications"), "Start Slack connection/reconnection and immediately return the workspace consent link.", AuthorizationRequiredSchema, Empty),

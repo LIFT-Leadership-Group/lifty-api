@@ -1,3 +1,5 @@
+import { createApp } from "../src/app.js";
+import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
 import { describe, expect, it } from "vitest";
 import { createLinkedinCampaignOperations } from "../src/linkedin-campaign.js";
 import { LinkedinCampaignRequest, linkedinCampaignResultFor } from "../src/linkedin-campaign-contracts.js";
@@ -12,6 +14,26 @@ const preview = { workspace_ref: workspace, campaign_ref: campaign, connection_r
   content: { invitation: { note: null }, message: { text: prepare.payload.text }, target_identifier: "https://www.linkedin.com/in/recipient", timezone: "America/Argentina/Buenos_Aires", policy: LINKEDIN_POLICY }, actions: [], blockers: [] };
 
 describe("LinkedIn campaigns", () => {
+  it("retains historical uncertainty and stable refs while masking delivery vendors and IDs", async () => {
+    const native = { ...preview, blockers: ["heyreach_unavailable"], actions: [{ intent_ref: version, action_type: "message", status: "ambiguous",
+      provider_id: "private-vendor-action", chat_id: "private-vendor-chat", acceptance_detected_at: null, error_code: "unipile_unavailable" }] };
+    let called = 0;
+    const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: lead, client: {} } }),
+      linkedinCampaign: async () => { called++; return native as never; }, log: () => {} });
+    const request = (body: unknown) => app.request("/v1/linkedin/campaign", { method: "POST", headers: {
+      authorization: "Bearer test", "content-type": "application/json", "x-lifty-client-contract": STAGE_CLIENT_CONTRACT,
+    }, body: JSON.stringify(body) });
+    const response = await request({ operation: "status", payload: { workspace, campaign_ref: campaign } });
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.actions[0]).toMatchObject({ intent_ref: version, status: "ambiguous", error_code: "delivery_unavailable" });
+    expect(data.blockers).toEqual(["delivery_unavailable"]);
+    expect(JSON.stringify(data)).not.toMatch(/heyreach|unipile|private-vendor|provider_id|chat_id/i);
+    expect(native.actions[0]!.provider_id).toBe("private-vendor-action");
+    for (const operation of ["prepare", "approve", "activate"])
+      expect((await request(operation === "prepare" ? prepare : { operation, payload: { workspace, campaign_ref: campaign, digest, confirm: true } })).status).toBe(400);
+    expect(called).toBe(1);
+  });
   it("prepares exactly three pinned messages and rejects changed follow-up copy", async () => {
     const messages = [{ text: "First" }, { text: "Second" }, { text: "Third" }];
     const input = { operation: "prepare" as const, payload: { workspace, lead_id: lead, connection_ref: connection, messages } };

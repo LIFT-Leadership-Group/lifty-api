@@ -1,0 +1,1392 @@
+{
+  "journey_detail": {
+    "journey": {
+      "name": "Coordinated",
+      "version": 3,
+      "campaigns": [
+        {
+          "name": "linkedin",
+          "state": "active",
+          "channel": "linkedin",
+          "version": 9,
+          "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+          "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5",
+          "draft_revision": {
+            "digest": "40211ab2bf86f2048a614c5ab833b6ad714cf493922cd4a6be1b75bd9bae25c2",
+            "approval": null,
+            "revision_ref": "64ce850f-a70e-4734-99bb-034ceceac969"
+          },
+          "active_revision": {
+            "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:49.279039+00:00"
+            },
+            "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+          }
+        },
+        {
+          "name": "email",
+          "state": "active",
+          "channel": "email",
+          "version": 8,
+          "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+          "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0",
+          "draft_revision": {
+            "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:49.53948+00:00"
+            },
+            "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+          },
+          "active_revision": {
+            "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:49.53948+00:00"
+            },
+            "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+          }
+        },
+        {
+          "name": "twin",
+          "state": "inactive",
+          "channel": "linkedin",
+          "version": 2,
+          "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+          "campaign_ref": "d2fba8a2-aa57-4b0c-81b9-f5e0f9bbc52c",
+          "draft_revision": {
+            "digest": "941bceed5f3a01191e97888f6d167529c9dfb00aeb796ca4e19b7651fa422fe3",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:48.097944+00:00"
+            },
+            "revision_ref": "34ea0d31-b614-488f-9c1a-86d253800756"
+          },
+          "active_revision": null
+        }
+      ],
+      "revisions": [
+        {
+          "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+          "content": {
+            "stops": [
+              "reply",
+              "meeting_booked",
+              "suppression",
+              "manual_stop"
+            ],
+            "audience": {
+              "kind": "qualified"
+            }
+          },
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:47.634793+00:00"
+          },
+          "created_at": "2026-10-02T20:04:46.104204+00:00",
+          "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+        }
+      ],
+      "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+      "draft_revision": {
+        "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+        "content": {
+          "stops": [
+            "reply",
+            "meeting_booked",
+            "suppression",
+            "manual_stop"
+          ],
+          "audience": {
+            "kind": "qualified"
+          }
+        },
+        "approval": {
+          "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+          "approved_at": "2026-10-02T20:04:47.634793+00:00"
+        },
+        "created_at": "2026-10-02T20:04:46.104204+00:00",
+        "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+      },
+      "active_revision": {
+        "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+        "content": {
+          "stops": [
+            "reply",
+            "meeting_booked",
+            "suppression",
+            "manual_stop"
+          ],
+          "audience": {
+            "kind": "qualified"
+          }
+        },
+        "approval": {
+          "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+          "approved_at": "2026-10-02T20:04:47.634793+00:00"
+        },
+        "created_at": "2026-10-02T20:04:46.104204+00:00",
+        "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+      },
+      "executable_version": {
+        "graph": {
+          "status": "compiled"
+        },
+        "digest": "c716cbb70281eac9a879ec5c8cd4d4a641273031d9b364fbf62811307276497f",
+        "journey": {
+          "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+          "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+        },
+        "campaigns": [
+          {
+            "channel": "linkedin",
+            "revision": {
+              "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+              "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+            },
+            "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+          },
+          {
+            "channel": "email",
+            "revision": {
+              "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+              "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+            },
+            "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0"
+          }
+        ],
+        "created_at": "2026-10-02T20:04:49.596227+00:00",
+        "executable_version_ref": "db1f2f3c-7e19-4042-aa19-efe78259b8ed"
+      }
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "b4c08e54-c08d-4c81-9a94-2939259020c0"
+    }
+  },
+  "campaign_detail": {
+    "campaign": {
+      "name": "email",
+      "state": "active",
+      "channel": "email",
+      "version": 8,
+      "revisions": [
+        {
+          "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+          "content": {
+            "lanes": {
+              "field": "title",
+              "rules": [
+                {
+                  "lane": "transform",
+                  "contains_any": [
+                    "transform",
+                    "change",
+                    "automation"
+                  ]
+                }
+              ],
+              "default": "ops"
+            },
+            "start": [
+              {
+                "step": 2,
+                "type": "sent",
+                "after": {
+                  "business_days": 2
+                },
+                "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+              },
+              {
+                "type": "unaccepted",
+                "after": {
+                  "business_days": 5
+                },
+                "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+              }
+            ],
+            "steps": [
+              {
+                "delay": {
+                  "days": 0
+                },
+                "position": 1,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 1 cold",
+                    "opener": "cold",
+                    "subject": "transform thread"
+                  },
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 1 linkedin_bridge",
+                    "opener": "linkedin_bridge",
+                    "subject": "transform thread"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 1 cold",
+                    "opener": "cold",
+                    "subject": "ops thread"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 1 linkedin_bridge",
+                    "opener": "linkedin_bridge",
+                    "subject": "ops thread"
+                  }
+                ]
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 2,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 2"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 2"
+                  }
+                ]
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 3,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 3"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 3"
+                  }
+                ]
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 4,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 4"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 4"
+                  }
+                ]
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 5,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 5"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 5"
+                  }
+                ]
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/New_York",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "5b806359-8a17-4106-abfb-1104332817d8",
+              "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+            ],
+            "compose_mode": "templates",
+            "instructions": "Fill only the declared slots.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:49.53948+00:00"
+          },
+          "created_at": "2026-10-02T20:04:49.479772+00:00",
+          "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+        },
+        {
+          "digest": "40082ba8eea04a7a80e8f6cd9540d3d22e6312fed52d06e0108591c97a006137",
+          "content": {
+            "lanes": {
+              "field": "title",
+              "rules": [
+                {
+                  "lane": "transform",
+                  "contains_any": [
+                    "transform",
+                    "change",
+                    "automation"
+                  ]
+                }
+              ],
+              "default": "ops"
+            },
+            "start": [
+              {
+                "step": 2,
+                "type": "sent",
+                "after": {
+                  "business_days": 2
+                },
+                "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+              },
+              {
+                "type": "unaccepted",
+                "after": {
+                  "business_days": 5
+                },
+                "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+              }
+            ],
+            "steps": [
+              {
+                "delay": {
+                  "days": 0
+                },
+                "position": 1,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 1 cold",
+                    "opener": "cold",
+                    "subject": "transform thread"
+                  },
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 1 linkedin_bridge",
+                    "opener": "linkedin_bridge",
+                    "subject": "transform thread"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 1 cold",
+                    "opener": "cold",
+                    "subject": "ops thread"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 1 linkedin_bridge",
+                    "opener": "linkedin_bridge",
+                    "subject": "ops thread"
+                  }
+                ]
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 2,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 2"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 2"
+                  }
+                ]
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 3,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 3"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 3"
+                  }
+                ]
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 4,
+                "variants": [
+                  {
+                    "lane": "transform",
+                    "text": "Hi {first_name}, transform email 4"
+                  },
+                  {
+                    "lane": "ops",
+                    "text": "Hi {first_name}, ops email 4"
+                  }
+                ]
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/New_York",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "5b806359-8a17-4106-abfb-1104332817d8",
+              "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+            ],
+            "compose_mode": "templates",
+            "instructions": "Fill only the declared slots.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:47.562955+00:00"
+          },
+          "created_at": "2026-10-02T20:04:46.285134+00:00",
+          "revision_ref": "9d510623-6ba2-4a1a-8c24-34973999556a"
+        }
+      ],
+      "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+      "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0",
+      "draft_revision": {
+        "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+        "content": {
+          "lanes": {
+            "field": "title",
+            "rules": [
+              {
+                "lane": "transform",
+                "contains_any": [
+                  "transform",
+                  "change",
+                  "automation"
+                ]
+              }
+            ],
+            "default": "ops"
+          },
+          "start": [
+            {
+              "step": 2,
+              "type": "sent",
+              "after": {
+                "business_days": 2
+              },
+              "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+            },
+            {
+              "type": "unaccepted",
+              "after": {
+                "business_days": 5
+              },
+              "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+            }
+          ],
+          "steps": [
+            {
+              "delay": {
+                "days": 0
+              },
+              "position": 1,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 1 cold",
+                  "opener": "cold",
+                  "subject": "transform thread"
+                },
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 1 linkedin_bridge",
+                  "opener": "linkedin_bridge",
+                  "subject": "transform thread"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 1 cold",
+                  "opener": "cold",
+                  "subject": "ops thread"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 1 linkedin_bridge",
+                  "opener": "linkedin_bridge",
+                  "subject": "ops thread"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 2,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 2"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 2"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 3,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 3"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 3"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 4,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 4"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 4"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 5,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 5"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 5"
+                }
+              ]
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/New_York",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "5b806359-8a17-4106-abfb-1104332817d8",
+            "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+          ],
+          "compose_mode": "templates",
+          "instructions": "Fill only the declared slots.",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": {
+          "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+          "approved_at": "2026-10-02T20:04:49.53948+00:00"
+        },
+        "created_at": "2026-10-02T20:04:49.479772+00:00",
+        "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+      },
+      "active_revision": {
+        "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+        "content": {
+          "lanes": {
+            "field": "title",
+            "rules": [
+              {
+                "lane": "transform",
+                "contains_any": [
+                  "transform",
+                  "change",
+                  "automation"
+                ]
+              }
+            ],
+            "default": "ops"
+          },
+          "start": [
+            {
+              "step": 2,
+              "type": "sent",
+              "after": {
+                "business_days": 2
+              },
+              "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+            },
+            {
+              "type": "unaccepted",
+              "after": {
+                "business_days": 5
+              },
+              "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+            }
+          ],
+          "steps": [
+            {
+              "delay": {
+                "days": 0
+              },
+              "position": 1,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 1 cold",
+                  "opener": "cold",
+                  "subject": "transform thread"
+                },
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 1 linkedin_bridge",
+                  "opener": "linkedin_bridge",
+                  "subject": "transform thread"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 1 cold",
+                  "opener": "cold",
+                  "subject": "ops thread"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 1 linkedin_bridge",
+                  "opener": "linkedin_bridge",
+                  "subject": "ops thread"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 2,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 2"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 2"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 3,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 3"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 3"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 4,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 4"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 4"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 5,
+              "variants": [
+                {
+                  "lane": "transform",
+                  "text": "Hi {first_name}, transform email 5"
+                },
+                {
+                  "lane": "ops",
+                  "text": "Hi {first_name}, ops email 5"
+                }
+              ]
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/New_York",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "5b806359-8a17-4106-abfb-1104332817d8",
+            "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+          ],
+          "compose_mode": "templates",
+          "instructions": "Fill only the declared slots.",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": {
+          "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+          "approved_at": "2026-10-02T20:04:49.53948+00:00"
+        },
+        "created_at": "2026-10-02T20:04:49.479772+00:00",
+        "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+      }
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "b4c08e54-c08d-4c81-9a94-2939259020c0"
+    }
+  },
+  "journeys_list": {
+    "journeys": [
+      {
+        "name": "Elsewhere",
+        "version": 1,
+        "journey_ref": "07d2a876-e02a-465a-99f8-09b33ebafd0c",
+        "draft_revision": {
+          "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+          "approval": null,
+          "revision_ref": "f8a3a6ce-fe33-49f3-bdeb-3f0ae00a669b"
+        },
+        "active_revision": null,
+        "executable_version": null
+      },
+      {
+        "name": "Coordinated",
+        "version": 3,
+        "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+        "draft_revision": {
+          "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:47.634793+00:00"
+          },
+          "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+        },
+        "active_revision": {
+          "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:47.634793+00:00"
+          },
+          "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+        },
+        "executable_version": {
+          "graph": {
+            "status": "compiled"
+          },
+          "digest": "c716cbb70281eac9a879ec5c8cd4d4a641273031d9b364fbf62811307276497f",
+          "journey": {
+            "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+            "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+          },
+          "campaigns": [
+            {
+              "channel": "linkedin",
+              "revision": {
+                "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+                "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+              },
+              "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+            },
+            {
+              "channel": "email",
+              "revision": {
+                "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+                "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+              },
+              "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0"
+            }
+          ],
+          "created_at": "2026-10-02T20:04:49.596227+00:00",
+          "executable_version_ref": "db1f2f3c-7e19-4042-aa19-efe78259b8ed"
+        }
+      }
+    ],
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "b4c08e54-c08d-4c81-9a94-2939259020c0"
+    },
+    "next_cursor": null
+  },
+  "campaigns_list": {
+    "campaigns": [
+      {
+        "name": "linkedin",
+        "state": "inactive",
+        "channel": "linkedin",
+        "version": 1,
+        "journey_ref": "07d2a876-e02a-465a-99f8-09b33ebafd0c",
+        "campaign_ref": "133bf9a8-75b4-4dd0-8013-f8fe0a8be978",
+        "draft_revision": {
+          "digest": "941bceed5f3a01191e97888f6d167529c9dfb00aeb796ca4e19b7651fa422fe3",
+          "approval": null,
+          "revision_ref": "3f6ab9ed-f1c2-4391-b151-27ad795a70f1"
+        },
+        "active_revision": null
+      },
+      {
+        "name": "linkedin",
+        "state": "active",
+        "channel": "linkedin",
+        "version": 9,
+        "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+        "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5",
+        "draft_revision": {
+          "digest": "40211ab2bf86f2048a614c5ab833b6ad714cf493922cd4a6be1b75bd9bae25c2",
+          "approval": null,
+          "revision_ref": "64ce850f-a70e-4734-99bb-034ceceac969"
+        },
+        "active_revision": {
+          "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:49.279039+00:00"
+          },
+          "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+        }
+      },
+      {
+        "name": "email",
+        "state": "active",
+        "channel": "email",
+        "version": 8,
+        "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+        "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0",
+        "draft_revision": {
+          "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:49.53948+00:00"
+          },
+          "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+        },
+        "active_revision": {
+          "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:49.53948+00:00"
+          },
+          "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+        }
+      },
+      {
+        "name": "twin",
+        "state": "inactive",
+        "channel": "linkedin",
+        "version": 2,
+        "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+        "campaign_ref": "d2fba8a2-aa57-4b0c-81b9-f5e0f9bbc52c",
+        "draft_revision": {
+          "digest": "941bceed5f3a01191e97888f6d167529c9dfb00aeb796ca4e19b7651fa422fe3",
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:48.097944+00:00"
+          },
+          "revision_ref": "34ea0d31-b614-488f-9c1a-86d253800756"
+        },
+        "active_revision": null
+      }
+    ],
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "b4c08e54-c08d-4c81-9a94-2939259020c0"
+    },
+    "next_cursor": null
+  },
+  "campaign_activation": {
+    "journey": {
+      "name": "Coordinated",
+      "version": 3,
+      "campaigns": [
+        {
+          "name": "linkedin",
+          "state": "active",
+          "channel": "linkedin",
+          "version": 9,
+          "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+          "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5",
+          "draft_revision": {
+            "digest": "40211ab2bf86f2048a614c5ab833b6ad714cf493922cd4a6be1b75bd9bae25c2",
+            "approval": null,
+            "revision_ref": "64ce850f-a70e-4734-99bb-034ceceac969"
+          },
+          "active_revision": {
+            "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:49.279039+00:00"
+            },
+            "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+          }
+        },
+        {
+          "name": "email",
+          "state": "active",
+          "channel": "email",
+          "version": 8,
+          "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+          "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0",
+          "draft_revision": {
+            "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:49.53948+00:00"
+            },
+            "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+          },
+          "active_revision": {
+            "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:49.53948+00:00"
+            },
+            "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+          }
+        },
+        {
+          "name": "twin",
+          "state": "inactive",
+          "channel": "linkedin",
+          "version": 2,
+          "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+          "campaign_ref": "d2fba8a2-aa57-4b0c-81b9-f5e0f9bbc52c",
+          "draft_revision": {
+            "digest": "941bceed5f3a01191e97888f6d167529c9dfb00aeb796ca4e19b7651fa422fe3",
+            "approval": {
+              "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+              "approved_at": "2026-10-02T20:04:48.097944+00:00"
+            },
+            "revision_ref": "34ea0d31-b614-488f-9c1a-86d253800756"
+          },
+          "active_revision": null
+        }
+      ],
+      "revisions": [
+        {
+          "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+          "content": {
+            "stops": [
+              "reply",
+              "meeting_booked",
+              "suppression",
+              "manual_stop"
+            ],
+            "audience": {
+              "kind": "qualified"
+            }
+          },
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:47.634793+00:00"
+          },
+          "created_at": "2026-10-02T20:04:46.104204+00:00",
+          "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+        }
+      ],
+      "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+      "draft_revision": {
+        "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+        "content": {
+          "stops": [
+            "reply",
+            "meeting_booked",
+            "suppression",
+            "manual_stop"
+          ],
+          "audience": {
+            "kind": "qualified"
+          }
+        },
+        "approval": {
+          "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+          "approved_at": "2026-10-02T20:04:47.634793+00:00"
+        },
+        "created_at": "2026-10-02T20:04:46.104204+00:00",
+        "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+      },
+      "active_revision": {
+        "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+        "content": {
+          "stops": [
+            "reply",
+            "meeting_booked",
+            "suppression",
+            "manual_stop"
+          ],
+          "audience": {
+            "kind": "qualified"
+          }
+        },
+        "approval": {
+          "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+          "approved_at": "2026-10-02T20:04:47.634793+00:00"
+        },
+        "created_at": "2026-10-02T20:04:46.104204+00:00",
+        "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+      },
+      "executable_version": {
+        "graph": {
+          "status": "compiled"
+        },
+        "digest": "c716cbb70281eac9a879ec5c8cd4d4a641273031d9b364fbf62811307276497f",
+        "journey": {
+          "digest": "67f3a3aab6ef31ed6f308418407f9a8779107d47acc09c3c0655bfb2f1f8f119",
+          "revision_ref": "dbee6a68-690f-4d10-929e-53dae77a3831"
+        },
+        "campaigns": [
+          {
+            "channel": "linkedin",
+            "revision": {
+              "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+              "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+            },
+            "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5"
+          },
+          {
+            "channel": "email",
+            "revision": {
+              "digest": "72590d3b2c8873d512168a93b6e6399c9c260a83f009409811ecddf180bbb5ce",
+              "revision_ref": "97a5ce2d-f28c-498c-b5c3-1f1dc9e30d96"
+            },
+            "campaign_ref": "63cdfb9c-6deb-4a23-a798-b7ccc94de4e0"
+          }
+        ],
+        "created_at": "2026-10-02T20:04:49.596227+00:00",
+        "executable_version_ref": "db1f2f3c-7e19-4042-aa19-efe78259b8ed"
+      }
+    },
+    "campaign": {
+      "name": "linkedin",
+      "state": "active",
+      "channel": "linkedin",
+      "version": 9,
+      "revisions": [
+        {
+          "digest": "40211ab2bf86f2048a614c5ab833b6ad714cf493922cd4a6be1b75bd9bae25c2",
+          "content": {
+            "start": [
+              {
+                "type": "journey_start"
+              }
+            ],
+            "steps": [
+              {
+                "delay": {
+                  "business_days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "business_days": 4
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/New_York",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "5b806359-8a17-4106-abfb-1104332817d8",
+              "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+            ],
+            "compose_mode": "generate",
+            "instructions": "Race A",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": null,
+          "created_at": "2026-10-02T20:04:50.851602+00:00",
+          "revision_ref": "64ce850f-a70e-4734-99bb-034ceceac969"
+        },
+        {
+          "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+          "content": {
+            "start": [
+              {
+                "type": "journey_start"
+              }
+            ],
+            "steps": [
+              {
+                "delay": {
+                  "business_days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "business_days": 4
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/New_York",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "5b806359-8a17-4106-abfb-1104332817d8",
+              "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+            ],
+            "compose_mode": "generate",
+            "instructions": "Unapproved successor.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:49.279039+00:00"
+          },
+          "created_at": "2026-10-02T20:04:47.896148+00:00",
+          "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+        },
+        {
+          "digest": "941bceed5f3a01191e97888f6d167529c9dfb00aeb796ca4e19b7651fa422fe3",
+          "content": {
+            "start": [
+              {
+                "type": "journey_start"
+              }
+            ],
+            "steps": [
+              {
+                "delay": {
+                  "business_days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "business_days": 4
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/New_York",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "5b806359-8a17-4106-abfb-1104332817d8",
+              "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+            ],
+            "compose_mode": "generate",
+            "instructions": "Use confirmed evidence only.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+            "approved_at": "2026-10-02T20:04:47.498476+00:00"
+          },
+          "created_at": "2026-10-02T20:04:46.195737+00:00",
+          "revision_ref": "ed92302e-4ec4-494c-b6a1-859a7d147c90"
+        }
+      ],
+      "journey_ref": "e2bcf6cd-a43d-4130-b0cb-387f2b6558ad",
+      "campaign_ref": "41276819-4ac3-42d4-ab97-20a7a5a3fae5",
+      "draft_revision": {
+        "digest": "40211ab2bf86f2048a614c5ab833b6ad714cf493922cd4a6be1b75bd9bae25c2",
+        "content": {
+          "start": [
+            {
+              "type": "journey_start"
+            }
+          ],
+          "steps": [
+            {
+              "delay": {
+                "business_days": 0
+              },
+              "position": 1
+            },
+            {
+              "delay": {
+                "business_days": 4
+              },
+              "position": 2
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/New_York",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "5b806359-8a17-4106-abfb-1104332817d8",
+            "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+          ],
+          "compose_mode": "generate",
+          "instructions": "Race A",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": null,
+        "created_at": "2026-10-02T20:04:50.851602+00:00",
+        "revision_ref": "64ce850f-a70e-4734-99bb-034ceceac969"
+      },
+      "active_revision": {
+        "digest": "14ac5ad493fa1b52cf81486c0dbda693e04355d9252c46f178f26b4e24b4f494",
+        "content": {
+          "start": [
+            {
+              "type": "journey_start"
+            }
+          ],
+          "steps": [
+            {
+              "delay": {
+                "business_days": 0
+              },
+              "position": 1
+            },
+            {
+              "delay": {
+                "business_days": 4
+              },
+              "position": 2
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/New_York",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "5b806359-8a17-4106-abfb-1104332817d8",
+            "6bd2a6b4-8187-4395-94cb-019138ad7cf4"
+          ],
+          "compose_mode": "generate",
+          "instructions": "Unapproved successor.",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": {
+          "actor_ref": "a37cdc1d-3b55-47b4-a1e0-95c6cd2c082d",
+          "approved_at": "2026-10-02T20:04:49.279039+00:00"
+        },
+        "created_at": "2026-10-02T20:04:47.896148+00:00",
+        "revision_ref": "96b82c3d-c7f7-4d93-85a5-ac3d846315be"
+      }
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "b4c08e54-c08d-4c81-9a94-2939259020c0"
+    }
+  }
+}

@@ -9,7 +9,7 @@ import {
   SetupStatusSchema,
 } from "./business-contracts.js";
 import { RunErrorCodeSchema, WorkspaceStatusSchema } from "./contracts.js";
-import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
+import { CampaignsSchema, JourneysSchema, ExactRevisionSchema } from "./outreach-contracts.js";
 import { PublicError } from "./errors.js";
 import { SenderSchema, SendersGetSchema } from "./identity-contracts.js";
 import { ResearchScheduleSchema } from "./research-operations.js";
@@ -62,32 +62,17 @@ function scoped<T extends { workspace_ref: string }>(
     });
   return value;
 }
-const Campaign = z
-  .object({
-    state: WorkspaceCampaignResult.shape.state,
-    outreach_enabled: z.boolean(),
-    version_ref: z.uuid().nullable(),
-    selected_channels: z.array(z.enum(["email", "linkedin"])),
-    templates: z
-      .object({ email: z.number().int(), linkedin: z.number().int() })
-      .strict(),
-    engine: z.enum(["fixed_v1", "shared_v1"]).nullable(),
-    compose_modes: z
-      .object({
-        email: z.enum(["generate", "templates"]).nullable(),
-        linkedin: z.enum(["generate", "templates"]).nullable(),
-      })
-      .strict()
-      .nullable(),
-    preparation: WorkspaceCampaignResult.shape.preparation.nullable(),
-    eligible_count: z.number().int(),
-    includes_future_leads: z.boolean().nullable(),
-    audience: z.enum(["qualified_ab", "explicit_leads"]).nullable(),
-    progress: WorkspaceCampaignResult.shape.progress,
-    blockers: WorkspaceCampaignResult.shape.blockers,
-    continuing_version_count: z.number().int(),
-  })
-  .strict();
+const Campaign = z.object({
+  campaigns_next_cursor: z.uuid().nullable(), journeys_next_cursor: z.uuid().nullable(),
+  campaigns: z.array(z.object({ campaign_ref: z.uuid(), journey_ref: z.uuid(), version: z.number().int().positive(),
+    name: z.string(), channel: z.enum(["email", "linkedin"]), state: z.enum(["inactive", "active", "paused"]),
+    active_revision: ExactRevisionSchema.nullable(), draft_revision: ExactRevisionSchema, draft_approved: z.boolean(),
+  }).strict()).max(100),
+  journeys: z.array(z.object({ journey_ref: z.uuid(), version: z.number().int().positive(), name: z.string(),
+    active_revision: ExactRevisionSchema.nullable(), executable_version: JourneysSchema.shape.journeys.element.shape.executable_version,
+    draft_revision: ExactRevisionSchema, draft_approved: z.boolean(),
+  }).strict()).max(100),
+}).strict();
 const SummaryRunSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("none") }).strict(),
   z
@@ -305,55 +290,19 @@ export async function getWorkspaceSummary(
       return value.senders;
     }),
     readComponent(async () => {
-      const v = scoped(
-        WorkspaceCampaignResult.parse(
-          await deps.workspaceCampaign(session, {
-            operation: "status",
-            payload: { workspace: current },
-          }),
-        ),
-        current,
-      );
-      const cfg = v.configuration;
-      const shared = cfg && "engine" in cfg ? cfg : null;
+      const campaigns = CampaignsSchema.parse(await deps.outreachOperation(session, "campaigns.get", { path: {}, query: { limit: 20 }, body: undefined }));
+      const journeys = JourneysSchema.parse(await deps.outreachOperation(session, "journeys.get", { path: {}, query: { limit: 20 }, body: undefined }));
+      if (campaigns.workspace.workspace_ref !== current || journeys.workspace.workspace_ref !== current)
+        throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Outreach state changed workspace." });
       return {
-        state: v.state,
-        outreach_enabled: v.outreach_enabled,
-        version_ref: v.version_ref,
-        selected_channels: [
-          ...(cfg?.email ? ["email" as const] : []),
-          ...(cfg?.linkedin ? ["linkedin" as const] : []),
-        ],
-        templates: {
-          email:
-            cfg?.email && "steps" in cfg.email ? cfg.email.steps.length : 0,
-          linkedin:
-            cfg?.linkedin && "messages" in cfg.linkedin
-              ? cfg.linkedin.messages.length
-              : 0,
-        },
-        engine: shared
-          ? ("shared_v1" as const)
-          : cfg
-            ? ("fixed_v1" as const)
-            : null,
-        compose_modes: shared
-          ? {
-              email: shared.email?.compose_mode ?? null,
-              linkedin: shared.linkedin?.compose_mode ?? null,
-            }
-          : null,
-        preparation: v.preparation ?? null,
-        eligible_count: v.eligible_count,
-        includes_future_leads: cfg?.audience.includes_future_leads ?? null,
-        audience: cfg
-          ? cfg.audience.lead_ids
-            ? ("explicit_leads" as const)
-            : ("qualified_ab" as const)
-          : null,
-        progress: v.progress,
-        blockers: v.blockers,
-        continuing_version_count: v.continuing_versions.length,
+        campaigns_next_cursor: campaigns.next_cursor, journeys_next_cursor: journeys.next_cursor,
+        campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version,
+          name: value.name, channel: value.channel, state: value.state, active_revision: value.active_revision ? { revision_ref: value.active_revision.revision_ref, digest: value.active_revision.digest } : null,
+          draft_revision: { revision_ref: value.draft_revision.revision_ref, digest: value.draft_revision.digest }, draft_approved: value.draft_revision.approval !== null })),
+        journeys: journeys.journeys.map(value => ({ journey_ref: value.journey_ref, version: value.version, name: value.name,
+          active_revision: value.active_revision ? { revision_ref: value.active_revision.revision_ref, digest: value.active_revision.digest } : null,
+          executable_version: value.executable_version,
+          draft_revision: { revision_ref: value.draft_revision.revision_ref, digest: value.draft_revision.digest }, draft_approved: value.draft_revision.approval !== null })),
       };
     }),
     readComponent(async () =>

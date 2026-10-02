@@ -1,3 +1,4 @@
+import { campaignSummary as canonicalCampaign } from "./outreach-fixtures.js";
 import { describe, it, expect, vi } from "vitest";
 import { PublicError } from "../src/errors.js";
 import { createApp, type AppDependencies } from "../src/app.js";
@@ -884,44 +885,8 @@ const runFixture = {
   workspace: { workspace_ref: workspaceRef, name: "Example" },
   leads: [],
 };
-const campaignFixture = {
-  workspace_ref: workspaceRef,
-  state: "unconfigured" as const,
-  outreach_enabled: false,
-  version_ref: null,
-  digest: null,
-  configuration: null,
-  continuing_versions: [],
-  blocked_leads: [],
-  eligible_count: 0,
-  progress: { enrolled: 0, blocked: 0, completed: 0 },
-  previews: [],
-  blockers: [],
-};
-const campaignExample = JSON.parse(
-  [
-    ...getAgentContext("campaign")!.instructions.matchAll(
-      /```json\n([\s\S]*?)\n```/g,
-    ),
-  ][0]![1]!,
-);
-const sharedCampaignFixture = {
-  ...campaignExample.request.payload.configuration,
-  audience: {
-    policy: "qualified_ab_v1",
-    lead_ids: null,
-    includes_future_leads: true,
-  },
-  linkedin: {
-    ...campaignExample.request.payload.configuration.linkedin,
-    sender: "https://www.linkedin.com/in/founder",
-    timezone: "America/Argentina/Buenos_Aires",
-    invitation_note: null,
-  },
-  email: null,
-  not_before: null,
-  stop_on_reply: true,
-};
+const emptyOutreach = (key: string) => ({ workspace: { workspace_ref: workspaceRef, name: "Example", state: "ready_for_connections" },
+  [key === "journeys.get" ? "journeys" : "campaigns"]: [], next_cursor: null });
 const crmConnected = {
   provider: "hubspot" as const,
   status: "connected" as const,
@@ -958,7 +923,7 @@ const summaryReads: Partial<AppDependencies> = {
     next_action: null,
   }),
   getRunStatus: async () => runFixture,
-  workspaceCampaign: async () => campaignFixture,
+  outreachOperation: async (_session, key) => emptyOutreach(key),
   getHubspotConnection: async () => crmConnected,
   getCrmSyncStatus: async () => syncFixture,
   identityOperation: async () => ({ status: 200, body: sendersFixture }),
@@ -968,7 +933,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
   it.each(["queued", "running", "failed"] as const)(
     "resumes a %s research receipt without starting a run or reading a campaign",
     async (state) => {
-      const campaign = vi.fn(async () => campaignFixture);
+      const campaign = vi.fn(async (_session, key: string) => emptyOutreach(key));
       const start = vi.fn();
       const h = harness(undefined, null, {
         getRunStatus: async () => ({
@@ -977,7 +942,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
           completed_at: state === "failed" ? profileFixture.updated_at : null,
           error_code: state === "failed" ? "research_failed" : null,
         }),
-        workspaceCampaign: campaign,
+        outreachOperation: campaign,
         startRun: start,
       });
       const result = await (await h.request("/v1/workspace/next-step")).json();
@@ -1024,66 +989,14 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       );
     },
   );
-  it.each([
-    ["draft", "pending", "pending", "campaign_preparing"],
-    ["draft", "failed", "blocked", "campaign_preparation_failed"],
-    ["draft", "ready", "action_required", "campaign_draft"],
-    ["paused", "ready", "action_required", "campaign_paused"],
-    ["active", "ready", "complete", "campaign_active"],
-  ] as const)(
-    "resumes campaign %s/%s with no activation",
-    async (state, preparation, expected, reason) => {
-      const campaign = vi.fn(async () => ({
-        ...campaignFixture,
-        configuration: sharedCampaignFixture,
-        state,
-        outreach_enabled: state === "active",
-        version_ref: laneFixture.id,
-        digest: "a".repeat(64),
-        preparation: {
-          state: preparation,
-          errors: preparation === "failed" ? ["render_failed"] : [],
-        },
-        blockers: state === "draft" ? ["sender_not_connected"] : [],
-      }));
-      const h = harness(undefined, null, {
-        getRunStatus: async () => runFixture,
-        workspaceCampaign: campaign,
-      });
-      const result = await (await h.request("/v1/workspace/next-step")).json();
-      expect(result).toMatchObject({
-        step: "campaign",
-        state: expected,
-        reason,
-        receipt: { version_ref: laneFixture.id, preparation },
-      });
-      expect(JSON.stringify(result).length).toBeLessThan(80000);
-      expect(campaign).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ userId: "founder" }),
-        { operation: "status", payload: { workspace: workspaceRef } },
-      );
-    },
-  );
-  it.each([
-    ["draft", ["sending_account_missing"], "sending_account_missing", "sending-accounts", ["senders_get", "sending_accounts_connect", "sending_accounts_attempt"]],
-    ["active", ["sending_account_needs_reconnect"], "sending_account_needs_reconnect", "sending-accounts", ["sending_accounts_get", "sending_accounts_reconnect"]],
-    ["draft", ["signature_missing", "email_warmup_required"], "signature_missing", "senders", ["senders_get", "senders_patch"]],
-  ] as const)(
-    "turns the campaign's %s Identity blocker %j into one roster-first next move",
-    async (state, blockers, reason, task, tools) => {
-      const h = harness(undefined, null, {
-        getRunStatus: async () => runFixture,
-        workspaceCampaign: async () => ({ ...campaignFixture, configuration: sharedCampaignFixture, state,
-          outreach_enabled: state === "active", version_ref: laneFixture.id, digest: "a".repeat(64),
-          preparation: { state: "ready", errors: [] }, blockers: [...blockers] }),
-      });
-      const result = await (await h.request("/v1/workspace/next-step")).json();
-      expect(result).toMatchObject({ step: "campaign", section: "outreach", state: "action_required", reason, context_task: task,
-        guide: { task }, receipt: { blockers } });
-      expect(result.recommended_tools).toEqual(expect.arrayContaining([...tools]));
-      expect(result.actions[0]).toContain(tools[0]);
-    },
-  );
+  it.each(["paused", "active"])("resumes canonical campaign %s without activating or inferring readiness", async state => {
+    const campaign = vi.fn(async () => ({ ...emptyOutreach("campaigns.get"), campaigns: [{ ...canonicalCampaign, state }] }));
+    const h = harness(undefined, null, { getRunStatus: async () => runFixture, outreachOperation: campaign });
+    const result = await (await h.request("/v1/workspace/next-step")).json();
+    expect(result).toMatchObject({ step: "campaign", state: "action_required", reason: "campaigns_saved", section: "outreach" });
+    expect(campaign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: "founder" }), "campaigns.get", { path: {}, query: {}, body: undefined });
+    expect(result.actions[0]).toContain("activate separately");
+  });
   it.each(["campaign", "run"])(
     "fails closed for a foreign %s instead of inferring missing configuration",
     async (component) => {
@@ -1096,10 +1009,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
                 workspace: { ...runFixture.workspace, workspace_ref: foreign },
               }
             : runFixture,
-        workspaceCampaign: async () => ({
-          ...campaignFixture,
-          workspace_ref: foreign,
-        }),
+        outreachOperation: async () => ({ ...emptyOutreach("campaigns.get"), workspace: { workspace_ref: foreign, name: "Other", state: "ready_for_connections" } }),
       });
       const response = await h.request("/v1/workspace/next-step");
       expect(response.status).toBe(403);
@@ -1109,10 +1019,10 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
   it("keeps unreadable campaign state unavailable instead of calling it unconfigured", async () => {
     const h = harness(undefined, null, {
       getRunStatus: async () => runFixture,
-      workspaceCampaign: async () => {
+      outreachOperation: async () => {
         throw new PublicError({
           status: 502,
-          code: "WORKSPACE_CAMPAIGN_UNAVAILABLE",
+          code: "OUTREACH_UNAVAILABLE",
           message: "Campaign status unavailable.",
         });
       },
@@ -1162,7 +1072,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       const write = vi.fn();
       const h = harness(undefined, null, {
         getRunStatus: async () => runFixture,
-        workspaceCampaign: async () => campaignFixture,
+        outreachOperation: async (_session, key) => emptyOutreach(key),
         getHubspotConnection: async () => connection as never,
         getCrmSyncStatus: async () => sync as never,
         startCrmSyncRun: write,
@@ -1186,7 +1096,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
   it("preserves leads-only review through optional CRM failures and never claims a new connection is needed", async () => {
     const h = harness(undefined, null, {
       getRunStatus: async () => runFixture,
-      workspaceCampaign: async () => campaignFixture,
+      outreachOperation: async (_session, key) => emptyOutreach(key),
       getHubspotConnection: async () => {
         throw Error("secret credential");
       },

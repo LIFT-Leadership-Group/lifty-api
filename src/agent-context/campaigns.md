@@ -1,72 +1,19 @@
 # Campaigns
 
-Purpose: configure a persistent campaign using the existing shared engine's
-graph, compose modes and outreach overlays. New campaigns use shared_v1.
-Read references.campaign for supported actions, schemas, runnable examples,
-composition, preview and approval. Read references.writing and
-references.anti_slop before recommending copy; references.common owns transport.
+A Campaign is one channel of a Journey. It owns its start rules, its ordered steps (and so its count), templates or generated-writing instructions, the delays between its steps, its sending schedule and timezone, and the canonical sender_ids it may use. Business owns profile/voice revisions; Identity owns persons and accounts; Searches owns lead facts. No vendor, engine, rate-control, language or country field belongs here.
 
-## Read current state
+Start rules are alternatives; the first one due starts the Campaign once. `journey_start` starts it when the lead starts the Journey and stands alone. `sent` waits the saved delay after the confirmed send of a step of another Campaign in the same Journey. `unaccepted` waits business days after an unaccepted LinkedIn invitation. Delays between steps count from the previous confirmed send of this Campaign; account limits or the sending window may delay a send but never shorten or expire pending work.
 
-GET with empty query reads the saved workspace configuration, version_ref,
-digest, preparation state, blockers and saved recipient examples. Read before
-creating or modifying. A failed read is unavailable, not missing setup.
-The campaign includes current and future eligible A/B leads unless the founder
-explicitly narrows lead_ids. Calibration leads are examples, not the audience.
+Templates mode saves one template per step, or variants. Content lanes route by the lead's title: the first rule whose terms it contains, otherwise the default lane, including a missing title. The first email may have `cold` and `linkedin_bridge` openers: bridge applies when this Journey already confirmed a LinkedIn message, otherwise cold. The lane and opener are chosen once, when the Campaign first prepares for that lead, and hold for every step. Every lane and opener needs exactly one variant; there is no A/B choice. An email thread has one subject per lane on the first email; later emails reply in that thread. Fixed text is sent as saved; only the declared {slots} are filled.
 
-## First setup
+Read before editing. Draft edits require expected_version and the exact source revision_ref, change only the supplied fields and append an immutable unapproved revision. Editing never pauses, activates or releases holds. Publish approves one exact revision/digest and records actor/time only. Activate uses an approved revision for new Journey starts and sets intent; use the same action after a pause, there is no resume. Started Journeys keep their revisions, content, person, signature, account/thread and timing. A Campaign that starts after another Campaign joins new Journeys once that Campaign is activated too. An unchanged Campaign keeps its approval when a sibling changes.
 
-Reuse the founder's explicit channel choice. If missing, offer LinkedIn, email,
-both, or not right now and wait. Connection and sample acceptance are not channel
-intent. Explain the chosen journey and future audience before drafting.
+Pause stops every automatic step of this Campaign in every started Journey, including follow-ups. Pending work is kept and begun or unknown sends reconcile. Other Campaigns continue where their start rules permit. A paused Campaign that starts the Journey starts no new Journeys. Connecting an account, readiness or approval never activates intent. Intent is not proof of a send or of account readiness.
 
-POST scope workspace, operation configure saves engine shared_v1, name, graph
-and selected channels with connection_ref, compose_mode and overlay. Generate
-composes for each lead using reusable outreach instructions; templates uses the
-existing Markdown template bank. This outreach overlay is separate from Scout.
-Do not add a country field or a separate language configuration. Do not require
-fixed message arrays in generate mode. The graph defines steps, waits and end;
-one invitation without a note, acceptance, one greeting and end is supported.
-Do not create a campaign per calibration lead or impose three messages.
+One lead keeps the same named person across LinkedIn and email; several persons may be permitted. Account limits, edits, approval or account loss never move a lead to another person. The full sender signature is added before preview and approval and kept in approved bytes.
 
-Omit lead_ids for current and future eligible leads. Omit not_before for normal
-timing. Initial configure omits version_ref/digest; replacement requires both
-from a fresh read. Configuration does not send. Preparation pending means wait
-and read again; failed includes errors; ready still requires resolved blockers
-and founder approval. Show the saved graph, composition policy, sender, audience,
-timing and saved examples. Examples are not the full future recipient list.
-The founder can approve a generation policy for future leads. After explicit
-confirmation, activate the exact version_ref/digest with confirm true, then read
-status. Activation and actual sending are different facts.
+Test a revision with tests_post: exact revision_ref/digest/expected_version, an idempotent request_ref and up to 20 saved researched lead_refs. Preview uses the existing person allocation without assigning the lead. To compare a candidate, pass baseline_test_ref of a completed test: the same leads, the baseline's saved outputs as the before, and only the after composed from the leads' current saved research. Each sample lists `changes` (research, lead facts, person, Business revisions, composer prompts). The first email previews `cold` unless `opener` asks for `linkedin_bridge`. tests_get discovers receipts after a lost response; test_detail reads outputs. A queued or running test is not output, approval or sending permission. Confirm whether feedback belongs to Business voice or this Campaign's templates/instructions before saving it.
 
-## Later edits
+For an actual still-unapproved per-lead draft, message_get reads the real message_ref and message_revisions_post saves a corrected new pending revision with the exact source_digest and review state. The old revision, person/signature and template/prompt/selection provenance are kept; reusable policy and other leads are unchanged. It never approves or sends; approved, sent or superseded messages cannot be corrected here.
 
-Read first. PATCH scope workspace, operation modify with current version_ref,
-digest and only changes requested. Nested channel fields merge; arrays and graph
-replace. Omitted fields stay saved. Null removes a channel, lead_ids override,
-not_before override or template_bank. Switching templates to generate clears
-template_bank with null. A timing edit copies the saved graph and changes only
-the relevant transition, preserving the rest. Stale references require a read.
-Read back the result; do not rewrite unrelated graph, channels, mode or overlay.
-
-Material edits pause automatic outreach and need fresh preparation and approval.
-A mailbox change is not an edit: the campaign sends from the workspace's current
-mailbox, and its saved connection_ref only records the one used at
-configuration. Never modify the campaign to follow a reconnected or replaced
-account. A disconnect pauses outreach; activate the same version_ref/digest,
-with the founder's confirmation, to resume.
-Continuing_versions identifies enrolled leads on earlier approved definitions.
-Use pause with current version/digest when asked to stop. Legacy workspace
-prepare and explicit individual operations remain available for compatibility
-and recovery; they are not the default for a new campaign.
-
-## User-facing behavior and errors
-
-Explain actual blockers and preparation errors. `email_signature_missing` means
-no preview can be composed until the sender's signature is saved (the
-founder's own words, saved with `senders_patch`). An unsupported graph does not
-become executable because structural validation succeeded. Preserve receipts
-and read after uncertain writes. Never treat saved preview examples as sends.
-Pending calibration or a reached weekly research limit does not prevent drafting.
-If shared workspace operations are unavailable, retain the draft and explain
-the limitation; do not silently fall back to individual campaigns.
+The runtime read groups started Journeys by the executable version and revision they keep, with recorded gate reasons only. Read back after uncertain writes; never repeat creation, approval or activation blindly. Unknown state is unavailable, not inactive, empty, failed or healthy. references.writing and references.anti_slop guide draft copy; references.common owns transport.

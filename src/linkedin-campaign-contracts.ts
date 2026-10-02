@@ -15,6 +15,10 @@ export const LinkedinCampaignRequest = z.discriminatedUnion("operation", [
   z.object({ operation: z.enum(["preview", "status"]), payload: locator }).strict(),
   z.object({ operation: z.enum(["approve", "activate", "pause", "cancel"]), payload: control }).strict(),
 ]);
+export const HistoricalLinkedinCampaignRequest = z.discriminatedUnion("operation", [
+  z.object({ operation: z.enum(["preview", "status"]), payload: locator }).strict(),
+  z.object({ operation: z.enum(["pause", "cancel"]), payload: control }).strict(),
+]);
 const contentBase = z.object({ invitation: z.object({ note: z.null() }).strict(),
   target_identifier: z.string().min(1).max(2048), timezone: LinkedinTimezone, policy: LinkedinPolicy });
 export const LinkedinCampaignResult = z.object({

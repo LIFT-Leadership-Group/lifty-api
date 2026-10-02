@@ -15,7 +15,7 @@ import {
   HubspotConnectionStatusSchema,
 } from "./contracts.js";
 import { readComponent } from "./workspace-summary.js";
-import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
+import { CampaignsSchema } from "./outreach-contracts.js";
 import { PublicError } from "./errors.js";
 import { z } from "zod";
 import { stageOperations } from "./stage-contracts.js";
@@ -50,29 +50,11 @@ const sampleFailures: Record<z.infer<typeof RunErrorCodeSchema>, { action: strin
     tools: [tool("sample-review", "post")],
   },
 };
-// The campaign status names these Identity blockers; each has one next move.
-const identityBlockers = [
-  {
-    blocker: "sending_account_missing", context: "sending-accounts",
-    action: `The campaign's sender has no connected account for this channel. Read ${tool("senders", "get")}, find the campaign's person and use the returned id; create a sender with ${tool("senders", "post")} only if that person is absent. Then ${tool("sending-accounts", "connect")} with {sender_id, channel}, give the founder the connection_url, and poll ${tool("sending-accounts", "attempt")} with bounded backoff until it is connected, failed or expired.`,
-    tools: [tool("senders", "get"), tool("sending-accounts", "connect"), tool("sending-accounts", "attempt")],
-  },
-  {
-    blocker: "sending_account_needs_reconnect", context: "sending-accounts",
-    action: `An account used by this active campaign needs reconnecting. Read ${tool("sending-accounts", "get")}, then ${tool("sending-accounts", "reconnect")} that account's id and give the founder the connection_url. Reconnecting does not resume or activate the campaign.`,
-    tools: [tool("sending-accounts", "get"), tool("sending-accounts", "reconnect"), tool("sending-accounts", "attempt")],
-  },
-  {
-    blocker: "signature_missing", context: "senders",
-    action: `The email sender has no signature. Ask the founder for their own sign-off text (never write it for them), then save it with ${tool("senders", "patch")} using the sender's id and expected_version from ${tool("senders", "get")}.`,
-    tools: [tool("senders", "get"), tool("senders", "patch")],
-  },
-] as const;
 type Reads = Pick<
   AppDependencies,
   | "businessOperation"
   | "getRunStatus"
-  | "workspaceCampaign"
+  | "outreachOperation"
   | "getHubspotConnection"
   | "getCrmSyncStatus"
 >;
@@ -283,19 +265,10 @@ export async function getNextStep(
       run,
     );
   }
-  const campaign = WorkspaceCampaignResult.parse(
-    await deps.workspaceCampaign(session, {
-      operation: "status",
-      payload: { workspace: ref! },
-    }),
-  );
-  if (campaign.workspace_ref !== ref)
-    throw new PublicError({
-      status: 403,
-      code: "WORKSPACE_FORBIDDEN",
-      message: "The campaign does not belong to the selected workspace.",
-    });
-  if (campaign.state === "unconfigured") {
+  const campaigns = CampaignsSchema.parse(await deps.outreachOperation(session, "campaigns.get", { path: {}, query: {}, body: undefined }));
+  if (campaigns.workspace.workspace_ref !== ref)
+    throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Outreach state changed workspace." });
+  if (!campaigns.campaigns.length) {
     const crm = await readComponent(async () =>
       HubspotConnectionStatusSchema.parse(
         await deps.getHubspotConnection(session),
@@ -362,39 +335,10 @@ export async function getNextStep(
       run,
     );
   }
-  // Identity blockers come from the campaign's own status (outreach path only,
-  // for the channels it uses); a leads-only workspace never reaches here.
-  const identity = identityBlockers.filter(item => campaign.blockers.includes(item.blocker));
-  const state =
-    campaign.state === "active"
-      ? "complete"
-      : campaign.preparation?.state === "pending"
-        ? "pending"
-        : campaign.preparation?.state === "failed"
-          ? "blocked"
-          : "action_required";
   return response(
-    identity.length ? "action_required" : state,
-    "campaign",
-    identity[0]?.blocker
-      ?? (campaign.preparation?.state === "pending"
-        ? "campaign_preparing"
-        : campaign.preparation?.state === "failed"
-          ? "campaign_preparation_failed"
-          : `campaign_${campaign.state}`),
-    [
-      ...identity.map(item => item.action),
-      "Read campaigns_get for the saved campaign and relevant blockers. Resume, prepare or activate only with explicit founder approval; Business changes never activate outreach.",
-    ],
-    [...new Set([...identity.flatMap(item => item.tools), tool("campaigns", "get"), tool("summary", "context")])].slice(0, 10),
-    identity[0]?.context ?? "summary",
-    {
-      state: campaign.state,
-      version_ref: campaign.version_ref,
-      preparation: campaign.preparation?.state ?? null,
-      blockers: campaign.blockers,
-    },
-    null,
-    "outreach",
+    "action_required", "campaign", "campaigns_saved",
+    ["Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent."],
+    [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")], "campaigns",
+    { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) }, null, "outreach",
   );
 }

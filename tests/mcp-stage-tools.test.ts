@@ -26,7 +26,7 @@ describe("generated MCP stage operations", () => {
       const name = stage === "summary" && action === "next_step" ? "next_step" : `${listedStage.replace(/-/g, "_")}_${action}`;
       const supported = Object.keys(operation.responses).some(status => status.startsWith("2"));
       const matches = tools.filter(tool => tool.name === name || tool.name === `${name}_read` || tool.name === `${name}_write`);
-      const split = stage === "campaigns" && ["post", "client_email", "client_linkedin"].includes(action);
+      const split = false;
       expect(matches.length, name).toBe(supported ? split ? 2 : 1 : 0);
       for (const tool of matches) {
         expect(tool.title.length).toBeGreaterThan(0);
@@ -53,8 +53,8 @@ describe("generated MCP stage operations", () => {
     expect(tools.find(tool => tool.name === "senders_delete")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(tools.find(tool => tool.name === "senders_post")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: false });
     expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
-    expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.destructiveHint).toBe(true);
-    expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.openWorldHint).toBe(true);
+    expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.destructiveHint).toBe(true);
+    expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.openWorldHint).toBe(true);
     expect(tools.find(tool => tool.name === "summary_get")!.annotations.openWorldHint).toBe(false);
     expect(tools.find(tool => tool.name === "next_step")!.annotations.openWorldHint).toBe(false);
     expect(tools.find(tool => tool.name === "sending_accounts_reconnect")!.inputSchema.required).toEqual(["path"]);
@@ -128,8 +128,8 @@ describe("generated MCP stage operations", () => {
       expect((await callStageMcpTool("targeting_update_status", input, incoming(), dispatch)).isError).toBe(true);
     }
     expect(dispatch).not.toHaveBeenCalled();
-    expect((await callStageMcpTool("campaigns_post_read", { body: { channel: "email", request: { operation: "placement-preview", payload: {} } } }, incoming(), dispatch)).isError).toBe(false);
-    expect(dispatch).toHaveBeenCalledOnce();
+    expect((await callStageMcpTool("campaigns_post_read", { body: { channel: "email", request: { operation: "placement-preview", payload: {} } } }, incoming(), dispatch)).isError).toBe(true);
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it("returns a run receipt immediately and makes progress a separate read", async () => {
@@ -172,15 +172,10 @@ describe("generated MCP stage operations", () => {
     expect(identity).toHaveBeenCalledOnce();
   });
 
-  it("keeps sends out of client campaign read tools", async () => {
-    const dispatch = vi.fn(async () => Response.json({ state: "ok" }));
-    const payload = { workspace: "client", campaign_ref: "11111111-1111-4111-8111-111111111111", digest: "a".repeat(64) };
-    expect((await callStageMcpTool("campaigns_client_email_read", { body: { operation: "activate", payload } }, incoming(), dispatch)).isError).toBe(true);
-    expect((await callStageMcpTool("campaigns_client_linkedin_read", { body: { operation: "activate", payload } }, incoming(), dispatch)).isError).toBe(true);
-    expect((await callStageMcpTool("campaigns_client_email_write", { body: { operation: "status", payload } }, incoming(), dispatch)).isError).toBe(true);
+  it("retires individual campaign tool aliases without dispatch", async () => {
+    const dispatch = vi.fn();
+    for (const name of ["campaigns_client_email_read", "campaigns_client_email_write", "campaigns_client_linkedin_write"])
+      expect((await callStageMcpTool(name, {}, incoming(), dispatch)).isError).toBe(true);
     expect(dispatch).not.toHaveBeenCalled();
-    expect((await callStageMcpTool("campaigns_client_email_read", { body: { operation: "status", payload } }, incoming(), dispatch)).isError).toBe(false);
-    expect(dispatch).toHaveBeenCalledWith("/v1/email/campaign", expect.objectContaining({ method: "POST" }));
-
   });
 });

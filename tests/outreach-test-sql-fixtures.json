@@ -1,0 +1,446 @@
+{
+  "test_pending": {
+    "test": {
+      "digest": "215bddd8f043057db456bf9b8753177145a2cfe5b35a7132976a12bdc98a765b",
+      "status": "queued",
+      "samples": [
+        {
+          "lane": "ops",
+          "opener": "cold",
+          "output": null,
+          "status": "queued",
+          "changes": [],
+          "lead_ref": "820ae945-e06e-48e4-ac65-bfd9e32e416f",
+          "lab_run_ref": "59110546-8e79-4e2e-ab74-69e51081ab18",
+          "baseline_output": null
+        },
+        {
+          "lane": "transform",
+          "opener": "cold",
+          "output": null,
+          "status": "queued",
+          "changes": [],
+          "lead_ref": "87a93269-6c20-4774-8714-e84833c9bba0",
+          "lab_run_ref": "882193e7-5956-43a9-a877-554382e944ef",
+          "baseline_output": null
+        }
+      ],
+      "test_ref": "73a47b98-5b2d-4071-96f3-8558fec6ede9",
+      "created_at": "2026-10-02T20:04:56.458314+00:00",
+      "request_ref": "3c40280a-781d-4578-82a0-77ff031b194e",
+      "campaign_ref": "fbe83277-a93e-43d1-ba44-d42d7807b1f4",
+      "revision_ref": "1c187c54-4c96-4248-9a51-8bcf91901fe4",
+      "baseline_test_ref": null
+    },
+    "workspace": {
+      "name": "LIF1188 Tests",
+      "state": "ready_for_connections",
+      "workspace_ref": "0ed882ab-fd87-4c40-82e7-391c412bd309"
+    }
+  },
+  "test_completed": {
+    "workspace": {
+      "name": "LIF1188 Tests",
+      "state": "ready_for_connections",
+      "workspace_ref": "0ed882ab-fd87-4c40-82e7-391c412bd309"
+    },
+    "test": {
+      "digest": "215bddd8f043057db456bf9b8753177145a2cfe5b35a7132976a12bdc98a765b",
+      "status": "completed",
+      "samples": [
+        {
+          "lane": "ops",
+          "opener": "cold",
+          "output": {
+            "digest": "c84758bd45aeeb513d8a99fa3f33431882848599f55c7e9736a35a59e382f9c6",
+            "content": {
+              "email_steps": [
+                {
+                  "text": "Confirmed message 1\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 0
+                },
+                {
+                  "text": "Confirmed message 2\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 3\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 4\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                }
+              ]
+            },
+            "context": {
+              "digest": "215bddd8f043057db456bf9b8753177145a2cfe5b35a7132976a12bdc98a765b",
+              "sender_id": "9447033e-fe2d-4b3b-80de-2aa57b22ed85",
+              "revision_ref": "1c187c54-4c96-4248-9a51-8bcf91901fe4",
+              "prompt_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "voice_version": 0,
+              "sender_version": 1,
+              "profile_version": 1
+            },
+            "selection": {
+              "lane": "ops",
+              "opener": "cold",
+              "template_ids": [
+                "step-1.ops.cold",
+                "step-2.ops",
+                "step-3.ops",
+                "step-4.ops"
+              ]
+            },
+            "created_at": "2026-10-02T20:04:57.338876+00:00",
+            "output_ref": "d2cbb216-c540-4176-acea-2b23459f8c43"
+          },
+          "status": "succeeded",
+          "changes": [],
+          "lead_ref": "820ae945-e06e-48e4-ac65-bfd9e32e416f",
+          "lab_run_ref": "59110546-8e79-4e2e-ab74-69e51081ab18",
+          "baseline_output": null
+        },
+        {
+          "lane": "transform",
+          "opener": "cold",
+          "output": {
+            "digest": "969876f24ff523ea7741660007c46530bbaa47f1b91ab53ebc1bfd4df63aae94",
+            "content": {
+              "email_steps": [
+                {
+                  "text": "Confirmed message 1\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 0
+                },
+                {
+                  "text": "Confirmed message 2\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 3\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 4\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                }
+              ]
+            },
+            "context": {
+              "digest": "215bddd8f043057db456bf9b8753177145a2cfe5b35a7132976a12bdc98a765b",
+              "sender_id": "9447033e-fe2d-4b3b-80de-2aa57b22ed85",
+              "revision_ref": "1c187c54-4c96-4248-9a51-8bcf91901fe4",
+              "prompt_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "voice_version": 0,
+              "sender_version": 1,
+              "profile_version": 1
+            },
+            "selection": {
+              "lane": "transform",
+              "opener": "cold",
+              "template_ids": [
+                "step-1.transform.cold",
+                "step-2.transform",
+                "step-3.transform",
+                "step-4.transform"
+              ]
+            },
+            "created_at": "2026-10-02T20:04:57.530966+00:00",
+            "output_ref": "69f17a45-5148-4ace-9e36-f2065a2e9183"
+          },
+          "status": "succeeded",
+          "changes": [],
+          "lead_ref": "87a93269-6c20-4774-8714-e84833c9bba0",
+          "lab_run_ref": "882193e7-5956-43a9-a877-554382e944ef",
+          "baseline_output": null
+        }
+      ],
+      "test_ref": "73a47b98-5b2d-4071-96f3-8558fec6ede9",
+      "created_at": "2026-10-02T20:04:56.458314+00:00",
+      "request_ref": "3c40280a-781d-4578-82a0-77ff031b194e",
+      "campaign_ref": "fbe83277-a93e-43d1-ba44-d42d7807b1f4",
+      "revision_ref": "1c187c54-4c96-4248-9a51-8bcf91901fe4",
+      "baseline_test_ref": null
+    }
+  },
+  "tests_list": {
+    "tests": [
+      {
+        "digest": "3693c2db1e07dc145263228f46b32ba3561a027408391b915c59ffa3217dce8d",
+        "status": "completed",
+        "test_ref": "0d067e55-c8c4-4a36-b4b2-1d76f39e9814",
+        "created_at": "2026-10-02T20:04:58.008185+00:00",
+        "request_ref": "a31cc1d8-1517-4550-bbef-d6dc2c366459",
+        "campaign_ref": "fbe83277-a93e-43d1-ba44-d42d7807b1f4",
+        "revision_ref": "22e760dc-c07f-4588-9d4b-a2de712aaac4",
+        "baseline_test_ref": "73a47b98-5b2d-4071-96f3-8558fec6ede9"
+      },
+      {
+        "digest": "215bddd8f043057db456bf9b8753177145a2cfe5b35a7132976a12bdc98a765b",
+        "status": "completed",
+        "test_ref": "73a47b98-5b2d-4071-96f3-8558fec6ede9",
+        "created_at": "2026-10-02T20:04:56.458314+00:00",
+        "request_ref": "3c40280a-781d-4578-82a0-77ff031b194e",
+        "campaign_ref": "fbe83277-a93e-43d1-ba44-d42d7807b1f4",
+        "revision_ref": "1c187c54-4c96-4248-9a51-8bcf91901fe4",
+        "baseline_test_ref": null
+      },
+      {
+        "digest": "3693c2db1e07dc145263228f46b32ba3561a027408391b915c59ffa3217dce8d",
+        "status": "queued",
+        "test_ref": "7cdf729a-0daf-43ca-a2c0-03f420fdaf66",
+        "created_at": "2026-10-02T20:04:58.53464+00:00",
+        "request_ref": "0a9983c6-6602-4f1e-ae43-3121a3a948d9",
+        "campaign_ref": "fbe83277-a93e-43d1-ba44-d42d7807b1f4",
+        "revision_ref": "22e760dc-c07f-4588-9d4b-a2de712aaac4",
+        "baseline_test_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "LIF1188 Tests",
+      "state": "ready_for_connections",
+      "workspace_ref": "0ed882ab-fd87-4c40-82e7-391c412bd309"
+    },
+    "next_cursor": null
+  },
+  "comparison": {
+    "workspace": {
+      "name": "LIF1188 Tests",
+      "state": "ready_for_connections",
+      "workspace_ref": "0ed882ab-fd87-4c40-82e7-391c412bd309"
+    },
+    "test": {
+      "digest": "3693c2db1e07dc145263228f46b32ba3561a027408391b915c59ffa3217dce8d",
+      "status": "completed",
+      "samples": [
+        {
+          "lane": "ops",
+          "opener": "cold",
+          "output": {
+            "digest": "41516c4ac97471caeb3e4e7da7d3ef05e877de9c571ef33adcf32c3bb0ddf491",
+            "content": {
+              "email_steps": [
+                {
+                  "text": "Candidate 1\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 0
+                },
+                {
+                  "text": "Candidate 2\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Candidate 3\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Candidate 4\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                }
+              ]
+            },
+            "context": {
+              "digest": "3693c2db1e07dc145263228f46b32ba3561a027408391b915c59ffa3217dce8d",
+              "sender_id": "9447033e-fe2d-4b3b-80de-2aa57b22ed85",
+              "revision_ref": "22e760dc-c07f-4588-9d4b-a2de712aaac4",
+              "prompt_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "voice_version": 0,
+              "sender_version": 1,
+              "profile_version": 1
+            },
+            "selection": {
+              "lane": "ops",
+              "opener": "cold",
+              "template_ids": [
+                "step-1.ops.cold",
+                "step-2.ops",
+                "step-3.ops",
+                "step-4.ops"
+              ]
+            },
+            "created_at": "2026-10-02T20:04:58.190662+00:00",
+            "output_ref": "cd77d56c-8522-431e-8a97-0325879789e0"
+          },
+          "status": "succeeded",
+          "changes": [
+            "composition_context_changed"
+          ],
+          "lead_ref": "820ae945-e06e-48e4-ac65-bfd9e32e416f",
+          "lab_run_ref": "b44c246b-e3fd-4a43-acd9-6c09b612cbc4",
+          "baseline_output": {
+            "digest": "c84758bd45aeeb513d8a99fa3f33431882848599f55c7e9736a35a59e382f9c6",
+            "content": {
+              "email_steps": [
+                {
+                  "text": "Confirmed message 1\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 0
+                },
+                {
+                  "text": "Confirmed message 2\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 3\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 4\n\nRegards, Pinned Person",
+                  "subject": "ops thread",
+                  "delay_minutes": 4320
+                }
+              ]
+            },
+            "context": {
+              "digest": "215bddd8f043057db456bf9b8753177145a2cfe5b35a7132976a12bdc98a765b",
+              "sender_id": "9447033e-fe2d-4b3b-80de-2aa57b22ed85",
+              "revision_ref": "1c187c54-4c96-4248-9a51-8bcf91901fe4",
+              "prompt_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "voice_version": 0,
+              "sender_version": 1,
+              "profile_version": 1
+            },
+            "selection": {
+              "lane": "ops",
+              "opener": "cold",
+              "template_ids": [
+                "step-1.ops.cold",
+                "step-2.ops",
+                "step-3.ops",
+                "step-4.ops"
+              ]
+            },
+            "created_at": "2026-10-02T20:04:57.338876+00:00",
+            "output_ref": "d2cbb216-c540-4176-acea-2b23459f8c43"
+          }
+        },
+        {
+          "lane": "transform",
+          "opener": "cold",
+          "output": {
+            "digest": "90cf2db0b6e1517b29e24552a42ff1cf174520f75a7a29249ece1e1faca0de9b",
+            "content": {
+              "email_steps": [
+                {
+                  "text": "Candidate 1\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 0
+                },
+                {
+                  "text": "Candidate 2\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Candidate 3\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Candidate 4\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                }
+              ]
+            },
+            "context": {
+              "digest": "3693c2db1e07dc145263228f46b32ba3561a027408391b915c59ffa3217dce8d",
+              "sender_id": "9447033e-fe2d-4b3b-80de-2aa57b22ed85",
+              "revision_ref": "22e760dc-c07f-4588-9d4b-a2de712aaac4",
+              "prompt_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "voice_version": 0,
+              "sender_version": 1,
+              "profile_version": 1
+            },
+            "selection": {
+              "lane": "transform",
+              "opener": "cold",
+              "template_ids": [
+                "step-1.transform.cold",
+                "step-2.transform",
+                "step-3.transform",
+                "step-4.transform"
+              ]
+            },
+            "created_at": "2026-10-02T20:04:58.334247+00:00",
+            "output_ref": "0d732dcf-fa8a-4e23-bad6-e6495ce26062"
+          },
+          "status": "succeeded",
+          "changes": [
+            "composition_context_changed",
+            "research_changed"
+          ],
+          "lead_ref": "87a93269-6c20-4774-8714-e84833c9bba0",
+          "lab_run_ref": "61558cf9-61d3-417b-bdca-f747b443fe79",
+          "baseline_output": {
+            "digest": "969876f24ff523ea7741660007c46530bbaa47f1b91ab53ebc1bfd4df63aae94",
+            "content": {
+              "email_steps": [
+                {
+                  "text": "Confirmed message 1\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 0
+                },
+                {
+                  "text": "Confirmed message 2\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 3\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message 4\n\nRegards, Pinned Person",
+                  "subject": "transform thread",
+                  "delay_minutes": 4320
+                }
+              ]
+            },
+            "context": {
+              "digest": "215bddd8f043057db456bf9b8753177145a2cfe5b35a7132976a12bdc98a765b",
+              "sender_id": "9447033e-fe2d-4b3b-80de-2aa57b22ed85",
+              "revision_ref": "1c187c54-4c96-4248-9a51-8bcf91901fe4",
+              "prompt_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "voice_version": 0,
+              "sender_version": 1,
+              "profile_version": 1
+            },
+            "selection": {
+              "lane": "transform",
+              "opener": "cold",
+              "template_ids": [
+                "step-1.transform.cold",
+                "step-2.transform",
+                "step-3.transform",
+                "step-4.transform"
+              ]
+            },
+            "created_at": "2026-10-02T20:04:57.530966+00:00",
+            "output_ref": "69f17a45-5148-4ace-9e36-f2065a2e9183"
+          }
+        }
+      ],
+      "test_ref": "0d067e55-c8c4-4a36-b4b2-1d76f39e9814",
+      "created_at": "2026-10-02T20:04:58.008185+00:00",
+      "request_ref": "a31cc1d8-1517-4550-bbef-d6dc2c366459",
+      "campaign_ref": "fbe83277-a93e-43d1-ba44-d42d7807b1f4",
+      "revision_ref": "22e760dc-c07f-4588-9d4b-a2de712aaac4",
+      "baseline_test_ref": "73a47b98-5b2d-4071-96f3-8558fec6ede9"
+    }
+  }
+}
