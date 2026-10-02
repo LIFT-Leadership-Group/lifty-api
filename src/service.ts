@@ -8,15 +8,11 @@ import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
 import { createCrmMappingReadinessCheck } from "./crm-mapping/readiness.js";
 import { createCompanyMapping } from "./company-mapping.js";
 import { createCrmMapping } from "./crm-mapping.js";
-import { createLinkedinConnectOperations } from "./linkedin-connect.js";
 import { createLinkedinCampaignOperations } from "./linkedin-campaign.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { deleteOwnLogin } from "./login-deletion.js";
 import { listMemberWorkspaces } from "./member-workspaces.js";
 import { createEmailCampaignOperations } from "./email-campaign.js";
-import { createEmailConnectOperations } from "./email-connect.js";
-import { createEmailAccountOperations } from "./email-accounts.js";
-import { createClientEmailOperations } from "./client-email-connect.js";
 import { createEmailWarmupOperations } from "./email-warmup.js";
 import { createEmailConnectionPlacementOperations } from "./email-connection-placement.js";
 import { createEmailDeliverabilityOperations } from "./email-deliverability.js";
@@ -30,6 +26,8 @@ import { renderCliAuthPage } from "./cli-auth-page.js";
 import { renderPasswordRecoveryPage } from "./password-recovery-page.js";
 import { DEFAULT_DASHBOARD_ORIGIN, loadConfig, type ServiceConfig } from "./config.js";
 import { executeResearchOperation } from "./research-operations.js";
+import { connectorUnavailable, executeIdentityOperation } from "./identity-operations.js";
+import { createAccountConnection } from "./account-connection.js";
 import { PublicError } from "./errors.js";
 import { createHubspotConnectOperations } from "./hubspot-connect.js";
 import { buildAuthorizationUrl } from "./hubspot-oauth.js";
@@ -46,10 +44,8 @@ import { createAcquisitionVerificationTrigger, createCrmSyncTrigger, createCrmMa
 import { disconnectIntegration, getCrmSyncStatus, getRunStatus, getWorkspaceStatus, getNotificationConfig, listSlackNotificationChannels, upsertNotificationDestination, setNotificationRoute, enqueueNotificationTest, startCrmSyncRun, startRun } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
-  const linkedin = config.linkedin ? createLinkedinConnectOperations(config.linkedin) : null;
-  const email = config.email ? createEmailConnectOperations(config.email) : null;
-  const clientEmail=config.email ? createClientEmailOperations(config.email) : null;
-  const emailAccounts=clientEmail ?? createEmailAccountOperations(config.supabase);
+  const emailKey = config.serverKeys?.email ?? null, linkedinKey = config.serverKeys?.linkedin ?? null;
+  const accounts = config.accounts ? createAccountConnection(config.accounts) : null;
   // Workspace member operations use their session. Browser setup uses a narrow,
   // server-key-protected intent RPC, never a Supabase administrative key.
   const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
@@ -78,10 +74,9 @@ export function createProductionApp(config: ServiceConfig) {
       ...(slack && slackSettings ? {slack:createOAuthConfirmation({provider:"slack",origin:new URL(slackSettings.publicBaseUrl).origin,...config.supabase,
         open:state=>openSlackConnectIntent(state,slackSettings.clientSecret),complete:slack.completeCallback})} : {}),
     },
-    validateConnectionReturn:(flow,state)=>{
-      const operation=flow==="email"?email:flow==="linkedin"?linkedin:clientEmail;
-      if(!operation)throw new SyntaxError("unavailable");operation.validateReturn(state);
-    },
+    ...(accounts && config.accounts ? { accounts: { connection: accounts, origin: new URL(config.accounts.publicBaseUrl).origin,
+      hostedOrigins: config.accounts.provider.v2.hostedAuthOrigins } } : {}),
+    identityOperation: (session, key, input, signal) => executeIdentityOperation(session, key, input, accounts ?? connectorUnavailable, signal),
     ...(config.openAiAppsChallenge === undefined ? {} : { openAiAppsChallenge: config.openAiAppsChallenge }),
     ...(config.mcp ? {
       mcp: { ...config.mcp, authenticate: createSupabaseAuthenticator(config.supabase, { oauthResource: config.mcp.resourceUrl }) },
@@ -95,34 +90,11 @@ export function createProductionApp(config: ServiceConfig) {
     getEmailDeliverability: deliverability.read,
     getEmailPlacement: placement.status,
     startEmailPlacement: placement.start,
-    getEmailAccounts:emailAccounts.accounts,
-    connectEmailAccount:emailAccounts.connect,
-    getEmailAccountAttempt:emailAccounts.status,
-    ...(clientEmail ? {authorizeClientEmail:clientEmail.authorize,receiveClientEmailV2Return:clientEmail.v2Return} : {}),
     ...(warmupSetup ? {warmupSetup} : {}),
-    ...(config.unipileV2HostedAuthOrigins ? {unipileV2HostedAuthOrigins:config.unipileV2HostedAuthOrigins} : {}),
-    ...(config.unipileHostedAuthOrigin ? { unipileHostedAuthOrigin: config.unipileHostedAuthOrigin } : {}),
-    ...((config.email?.serverKey ?? config.linkedin?.serverKey) ? { workspaceCampaign: createWorkspaceCampaignOperations((config.email?.serverKey ?? config.linkedin?.serverKey)!) } : {}),
-    ...(linkedin ? {
-      linkedinCampaign: createLinkedinCampaignOperations(config.linkedin!.serverKey),
-      startLinkedinConnect: linkedin.start,
-      getLinkedinConnection: linkedin.status,
-      disconnectLinkedin: linkedin.disconnect,
-      authorizeLinkedin: linkedin.authorize,
-      completeLinkedinCallback: linkedin.callback,
-      receiveLinkedinV2Return: linkedin.v2Return,
-    } : {}),
-    ...(email ? {
-      emailAvailable: true,
-      emailAuthorizationOrigin: new URL(config.email!.publicBaseUrl).origin,
-      emailCampaign: createEmailCampaignOperations(config.email!.serverKey),
-      startEmailConnect: email.start,
-      getEmailConnection: email.status,
-      disconnectEmail: email.disconnect,
-      authorizeEmail: email.authorize,
-      declareEmail: email.declare,
-      completeEmailCallback: email.callback,
-      receiveEmailV2Return: email.v2Return,
+    ...((emailKey ?? linkedinKey) ? { workspaceCampaign: createWorkspaceCampaignOperations((emailKey ?? linkedinKey)!) } : {}),
+    ...(linkedinKey ? { linkedinCampaign: createLinkedinCampaignOperations(linkedinKey) } : {}),
+    ...(emailKey ? {
+      emailCampaign: createEmailCampaignOperations(emailKey),
       getEmailWarmup: warmup.status,
       startEmailWarmup: warmup.start,
       changeEmailWarmup: (session, workspace, operation, connectionRef) => warmup[operation](session, workspace, connectionRef),

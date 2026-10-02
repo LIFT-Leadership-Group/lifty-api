@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createLinkedinCampaignOperations } from "../src/linkedin-campaign.js";
 import { LinkedinCampaignRequest, linkedinCampaignResultFor } from "../src/linkedin-campaign-contracts.js";
-import { LINKEDIN_POLICY } from "../src/linkedin-contracts.js";
+// The fixed LinkedIn policy a prepared campaign pins.
+const LINKEDIN_POLICY = { invitations_per_day: 5, invitations_per_7_days: 25, messages_per_day: 5, weekdays: [1, 2, 3, 4, 5], start: "09:00", end: "17:00", spacing_minutes: [15, 45] };
 
 const workspace = "22222222-2222-4222-8222-222222222222", campaign = "33333333-3333-4333-8333-333333333333";
 const connection = "44444444-4444-4444-8444-444444444444", lead = "55555555-5555-4555-8555-555555555555", version = "66666666-6666-4666-8666-666666666666";

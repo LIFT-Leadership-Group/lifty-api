@@ -11,14 +11,10 @@ import { CrmMappingError } from "./crm-mapping.js";
 import { registerStageRoutes } from "./stage-routes.js";
 import { handleMcpRequest, mcpResourceMetadata, type McpDependencies } from "./mcp.js";
 import { getStageMcpTools, callStageMcpTool } from "./mcp-stage-tools.js";
-import { renderEmailAuthorizationPage, renderEmailAuthorizationReceivedPage } from "./email-authorization-page.js";
-import { type ConnectionReturnResult } from "./connection-return-page.js";
-import { hostedReturnError, type HostedReturnError } from "./hosted-return-error.js";
 import { PENDING_SUBMIT_SCRIPT_HASH, renderLiftyPage } from "./lifty-brand.js";
 import { readFileSync } from "node:fs";
 import { createWarmupSetupRouter } from "./warmup-setup-routes.js";
 import type { WarmupSetup } from "./warmup-setup.js";
-import { versionedHostedAuthUrl, parseHostedAuthOrigin, UNIPILE_HOSTED_AUTH_ORIGIN } from "./hosted-auth-branding.js";
 import { getConnectionAttempt, type ConnectionAttemptStatus, type ConnectionProvider } from "./connection-attempt.js";
 import {
   type CompanyMappingOperation,
@@ -49,19 +45,26 @@ import {
 import { isSealedSlackState } from "./slack-state.js";
 
 import { LinkedinCampaignRequest, LinkedinCampaignResult, linkedinCampaignResultFor, type LinkedinCampaignInput, type LinkedinCampaignOutput } from "./linkedin-campaign-contracts.js";
-import { LinkedinConnectRequest, LinkedinConnectResult, LegacyLinkedinConnectResult, LinkedinConnectionStatus, LinkedinWorkspaceRequest, LinkedinDisconnectRequest, type LinkedinConnectInput, type LinkedinStart, type LinkedinStatus } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
-import { HostedEmailProvider, EmailConnectRequest, EmailConnectResult, LegacyEmailConnectResult, EmailConnectionStatus, type EmailConnectInput, type EmailStart, type EmailStatus } from "./email-contracts.js";
+import { EmailWorkspace } from "./email-contracts.js";
+import { connectorUnavailable, executeIdentityOperation, type IdentityInput, type IdentityResult } from "./identity-operations.js";
+import { createAccountConnectRouter } from "./account-connect-routes.js";
+import type { AccountConnection } from "./account-connection.js";
 import { WarmupStartResult, WarmupStatus, WarmupWorkspaceRequest, type WarmupStartResult as WarmupStart, type WarmupStatus as WarmupStatusValue } from "./email-warmup-contracts.js";
 import { ConnectionPlacementStatus, PlacementStartRequest, PlacementStatusRequest, type PlacementStartInput, type PlacementStatusInput } from "./email-connection-placement.js";
 import { DeliverabilityQuery, DeliverabilityQueryParams, DeliverabilityResponse, type DeliverabilityQuery as DeliverabilityQueryValue, type DeliverabilityResponse as DeliverabilityResponseValue } from "./email-deliverability-contracts.js";
-import { EmailAccountsRequest, EmailAccountsResult, EmailAccountConnectRequest, EmailAccountConnectResult,
-  EmailAccountStatusRequest, EmailAccountStatusResult, type EmailAccountsInput, type EmailAccountsOutput,
-  type EmailAccountConnectInput, type EmailAccountConnectOutput, type EmailAccountStatusInput, type EmailAccountStatusOutput } from "./email-accounts-contracts.js";
+
 
 const MAX_REQUEST_BYTES = 132 * 1024;
 // The create-workspace body carries only a bounded name and description.
 const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
+// One shared per-user budget for expensive provisioning, run and provider operations.
+const rateLimitedPaths = new Set([
+  "/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/sample-review", "/v1/integrations/hubspot/company-mapping", "/v1/email/warmup/start",
+  "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/senders", "/v1/workspace/sending-accounts/connect",
+  "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync",
+]);
+const rateLimitedPatterns = [/^\/v1\/workspace\/sending-accounts\/[^/]+\/(?:reconnect|disconnect)$/, /^\/v1\/workspace\/senders\/[^/]+\/delete$/];
 const RequestIdSchema = z.uuid();
 const SubmissionRefSchema = z.uuid();
 const DestinationRefSchema = z.uuid();
@@ -82,12 +85,6 @@ export interface AppDependencies {
   mcp?: McpDependencies;
   renderOAuthConsentPage?(authorizationId: string): { html: string; scriptNonce: string; connectOrigin: string };
   warmupSetup?: WarmupSetup;
-  unipileHostedAuthOrigin: string;
-  unipileV2HostedAuthOrigins: string[];
-  receiveEmailV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
-  receiveLinkedinV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
-  receiveClientEmailV2Return: (state:string,returnError:HostedReturnError|null)=>Promise<ConnectionReturnResult|void>;
-  authorizeClientEmail: (state:string)=>Promise<string>;
   getConnectionAttempt(session: AuthSession, provider: ConnectionProvider, attemptRef: string, workspace: string): Promise<ConnectionAttemptStatus>;
   acquisitionRecovery(session: AuthSession, input: AcquisitionRecoveryInput): Promise<AcquisitionRecoveryOutput>;
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
@@ -95,28 +92,16 @@ export interface AppDependencies {
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
   workspaceCampaign(session: AuthSession, input: WorkspaceCampaignInput): Promise<WorkspaceCampaignOutput>;
   linkedinCampaign(session: AuthSession, input: LinkedinCampaignInput): Promise<LinkedinCampaignOutput>;
-  startLinkedinConnect(session: AuthSession, input: LinkedinConnectInput): Promise<LinkedinStart>;
-  getLinkedinConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<LinkedinStatus>;
-  disconnectLinkedin(session: AuthSession, workspace: string): Promise<LinkedinStatus>;
-  authorizeLinkedin(state: string): Promise<string>;
-  completeLinkedinCallback(state: string, body: unknown): Promise<void>;
-  emailAvailable: boolean;
-  emailAuthorizationOrigin: string | null;
-  startEmailConnect(session: AuthSession, input: EmailConnectInput): Promise<EmailStart>;
-  getEmailConnection(session: AuthSession, workspace: string, attemptRef?: string): Promise<EmailStatus>;
-  disconnectEmail(session: AuthSession, workspace: string): Promise<EmailStatus>;
-  authorizeEmail(state: string): Promise<string>;
-  declareEmail(state: string, provider?: HostedEmailProvider, mailboxUse?: "personal" | "outreach"): Promise<string>;
   getEmailWarmup(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStatusValue>;
   startEmailWarmup(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStart>;
   changeEmailWarmup(session: AuthSession, workspace: string, operation: "pause" | "resume" | "remove", connectionRef?: string): Promise<WarmupStatusValue>;
   getEmailDeliverability(session: AuthSession, query: DeliverabilityQueryValue): Promise<DeliverabilityResponseValue>;
   getEmailPlacement(session: AuthSession, input: PlacementStatusInput): Promise<ConnectionPlacementStatus>;
   startEmailPlacement(session: AuthSession, input: PlacementStartInput): Promise<ConnectionPlacementStatus>;
-  getEmailAccounts(session:AuthSession,input:EmailAccountsInput):Promise<EmailAccountsOutput>;
-  connectEmailAccount(session:AuthSession,input:EmailAccountConnectInput):Promise<EmailAccountConnectOutput>;
-  getEmailAccountAttempt(session:AuthSession,input:EmailAccountStatusInput):Promise<EmailAccountStatusOutput>;
-  completeEmailCallback(state: string, body: unknown): Promise<void>;
+  /** Senders and sending accounts (LIF-1182); provider effects go through the account connection. */
+  identityOperation(session: AuthSession, key: string, input: IdentityInput, signal?: AbortSignal): Promise<IdentityResult>;
+  /** Browser connect page and confirmation shell for sending accounts. */
+  accounts?: { connection: AccountConnection; origin: string; hostedOrigins: string[] };
   authenticate(request: Request): Promise<AuthenticationResult>;
   businessOperation(session: AuthSession, key: string, payload?: unknown): Promise<unknown>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
@@ -180,7 +165,6 @@ export interface AppDependencies {
   checkCompanyReadiness(): Promise<boolean>;
   checkCrmMappingReadiness(): Promise<boolean>;
   connectionCallbacks?: ConfirmationAdapters;
-  validateConnectionReturn?(flow:"email"|"linkedin"|"client-email", state:string):void;
   log(event: LogEvent): void;
 }
 
@@ -310,33 +294,18 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/me/delete",operationId:"deleteOwnLogin",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:DeleteLoginRequest}}}},
     responses:{200:JsonResponse(DeleteLoginResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),404:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/connect", operationId: "startLinkedinConnect", security: [{ bearerAuth: [] }],
-    request: { body: { required: true, content: { "application/json": { schema: LinkedinConnectRequest } } } },
-    responses: { 200: JsonResponse(LegacyLinkedinConnectResult), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 429: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
-  app.openAPIRegistry.registerPath({ method: "get", path: "/v1/linkedin", operationId: "getLinkedinConnection", security: [{ bearerAuth: [] }],
-    request: { query: LinkedinWorkspaceRequest },
-    responses: { 200: JsonResponse(LinkedinConnectionStatus), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
-  app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/disconnect", operationId: "disconnectLinkedin", security: [{ bearerAuth: [] }],
-    request: { body: { required: true, content: { "application/json": { schema: LinkedinDisconnectRequest } } } },
-    responses: { 200: JsonResponse(LinkedinConnectionStatus), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
   app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/campaign", operationId: "linkedinCampaign", security: [{ bearerAuth: [] }],
     request: { body: { required: true, content: { "application/json": { schema: LinkedinCampaignRequest } } } },
     responses: { 200: JsonResponse(LinkedinCampaignResult), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/campaign/placement/preview",operationId:"previewEmailPlacement",security:[{bearerAuth:[]}],
-    request:{query:z.object({workspace:EmailConnectRequest.shape.workspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
+    request:{query:z.object({workspace:EmailWorkspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
     responses:{200:JsonResponse(EmailPlacementPreview),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/campaign/placement",operationId:"getEmailPlacement",security:[{bearerAuth:[]}],
-    request:{query:z.object({workspace:EmailConnectRequest.shape.workspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
+    request:{query:z.object({workspace:EmailWorkspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
     responses:{200:JsonResponse(EmailPlacementResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/campaign",operationId:"emailCampaign",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:EmailCampaignRequest}}}},
     responses:{200:JsonResponse(EmailCampaignResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/disconnect",operationId:"disconnectEmail",security:[{bearerAuth:[]}],
-    request:{body:{required:true,content:{"application/json":{schema:z.object({workspace:EmailConnectRequest.shape.workspace}).strict()}}}},
-    responses:{200:JsonResponse(EmailConnectionStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/connect",operationId:"startEmailConnect",security:[{bearerAuth:[]}],
-    request:{body:{required:true,content:{"application/json":{schema:EmailConnectRequest}}}},
-    responses:{200:JsonResponse(LegacyEmailConnectResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/warmup",operationId:"getEmailWarmup",security:[{bearerAuth:[]}],
     request:{query:WarmupWorkspaceRequest},responses:{200:JsonResponse(WarmupStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/deliverability",operationId:"getEmailDeliverability",security:[{bearerAuth:[]}],
@@ -349,16 +318,6 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     description:"LIF-1063: queue one Mailivery connected-mailbox placement test after explicit consent. Mailivery sends the email from the warmed mailbox to its seed inboxes and uses one test credit. A retried start returns the open test. Never releases a mailbox.",
     request:{body:{required:true,content:{"application/json":{schema:PlacementStartRequest}}}},
     responses:{200:JsonResponse(ConnectionPlacementStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),413:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/accounts",operationId:"getEmailAccounts",security:[{bearerAuth:[]}],
-    request:{query:EmailAccountsRequest},responses:{200:JsonResponse(EmailAccountsResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
-  for (const [path,operationId,request,response] of [
-    ["/v1/email/accounts/connect","connectEmailAccount",EmailAccountConnectRequest,EmailAccountConnectResult],
-    ["/v1/email/accounts/connect/status","getEmailAccountAttempt",EmailAccountStatusRequest,EmailAccountStatusResult],
-  ] as const) {
-    app.openAPIRegistry.registerPath({method:"post",path,operationId,security:[{bearerAuth:[]}],
-      request:{body:{required:true,content:{"application/json":{schema:request}}}},
-      responses:{200:JsonResponse(response),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),413:JsonResponse(ErrorResponseSchema),429:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
-  }
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/warmup/start",operationId:"startEmailWarmup",security:[{bearerAuth:[]}],
     description:"Start setup for the workspace's verified mailbox. OAuth-enabled servers return a one-hour Lifty setup link. Legacy servers return a signed Mailivery form link. An already-bound mailbox receives no new connection link.",
     request:{body:{required:true,content:{"application/json":{schema:WarmupWorkspaceRequest}}}},
@@ -368,8 +327,6 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
       request:{body:{required:true,content:{"application/json":{schema:WarmupWorkspaceRequest}}}},
       responses:{200:JsonResponse(WarmupStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   }
-  app.openAPIRegistry.registerPath({method:"get",path:"/v1/email",operationId:"getEmailConnection",security:[{bearerAuth:[]}],
-    request:{query:z.object({workspace:EmailConnectRequest.shape.workspace})},responses:{200:JsonResponse(EmailConnectionStatus),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({
     method: "post",
     path: "/v1/workspaces/{workspace_ref}/integrations/slack/connect-link",
@@ -665,7 +622,7 @@ function resolveProvider(
         context,
         400,
         "PROVIDER_INVALID",
-        "Unknown provider. Supported providers: hubspot, slack, unipile.",
+        "Unknown provider. Supported providers: hubspot, slack.",
       ),
     };
   }
@@ -683,16 +640,12 @@ function providerUnavailable(context: Context<AppEnvironment>, provider: Provide
 
 const defaultDependencies: AppDependencies = {
   getConnectionAttempt,
-  declareEmail: async () => { throw new PublicError({ status: 503, code: "EMAIL_NOT_CONFIGURED", message: "Email connection is not configured yet." }); },
   getEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet." }); },
   startEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet. Nothing was changed." }); },
   changeEmailWarmup: async () => { throw new PublicError({ status: 503, code: "EMAIL_WARMUP_NOT_CONFIGURED", message: "Mailbox warmup is not available on this LIFTY server yet. Nothing was changed." }); },
   getEmailDeliverability: async () => { throw new PublicError({ status: 503, code: "DELIVERABILITY_NOT_CONFIGURED", message: "Deliverability is not available on this LIFTY server yet." }); },
   getEmailPlacement: async () => { throw new PublicError({ status: 503, code: "EMAIL_PLACEMENT_NOT_CONFIGURED", message: "Placement tests are not available on this LIFTY server yet." }); },
   startEmailPlacement: async () => { throw new PublicError({ status: 503, code: "EMAIL_PLACEMENT_NOT_CONFIGURED", message: "Placement tests are not available on this LIFTY server yet. Nothing was requested." }); },
-  getEmailAccounts: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account management is not available yet."}); },
-  connectEmailAccount: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account management is not available yet. Nothing was changed."}); },
-  getEmailAccountAttempt: async () => { throw new PublicError({status:503,code:"EMAIL_ACCOUNTS_UNAVAILABLE",message:"Email account setup could not be verified. Keep the same attempt reference."}); },
   denyHubspotCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
   denySlackCallback: async () => { throw new PublicError({ status: 503, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization outcome could not be recorded." }); },
   acquisitionRecovery: async () => { throw new PublicError({status:503,code:"ACQUISITION_RECOVERY_UNAVAILABLE",message:"Research recovery is not configured."}); },
@@ -700,27 +653,10 @@ const defaultDependencies: AppDependencies = {
   deleteOwnLogin: async () => { throw new PublicError({status:503,code:"LOGIN_DELETION_UNAVAILABLE",message:"Login deletion is not configured yet."}); },
   workspaceCampaign: async () => { throw new PublicError({ status: 503, code: "WORKSPACE_CAMPAIGN_NOT_CONFIGURED", message: "Workspace sequences are not configured yet." }); },
   linkedinCampaign: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn campaigns are not configured yet." }); },
-  startLinkedinConnect: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
-  getLinkedinConnection: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
-  disconnectLinkedin: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
-  authorizeLinkedin: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
-  completeLinkedinCallback: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn connection is not configured yet." }); },
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
-  disconnectEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
-  emailAvailable: false,
-  unipileHostedAuthOrigin: UNIPILE_HOSTED_AUTH_ORIGIN,
-  unipileV2HostedAuthOrigins: [],
-  receiveEmailV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
-  receiveLinkedinV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
-  receiveClientEmailV2Return: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
-  authorizeClientEmail: async()=>{throw new PublicError({status:503,code:"INTEGRATION_NOT_CONFIGURED",message:"Connection service is unavailable."});},
-  emailAuthorizationOrigin: null,
-  startEmailConnect: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
-  getEmailConnection: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
-  authorizeEmail: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
-  completeEmailCallback: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email connection is not configured yet."}); },
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
   businessOperation: executeBusinessOperation,
+  identityOperation: (session, key, input, signal) => executeIdentityOperation(session, key, input, connectorUnavailable, signal),
   researchOperation: (session, key, input) => executeResearchOperation(session, key, input, DEFAULT_DASHBOARD_ORIGIN),
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
@@ -815,10 +751,6 @@ export function createApp(
 ): OpenAPIHono<AppEnvironment> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const trustedMcpRequests = new WeakMap<Request, AuthSession>();
-  const hostedAuthOrigin = parseHostedAuthOrigin(dependencies.unipileHostedAuthOrigin);
-  const v2HostedAuthOrigins=dependencies.unipileV2HostedAuthOrigins.map(origin=>parseHostedAuthOrigin(origin));
-  if(v2HostedAuthOrigins.includes(UNIPILE_HOSTED_AUTH_ORIGIN))throw new Error("V2 hosted origins cannot include V1.");
-  const emailAuthorizationCsp = `default-src 'none'; style-src 'unsafe-inline'; script-src '${PENDING_SUBMIT_SCRIPT_HASH}'; form-action 'self' ${[hostedAuthOrigin,...v2HostedAuthOrigins].join(" ")}; base-uri 'none'; frame-ancestors 'none'`;
   const app = new OpenAPIHono<AppEnvironment>();
   registerOpenApi(app);
   const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
@@ -1015,121 +947,16 @@ export function createApp(
     context.header("referrer-policy", "no-referrer");
     return context.redirect(authorizeUrl, 302);
   });
-  for(const flow of ["hubspot","slack","email","linkedin","client-email"] as const) {
-    const receive=flow==="client-email" ? dependencies.receiveClientEmailV2Return : flow==="linkedin" ? dependencies.receiveLinkedinV2Return : dependencies.receiveEmailV2Return;
-    const adapter:ConfirmationAdapter=dependencies.connectionCallbacks?.[flow] ?? (flow==="hubspot" || flow==="slack" ? {
+  for(const flow of ["hubspot","slack"] as const) {
+    const adapter:ConfirmationAdapter=dependencies.connectionCallbacks?.[flow] ?? {
       validate(input:{state:string}) { if(!(flow==="hubspot"?isSealedHubspotState:isSealedSlackState)(input.state))throw new SyntaxError("invalid_state"); },
       status:async()=>invalidConfirmation(),
-    } : {
-      validate(input:{state:string}) { if(dependencies.validateConnectionReturn)dependencies.validateConnectionReturn(flow,input.state); },
-      status:async(input:{state:string;errorType?:string})=>(await receive(input.state,hostedReturnError(input.errorType??"")))??{status:"pending" as const},
-    });
-    app.route("/",createConfirmationRouter(flow,adapter,{
-      ...((adapter.origin??dependencies.emailAuthorizationOrigin) ? {origin:(adapter.origin??dependencies.emailAuthorizationOrigin)!} : {}),
-      log:logConfirmation,
-    }));
+    };
+    app.route("/",createConfirmationRouter(flow,adapter,{...(adapter.origin ? {origin:adapter.origin} : {}),log:logConfirmation}));
   }
-  app.get("/unipile/client-email/start",async context=>{
-    context.header("cache-control","no-store");
-    context.header("referrer-policy","no-referrer");
-    const target=await dependencies.authorizeClientEmail(context.req.query("intent") ?? "");
-    if(target==="authorization_received")return context.html(renderEmailAuthorizationReceivedPage(),200,{
-      "content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
-      "x-content-type-options":"nosniff",
-    });
-    const url=versionedHostedAuthUrl(target,hostedAuthOrigin,v2HostedAuthOrigins);
-    if(!url || !v2HostedAuthOrigins.includes(new URL(url).origin))throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"Lifty could not prepare the email connection."});
-    return context.redirect(url,303);
-  });
-  app.get("/unipile/linkedin/start", async (context) => {
-    context.header("cache-control", "no-store");
-    context.header("referrer-policy", "no-referrer");
-    const target = await dependencies.authorizeLinkedin(context.req.query("intent") ?? "");
-    const redirect = versionedHostedAuthUrl(target, hostedAuthOrigin,v2HostedAuthOrigins);
-    if (!redirect) {
-      throw new PublicError({ status: 502, code: "LINKEDIN_INVALID_HANDOFF", message: "LIFTY could not prepare the LinkedIn connection." });
-    }
-    return context.redirect(redirect, 303);
-  });
-  app.post("/unipile/linkedin/callback", async (context) => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Invalid LinkedIn callback.");
-    let payload: unknown;
-    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Invalid LinkedIn callback."); }
-    await dependencies.completeLinkedinCallback(context.req.query("intent") ?? "", payload);
-    return context.json({ ok: true });
-  });
-  app.get("/unipile/start", async (context) => {
-    context.header("cache-control", "no-store");
-    context.header("referrer-policy", "no-referrer");
-    const state = context.req.query("intent") ?? "";
-    let target: string;
-    try { target = await dependencies.authorizeEmail(state); }
-    catch (error) {
-      if (!(error instanceof PublicError) || !["EMAIL_DECLARATION_REQUIRED", "EMAIL_PROVIDER_REQUIRED"].includes(error.code)) throw error;
-      return context.html(renderEmailAuthorizationPage(state, error.code === "EMAIL_PROVIDER_REQUIRED"), 200, {
-        "cache-control": "no-store", "referrer-policy": "strict-origin", "x-content-type-options": "nosniff",
-        "content-security-policy": emailAuthorizationCsp,
-      });
-    }
-    if (target === "authorization_received") {
-      return context.html(renderEmailAuthorizationReceivedPage(), 200, {
-        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
-        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
-      });
-    }
-    const redirect = versionedHostedAuthUrl(target, hostedAuthOrigin,v2HostedAuthOrigins);
-    if (!redirect) {
-      throw new PublicError({status:502,code:"EMAIL_INVALID_HANDOFF",message:"LIFTY could not prepare the email connection."});
-    }
-    return context.redirect(redirect, 303);
-  });
-  app.post("/unipile/start", async context => {
-    context.header("cache-control", "no-store");
-    context.header("referrer-policy", "no-referrer");
-    const origin = context.req.header("origin");
-    // TLS terminates at the hosting proxy; compare with the configured public origin.
-    const expectedOrigin = dependencies.emailAuthorizationOrigin ?? new URL(context.req.url).origin;
-    if ((origin && origin !== expectedOrigin) || context.req.header("sec-fetch-site") === "cross-site") {
-      return errorJson(context, 403, "INVALID_REQUEST", "Continue from the email authorization page.");
-    }
-    if (!context.req.header("content-type")?.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
-      return errorJson(context, 400, "INVALID_REQUEST", "Submit the email authorization form.");
-    }
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Invalid email account declaration.");
-    const form = new URLSearchParams(raw.text);
-    if (form.getAll("intent").length !== 1 || form.getAll("mailbox_use").length !== 1
-      || form.getAll("email_provider").length > 1
-      || (form.has("email_provider") && !HostedEmailProvider.safeParse(form.get("email_provider")).success)
-      || [...form.keys()].some(key => !["intent", "mailbox_use", "email_provider"].includes(key))
-      || !["personal", "outreach"].includes(form.get("mailbox_use") ?? "")) {
-      return errorJson(context, 400, "INVALID_REQUEST", "Say how you use this mailbox before continuing.");
-    }
-    const mailboxUse = form.get("mailbox_use") === "outreach" ? "outreach" as const : "personal" as const;
-    const target = await dependencies.declareEmail(form.get("intent")!, form.has("email_provider") ? HostedEmailProvider.parse(form.get("email_provider")) : undefined, mailboxUse);
-    if (target === "authorization_received") {
-      return context.html(renderEmailAuthorizationReceivedPage(), 200, {
-        "cache-control": "no-store", "referrer-policy": "no-referrer", "x-content-type-options": "nosniff",
-        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
-      });
-    }
-    const redirect = versionedHostedAuthUrl(target, hostedAuthOrigin,v2HostedAuthOrigins);
-    if (!redirect) {
-      throw new PublicError({ status: 502, code: "EMAIL_INVALID_HANDOFF", message: "LIFTY could not prepare the email connection." });
-    }
-    return context.redirect(redirect, 303);
-  });
-  app.post("/unipile/callback", async (context) => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Invalid email callback.");
-    let payload: unknown;
-    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Invalid email callback."); }
-    await dependencies.completeEmailCallback(context.req.query("intent") ?? "", payload);
-    return context.json({ok:true});
-  });
+  // Sending accounts: Lifty's connect page and the shared confirmation shell.
+  if (dependencies.accounts) app.route("/", createAccountConnectRouter(dependencies.accounts.connection, { origin: dependencies.accounts.origin,
+    hostedOrigins: dependencies.accounts.hostedOrigins, log: logConfirmation }));
   app.get("/openapi.json", context => {
     const document = app.getOpenAPI31Document({
       openapi: "3.1.0",
@@ -1242,14 +1069,9 @@ export function createApp(
     await next();
   });
 
-  // One shared per-user budget for expensive provisioning/run operations.
   // Expired entries are removed on access, without a process-owning timer.
   app.use("/v1/*", async (context, next) => {
-    if (context.req.method !== "POST" || ![
-      "/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/sample-review", "/v1/integrations/hubspot/company-mapping", "/v1/email/connect", "/v1/email/accounts/connect", "/v1/email/warmup/start", "/v1/linkedin/connect",
-      "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/sending-accounts",
-      "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync",
-    ].includes(context.req.path)) return next();
+    if (context.req.method !== "POST" || !(rateLimitedPaths.has(context.req.path) || rateLimitedPatterns.some(pattern => pattern.test(context.req.path)))) return next();
     const now = Date.now();
     for (const [key, window] of mutationWindows) {
       if (window.resetsAt <= now) mutationWindows.delete(key);
@@ -1509,35 +1331,6 @@ export function createApp(
     const result = await dependencies.linkedinCampaign(context.get("authSession"), parsed.data);
     return context.json(linkedinCampaignResultFor(parsed.data, result));
   });
-  app.post("/v1/linkedin/connect", async (context) => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "LinkedIn connection request is too large.");
-    let body: unknown;
-    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide the workspace, timezone and account declarations."); }
-    const parsed = LinkedinConnectRequest.safeParse(body);
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose an IANA timezone and declare a personal account without other automation.");
-    const result = LinkedinConnectResult.parse(await dependencies.startLinkedinConnect(context.get("authSession"), parsed.data));
-    if (result.status === "pending") delete result.expires_at;
-    return context.json(LegacyLinkedinConnectResult.parse(result));
-  });
-  app.get("/v1/linkedin", async (context) => {
-    context.header("cache-control", "no-store");
-    const parsed = LinkedinWorkspaceRequest.safeParse(context.req.query());
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace.");
-    return context.json(LinkedinConnectionStatus.parse(await dependencies.getLinkedinConnection(context.get("authSession"), parsed.data.workspace)));
-  });
-  app.post("/v1/linkedin/disconnect", async (context) => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "LinkedIn request is too large.");
-    let body: unknown;
-    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace and confirm disconnection."); }
-    const parsed = LinkedinDisconnectRequest.safeParse(body);
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace and explicitly confirm disconnection.");
-    return context.json(LinkedinConnectionStatus.parse(await dependencies.disconnectLinkedin(context.get("authSession"), parsed.data.workspace)));
-  });
-
   app.post("/v1/email/campaign", async (context) => {
     context.header("cache-control", "no-store");
     const raw = await readRequestTextWithinLimit(context.req.raw, 128 * 1024);
@@ -1550,29 +1343,6 @@ export function createApp(
     return context.json(campaignResultFor(parsed.data.operation, result));
   });
 
-  app.post("/v1/email/disconnect", async (context) => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Email request is too large.");
-    let body: unknown;
-    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace."); }
-    const parsed = z.object({workspace:EmailConnectRequest.shape.workspace}).strict().safeParse(body);
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace explicitly.");
-    return context.json(EmailConnectionStatus.parse(await dependencies.disconnectEmail(context.get("authSession"), parsed.data.workspace)));
-  });
-
-  app.post("/v1/email/connect", async (context) => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 4096);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "Email connection request is too large.");
-    let payload: unknown;
-    try { payload = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace and the current email connection fields."); }
-    const parsed = EmailConnectRequest.safeParse(payload);
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide workspace; legacy email and mailbox_use must be supplied together.");
-    const result = EmailConnectResult.parse(await dependencies.startEmailConnect(context.get("authSession"), parsed.data));
-    if (result.status === "pending") delete result.expires_at;
-    return context.json(LegacyEmailConnectResult.parse(result));
-  });
   app.get("/v1/email/warmup", async (context) => {
     context.header("cache-control", "no-store");
     const parsed = WarmupWorkspaceRequest.safeParse(context.req.query());
@@ -1610,34 +1380,6 @@ export function createApp(
     if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Provide the workspace, a subject, a body of at least 10 characters and confirm: true.");
     return context.json(ConnectionPlacementStatus.parse(await dependencies.startEmailPlacement(context.get("authSession"), parsed.data)));
   });
-  // Explicit member workspace operations deliberately bypass founder-profile
-  // adapters. The authenticated Edge owner checks membership on every request.
-  app.get("/v1/email/accounts",async context=>{
-    context.header("cache-control","no-store");
-    const query=new URL(context.req.url).searchParams;
-    if(query.getAll("workspace").length!==1)return errorJson(context,400,"INVALID_REQUEST","Choose one workspace.");
-    const input=EmailAccountsRequest.safeParse(context.req.query());
-    if(!input.success)return errorJson(context,400,"INVALID_REQUEST","Choose a workspace.");
-    return context.json(EmailAccountsResult.parse(await dependencies.getEmailAccounts(context.get("authSession"),input.data)));
-  });
-  for(const operation of ["connect","connect/status"] as const) {
-    app.post(`/v1/email/accounts/${operation}`,async context=>{
-      context.header("cache-control","no-store");
-      const raw=await readRequestTextWithinLimit(context.req.raw,8192);
-      if(!raw.ok)return errorJson(context,413,"INVALID_REQUEST","Email account request is too large.");
-      let body:unknown;
-      try{body=JSON.parse(raw.text);}catch{return errorJson(context,400,"INVALID_REQUEST","Provide the requested email account fields.");}
-      const session=context.get("authSession");
-      if(operation==="connect") {
-        const input=EmailAccountConnectRequest.safeParse(body);
-        if(!input.success)return errorJson(context,400,"INVALID_REQUEST","Choose a workspace, sender and exact email address.");
-        return context.json(EmailAccountConnectResult.parse(await dependencies.connectEmailAccount(session,input.data)));
-      }
-      const input=EmailAccountStatusRequest.safeParse(body);
-      if(!input.success)return errorJson(context,400,"INVALID_REQUEST","Provide the workspace and retained connection attempt reference.");
-      return context.json(EmailAccountStatusResult.parse(await dependencies.getEmailAccountAttempt(session,input.data)));
-    });
-  }
   for (const operation of ["start", "pause", "resume", "remove"] as const) {
     app.post(`/v1/email/warmup/${operation}`, async (context) => {
       context.header("cache-control", "no-store");
@@ -1654,13 +1396,6 @@ export function createApp(
         : WarmupStatus.parse(await dependencies.changeEmailWarmup(session, parsed.data.workspace, operation, ...connection)));
     });
   }
-  app.get("/v1/email", async (context) => {
-    context.header("cache-control", "no-store");
-    const workspace = EmailConnectRequest.shape.workspace.safeParse(context.req.query("workspace"));
-    if (!workspace.success) return errorJson(context, 400, "INVALID_REQUEST", "Choose a workspace.");
-    return context.json(EmailConnectionStatus.parse(await dependencies.getEmailConnection(context.get("authSession"), workspace.data)));
-  });
-
   // ---------------------------------------------------------------- integrations
 
   app.post("/v1/workspaces/:workspace_ref/integrations/slack/connect-link", async (context) => {
@@ -1674,9 +1409,6 @@ export function createApp(
   app.post("/v1/integrations/:provider/connect", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    if (provider.provider === "unipile") {
-      return providerUnavailable(context, provider.provider);
-    }
     const result = provider.provider === "hubspot"
       ? await dependencies.startHubspotConnect(context.get("authSession"))
       : await dependencies.startSlackConnect(context.get("authSession"));
@@ -1688,15 +1420,6 @@ export function createApp(
   app.get("/v1/integrations/:provider", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    if (provider.provider === "unipile") {
-      // No connect path exists yet, so nothing can be connected.
-      return context.json(
-        IntegrationConnectionStatusSchema.parse({
-          provider: provider.provider,
-          status: "not_connected",
-        }),
-      );
-    }
     const result = provider.provider === "hubspot"
       ? await dependencies.getHubspotConnection(context.get("authSession"))
       : await dependencies.getSlackConnection(context.get("authSession"));

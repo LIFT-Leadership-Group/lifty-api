@@ -1,6 +1,6 @@
 import { businessOperationDefinitions } from "./business-operations.js";
 import { researchOperationDefinitions } from "./research-operations.js";
-import { SenderChoice, SenderRoster, SenderSignatureRequest, SenderSignatureResult, SenderSignatures } from "./sender-choice.js";
+import { identityOperationDefinitions } from "./identity-operations.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
@@ -17,13 +17,9 @@ import { HubspotConnectionStatusSchema, NotificationConfigSchema, NotificationDe
 import { DeleteLoginRequest, DeleteLoginResult } from "./login-deletion.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
-import { EmailConnectionStatus, EmailConnectRequest } from "./email-contracts.js";
-import { EmailAccountsRequest, EmailAccountsResult, EmailAccountConnectRequest, EmailAccountConnectResult,
-  EmailAccountStatusRequest, EmailAccountStatusResult } from "./email-accounts-contracts.js";
 import { WarmupWorkspaceRequest, WarmupStatus, WarmupStartResult } from "./email-warmup-contracts.js";
 import { ConnectionPlacementStatus, PlacementStartRequest, PlacementStatusRequest } from "./email-connection-placement.js";
 import { DeliverabilityQueryParams, DeliverabilityResponse } from "./email-deliverability-contracts.js";
-import { LinkedinConnectRequest, LinkedinConnectionStatus, LinkedinDisconnectRequest, LinkedinWorkspaceRequest, LegacyLinkedinConnectResult } from "./linkedin-contracts.js";
 import { EmailCampaignRequest, EmailCampaignResult } from "./email-campaign-contracts.js";
 import { LinkedinCampaignRequest, LinkedinCampaignResult } from "./linkedin-campaign-contracts.js";
 
@@ -61,20 +57,6 @@ export const ConnectionAttemptStatusSchema = z.discriminatedUnion("status", [
     error_code: z.string().min(1).optional() }).strict(),
 ]);
 export const ConnectionAttemptQuerySchema = z.object({ attempt_ref: AttemptRef.optional() }).strict();
-export const SendingAccountQuerySchema = ConnectionAttemptQuerySchema.extend({ channel: z.enum(["linkedin", "email"]) });
-export const SendingAccountStartSchema = z.discriminatedUnion("channel", [
-  LinkedinConnectRequest.omit({ workspace: true, reconnect: true }).extend({ channel: z.literal("linkedin") }),
-  // The hosted email flow owns account/provider selection. No pre-link address
-  // or use questionnaire, credentials, or authorization override is accepted.
-  z.object({ channel: z.literal("email"), select_account: z.boolean().optional(), sender: SenderChoice.optional() }).strict(),
-]);
-// Current-workspace disconnection. The explicit confirmation mirrors the
-// existing LinkedIn route; the adapter supplies the authenticated workspace.
-export const SendingAccountDisconnectSchema = z.object({
-  channel: z.enum(["email", "linkedin"]), confirm: z.literal(true),
-}).strict();
-const WorkspaceRefPath = z.object({ workspace_ref: z.uuid() }).strict();
-const ClientEmailDisconnectSchema = z.object({ workspace: EmailConnectRequest.shape.workspace }).strict();
 export const NotificationStagePatchSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("destination"), values: UpsertNotificationDestinationRequestSchema }).strict(),
   z.object({ operation: z.literal("route"), values: SetNotificationRouteRequestSchema }).strict(),
@@ -130,6 +112,17 @@ const businessCatalog = Object.fromEntries(Object.entries(businessOperationDefin
   ...("cli" in definition ? { cli: definition.cli } : {}),
   ...(resource === "business" && key === "post" ? { responses: { ...operation(definition.method, definition.route, definition.description, definition.response, definition.request).responses, "201": json(definition.response) } } : {}),
 }]))]));
+// Identity operations publish their success status: 201 for creation and,
+// for disconnect/delete, both 200 (access removal confirmed) and 202.
+const identityCatalog = Object.fromEntries(Object.entries(identityOperationDefinitions).map(([resource, entries]) => [resource, Object.fromEntries(Object.entries(entries).map(([key, definition]) => {
+  const base = operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query, definition.path);
+  const success = json(definition.response);
+  const { "200": _ok, ...errors } = base.responses;
+  return [key, { ...base, ...("cli" in definition ? { cli: definition.cli } : {}),
+    responses: definition.success === 201 ? { "201": success, ...errors } : definition.success === 202 ? { "200": success, "202": success, ...errors } : base.responses }];
+}))]));
+// Public guide of an Identity stage; `lifty context <stage>` and the MCP tool read the same document.
+const stageContext = (stage: string, description: string) => ({ ...operation("GET", `/v1/context/${stage}`, description, z.record(z.string(), z.unknown())), cli: { operation: "context" } });
 const researchCatalog = Object.fromEntries(Object.entries(researchOperationDefinitions).map(([resource, entries]) => [resource, Object.fromEntries(Object.entries(entries).map(([key, definition]) => [key, {
   ...operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query),
   ...("cli" in definition ? { cli: definition.cli } : {}),
@@ -141,9 +134,9 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   summary: {
     next_step: operation("GET", "/v1/workspace/next-step", "Read the next step from saved Business resources, setup draft, research and campaign receipts together with the current stage guide. Does not start work, accept a sample or authorize sending.", NextStepSchema),
     context: operation("GET", "/v1/context/{task}", "Read the complete current guide, references and operation schemas for a specific requested Lifty stage.", z.record(z.string(), z.unknown()), null, Empty, z.object({ task: z.string().regex(/^[a-z][a-z-]{0,63}$/) }).strict()),
-    get: { ...operation("GET", stageRoute("summary"), "Refresh the selected workspace's typed Business resources and versions, immutable setup receipt, first research run, HubSpot and its last sync, email (or the mailbox list of a LIFT-managed client workspace), LinkedIn and the saved campaign. With several workspaces, select one with the x-lifty-workspace header. Connection checks can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema), readOnly: false },
-    post: unsupported("summary", "POST", "Use the summary GET operation; its connection checks can change saved provider state."),
-    patch: unsupported("summary", "PATCH", "Use the summary GET operation; its connection checks can change saved provider state."),
+    get: operation("GET", stageRoute("summary"), "Read the selected workspace's typed Business resources and versions, immutable setup receipt, first research run, research schedule, HubSpot and its last sync, senders with their sending accounts, and the saved campaign. Read-only: it never checks or changes a provider. Does not authorize outreach. Unavailable means retry, not missing setup.", WorkspaceSummarySchema),
+    post: unsupported("summary", "POST", "The summary is read-only."),
+    patch: unsupported("summary", "PATCH", "The summary is read-only."),
   },
   business: { ...businessCatalog.business!, delete: unsupported("business", "DELETE", "Profile revisions and pinned history are retained. Customers cannot delete a workspace; contact LIFT support.") },
   targeting: { ...businessCatalog.targeting!, post: unsupported("targeting", "POST", "Setup creates targeting together with criteria."), delete: unsupported("targeting", "DELETE", "Search activation belongs to the research schedule; targeting history is retained.") },
@@ -186,27 +179,20 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     client_mapping_context: operation("GET", "/v1/integrations/hubspot/company-mapping/context", "Read the live HubSpot company schema, current mapping and bounded plan schema for an explicitly named workspace you belong to.", CompanyMappingContextSchema, null, z.object({ workspace_ref: z.uuid() }).strict()),
     client_mapping_apply: operation("POST", "/v1/integrations/hubspot/company-mapping", "Apply a bounded company mapping plan to the workspace named in the plan, using its current mapping and schema versions. No tokens, arbitrary mappings or connected flag updates.", CompanyMappingReceiptSchema, CompanyPlanSchema),
   },
+  senders: {
+    context: stageContext("senders", "Read the public guide for senders: who a sender is, roster-first lookup by id, name, signature and booking link rules, and soft delete. No workspace data."),
+    ...identityCatalog.senders!,
+  },
   "sending-accounts": {
-    senders: operation("GET", "/v1/workspace/sending-accounts/senders", "Read named senders and their connections. The first sender defaults to the account creator; later account setup requires a choice of existing or new sender.", SenderRoster),
-    signature: operation("GET", "/v1/workspace/sending-accounts/signature", "Read each sender's plain-text email signature. Lifty appends it to every campaign email after a blank line; while a sender has none, its email campaigns show email_signature_missing and cannot compose, approve or send.", SenderSignatures),
-    signature_save: operation("POST", "/v1/workspace/sending-accounts/signature", "Save the exact signature text the founder wrote for one sender, never text drafted by AI: plain text of at most 500 characters, no HTML, links only with https://. Unsent campaign previews are composed again with it; emails already approved keep theirs. Never sends.", SenderSignatureResult, SenderSignatureRequest),
-    get: { ...operation("GET", stageRoute("sending-accounts"), "Check the selected channel's current account or exact attempt_ref after approval. This can complete previously authorized bindings, update health, and remove unreferenced duplicate LinkedIn provider accounts. A healthy previous account is not a new attempt's success. Does not authorize outreach.", z.union([EmailConnectionStatus, LinkedinConnectionStatus, ConnectionAttemptStatusSchema]), null, SendingAccountQuerySchema), readOnly: false },
-    post: operation("POST", stageRoute("sending-accounts"), "Start hosted LinkedIn or email connection/reconnection. For email, select_account: true opens provider/account selection after an explicit disconnect; omit it to reconnect the saved account.", AuthorizationRequiredSchema, SendingAccountStartSchema),
-    patch: unsupported("sending-accounts", "PATCH", "Account identity, policy limits and sending enablement cannot be changed through configuration or used to bypass consent."),
-    client_accounts: operation("GET","/v1/email/accounts","Read the explicitly named client workspace's available senders and email connections using member authorization. This does not require or infer a founder workspace.",EmailAccountsResult,null,EmailAccountsRequest),
-    client_connect: operation("POST","/v1/email/accounts/connect","Create a Lifty-branded Google authorization link for a new mailbox with protocol_version:2; existing accounts retain their connection flow. Keep the returned attempt_ref and verify this attempt after browser consent; campaigns stay paused.",EmailAccountConnectResult,EmailAccountConnectRequest.required({protocol_version:true})),
-    client_connect_status: operation("POST","/v1/email/accounts/connect/status","Verify the retained client email attempt, or perform a fresh provider check using its verified connection_ref after the sign-in link expires. Supply exactly one reference in the same explicit workspace. The bounded capability is a POST body, never a query parameter. Only connected with its connection_ref confirms this attempt.",EmailAccountStatusResult,EmailAccountStatusRequest),
-    warmup_status: operation("GET","/v1/email/warmup","Read warmup status for an explicit workspace. Client workspaces require connection_ref; founder requests retain workspace-only behavior. Warmup eligibility does not imply campaigns are unpaused.",WarmupStatus,null,WarmupWorkspaceRequest),
+    context: stageContext("sending-accounts", "Read the public guide for sending accounts: connect, reconnect, pause, resume, disconnect, observation and the browser declaration. No workspace data."),
+    ...identityCatalog["sending-accounts"]!,
+    // Email-owned operations keep their single implementation and wording here until the Email block (LIF-1186) moves them.
+    warmup_status: operation("GET","/v1/email/warmup","Read warmup status for an explicit workspace and mailbox. connection_ref is the sending account id; it is required when the workspace has several email accounts. Warmup eligibility does not imply campaigns are unpaused.",WarmupStatus,null,WarmupWorkspaceRequest),
     deliverability: operation("GET","/v1/email/deliverability","Read inbox health for an explicit workspace: each inbox's senders, warmup, recent placement tests, campaigns, approval, notes and send checks, with the same states and explanations as the Deliverability page. Filter by sender ref or unassigned, or one mailbox; detail=placement reads stored reports for one mailbox_ref. Read-only: never starts a placement test or changes sending.",DeliverabilityResponse,null,DeliverabilityQueryParams),
-    warmup_start: operation("POST","/v1/email/warmup/start","Start separate Mailivery setup for the verified connection. Client workspaces require connection_ref and branded Google OAuth; no password fallback. Campaigns stay paused for 21 active days and require explicit operator release.",WarmupStartResult,WarmupWorkspaceRequest),
+    warmup_start: operation("POST","/v1/email/warmup/start","Start separate Mailivery setup for a verified mailbox (connection_ref = sending account id, required when the workspace has several email accounts) through branded Google OAuth; no password fallback. Campaigns stay paused for 21 active days and require explicit operator release.",WarmupStartResult,WarmupWorkspaceRequest),
     placement_status: operation("GET","/v1/email/placement","Read the latest Mailivery placement test for one warmed mailbox (connection_ref when the workspace has several), whether a new one can be requested, and whether its result gates sending. Read-only.",ConnectionPlacementStatus,null,PlacementStatusRequest),
     placement_start: operation("POST","/v1/email/placement/start","Queue one Mailivery placement test for a warmed mailbox only after the user explicitly agrees: Mailivery sends the given subject/body from that mailbox to roughly 20-40 of its seed inboxes and uses one test credit. Use the first email of the real sequence. A retried start returns the open test. The result never releases a mailbox or starts campaigns.",ConnectionPlacementStatus,PlacementStartRequest),
-    ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and client connection_ref. Warmup resume never releases outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),
-    disconnect: operation("POST", "/v1/workspace/sending-accounts/disconnect", "Disconnect the current workspace's email or LinkedIn account with explicit confirmation. Future campaign steps on that channel are blocked; history and consumed sending limits are kept. Reconnecting does not restart campaigns.", z.union([EmailConnectionStatus, LinkedinConnectionStatus]), SendingAccountDisconnectSchema),
-    client_email_disconnect: operation("POST", "/v1/email/disconnect", "Disconnect the email account of an explicitly named workspace you belong to. Future campaign emails from it are blocked; reconnecting does not restart campaigns.", EmailConnectionStatus, ClientEmailDisconnectSchema),
-    client_linkedin_status: { ...operation("GET", "/v1/linkedin", "Check the LinkedIn account of an explicitly named workspace you belong to. The check can update saved health and remove unreferenced duplicate provider accounts. Does not authorize outreach.", LinkedinConnectionStatus, null, LinkedinWorkspaceRequest), readOnly: false },
-    client_linkedin_connect: operation("POST", "/v1/linkedin/connect", "Start hosted LinkedIn connection or reconnection for an explicitly named workspace you belong to and return the authorization link. Sending stays disabled until campaigns are separately approved.", LegacyLinkedinConnectResult, LinkedinConnectRequest),
-    client_linkedin_disconnect: operation("POST", "/v1/linkedin/disconnect", "Disconnect LinkedIn for an explicitly named workspace you belong to with explicit confirmation. Future LinkedIn actions are blocked; history and limits are kept.", LinkedinConnectionStatus, LinkedinDisconnectRequest),
+    ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and mailbox (connection_ref = sending account id). Warmup resume never releases outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),
   },
   campaigns: {
     get: operation("GET", stageRoute("campaigns"), "Read the saved workspace graph, composition policy, current/future audience and preparation state by default. Previews are saved recipient examples. Explicit channel plus campaign_ref reads an existing individual campaign.", z.union([WorkspaceCampaignResult, EmailCampaignResult, LinkedinCampaignResult]), null, CampaignStageQuerySchema),

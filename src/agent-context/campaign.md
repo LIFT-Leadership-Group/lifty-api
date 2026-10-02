@@ -17,9 +17,10 @@ MCP exposes POST reads as `campaigns_post_read` and writes as
 Sign in through the current client before requesting provider authorization.
 Read the sending-accounts, crm or notifications guide through `summary_context`,
 then use its published connection operation. It returns a real link immediately
-with an `attempt_ref` and expiry. Show the link, let the founder choose their
-browser and account, and wait for their response. Read the same stage afterward
-with the retained `attempt_ref` and sending channel when required.
+with an attempt reference and expiry. Show the link, let the founder choose their
+browser and account, and wait for their response. Afterward read that exact
+attempt: `sending_accounts_attempt` with its `id`, or the crm/notifications stage
+GET with its `attempt_ref`.
 
 Only matching verified completion confirms that authorization. An older healthy
 grant does not complete a new reconnect. Preserve the reference after an
@@ -342,18 +343,15 @@ current operation schema changes.
 
 ## Email campaigns
 
-If no eligible email account is connected, offer the hosted email connection
-from the `sending-accounts` stage. Start it with the published email input;
-provider/account selection and the mailbox-use declaration happen
-in the browser. Do not ask for an address or mailbox-use questionnaire first.
-Reconnection creates a separately verifiable attempt while the existing grant
-remains usable; it does not require a destructive disconnect. A replacement
-account still follows the provider's existing pinned-account policy. Verify the
-exact returned attempt after the founder finishes. Connection never activates
-sending. The hosted form asks whether the account is a mailbox the founder
-already uses (`personal`, the default) or a new or dedicated account for
-outreach (`outreach`). Once the connection is verified, offer warmup as the
-`sending-accounts` stage describes. Read current preview policy and blockers
+If the campaign's sender has no connected mailbox, connect one for that sender
+with `sending_accounts_connect` as the `sending-accounts` guide describes (find
+the sender's `id` with `senders_get` first). Lifty's connect page asks whether
+it is a mailbox the person already uses (shown as `personal` here) or a
+dedicated sending mailbox (`outreach`). Do not ask for an address or
+questionnaire first. Reconnection creates a separately verifiable attempt; it
+does not require a destructive disconnect. Verify the exact attempt after the
+founder finishes. Connection never activates sending. Once the connection is
+verified, offer warmup as the `sending-accounts` stage describes. Read current preview policy and blockers
 before preparing or approving a send.
 
 Use this path only when the founder asks to prepare or operate a campaign.
@@ -369,16 +367,17 @@ API returns; never substitute another workspace or provider silently.
    alone does not demonstrate transport support or enable sending. Existing
    executions keep their pinned provider and account.
 3. Use `prepare` with the intended lead, current sender connection, name, start
-   time and supported steps from the live schema. Obtain connection_ref from
-   the sending-accounts email GET. Follow-ups wait at least one minute after
+   time and supported steps from the live schema. connection_ref is the
+   email account's `id` from `sending_accounts_get`. Follow-ups wait at least one minute after
    the previous confirmed send. Use PATCH with the saved campaign_ref for edits.
    A retry of identical content reuses its version; material edits invalidate
    approval and cancel outstanding steps of the old version.
 4. GET the exact preview. Show sender, recipient, copy, schedule, daily ceiling
    and blockers. Do not fabricate warmup or placement evidence. Habitual personal
    or business correspondence accounts may qualify, including corporate domains.
-   `email_signature_missing` means the sender has no saved signature: follow
-   the `sending-accounts` signature steps, then prepare the campaign again.
+   `email_signature_missing` means the sender has no saved signature: ask the
+   founder for their own text and save it with `senders_patch` (`senders`
+   guide), then prepare the campaign again.
    A new or dedicated `outreach` account shows `email_warmup_required` until
    its warmup passes: 21 active days, healthy, checked within the last 24 hours.
    Read sending-accounts `warmup_status` for that workspace and give the
@@ -404,7 +403,7 @@ API returns; never substitute another workspace or provider silently.
    Cancellation retains receipts and budget and cannot recall accepted mail.
 7. POST `pause` stops future steps. POST `suppress` suppresses the intended
    recipient. Disconnect the mailbox only with the founder's explicit yes, using
-   the sending-accounts `disconnect` operation for the current workspace. Do not
+   `sending_accounts_disconnect` for that account. Do not
    substitute a provider switch or another endpoint. Reconnection never restarts campaigns
    nor clears the physical mailbox's daily count.
 
@@ -419,13 +418,13 @@ before deciding whether any retry is safe. Do not replay uncertain sends.
 
 Use this separate channel path only for explicitly requested individual LinkedIn
 work or recovery. New workspace outreach uses shared configure above.
-The beta supports one existing habitual-use account per workspace. Read the
-`sending-accounts` stage and obtain the founder's IANA timezone plus explicit
-personal-use and no-other-automation declarations required by its LinkedIn POST.
-If another automation tool is active, do not connect. Hand off the returned real
-link and verify the same attempt after the founder finishes. Credentials stay
-in the hosted browser flow. A normal stage GET without `attempt_ref` reads the
-current connection reference and health for campaign preparation; it is not
+A sender has at most one LinkedIn account. Connect it for that sender with
+`sending_accounts_connect` (`sending-accounts` guide); Lifty's connect page asks
+the person to confirm it is their habitual personal account with no other
+automation tool. If another automation tool is active, do not connect. Hand off
+the returned real link and verify the same attempt after the founder finishes.
+Credentials stay in the browser sign-in. `sending_accounts_get` reads the
+account `id` (the campaign's connection reference) and its status; it is not
 proof of a new authorization. Connection does not authorize or activate sends.
 
 1. Select an existing researched lead in this workspace with its stored
@@ -457,11 +456,11 @@ proof of a new authorization. Connection does not authorize or activate sends.
    account issue before an explicitly requested sending-accounts reconnect.
    Reconnection preserves history/consumed limits and never restarts campaigns;
    reactivation is explicit. Disconnect LinkedIn only with the founder's explicit
-   yes, using the sending-accounts `disconnect` operation with
-   `{"channel":"linkedin","confirm":true}`.
+   yes, using `sending_accounts_disconnect` for that account with
+   `{"confirm":true}`.
 
 Canonical lead activity records continue to show invitations, acceptance,
-messages and replies through Unipile. Preserve those receipts when describing
+messages and replies through the connected account. Preserve those receipts when describing
 history. No warmup period or elapsed warning-free interval substitutes for
 functional canary acceptance. Never send extra test actions
 without approval of the exact recipient, account and copy.

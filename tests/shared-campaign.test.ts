@@ -34,7 +34,7 @@ const modify = WorkspaceCampaignRequest.parse({ operation: "modify", payload: {
 } });
 const changed = { ...saved, version_ref: nextVersion, digest: nextDigest,
   configuration: { ...shared, linkedin: { ...shared.linkedin, overlay: "Only a short greeting." } } };
-const headers = { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v7" };
+const headers = { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v8" };
 const base: Partial<AppDependencies> = {
   authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
   getWorkspace: async () => ({ state: "ready_for_connections", workspace: { workspace_ref: workspace, name: "Example" }, next_action: null }), log: () => {},

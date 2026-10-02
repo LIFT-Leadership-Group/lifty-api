@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { throwSenderError } from "./sender-choice.js";
 import { PublicError } from "./errors.js";
 
 const messages: Record<string, string> = {
@@ -9,7 +8,6 @@ const messages: Record<string, string> = {
   linkedin_workspace_suspended: "This workspace is paused. Resume it before activating LinkedIn.",
   unauthenticated: "Sign in to LIFTY before operating LinkedIn.",
   linkedin_confirmation_required: "Provide the current digest and explicitly confirm this operation.",
-  linkedin_intent_conflict: "This connection link is already being prepared or has ended. Check status before opening another link.",
   linkedin_invalid_content: "Use a lead with a LinkedIn profile and one plain-text message of 1–3000 characters.",
   linkedin_campaign_pin_mismatch: "The campaign’s sending connection or lead changed. Use its bound connection and lead.",
   linkedin_campaign_started: "An action has already started. Inspect the campaign before changing its approved content.",
@@ -21,17 +19,7 @@ const messages: Record<string, string> = {
   linkedin_health_stale: "Refresh the LinkedIn connection status before activating the campaign.",
   linkedin_policy_changed: "The connection policy changed. Prepare, preview and approve the campaign again.",
   linkedin_outbound_disabled: "LinkedIn sending is paused. Verify the connection and explicitly activate the campaign.",
-  linkedin_invalid_health: "The LinkedIn health check could not be verified. Sending remains paused.",
   linkedin_invalid_request: "Check the LinkedIn operation and required fields.",
-  linkedin_invalid_timezone: "Choose a valid IANA timezone.",
-  linkedin_declaration_required: "Use a personal LinkedIn account you use regularly, without another automation tool.",
-  linkedin_profile_conflict: "Reconnect the LinkedIn account already bound to this workspace.",
-  linkedin_identity_mismatch: "The authorized LinkedIn profile does not match the account bound to this workspace.",
-  linkedin_account_taken: "This LinkedIn account is already bound to another workspace.",
-  linkedin_namespace_mismatch: "The LinkedIn provider configuration changed. Contact LIFT support.",
-  linkedin_intent_expired: "This connection link expired. Run the LinkedIn connect command again.",
-  linkedin_callback_invalid: "This LinkedIn callback could not be verified.",
-  linkedin_callback_conflict: "This connection link already refers to a different account. Run connect again.",
   linkedin_target_forbidden: "Choose a lead from this workspace.",
   linkedin_connection_forbidden: "Choose a LinkedIn connection from this workspace.",
   linkedin_campaign_forbidden: "Choose a LinkedIn campaign from this workspace.",
@@ -49,14 +37,12 @@ const messages: Record<string, string> = {
   linkedin_channel_inactive: "LinkedIn sending is paused. Verify the connection, then explicitly activate the campaign.",
   linkedin_recovery_required: "An action has an uncertain result. Inspect status; do not resend it.",
   linkedin_cancel_confirmation_required: "Cancel using the exact digest and explicit confirmation.",
-  unipile_v1_retired: "This LinkedIn account was connected through Lifty's previous sign-in, which is retired. Disconnect it, then connect it again.",
 };
 export function linkedinFailure(code: string, status = 502, message = "LIFTY could not complete the LinkedIn request. Check status before trying again."): never {
   throw new PublicError({ status, code, message });
 }
 export function mapLinkedinRpcError(error: unknown, fallback = "LINKEDIN_CONNECTION_UNAVAILABLE"): never {
   if (error instanceof PublicError) throw error;
-  throwSenderError(error);
   const parsed = z.object({ code: z.string().optional(), message: z.string().optional() }).safeParse(error);
   const code = parsed.success ? parsed.data.code : undefined;
   const rawMessage = parsed.success ? parsed.data.message ?? "" : "";

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 
-const current = "lifty-cli-context.v7";
-const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6"];
+const current = "lifty-cli-context.v8";
+const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7"];
 const tasks = ["setup", "account", "campaign", "stages", "business", "targeting", "research-criteria",
-  "sample-review", "commercial-voice", "crm", "sending-accounts", "campaigns", "notifications"];
+  "sample-review", "commercial-voice", "crm", "senders", "sending-accounts", "campaigns", "notifications"];
 
 describe("retired client contracts", () => {
   it.each(retired)("rejects %s on every public context without exposing executable guidance", async version => {
@@ -24,8 +24,7 @@ describe("retired client contracts", () => {
     const business = vi.fn(async () => { throw new Error("retired client reached business state"); });
     const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
       getWorkspace: business, businessOperation: business, startRun: business,
-      startHubspotConnect: business, startSlackConnect: business, startEmailConnect: business,
-      startLinkedinConnect: business, log: () => {} });
+      startHubspotConnect: business, startSlackConnect: business, identityOperation: business, log: () => {} });
     const contract = await (await app.request("/openapi.json")).json();
     let checked = 0;
     for (const [path, methods] of Object.entries(contract.paths) as Array<[string, Record<string, any>]>) {

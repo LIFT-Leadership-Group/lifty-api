@@ -142,22 +142,13 @@ describe("LIFTY API workspace management (P6)", () => {
     expect(await response.json()).toMatchObject({ error: { code: "PROVIDER_INVALID" } });
   });
 
-  it("routes unipile honestly: reserved, not connectable yet", async () => {
+  it("accepts only HubSpot and Slack integration providers", async () => {
     const app = createApp({ authenticate });
-
-    const connect = await app.request("/v1/integrations/unipile/connect", {
-      method: "POST",
-      headers: authorized,
-    });
-    expect(connect.status).toBe(501);
-    expect(await connect.json()).toMatchObject({ error: { code: "PROVIDER_NOT_AVAILABLE" } });
-
-    const status = await app.request("/v1/integrations/unipile", { headers: authorized });
-    expect(status.status).toBe(200);
-    expect(await status.json()).toEqual({ provider: "unipile", status: "not_connected" });
-
-    const sync = await app.request("/v1/integrations/unipile/sync", { headers: authorized });
-    expect(sync.status).toBe(501);
+    for (const [path, method] of [["/v1/integrations/unipile/connect", "POST"], ["/v1/integrations/unipile", "GET"], ["/v1/integrations/unipile/sync", "GET"]] as const) {
+      const response = await app.request(path, { method, headers: authorized });
+      expect(response.status, path).toBe(400);
+      expect(await response.json()).toMatchObject({ error: { code: "PROVIDER_INVALID", message: "Unknown provider. Supported providers: hubspot, slack." } });
+    }
   });
 
   it("keeps the hubspot paths valid after provider generalization", async () => {

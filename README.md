@@ -21,9 +21,9 @@ configured Hono app for programmatic use.
 from the same catalog used by HTTP and MCP. Public context works before login
 and contains no tenant values or Scout base.
 
-The supported client contract is `lifty-cli-context.v7`. The CLI requests it
+The supported client contract is `lifty-cli-context.v8`. The CLI requests it
 through the public `client_contract` query and sends
-`x-lifty-client-contract: lifty-cli-context.v7` on authenticated requests.
+`x-lifty-client-contract: lifty-cli-context.v8` on authenticated requests.
 Missing, retired or unknown contracts return 409 `CONTEXT_CLIENT_UNSUPPORTED`
 after authentication. Invalid sessions return 401. Public unversioned links
 show current documentation. Health, login and provider browser callbacks keep
@@ -50,8 +50,8 @@ the database, which applies this one rule for every Lifty RPC.
 Edit public guidance in `src/agent-context/`. The CLI fetches fresh context,
 resolves a catalog operation and transports its request/response. It owns no
 Business schema, generation template or authoritative local draft. Build
-replaces `dist/agent-context/`, removing retired assets. Publish a compatible v7
-CLI before or alongside this API cutover; v6 is deliberately retired.
+replaces `dist/agent-context/`, removing retired assets. Publish a compatible v8
+CLI and dashboard alongside this API cutover; v7 is deliberately retired.
 
 Weekly research (LIF-1174) is one schedule per workspace: `weekly_target` plus
 active or paused, with CAS `expected_version`. The plan's weekly research limit
@@ -83,6 +83,9 @@ through one table in `src/rpc-errors.ts`; an unknown code is a 502
 - `POST /v1/workspace/sample-review`, `GET …/sample-review`, `GET /v1/workspace/runs/progress` — five-person calibration sample, its results and bounded progress
 - `GET /v1/workspace/research-schedule`, `PATCH …/research-schedule`, `POST …/research-schedule/activate`, `POST …/research-schedule/pause`, `GET …/research-schedule/status` — weekly research schedule and weekly status
 - `GET /v1/workspace/leads` — researched leads, newest first, with grade/week filters and an opaque cursor
+- `GET /v1/workspace/senders`, `POST …/senders`, `PATCH …/senders/{id}`, `POST …/senders/{id}/delete` — senders (people) with versioned name, signature and booking link; soft delete
+- `GET /v1/workspace/sending-accounts`, `POST …/sending-accounts/connect`, `GET …/sending-accounts/attempts/{id}`, `POST …/sending-accounts/{id}/reconnect|pause|resume|disconnect` — accounts each sender owns
+- `GET /connect/{email|linkedin}`, `POST …` — Lifty's connect page (declaration, then sign-in); `/connect/{channel}/return` is the shared confirmation shell
 - `GET /v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}`, `POST …` — operator-only acquisition recovery for a failed first run; not in the customer catalog, MCP tools or CLI. The database allows only LIFT admins
 - `POST /v1/integrations/{provider}/connect` — short-lived connection URL
 - `POST /v1/workspaces/{workspace_ref}/integrations/slack/connect-link` — admin-only seven-day client invitation for an explicit workspace; requires membership as well as LIFT admin status
@@ -145,78 +148,42 @@ prerequisites.
 
 Admin Slack invitations reuse `/slack/start` and `/slack/callback`. Reissuing replaces unused Slack invitations only for the selected workspace. The database rechecks the issuer's admin status, membership, and workspace activity when the callback consumes an admin invitation. Store neither generated links nor OAuth tokens in logs or durable evidence. Deploy migration `20260914180009_lif639_admin_slack_connect_links.sql` before this API, then the dashboard Settings card.
 
-## Hosted email connection (LIF-827)
+## Senders and sending accounts (LIF-1182)
 
-The CLI uses `POST /v1/email/connect` with `{workspace, email, mailbox_use}` and
-polls `GET /v1/email?workspace=<slug-or-id>`. Workspace membership is explicit;
-it never relies on the operator's default workspace. `personal` means a mailbox
-the founder already uses regularly, including business-domain mailboxes; its
-recorded declaration exempts warmup. New/dedicated `outreach` mailboxes require
-warmup. The profile fixes the configurable ceiling at 10 automated emails/day.
-This connection slice does not send mail or enable sender/channel/default routes.
-The actual atomic daily send budget and activation checks remain in LIF-828.
+A sender is a named person; every LinkedIn account or mailbox (a sending account)
+belongs to one sender, at most one LinkedIn account per sender. Every workspace
+uses the same operations; the database resolves the workspace from
+`x-lifty-workspace` (`src/identity-operations.ts`, member RPCs `get_lifty_senders`,
+`create_/patch_/delete_lifty_sender`, `get_lifty_sending_accounts`,
+`connect_/reconnect_lifty_sending_account`, `get_lifty_sending_account_attempt`,
+`pause_/resume_/disconnect_lifty_sending_account`). Reads are pure: they never
+check or change a provider. Account `observation` and `sends` come from SQL.
 
-The browser goes through `/unipile/start` to a single-use Unipile Gmail-only
-hosted link without mailbox-history sync. Gmail includes Google Workspace
-addresses on corporate domains; the authenticated provider determines eligibility.
-Outlook and IMAP/SMTP are unsupported in v1. Account readback enforces this
-restriction for callbacks, reconnections and status recovery, including old links.
-`/unipile/callback` requires an opaque
-intent and a server-generated correlation MAC, then independently rereads the
-bound account ID, exact email and mail-source health before persisting anything.
-It handles `CREATION_SUCCESS` and `RECONNECTED`. Revoked membership, suspended
-workspaces, stale intents and identity changes fail closed; repeated completed
-callbacks cannot reactivate a disconnected account.
+Connect and reconnect open a durable attempt and return Lifty's connect URL
+(`/connect/{channel}?intent=<sealed>`, `src/connect-state.ts`). The page asks
+the person's declaration (LinkedIn: habitual personal account, no other
+automation; email: habitual or dedicated mailbox), claims one sign-in link and
+hands off to the provider's Lifty-branded hosted sign-in. Completion requires a
+signed provider authorization, matching application/scope, an authenticated
+identity read (primary mailbox or LinkedIn SELF profile, the same identity for a
+reconnect) and the database's exclusivity checks. Browser return parameters are
+hints only. The confirmation shell, the agent's attempt read and the webhook
+converge on the same attempt through the trusted
+`lifty_sending_account_provider` RPC (`src/account-connection.ts`). Connecting
+never activates a campaign.
 
-Deployment order:
+Disconnect and sender delete commit the local block first, then request access
+removal at the provider within one 20-second budget per request
+(`REVOCATION_BUDGET_MS`). 200 means every affected account has
+`access_revoked_at` from provider evidence; 202 means it is still unconfirmed and
+the same request finishes it. Providers without a removal operation stay 202.
 
-1. Apply `lif827_hosted_email_connections` in the GTM Engine migration root and
-   align the source filename with the production ledger's actual version.
-2. Generate a dedicated random `LIFTY_EMAIL_SERVER_KEY` (at least 32 characters)
-   in the deployment secret manager. Provision only its SHA-256 digest plus the
-   stable Unipile organization/credential namespace into
-   `private.lifty_email_server_config`. The namespace is NOT the DSN. No seed
-   config is shipped, so an unconfigured deployment remains closed.
-3. Configure `UNIPILE_DSN`, `UNIPILE_ACCESS_TOKEN`, and that dedicated key in the
-   API deployment. Never add a Supabase service-role key to this API. The new
-   narrow RPC needs both the API key and current user membership (or a verified
-   provider callback backed by the stored issuer).
-4. Run the repository's verification/deployment scripts and publish a new CLI
-   version through the existing reviewed release process. A merge alone does
-   not publish or configure this feature. Existing CLI next.10 lacks the new
-   flags until a new version is released.
-5. Confirm with a real non-production mailbox, including reconnection and
-   expired/forged callbacks. Unit HTTP contracts and SQL fixture tests are not
-   live OAuth acceptance evidence.
-
-### Hosted connection domain
-
-Email and LinkedIn browser handoffs support `UNIPILE_HOSTED_AUTH_ORIGIN`.
-When unset, they use `https://account.unipile.com`. To enable a Lifty domain:
-
-1. Create `connect.liftygtm.com` as a CNAME to `account.unipile.com`.
-2. Ask Unipile support to activate the V1 hosted domain and issue its TLS
-   certificate. Verify public DNS and HTTPS before changing the API setting.
-3. Set `UNIPILE_HOSTED_AUTH_ORIGIN=https://connect.liftygtm.com` on the API
-   deployment. It accepts only an HTTPS DNS origin, with no credentials,
-   non-default port, path, query or fragment.
-4. Verify new and resumed email/LinkedIn handoffs, then real account
-   authorization and reconnection in the designated test workspace.
-
-The provider and database continue using canonical Unipile URLs. Only the
-browser redirect hostname changes; the session path/query, signed callbacks,
-identity readback and account permissions remain intact. No database migration
-or CLI update is required. Roll back by removing `UNIPILE_HOSTED_AUTH_ORIGIN`
-and deploying the configuration; existing unexpired intents remain usable.
-
-Custom domains do not establish logo removal or change Google/Microsoft's OAuth
-consent branding. Confirm V1 page branding separately with Unipile. Do not
-change shared OAuth credentials or migrate to V2 to enable this setting.
-
-LIF-827 still owns Mailivery warmup/placement evidence and durable activation
-policy. LIF-828 must enforce the per-physical-mailbox 10/day budget atomically
-across all automated sends, retries and workspace resets before any sending is
-enabled. Personal-use exemption never invents historical warmup dates.
+Configuration: `UNIPILE_V2_ACCESS_TOKEN`, `UNIPILE_V2_APPLICATION_ID`,
+`UNIPILE_V2_HOSTED_AUTH_ORIGINS` (Lifty's verified hosted sign-in origins only)
+and the existing `LIFTY_EMAIL_SERVER_KEY` / `LIFTY_LINKEDIN_SERVER_KEY`. The
+optional `UNIPILE_DSN` + `UNIPILE_ACCESS_TOKEN` pair is used only to remove access
+for accounts still bound through the earlier provider API. The Functions
+migration providing these RPCs must be released before this API.
 
 ## Mailivery warmup (LIF-989)
 
@@ -248,33 +215,13 @@ it `start` returns `EMAIL_WARMUP_NOT_CONFIGURED` before any write. The API never
 logs the key, the signed URL or Mailivery response bodies. Deploy the
 `lifty_email_warmup` founder RPC migration before this API.
 
-### Multiple client mailboxes (LIF-1000)
+### Warmup per mailbox (LIF-1000)
 
-Members can list available senders and email connections with
-`GET /v1/email/accounts?workspace=<slug-or-uuid>`, then request one exact
-mailbox link using `POST /v1/email/accounts/connect` with
-`{workspace,sender_ref,email}`. Retain the returned signed `attempt_ref` and
-verify it after consent using `POST /v1/email/accounts/connect/status` with
-`{workspace,attempt_ref}`. The selected sender must come from the workspace's
-accounts read. One sender may have several mailboxes. These explicit member
-operations are published in `context sending-accounts` and do not look up or
-create a founder profile.
-
-The API forwards the already verified, non-revoked caller JWT and configured
-publishable key only to fixed `/functions/v1/lift-unipile-connect/member/*`
-routes on its configured Supabase origin. The Edge owner checks workspace
-membership at list, issue and status. The API checks strict responses, exact
-setup URL path/query, attempt identity, issuer and expiry before returning a
-link. It does not use a service-role credential, log provider bodies or put
-attempt capabilities in status URLs. All requests require the current
-`x-lifty-client-contract` header as well as the bearer session.
-
-Members of a non-Lifty client workspace select one verified Unipile email
-connection with `connection_ref` (its UUID), in addition to `workspace`.
-The same selector is supported on status, start, pause, resume and remove.
-Client requests must supply it; the database checks workspace membership and
-that the selected connection belongs to that workspace. Founder requests
-continue to use `{workspace}` and receive the existing response shape.
+Warmup operations select one email account with `connection_ref` (the sending
+account `id`), in addition to `workspace`; it is required when the workspace has
+several email accounts. The same selector is supported on status, start, pause,
+resume and remove; the database checks workspace membership and that the account
+belongs to that workspace.
 
 For example, an operator with a Lifty API session for a member of `lift` can
 issue one request per connected mailbox. Set `CONNECTION_REF` to the verified
@@ -447,32 +394,7 @@ Validation: browser-script tests execute the delivered inline JavaScript against
 
 Primary contracts: [password recovery guide](https://supabase.com/docs/guides/auth/passwords), [Auth REST schema](https://github.com/supabase/auth/blob/master/openapi.yaml), [official Auth client recovery/transport](https://github.com/supabase/auth-js/blob/master/src/GoTrueClient.ts), [redirect allowlist](https://supabase.com/docs/guides/auth/redirect-urls). No mandatory email-verification or leaked-password setting is introduced.
 
-## LinkedIn v1 control plane (LIF-844)
-
-`POST /v1/linkedin/connect` accepts only the workspace, founder IANA timezone,
-`account_use: "personal"`, and `other_automation: false`. The declaration means
-an account the founder uses regularly and does not automate with another tool.
-The API returns a short-lived URL under `/unipile/linkedin/start`; the browser
-uses a single-use, LinkedIn-only Hosted Auth link. It does not inherit the email
-provider picker or MAILING synchronization options.
-
-The signed intent and callback correlation MAC have LinkedIn-specific purposes.
-`/unipile/linkedin/callback` records an immutable account hint, then verifies
-`GET /api/v1/accounts/{account_id}` and `GET /api/v1/users/me?account_id=...` using
-the provider credential. Both responses must identify LinkedIn and the same
-profile; every source must have a unique nonblank ID and `OK` health. Only the
-selected profile ID, safe profile URL and display name cross the API boundary.
-A callback body never establishes identity by itself. A provider outage keeps
-the hint so authenticated `GET /v1/linkedin?workspace=...` can finish readback.
-Workspace membership is checked before reconciliation and again by completion.
-
-Status verifies account health and writes unhealthy or unverifiable readback to
-the connection through a caller-scoped RPC. Disconnect accepts
-`{ "workspace": "slug-or-id", "confirm": true }` at
-`POST /v1/linkedin/disconnect`; it pauses the durable connection and campaigns.
-Connection, healthy recovery and reconnect do not activate outbound. A healthy,
-already active account may truthfully report `sending_enabled: true`; every
-new or reconnecting account stays inactive until explicit campaign activation.
+## LinkedIn campaigns (LIF-844)
 
 `POST /v1/linkedin/campaign` accepts `{ "operation": ..., "payload": ... }`:
 
@@ -604,31 +526,23 @@ application, scope and owner against the existing canonical connection. New
 V2-only accounts retain their real V2 ID and `unipile:v2:<application_id>`
 namespace. They cannot be rolled back onto a fictitious V1 account.
 
-`UNIPILE_V2_HOSTED_AUTH_ORIGINS` is a comma-separated allowlist of verified HTTPS
-origins. The default `https://auth.unipile.com` is also allowed. Rollout configuration
-snapshots the selected origin into each intent. The API passes that domain to
-Unipile, checks the exact returned origin, and stores/redirects the returned URL
-without rewriting it. Keep previous origins in the allowlist until their links
-expire. Use a separate V2 domain while V1 links remain active; V1 URLs keep the
-existing V1 browser-boundary rewrite.
+`UNIPILE_V2_HOSTED_AUTH_ORIGINS` is a comma-separated allowlist of Lifty's
+verified HTTPS hosted sign-in origins; the provider's default pages are rejected.
+The attempt snapshots its origin; the API passes that domain to Unipile, checks
+the exact returned origin, and redirects only to an allowlisted origin. Keep
+previous origins in the allowlist until their links expire.
 
 The API first claims the intent, persists a channel-separated HMAC state, and
 issues one hosted link. Browser return parameters never authorize attachment.
 Only a separately authenticated, state-bearing lifecycle event can supply the
 account for exact-attempt polling. Polling independently reads the account and
-owner, checks application/scope/legacy alias, and submits verified evidence to
-SQL. SQL rechecks ownership, current intent, expiry and disconnect races. V1
-callbacks are rejected for V2 intents. Reconnection never enables sending.
-LinkedIn health writes include transport version/generation to reject stale
-readbacks after cutover or rollback.
+owner, checks application/scope, and submits verified evidence to SQL. SQL
+rechecks ownership, current attempt, expiry and disconnect races. Reconnection
+never enables sending. Provider health is observed by Jobs, never by API reads.
 
 Currently V2 accepts Google mailbox connections with exactly one verified primary
-email sender, and LinkedIn with an exact self-profile match. Outlook and IMAP
-continue on V1: the documented V2 account response does not expose the V1
-delegated-mailbox flag or matching IMAP/SMTP service settings needed by the current
-mailbox policy. V2 deliberately rejects those providers until equivalent vendor
-evidence is established. This limitation does not change existing V1 Outlook or
-IMAP support.
+email sender, and LinkedIn with an exact self-profile match. V2 deliberately
+rejects other mailbox providers until equivalent vendor identity evidence exists.
 
 Rollback disables new V2 routing and uses the retained mapping's generation CAS
 for copied accounts. Keep V2 credentials, endpoint and domains available while

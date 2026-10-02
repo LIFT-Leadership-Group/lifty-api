@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { EmailPolicy, EmailConnectRequest } from "./email-contracts.js";
+import { EmailPolicy, EmailWorkspace } from "./email-contracts.js";
 
-const workspace = EmailConnectRequest.shape.workspace;
+const workspace = EmailWorkspace;
 const reference = z.uuid();
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const campaign = { workspace, campaign_ref: reference };

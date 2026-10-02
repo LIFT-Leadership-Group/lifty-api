@@ -5,8 +5,7 @@ import type { SupabaseAuthenticationConfig } from "./supabase-auth.js";
 import type { HubspotConnectSettings } from "./hubspot-connect.js";
 import type { SlackConnectSettings } from "./slack-connect.js";
 
-import type { LinkedinConnectSettings } from "./linkedin-connect.js";
-import type { EmailConnectSettings } from "./email-connect.js";
+import type { AccountConnectionSettings } from "./account-connection.js";
 import type { MailiverySettings } from "./email-warmup.js";
 import type { WarmupSetupSettings } from "./warmup-setup.js";
 import type { McpSettings } from "./mcp.js";
@@ -19,8 +18,6 @@ type Environment = Record<string, string | undefined>;
 export interface ServiceConfig {
   openAiAppsChallenge?: string;
   mcp?: McpSettings | null;
-  unipileHostedAuthOrigin?: string;
-  unipileV2HostedAuthOrigins?: string[];
   crm?: { serverKey: string; readOnly: boolean } | null;
   dashboardOrigin?: string;
   host: string;
@@ -28,8 +25,10 @@ export interface ServiceConfig {
   supabase: SupabaseAuthenticationConfig;
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
   slack: Omit<SlackConnectSettings, "fetchImpl"> | null;
-  email?: Omit<EmailConnectSettings, "fetchImpl"> | null;
-  linkedin?: Omit<LinkedinConnectSettings, "fetchImpl"> | null;
+  /** Existing per-channel server capabilities (campaign, warmup and connection RPCs). */
+  serverKeys?: { email: string | null; linkedin: string | null };
+  /** Sending-account connections (LIF-1182). Null keeps connect links closed; reads still work. */
+  accounts?: Omit<AccountConnectionSettings, "fetchImpl"> | null;
   /** Mailivery warmup (LIF-989). Null keeps warmup start closed. */
   mailivery?: MailiverySettings | null;
   /** SmartDelivery report reads for deliverability detail (LIF-1042). Null reports detail as not configured. */
@@ -159,17 +158,18 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const slackClientId = environment.SLACK_CLIENT_ID?.trim();
   const slackClientSecret = environment.SLACK_CLIENT_SECRET?.trim();
 
-  const providerValues = [environment.UNIPILE_DSN, environment.UNIPILE_ACCESS_TOKEN];
-  const providerReady = providerValues.every(value => Boolean(value?.trim()));
+  // The earlier provider API is used only to remove access to accounts still bound through it.
+  const v1Values = [environment.UNIPILE_DSN?.trim(), environment.UNIPILE_ACCESS_TOKEN?.trim()];
+  if (v1Values.some(Boolean) && !v1Values.every(Boolean)) throw new Error("Unipile access removal requires both UNIPILE_DSN and UNIPILE_ACCESS_TOKEN.");
+  const v1 = v1Values.every(Boolean) ? { dsn: v1Values[0]!, accessToken: v1Values[1]! } : null;
   const v2Token=environment.UNIPILE_V2_ACCESS_TOKEN?.trim(), v2Application=environment.UNIPILE_V2_APPLICATION_ID?.trim();
   const v2Origins=environment.UNIPILE_V2_HOSTED_AUTH_ORIGINS?.trim();
   if(Boolean(v2Token)!==Boolean(v2Application) || (v2Origins && !v2Token))throw new Error("Unipile V2 requires UNIPILE_V2_ACCESS_TOKEN and UNIPILE_V2_APPLICATION_ID.");
   if(v2Application && !/^app_[A-Za-z0-9_-]+$/.test(v2Application))throw new Error("Invalid UNIPILE_V2_APPLICATION_ID.");
   const v2=v2Token && v2Application ? {accessToken:v2Token,applicationId:v2Application,
     hostedAuthOrigins:[...new Set((v2Origins ? v2Origins.split(",") : []).map(value=>parseHostedAuthOrigin(value)))]} : undefined;
-  if(v2?.hostedAuthOrigins.includes("https://account.unipile.com"))throw new Error("V2 cannot use the V1 hosted authentication origin.");
-  // Founders sign in on Lifty's own hosted page; Unipile's default page is never offered.
-  if(v2 && (!v2.hostedAuthOrigins.length || v2.hostedAuthOrigins.includes("https://auth.unipile.com")))
+  // People sign in on Lifty's own hosted page; the provider's default pages are never offered.
+  if(v2 && (!v2.hostedAuthOrigins.length || v2.hostedAuthOrigins.some(origin => ["https://auth.unipile.com", "https://account.unipile.com"].includes(origin))))
     throw new Error("UNIPILE_V2_HOSTED_AUTH_ORIGINS must list Lifty's hosted sign-in origins only.");
   const crmKey = environment.LIFTY_CRM_SERVER_KEY?.trim();
   if (crmKey && (crmKey.length < 32 || crmKey.length > 256)) throw new Error("LIFTY_CRM_SERVER_KEY must contain 32 to 256 characters.");
@@ -177,9 +177,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const linkedinKey = environment.LIFTY_LINKEDIN_SERVER_KEY?.trim();
   const emailEnabled = Boolean(emailKey);
   const linkedinEnabled = Boolean(linkedinKey);
-  if(v2 && !emailEnabled && !linkedinEnabled)throw new Error("Unipile V2 requires a dedicated connection service key.");
-  if ((emailEnabled || linkedinEnabled) && !providerReady) throw new Error("Unipile requires both UNIPILE_DSN and UNIPILE_ACCESS_TOKEN.");
-  if (providerValues.some(value => Boolean(value?.trim())) && !emailEnabled && !linkedinEnabled) throw new Error("Unipile requires a dedicated email or LinkedIn service key.");
+  if((v2 || v1) && !emailEnabled && !linkedinEnabled)throw new Error("Unipile requires a dedicated email or LinkedIn service key.");
   if (emailKey && emailKey.length < 32) throw new Error("LIFTY_EMAIL_SERVER_KEY must contain at least 32 characters.");
   if (linkedinKey && linkedinKey.length < 32) throw new Error("LIFTY_LINKEDIN_SERVER_KEY must contain at least 32 characters.");
   if (linkedinKey && linkedinKey === emailKey) throw new Error("LinkedIn requires a server key distinct from email.");
@@ -203,8 +201,6 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   return {
     mcp,
     ...(openAiAppsChallenge === undefined ? {} : { openAiAppsChallenge }),
-    unipileHostedAuthOrigin: parseHostedAuthOrigin(environment.UNIPILE_HOSTED_AUTH_ORIGIN),
-    ...(v2 ? {unipileV2HostedAuthOrigins:v2.hostedAuthOrigins} : {}),
     crm: crmKey ? { serverKey: crmKey, readOnly: [environment.DASHBOARD_READ_ONLY_MODE, environment.CONSUMER_READ_ONLY_MODE].some(value => value === "1" || value?.toLowerCase() === "true") } : null,
     dashboardOrigin: dashboardUrl.origin,
     mailivery: mailiveryKey ? { apiKey: mailiveryKey } : null,
@@ -213,19 +209,12 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
       serverKey:emailKey, publicBaseUrl:warmupBaseUrl.origin, supabaseUrl:supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
       googleClientId, googleClientSecret, mailivery:{apiKey:mailiveryKey},
     } : null,
-    linkedin: linkedinEnabled ? {
-      ...(v2 ? {v2} : {}),
-      dsn: required(environment, "UNIPILE_DSN"), accessToken: required(environment, "UNIPILE_ACCESS_TOKEN"),
-      serverKey: required(environment, "LIFTY_LINKEDIN_SERVER_KEY"),
+    serverKeys: { email: emailKey || null, linkedin: linkedinKey || null },
+    accounts: v2 && (emailKey || linkedinKey) ? {
       publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
-    } : null,
-    email: emailEnabled ? {
-      ...(v2 ? {v2} : {}),
-      dsn: required(environment,"UNIPILE_DSN"), accessToken: required(environment,"UNIPILE_ACCESS_TOKEN"),
-      serverKey: required(environment,"LIFTY_EMAIL_SERVER_KEY"),
-      publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
-      supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
+      serverKeys: { ...(emailKey ? { email: emailKey } : {}), ...(linkedinKey ? { linkedin: linkedinKey } : {}) },
+      provider: { v2, v1 },
     } : null,
     host: environment.HOST?.trim() || "0.0.0.0",
     port: parsePort(environment.PORT),

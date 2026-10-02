@@ -94,8 +94,8 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
     .strict(),
 ]);
 
-/** Providers the integration routes accept. unipile is reserved: routed, not connectable yet. */
-export const ProviderSchema = z.enum(["hubspot", "slack", "unipile"]);
+/** Providers the integration routes accept. */
+export const ProviderSchema = z.enum(["hubspot", "slack"]);
 
 export const HubspotConnectStartSchema = z
   .object({
@@ -176,16 +176,10 @@ export const SlackConnectionStatusSchema = z.discriminatedUnion("status", [
     .strict(),
 ]);
 
-/** GET /v1/integrations/{provider}: hubspot reads the RPC; unipile has no connect path yet. */
+/** GET /v1/integrations/{provider}. */
 export const IntegrationConnectionStatusSchema = z.union([
   HubspotConnectionStatusSchema,
   SlackConnectionStatusSchema,
-  z
-    .object({
-      provider: z.literal("unipile"),
-      status: z.literal("not_connected"),
-    })
-    .strict(),
 ]);
 
 export const NotificationTypeSchema = z.enum([

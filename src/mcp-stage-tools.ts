@@ -20,7 +20,11 @@ const campaignReads = campaignReadOperations;
 const splitCampaigns = splitCampaignOperations;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
 const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.post", "campaigns.client_email", "campaigns.client_linkedin",
-  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test"]);
+  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
+  // Removing Lifty's access at the account provider.
+  "sending-accounts.disconnect", "senders.delete"]);
+// Creating a resource changes nothing that exists.
+const nonDestructive = new Set(["business.post", "senders.post"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.
@@ -30,6 +34,10 @@ function withoutDialect(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "$schema").map(([key, item]) => [key, withoutDialect(item)]));
 }
 const title = (value: string) => value.replace(/[-_]/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
+// Transport metadata shared by every tool, never a resource field. The stateless
+// adapter forwards it as x-lifty-workspace; the database resolves membership.
+const WorkspaceKey = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/);
+const WorkspaceProperty = { type: "string", pattern: "^[A-Za-z0-9_-]{1,100}$", description: "The user's chosen workspace; send on every call." };
 
 // Split the existing discriminated request, including nested channel unions.
 // Every field still comes from the REST contract; there is no second schema.
@@ -74,7 +82,8 @@ function entries(): Entry[] {
       const label = title(name);
       const body = campaignRead === undefined ? operation.request.body : campaignBody(operation.request.body!, campaignRead);
       if (operation.request.body && !body) throw new Error(`Empty MCP request variant: ${name}`);
-      const properties: Record<string, object> = { path: withoutDialect(operation.request.path) as object, query: withoutDialect(operation.request.query) as object };
+      const properties: Record<string, object> = { workspace: WorkspaceProperty,
+        path: withoutDialect(operation.request.path) as object, query: withoutDialect(operation.request.query) as object };
       const required: string[] = [];
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
@@ -84,9 +93,7 @@ function entries(): Entry[] {
         ...(campaignRead === undefined ? {} : { campaignRead }),
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },
-          annotations: { title: label, readOnlyHint: read, destructiveHint: !read && !(stage === "business" && action === "post"),
-            // Connection reconciliation can delete provider duplicates, but is
-            // still confined to the user's private accounts (not open-world).
+          annotations: { title: label, readOnlyHint: read, destructiveHint: !read && !nonDestructive.has(`${stage}.${action}`),
             openWorldHint: !read && openWorld.has(`${stage}.${action}`) } } };
     });
   }));
@@ -109,6 +116,7 @@ export const getStageMcpTools = (): StageMcpTool[] => {
 
 const QueryScalar = z.union([z.string(), z.number().finite(), z.boolean()]);
 const Envelope = z.object({
+  workspace: WorkspaceKey.optional(),
   path: z.record(z.string(), z.string().regex(/^[A-Za-z0-9_-]+$/)).default({}),
   // Array values become repeated parameters, as the CLI sends them.
   query: z.record(z.string(), z.union([QueryScalar, z.array(QueryScalar).min(1).max(20)])).default({}),
@@ -159,6 +167,12 @@ export async function callStageMcpTool(name: string, args: unknown, request: Req
   for (const key of ["authorization", "x-request-id", "x-lifty-workspace"]) {
     const value = request.headers.get(key);
     if (value) headers.set(key, value);
+  }
+  // One selection per call: a different connection-level header never silently wins.
+  const connectionWorkspace = request.headers.get("x-lifty-workspace")?.trim();
+  if (input.workspace) {
+    if (connectionWorkspace && connectionWorkspace !== input.workspace) return invalid();
+    headers.set("x-lifty-workspace", input.workspace);
   }
   const clientContract = request.headers.get("x-lifty-client-contract");
   if (clientContract && clientContract !== STAGE_CLIENT_CONTRACT) return result({ error: { code: "CONTEXT_CLIENT_UNSUPPORTED", message: "Reconnect Lifty to refresh the client contract." } }, true);

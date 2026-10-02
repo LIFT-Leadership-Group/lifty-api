@@ -15,7 +15,7 @@ import {
   type StageOperation,
 } from "./stage-contracts.js";
 
-export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v7";
+export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v8";
 export const CLIENT_UPGRADE_MESSAGE = `Update the installed LIFTY CLI and skill to ${STAGE_CLIENT_CONTRACT}. Earlier client contracts are retired. Reload the updated client; setup resumes from the server draft.`;
 export const AgentContextSchema = z.object({
   format: z.literal("lifty-context.v1"),
@@ -104,7 +104,7 @@ function operationGuide(
       )
       .map(
         ([key, op]) =>
-          `- lifty ${op.method.toLowerCase()} ${stage}${cliNoun(key, op)} → ${op.method} ${op.route}; MCP ${operationToolNames(stage, key).join(" / ")}`,
+          `- ${op.route === `/v1/context/${stage}` ? `lifty context ${stage}` : `lifty ${op.method.toLowerCase()} ${stage}${cliNoun(key, op)}`} → ${op.method} ${op.route}; MCP ${operationToolNames(stage, key).join(" / ")}`,
       )
       .join("\n")
   );
@@ -121,7 +121,7 @@ const stageDocuments = Object.fromEntries(
       operations,
       references: {
         ...stageReferences,
-        ...(["crm", "sending-accounts", "notifications"].includes(stage)
+        ...(["crm", "notifications"].includes(stage)
           ? { connections: readGuide("stage-connections") }
           : {}),
         // The interview carries the founder voice and first-reply rules;

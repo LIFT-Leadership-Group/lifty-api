@@ -1,144 +1,97 @@
 # Sending accounts
 
-Start with `whoami`. If it lists several workspaces and the user has not named
-one, ask which workspace they mean, naming the listed workspaces, before any
-other read. Do not try `summary_get` or GET to find out; send the chosen
-workspace with every call as `references.common` describes. For a LIFT-managed
-client workspace (`self_service: false` in `whoami`), start with
-`client_accounts` below using its exact slug, and never use the founder
-operations for it. `WORKSPACE_SELECTION_REQUIRED` means the same: ask which
-workspace, then continue.
+A sending account is one LinkedIn account or mailbox owned by one sender
+(`senders` guide). Every workspace uses the same operations; send the chosen
+workspace as `references.common` describes. Customers never see the provider
+behind Lifty's connection pages; do not name it.
 
-For a self-service workspace (always the case with a single workspace),
-refresh `summary_get` with approval before proposing setup or changes in a new
-authenticated session.
-Do not infer a founder workspace from summary or create a founder profile to
-manage client mailboxes. Reuse verified saved state. Unavailable reads require
-a retry, not assumptions that setup is missing.
+## Read
 
-Purpose: connect the requested sending channel through hosted Unipile flows.
-Use `summary_context` with `path: {"task":"sending-accounts"}` to read the
-current operations, `references.common` and `references.connections` in full.
-The shared guide applies in every client; follow each tool's path/query/body schema.
+`sending_accounts_get` (`lifty get sending-accounts`, optional query
+`sender_id`, `channel`) lists accounts including disconnected history. Each has:
 
-## Read current state
+- `status`: `connected`, `needs_reconnect` (Lifty lost access; the person must
+  sign in again) or `disconnected` (explicitly removed by the customer or an
+  operator).
+- `state`: `active` or `paused`, the account's own usage switch, independent of
+  `status`.
+- `checked_at` and `observation.state`: the last verified provider check and
+  whether it is recent enough. `unverified` means the last known facts are
+  older than the freshness window; it is not a disconnection and not a reason
+  to reconnect by itself. Sending waits until a fresh check.
+- `declaration`: what the person confirmed on Lifty's connect page.
+- `sends`: sends today and over the last seven days.
 
-For a named client workspace, use `client_accounts` with query
-`{"workspace":"<slug-or-uuid>"}`. It returns the workspace identity,
-available senders, each email connection and its campaign pause. Select the
-intended sender from that returned roster; do not invent its UUID, choose an
-unrelated sender, or reuse one from another workspace. One sender can own
-multiple mailboxes. If no sender is available, explain that a workspace
-operator must add one before setup. Do not request administrative credentials.
+Reads never check or change a provider. A failed read is unknown: retry it;
+never report an account as disconnected or missing from a failed read.
 
-The remaining main GET/POST instructions describe the founder flow.
-GET requires `channel: linkedin` or `channel: email` in the query. It reads
-the current account, health and provider policy. Add `attempt_ref` when
-verifying authorization; ordinary current-account state is insufficient.
-This check can complete previously authorized bindings, update health, and
-remove unreferenced duplicate LinkedIn provider accounts. Obtain approval
-before calling it; it does not authorize outreach.
+## Connect
 
-## Sender identity
+1. Resolve the person with `senders_get` and use their `id` (create the sender
+   first only if absent). Ask whose account it is when unclear.
+2. `sending_accounts_connect` with `{"sender_id":"<id>","channel":"linkedin"|"email"}`.
+   Ask nothing else: Lifty's connect page asks the person's declaration (for
+   LinkedIn, that it is their habitual personal account with no other
+   automation tool; for email, a mailbox they already use or a dedicated
+   sending mailbox), then opens the sign-in. Only Google is offered for new
+   mailboxes. A sender has at most one LinkedIn account
+   (`LINKEDIN_ALREADY_CONNECTED`: reconnect that one instead).
+3. Immediately show the returned `connection_url` as a clickable link and say
+   whose account it connects. Do not open it yourself. An open attempt for the
+   same sender and channel is reused (`created:false`): show its link again.
+4. After the person finishes, read `sending_accounts_attempt` with
+   `path.id` = the returned `id`, with bounded backoff. `connected` gives the
+   new `account_id`. A failed or timed-out read is unknown, not failure: keep
+   polling the same attempt. `failed` reasons: `canceled` (sign-in not
+   finished; offer a new connect when ready), `account_in_use` (the account is
+   live in another workspace; another link will not fix it), `identity_mismatch`
+   (another mailbox/profile signed in), `provider_rejected` (offer one new
+   attempt, then ask for LIFT review). `expired`: start a new connect.
 
-For the founder flow, call `senders` before starting an account connection.
-A sender is a person and may own both email and LinkedIn. Keep the returned
-sender references and account associations; never infer ownership from matching
-names, email domains, the Lifty login, or a shared workspace.
+Connecting never activates a campaign or sends anything.
 
-If the roster is empty, the first sender defaults to the account creator.
-Do not ask whether to create a sender or choose an existing one. Use the saved
-creator name. If it is missing, ask only for their name, then include
-`sender: {"kind":"self","name":"<confirmed person name>"}` in POST.
-With a saved creator name, the first POST may omit `sender`.
+## Reconnect
 
-For an additional account, ask which listed person owns it or whether to create
-a new sender. Include either `sender: {"kind":"existing","sender_ref":"<returned reference>"}`
-or `sender: {"kind":"new","name":"<confirmed person name>"}`. Reuse a choice
-already made in this conversation. Use person names such as Valen, never channel
-labels such as LinkedIn or Email, and never name a sender after an inbox address.
+`sending_accounts_reconnect` with `path.id` = the account `id` returns a
+`connection_url` like connect. The same mailbox or LinkedIn profile must sign
+in; another one fails with `identity_mismatch`. After `needs_reconnect` the
+account keeps its usage state. After an explicit disconnect it comes back
+`paused` until resumed. Reconnecting never resumes or activates a campaign.
+`CONNECT_UNAVAILABLE` means Lifty cannot reconnect this account through its
+current sign-in; ask LIFT support rather than connecting a different account.
 
-Reconnects keep their existing sender and need no repeated ownership question.
-A pending attempt also retains its selected sender: continue that attempt rather
-than selecting a different person. A sender conflict requires reviewing the
-saved binding; never disconnect or move an account to bypass it. After successful
-authorization, read `senders` again to confirm the exact connection is attached
-to the selected person. The returned connection status alone does not prove a
-new authorization; continue the exact-attempt verification below as well.
+## Pause and resume
 
-## Email signature
+`sending_accounts_pause` / `sending_accounts_resume` with `path.id`, only when
+the user asks. Pause stops new work on that account (in-flight sends settle);
+resume makes it usable again only when it is connected and every campaign gate
+allows. Resume refuses a disconnected account (`ACCOUNT_DISCONNECTED`):
+reconnect first. Neither changes other accounts or activates a campaign.
 
-Lifty adds the sender's plain-text signature to the end of every campaign
-email, after a blank line. While a sender has none, its email campaigns show
-`email_signature_missing` and cannot compose, be approved or send.
+## Disconnect
 
-After an email account is connected, and whenever `email_signature_missing`
-appears, call `signature` to read each sender's saved signature. If it is
-missing, ask the founder for the exact signature text for that sender. The
-signature is never written by AI: do not draft, suggest, complete or polish it,
-and add nothing the founder did not write (no title, company, link or
-tagline). If they only want their first name, that is the whole signature.
-Save exactly their text with `signature_save` and body
-`{"sender_ref":"<returned sender reference>","signature":"<their exact text>"}`.
-It must be plain text of at most 500 characters, with no HTML, and any link
-must start with `https://`.
-
-Saving a different signature composes unsent campaign previews again; emails
-already approved keep the signature they were approved with. Show the new
-previews before approval.
-
-## First setup and required inputs
-
-For a named client workspace, use `client_connect` with
-`{"workspace":"<slug-or-uuid>","sender_ref":"<returned-sender-uuid>","email":"<exact-address>","protocol_version":2}`.
-Connect each requested mailbox separately under its intended sender. Show the
-actual returned `connection_url` as a clickable link labeled with that exact
-mailbox. New mailboxes use the Lifty-branded Google flow. The owner signs into
-the matching Google account and approves access;
-no separate Unipile signup is needed. Keep the returned `attempt_ref` private
-and retain it with that workspace, sender and email. Never guess it or use a
-previous healthy connection as evidence of the new authorization.
-
-After consent, call `client_connect_status` with body
-`{"workspace":"<same-workspace>","attempt_ref":"<retained-reference>"}`.
-Only `status: connected` with its returned `connection_ref` confirms the
-selected mailbox. Keep checking the same attempt after pending or an
-unavailable read. `needs_authorization` or `needs_reconnect` requires the owner
-to finish or renew consent; `conflict` needs operator review. Do not create
-another account to bypass a conflict. An expired attempt needs a fresh link
-after reading current accounts. After a connection is verified, check it later with
-`client_connect_status` and `{"workspace":"<same-workspace>","connection_ref":"<verified-connection>"}`.
-This performs a fresh provider check even after the sign-in link expires. Use this
-for the 65-minute renewal test; do not reconnect or use an inventory row as proof
-of current provider health. Membership is checked again on every read.
-These operations require no founder onboarding. `CLIENT_UPDATE_REQUIRED` means
-update the CLI and request a fresh link; never work around it by generating a
-legacy provider link. A new mailbox never falls back to the old connection flow.
-Existing accounts retain their own connection flow and require no bulk migration.
-Connecting alone starts neither warmup nor campaigns. Keep both off for a
-connection-only test; only call `warmup_start` when the user requests warmup.
-
-POST selects the channel. For LinkedIn, obtain only missing current-contract
-declarations (`timezone`, personal `account_use`, and no `other_automation`)
-before the hosted LinkedIn account connection. Preserve existing policy limits.
-For email, use `channel: email` plus the sender choice above: provider/account selection
-happens on the hosted email connection screen for a new account. A saved account
-reconnects with its existing provider. Do not add an email-address or
-mailbox-use questionnaire, ask for a password, or create an artificial address.
-Hosted selection must satisfy the existing provider/policy checks afterward.
-
-Show the actual returned link immediately as "Connect LinkedIn" or "Connect
-your email account" in the founder's language. Keep `attempt_ref` and verify
-with GET using both the same channel and reference after authorization.
+Only with the user's explicit yes in this conversation:
+`sending_accounts_disconnect` with `path.id` and `{"confirm":true}`. The account
+is paused and disconnected at once (new sends stop; already submitted sends
+keep their history and limits), then Lifty removes its access at the provider.
+200 means access removal is confirmed (`access_revoked_at`). 202 means the
+account is blocked but removal is not confirmed yet: repeat the same request a
+few times with short waits; no new consent is needed. If it stays unconfirmed,
+tell the user the account is blocked and removal is pending, and repeat it later
+on the same account. Never claim access was removed without `access_revoked_at`.
+Other accounts are unaffected. To change mailboxes, connect the new one and
+disconnect the old one.
 
 ## Email warmup after connection
 
-For client mailboxes, use `warmup_status` and `warmup_start` with both the
-explicit `workspace` and the verified `connection_ref`. GET inputs belong in
-query; POST inputs belong in body.
-Mailivery authorization is a separate Google OAuth step from Unipile. Show
-the returned branded setup link for that exact mailbox; the owner must choose
-the same Google account again. Client setup has no app-password fallback.
+Warmup, placement and inbox health keep their own operations. They take the
+explicit `workspace` and, as `connection_ref`, the email account's `id` from
+`sending_accounts_get`; `connection_ref` is required when the workspace has
+several email accounts. GET inputs belong in query; POST inputs belong in body.
+Mailivery authorization is a separate Google OAuth step from the account
+connection. Show the returned branded setup link for that exact mailbox; the
+owner must choose the same Google account again. There is no app-password
+fallback.
 
 Keep every requested connection's campaigns paused throughout its own 21
 active warmup days, starting from its actual Mailivery warmup. Paused days and
@@ -155,10 +108,10 @@ Use `warmup_pause`, `warmup_resume` or `warmup_remove` with the same two
 selectors when requested. Warmup resume never resumes campaigns. Report each mailbox
 separately; readiness or consent for one cannot satisfy another mailbox.
 
-For the founder flow without `connection_ref`, continue as follows.
-After GET confirms the email account is connected, call `warmup_status` with
-the explicit `workspace` in query. Its `mailbox_use` decides
-what to tell the founder. Use the returned `recommended_go_live` message and
+After the email account is connected, call `warmup_status` with the explicit
+`workspace` (and `connection_ref` when needed) in query. Its `mailbox_use`
+decides what to tell the founder: `personal` is a mailbox the person already
+uses (declared habitual) and `outreach` a dedicated sending mailbox. Use the returned `recommended_go_live` message and
 date; do not compute your own.
 
 - `personal`: campaigns can start now and warmup is optional. Explain the
@@ -181,7 +134,7 @@ does not create another email address.
 
 Warmup setup uses Google OAuth only. Never request an App Password or route the
 founder to a legacy password form or Microsoft consent flow. Mailivery needs
-separate mailbox access; Unipile's grant cannot be reused. If the returned link
+separate mailbox access; the account connection's grant cannot be reused. If the returned link
 or status does not support the current Lifty Google setup, report the actual
 blocker and involve support. Do not create another account or invent a link.
 
@@ -235,8 +188,8 @@ mailbox or starts campaigns by itself. For founders it is advisory.
 
 To answer how inboxes are doing, what a sender's last placement tests were,
 or when an inbox will be ready, use `deliverability` with the explicit
-`workspace` in query. Add `sender` (a ref from `client_accounts` or
-`senders`, or `unassigned`) or `mailbox`; add `detail: placement` with one
+`workspace` in query. Add `sender` (a sender `id` from `senders_get`, or
+`unassigned`) or `mailbox`; add `detail: placement` with one
 `mailbox_ref` only when the stored test reports are needed. Follow
 `next_cursor` until it is null before describing all inboxes.
 
@@ -247,47 +200,11 @@ missing or out-of-date evidence is not healthy. Workspace health covers the
 whole workspace, not one inbox. This read never starts a placement test or
 changes sending; propose those only as separate, explicitly requested actions.
 
-## Later edits
+## Campaigns and accounts
 
-Reconnection uses POST again and must verify the new attempt, even while the
-old account is healthy. PATCH is unsupported (405): account identity, limits,
-provider policy and sending enablement are not freely writable settings.
-Use the supported authorization flow to replace consent; do not patch around it.
-
-When the founder explicitly wants to choose another email account or provider,
-the saved account must first be disconnected if it is still connected.
-Disconnect only after the founder explicitly confirms in this conversation:
-`disconnect` with `{"channel":"email","confirm":true}` (or `"linkedin"`)
-disconnects the current workspace's account and returns its new state. Future
-campaign steps on that channel stay blocked; history and consumed sending
-limits are kept. For an explicitly named client workspace use
-`client_email_disconnect` or `client_linkedin_disconnect`; check client LinkedIn
-with `client_linkedin_status` and reconnect it with `client_linkedin_connect`.
-After that authorized disconnect is verified, POST
-`{"channel":"email","select_account":true,"sender":{"kind":"existing","sender_ref":"<selected sender>"}}`
-(or the confirmed new-sender choice). This opens a new hosted provider
-selector for Google and leaves sending disabled. Existing Microsoft and IMAP/SMTP
-connections retain their reconnect flow; new connections for those providers
-are unavailable until equivalent account verification is supported.
-An ordinary POST without `select_account: true` reconnects the saved mailbox;
-it does not reopen provider selection. Do not disconnect a working account just
-to preview the selector. Selection does not erase earlier account history or
-restart campaigns, and still requires verified authorization for the new attempt.
-The workspace campaign sends from the workspace's current mailbox: a reconnect
-or a replaced account changes neither its version nor its approval. Do not
-modify the campaign to point at the new connection; after a disconnect the
-founder resumes it by activating the same version.
-
-## User-facing behavior and errors
-
-Explain confirmed pending, expired, denied or failed attempts without exposing
-callback contents. A failed attempt with `authorization_cancelled`,
-`account_exists` or `provider_rejected` means the provider reported that error
-when it sent the founder back; follow the connection-stage guidance for each. Retry status reads using the same reference and wait the
-returned retry interval. When a known mailbox already exists at the provider,
-Lifty reconnects that account instead of creating another one, and a mailbox
-held live by another workspace fails before any link is issued. Never interpret a failed read as disconnected or a
-previous connected grant as the new attempt. A verified connection does not
-authorize any email, message or invitation; use campaign previews and explicit
-approval/activation before sending. Connection can proceed while the sample
-or new research is waiting for the weekly reset.
+Campaigns refer to senders. Which of a sender's mailboxes sends is a campaign
+decision; a reconnected or replaced mailbox never changes an approved
+campaign. A connected account does not authorize any email, message or
+invitation: use campaign previews and explicit approval/activation.
+Connection can proceed while the sample or new research waits for the weekly
+reset.

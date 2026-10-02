@@ -33,6 +33,8 @@ describe("generated MCP stage operations", () => {
         expect(typeof tool.annotations.readOnlyHint).toBe("boolean");
         expect(typeof tool.annotations.destructiveHint).toBe("boolean");
         if (tool.annotations.readOnlyHint) expect(tool.annotations.destructiveHint).toBe(false);
+        expect(tool.inputSchema.properties.workspace).toMatchObject({ type: "string" });
+        expect(tool.inputSchema.required).not.toContain("workspace");
         expect(tool.inputSchema.properties.path).toEqual(withoutDialect(operation.request.path));
         expect(tool.inputSchema.properties.query).toEqual(withoutDialect(operation.request.query));
         if (!split && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(withoutDialect(operation.request.body));
@@ -47,20 +49,22 @@ describe("generated MCP stage operations", () => {
     expect(JSON.stringify(tools).length).toBeLessThan(190_000);
     expect(tools.find(tool => tool.name === "crm_mapping_sources")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "sending_accounts_deliverability")!.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
-    expect(tools.find(tool => tool.name === "sending_accounts_client_connect_status")!.annotations.readOnlyHint).toBe(false);
+    expect(tools.find(tool => tool.name === "sending_accounts_disconnect")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
+    expect(tools.find(tool => tool.name === "senders_delete")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
+    expect(tools.find(tool => tool.name === "senders_post")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: false });
     expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.destructiveHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_post_write")!.annotations.openWorldHint).toBe(true);
     expect(tools.find(tool => tool.name === "summary_get")!.annotations.openWorldHint).toBe(false);
     expect(tools.find(tool => tool.name === "next_step")!.annotations.openWorldHint).toBe(false);
-    expect(tools.find(tool => tool.name === "sending_accounts_get")!.inputSchema.required).toContain("query");
+    expect(tools.find(tool => tool.name === "sending_accounts_reconnect")!.inputSchema.required).toEqual(["path"]);
   });
 
   it("keeps authentication, current contract, validation and the shared mutation limiter in the owning REST route", async () => {
     const create = vi.fn(async () => ({ created:true, workspace:{...workspace,state:"ready_for_connections"},profile:profileFixture,voice:{version:0} }));
     const auth = vi.fn(async (request: Request) => request.headers.get("authorization") === "Bearer founder"
       ? { ok: true as const, session: { userId: "founder", client: {} } } : { ok: false as const, reason: "invalid_session" as const });
-    const app = createApp({ authenticate: auth, listMemberWorkspaces: async()=>({workspaces:[{workspace_ref:workspace.workspace_ref,name:"Example",slug:"example",active:true,self_service:true,founder_default:true}]}), businessOperation: create, log: () => {} });
+    const app = createApp({ authenticate: auth, listMemberWorkspaces: async()=>({workspaces:[{workspace_ref:workspace.workspace_ref,name:"Example",slug:"example",active:true}]}), businessOperation: create, log: () => {} });
     const dispatch = (route: string, init: RequestInit) => Promise.resolve(app.request(route, init));
     const input = { body: { name: "Example",website_url:null } };
     expect((await callStageMcpTool("business_post", input, new Request("https://example.test/mcp"), dispatch)).structuredContent.status).toBe(401);
@@ -74,21 +78,41 @@ describe("generated MCP stage operations", () => {
     expect(auth.mock.calls.at(-1)![0].headers.get("x-lifty-client-contract")).toBe(STAGE_CLIENT_CONTRACT);
   });
 
-  it("requires write permission for account checks that reconcile or remove provider duplicates", () => {
+  it("publishes the summary and account reads as read-only tools; only the attempt read reconciles a prior authorization", () => {
     const tools = getStageMcpTools();
-    for (const name of ["summary_get", "sending_accounts_get", "sending_accounts_client_connect_status"]) {
-      expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({
-        readOnlyHint: false, destructiveHint: true, openWorldHint: false,
-      });
+    for (const name of ["summary_get", "senders_get", "sending_accounts_get", "sending_accounts_attempt", "next_step", "crm_get", "notifications_get"]) {
+      expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
     }
-    for (const name of ["summary_get", "sending_accounts_get"]) {
-      expect(tools.find(tool => tool.name === name)!.description).toContain("remove unreferenced duplicate LinkedIn provider accounts");
+    for (const name of ["summary_get", "senders_get", "sending_accounts_get"]) {
+      expect(tools.find(tool => tool.name === name)!.description, name).toMatch(/Read-only/);
     }
-    for (const name of ["next_step", "crm_get", "notifications_get"]) {
-      expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({
-        readOnlyHint: true, destructiveHint: false, openWorldHint: false,
-      });
+    for (const retired of ["sending_accounts_senders", "sending_accounts_signature_save", "sending_accounts_post", "sending_accounts_client_accounts",
+      "sending_accounts_client_connect", "sending_accounts_client_connect_status", "sending_accounts_client_email_disconnect",
+      "sending_accounts_client_linkedin_status", "sending_accounts_client_linkedin_connect", "sending_accounts_client_linkedin_disconnect"]) {
+      expect(tools.some(tool => tool.name === retired), retired).toBe(false);
     }
+  });
+
+  it("forwards the common workspace input as the selection header on every stage and never overrides a different one", async () => {
+    const seen: (string | null)[] = [];
+    const dispatch = vi.fn(async (_route: string, init: RequestInit) => { seen.push(new Headers(init.headers).get("x-lifty-workspace")); return Response.json({}); });
+    for (const [name, args] of [["business_get", {}], ["research_schedule_get", {}], ["senders_get", {}],
+      ["sending_accounts_pause", { path: { id: "11111111-1111-4111-8111-111111111111" } }]] as const) {
+      expect((await callStageMcpTool(name, { ...args, workspace: "acme" }, incoming(), dispatch)).isError, name).toBe(false);
+    }
+    expect(seen).toEqual(["acme", "acme", "acme", "acme"]);
+    const pinned = incoming(); pinned.headers.set("x-lifty-workspace", "acme");
+    expect((await callStageMcpTool("senders_get", {}, pinned, dispatch)).isError).toBe(false);
+    expect((await callStageMcpTool("senders_get", { workspace: "acme" }, pinned, dispatch)).isError).toBe(false);
+    expect(seen.slice(4)).toEqual(["acme", "acme"]);
+    expect(dispatch).toHaveBeenCalledTimes(6);
+    for (const workspace of ["other", "../acme", ""]) {
+      expect((await callStageMcpTool("senders_get", { workspace }, workspace === "other" ? pinned : incoming(), dispatch)).isError, workspace).toBe(true);
+    }
+    expect(dispatch).toHaveBeenCalledTimes(6);
+    // Without any selection the database rule decides; nothing is invented.
+    expect((await callStageMcpTool("senders_get", {}, incoming(), dispatch)).isError).toBe(false);
+    expect(seen.at(-1)).toBeNull();
   });
 
   it("refuses retired onboarding aliases without dispatching", async () => {
@@ -126,13 +150,11 @@ describe("generated MCP stage operations", () => {
     const other = "33333333-3333-4333-8333-333333333333";
     const disconnectIntegration = vi.fn(async (_session: unknown, provider: "hubspot" | "slack") => ({ provider, status: "disconnected" as const,
       portal_id: null, disconnected_at: "2026-09-28T00:00:00Z", workspace, revocation_ref: null }));
-    const disconnectEmail = vi.fn(async (_session: unknown, _workspace: string) => ({ provider: "unipile" as const, channel: "email" as const,
-      workspace_ref: workspace.workspace_ref, status: "not_connected" as const }));
-    const disconnectLinkedin = vi.fn(async (_session: unknown, _workspace: string) => ({ provider: "unipile" as const, channel: "linkedin" as const,
-      workspace_ref: workspace.workspace_ref, status: "not_connected" as const }));
+    const identity = vi.fn(async (_session: unknown, _key: string, input: { path: Record<string, string> }) => ({ status: 202 as const, body: { workspace: { ...workspace, state: "ready_for_connections" },
+      account: { id: input.path.id } } }));
     const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
       getWorkspace: async () => ({ state: "ready_for_connections", workspace, next_action: null }),
-      disconnectIntegration, disconnectEmail, disconnectLinkedin, enqueueIntegrationRevocation: vi.fn(), log: () => {} } as never);
+      disconnectIntegration, identityOperation: identity, enqueueIntegrationRevocation: vi.fn(), log: () => {} } as never);
     const dispatch = (route: string, init: RequestInit) => Promise.resolve(app.request(route, init));
     const call = (name: string, args: unknown) => callStageMcpTool(name, args, incoming(), dispatch);
 
@@ -141,15 +163,13 @@ describe("generated MCP stage operations", () => {
     expect(disconnectIntegration.mock.calls.map(([, provider]) => provider)).toEqual(["hubspot", "slack"]);
     expect((await call("crm_disconnect", { body: { workspace: other } })).isError).toBe(true);
 
-    expect((await call("sending_accounts_disconnect", { body: { channel: "email", confirm: true } })).isError).toBe(false);
-    expect((await call("sending_accounts_disconnect", { body: { channel: "linkedin", confirm: true } })).isError).toBe(false);
-    expect(disconnectEmail).toHaveBeenCalledWith(expect.anything(), workspace.workspace_ref);
-    expect(disconnectLinkedin).toHaveBeenCalledWith(expect.anything(), workspace.workspace_ref);
-    for (const body of [{ channel: "email" }, { channel: "email", confirm: true, workspace: other }]) {
-      expect((await call("sending_accounts_disconnect", { body })).isError).toBe(true);
+    const id = "44444444-4444-4444-8444-444444444444";
+    expect((await call("sending_accounts_disconnect", { path: { id }, body: { confirm: true } })).structuredContent).toMatchObject({ status: 202, data: { account: { id } } });
+    expect(identity).toHaveBeenCalledExactlyOnceWith(expect.anything(), "sending-accounts.disconnect", { path: { id }, query: {}, body: { confirm: true } }, expect.any(AbortSignal));
+    for (const args of [{ path: { id }, body: {} }, { path: { id }, body: { confirm: true, channel: "email" } }, { body: { confirm: true } }]) {
+      expect((await call("sending_accounts_disconnect", args)).isError).toBe(true);
     }
-    expect(disconnectEmail).toHaveBeenCalledOnce();
-    expect(disconnectLinkedin).toHaveBeenCalledOnce();
+    expect(identity).toHaveBeenCalledOnce();
   });
 
   it("keeps sends out of client campaign read tools", async () => {

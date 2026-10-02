@@ -3,14 +3,12 @@
  "filters": {
   "senders": [
    {
-    "is_active": true,
     "mailbox_count": 3,
     "name": "Dana Smith",
     "sender_ref": "10392000-0000-4000-8000-000000000001",
     "workspace_ref": "10391000-0000-4000-8000-000000000001"
    },
    {
-    "is_active": true,
     "mailbox_count": 2,
     "name": "Lee Park",
     "sender_ref": "10392000-0000-4000-8000-000000000002",
@@ -194,7 +192,6 @@
    },
    "senders": [
     {
-     "is_active": true,
      "name": "Lee Park",
      "sender_ref": "10392000-0000-4000-8000-000000000002",
      "sources": [
@@ -330,7 +327,6 @@
    },
    "senders": [
     {
-     "is_active": true,
      "name": "Dana Smith",
      "sender_ref": "10392000-0000-4000-8000-000000000001",
      "sources": [
@@ -338,7 +334,6 @@
      ]
     },
     {
-     "is_active": true,
      "name": "Lee Park",
      "sender_ref": "10392000-0000-4000-8000-000000000002",
      "sources": [
