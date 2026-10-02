@@ -1,3 +1,4 @@
+import { PublicError } from "../src/errors.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { describe, expect, it, vi } from "vitest";
@@ -42,7 +43,7 @@ describe("MCP HTTP boundary", () => {
     const authenticate = vi.fn(authentication);
     const app = createApp({ mcp: { ...settings, authenticate }, authenticate,
       getWorkspace: async () => ({ state: "needs_workspace", workspace: null, next_action: "provision_workspace" }),
-      getOnboardingState: async () => ({ state: "none", revision: 0 }) });
+      listMemberWorkspaces: async () => ({workspaces:[]}), businessOperation: async () => ({workspace:null,profile:null}) });
     await Promise.all(["founder-1", "founder-2"].map(async userId => {
       const transport = new StreamableHTTPClientTransport(new URL(settings.resourceUrl), {
         requestInit: { headers: { authorization: `Bearer ${userId}` } },
@@ -59,10 +60,10 @@ describe("MCP HTTP boundary", () => {
         expect(list.tools[0]).toMatchObject({ name: "whoami", annotations: { readOnlyHint: true, destructiveHint: false },
           _meta: { securitySchemes: [{ type: "oauth2", scopes: ["openid", "email", "profile"] }] } });
         const result = await client.callTool({ name: "whoami", arguments: {} });
-        expect(result.structuredContent).toEqual({ user_id: userId, workspaces: null });
+        expect(result.structuredContent).toEqual({ user_id: userId, workspaces: [] });
         const next = await client.callTool({ name: "next_step", arguments: {} });
         expect(next.structuredContent).toMatchObject({ status: 200, data: { step: "business", reason: "workspace_missing",
-          section: "leads", gates: { next: "company" }, guide: { task: "step-interview" } } });
+          section: "leads", gates: null, guide: { task: "business" } } });
         expect(client.getInstructions()).toContain("Start with whoami, then next_step");
         expect(JSON.stringify(result)).not.toContain("Bearer");
         expect(transport.sessionId).toBeUndefined();
@@ -86,8 +87,8 @@ describe("MCP HTTP boundary", () => {
     expect(listMemberWorkspaces.mock.calls.map(([session]) => session.userId)).toEqual(["founder-1", "founder-2", "founder-broken"]);
   });
 
-  it("returns a relinking challenge if the REST session is revoked after MCP authentication", async () => {
-    const app = createApp({ mcp: { ...settings, authenticate: authentication }, log: () => {} });
+  it("returns a relinking challenge when SQL rejects a session after MCP authentication", async () => {
+    const app = createApp({ mcp: { ...settings, authenticate: authentication }, listMemberWorkspaces:async()=>({workspaces:[]}), businessOperation:async()=>{throw new PublicError({status:401,code:"UNAUTHORIZED",message:"Session revoked"});}, log: () => {} });
     const response = await app.request(post("tools/call", { name: "business_get", arguments: {} }));
     const payload = await response.json();
     expect(payload.result).toMatchObject({ isError: true, structuredContent: { status: 401 } });

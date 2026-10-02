@@ -1,44 +1,17 @@
-# Targeting / ICP
+# Targeting
 
-Purpose: translate confirmed buyer and company criteria into supported
-discovery fields. Read `references.common`, `interview` and `calibration`.
+Targeting owns the people and company search filters and the personas. Read every saved lane before editing. Filter first: research costs time and budget, so an exclusion a search filter can express belongs here before any research runs (excluded_industry_codes, company.employees, locations). Explain that to the founder in one sentence. Only exclusions that need evidence go to the research criteria.
 
-## Read current state
+A lane has personas, seniorities, person_locations and company `{locations, industries, industry_codes, excluded_industry_codes, domains, employees, keywords}`. Lanes have no names; the server assigns lane and persona ids. NAICS industry_codes and excluded_industry_codes use the public 2–6 digit standard; validate codes against the official NAICS reference at https://www.census.gov/naics/ . company.employees is always a list of ordered, non-overlapping `{min, max}` ranges; max null means no ceiling. A persona is `{id, name, titles, persona_type}`; its role and organizational tell belong to the criteria inputs. Allocation and data-quality settings are platform policy, not targeting. Follow references.configuration for each filter's meaning.
 
-GET reads the saved ICP/personas. Read `generation_context` before edits to
-obtain current configuration, confirmed draft, generation rules and artifact
-schema. Existing values answer questions; shared schemas do not.
+PATCH sends expected_version and lanes:
 
-## First setup and required inputs
+- `{id, ...fields}` changes that lane; omitted fields, including omitted company keys, stay as they are. Null clears a filter.
+- A lane without id is added (personas required); the server assigns its id.
+- `{id, remove: true}` removes that lane and carries no other keys. At least one lane must remain.
 
-Obtain only missing company, buyer, geography, size/unit, persona and exclusion
-decisions described by the current draft schema. Read `onboarding_context` and
-generate the configuration locally against its current schema. Stage POST
-uses the existing full onboarding submission (`draft` and `configuration`),
-once for the initial setup; it is not a partial-stage write. Research criteria
-and commercial voice share that initial transaction. Follow
-`references.configuration`: save through `onboarding_save`, submit the exact saved
-pair with its revision and stable key, follow `onboarding_status`, then GET
-saved targeting. A lost response reuses the original key and content. Never
-repeat the initial submission per stage.
+Lanes you do not list stay unchanged. personas, when given, replaces that lane's list: keep each existing persona's id to preserve its identity; a persona without id is new.
 
-## Later edits
+A persona change (added, removed, renamed, titles or type changed) needs regenerated_criteria in the same PATCH, because the criteria describe the personas: both change together or neither does. regenerated_criteria carries the criteria expected_version and the regenerated text and/or research_fields; author it with references.configuration. Without it the server returns CRITERIA_REGENERATION_REQUIRED and writes nothing. Filter-only edits regenerate nothing.
 
-PATCH uses `section: icp`, changed `values`, and the locally generated
-`configuration` required by the authenticated generation contract. Supported
-criteria are person/company locations, industries, employee ranges, seniorities,
-personas, generic keywords, email status, staleness and extrapolation settings.
-Use the runtime schema/rules for exact fields. Persona lists replace the full
-list, so preserve confirmed personas when changing filters only. Confirm the
-applied receipt and read back saved targeting before reviewing a new sample.
-
-## User-facing behavior and errors
-
-Distinguish buyer geography from company headquarters. ARR/revenue is not
-headcount; use an employee proxy only with founder agreement. Industry labels
-do not prove native provider filtering; keywords are not Boolean search.
-Explain any intentionally unrestricted native search before applying it.
-Lane labels, allocation weights, versions and digests are read-only. Respect
-multi-lane management restrictions and stale-context errors. Preserve unrelated
-criteria and the A/B/C evidence rubric. A poor sample warrants diagnosis and a
-confirmed adjustment, not repeated unchanged discovery or invented fit.
+Changed filters affect the next discovery; people already found are not repeated. After calibration, when several people were disqualified for a reason a filter could cover, propose that filter and explain that it keeps research on people who can fit (references.calibration). On VERSION_CONFLICT read the latest targeting and reapply only the intended change. Initial creation belongs to setup; targeting is never deleted or activated here.

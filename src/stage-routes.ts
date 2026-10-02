@@ -1,8 +1,10 @@
+import { businessEntries, validateBusinessRequest } from "./business-operations.js";
+import { researchEntries, validateResearchInput } from "./research-operations.js";
 import { readSenderRoster, readSenderSignatures, saveSenderSignature, SenderSignatureRequest } from "./sender-choice.js";
 import { getWorkspaceSummary, readComponent } from "./workspace-summary.js";
 import { getNextStep } from "./next-step.js";
+import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
-import { BusinessWebsiteSchema } from "./business-website.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
 import {
   CrmMappingCatalogSchema, CrmMappingSourcesRequestSchema, CrmMappingSourcesSchema,
@@ -22,16 +24,13 @@ import { HostedReturnError } from "./hosted-return-error.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
 import { EmailConnectionStatus } from "./email-contracts.js";
 import { LinkedinConnectionStatus } from "./linkedin-contracts.js";
+import { HubspotConnectionStatusSchema, NotificationConfigSchema, RunStatusSchema, StartRunResultSchema, WorkspaceStatusSchema } from "./contracts.js";
 import {
-  HubspotConnectionStatusSchema, NotificationConfigSchema, WorkspaceConfigSchema,
-  WorkspaceStatusSchema, SubmitOnboardingRequestSchema, CreateWorkspaceRequestSchema,
-} from "./contracts.js";
-import {
-  AuthorizationRequiredSchema, BusinessStagePatchSchema, BusinessStageSchema,
+  AuthorizationRequiredSchema,
   CampaignStagePatchSchema, CampaignStageQuerySchema, CampaignStageRequestSchema,
-  CapacityStageSchema, ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
-  NotificationStagePatchSchema, ResearchStagePatchSchema, SendingAccountDisconnectSchema, SendingAccountQuerySchema,
-  SendingAccountStartSchema, SummaryQuerySchema, TargetingStagePatchSchema, VoiceStagePatchSchema, stageOperations,
+   ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
+  NotificationStagePatchSchema, SendingAccountDisconnectSchema, SendingAccountQuerySchema,
+  SendingAccountStartSchema, StageErrorSchema, stageOperations,
 } from "./stage-contracts.js";
 
 const Empty = z.object({}).strict();
@@ -39,7 +38,9 @@ const MAX_STAGE_BYTES = 132 * 1024;
 const invalid = () => new PublicError({ status: 400, code: "INVALID_REQUEST", message: "Use the current stage request schema and supported fields." });
 const forbidden = () => new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "This operation belongs to the current Lifty workspace." });
 
-async function readBody(context: Context<AppEnvironment>): Promise<unknown> {
+async function readBody(context: Context<AppEnvironment>, invalidCode?: string): Promise<unknown> {
+  const length = Number(context.req.header("content-length"));
+  if (Number.isFinite(length) && length > MAX_STAGE_BYTES) throw new PublicError({ status: 413, code: "PAYLOAD_TOO_LARGE", message: "The request exceeds 132 KiB." });
   const reader = context.req.raw.body?.getReader();
   if (!reader) return {};
   const chunks: Uint8Array[] = [];
@@ -56,7 +57,18 @@ async function readBody(context: Context<AppEnvironment>): Promise<unknown> {
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { throw invalid(); }
+  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { if (invalidCode) throw new PublicError({ status: 422, code: invalidCode, message: "Supply JSON using the current resource schema.", issues: [{code:"invalid_json",path:"/",message:"The request body is not JSON.",suggestion:"Send one JSON object matching the operation schema."}] }); throw invalid(); }
+}
+// Repeated query keys arrive as arrays; a field declared as an array accepts
+// one or more values (grade=A&grade=B), any other field exactly one.
+function readQuery(context: Context<AppEnvironment>, schema: z.ZodType): Record<string, unknown> {
+  const fields = schema instanceof z.ZodObject ? schema.shape as Record<string, z.ZodType> : {};
+  const isArray = (key: string) => {
+    const field = fields[key];
+    return (field instanceof z.ZodOptional ? field.unwrap() : field) instanceof z.ZodArray;
+  };
+  return Object.fromEntries(Object.entries(context.req.queries()).map(([key, values]) =>
+    [key, isArray(key) || values.length > 1 ? values : values[0]]));
 }
 function parse<T extends z.ZodType>(schema: T, input: unknown): z.output<T> {
   const parsed = schema.safeParse(input);
@@ -66,12 +78,87 @@ function parse<T extends z.ZodType>(schema: T, input: unknown): z.output<T> {
 
 export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependencies: AppDependencies): void {
   app.openAPIRegistry.registerPath({ method: "get", path: "/v1/workspace/next-step", security: [{ bearerAuth: [] }],
-    responses: { 200: { description: "Next onboarding step observed from server state", content: { "application/json": { schema: NextStepSchema } } } } });
+    responses: { 200: { description: "Next step observed from Business resources and saved run receipts", content: { "application/json": { schema: NextStepSchema } } } } });
   app.get("/v1/workspace/next-step", async context => {
     parse(Empty, context.req.query());
     context.header("cache-control", "no-store");
     return context.json(await getNextStep(dependencies, context.get("authSession")));
   });
+  // The operation catalog is also the route inventory: request/response and RPC
+  // owners are identical across HTTP, MCP and API-owned guidance.
+  for (const { key, definition } of businessEntries()) {
+    const handler = async (context: Context<AppEnvironment>) => {
+      context.header("cache-control", "no-store");
+      validateBusinessRequest(Empty, context.req.query(), definition.code);
+      const session = context.get("authSession");
+      const body = ["POST", "PATCH"].includes(definition.method) ? validateBusinessRequest(definition.request, await readBody(context, definition.code), definition.code) : undefined;
+      const result = definition.response.parse(await dependencies.businessOperation(session, key, body));
+      return context.json(result, key === "business.post" && "created" in result && result.created ? 201 : 200);
+    };
+    app.on(definition.method, definition.route, handler);
+    app.openAPIRegistry.registerPath({ method: definition.method.toLowerCase() as "get" | "post" | "patch" | "delete", path: definition.route, security: [{ bearerAuth: [] }],
+      request: { headers: z.object({"x-lifty-workspace":z.string().max(100).optional()}), ...(["POST", "PATCH"].includes(definition.method) ? {body:{required:true,content:{"application/json":{schema:definition.request}}}} : {}) },
+      responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } }, ...(key === "business.post" ? {201:{description:"Workspace created",content:{"application/json":{schema:definition.response}}}} : {}), ...Object.fromEntries([401,403,409,413,422,429,502].map(code=>[code,{description:"Typed resource error",content:{"application/json":{schema:StageErrorSchema}}}])) }
+    });
+  }
+  // Research schedule and leads (LIF-1174). As for Business, the database
+  // selects the workspace from the session's x-lifty-workspace header.
+  for (const { key, definition } of researchEntries()) {
+    app.on(definition.method, definition.route, async (context: Context<AppEnvironment>) => {
+      context.header("cache-control", "no-store");
+      const query = validateResearchInput(definition.query, readQuery(context, definition.query), { status: 400, code: "INVALID_REQUEST" }) as Record<string, unknown>;
+      const body = definition.request
+        ? validateResearchInput(definition.request, await readBody(context, definition.invalid.status === 422 ? definition.invalid.code : undefined), definition.invalid)
+        : undefined;
+      return context.json(definition.response.parse(await dependencies.researchOperation(context.get("authSession"), key, { query, body })));
+    });
+    app.openAPIRegistry.registerPath({ method: definition.method.toLowerCase() as "get" | "post" | "patch", path: definition.route, security: [{ bearerAuth: [] }],
+      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), ...(definition.method === "GET" ? { query: definition.query as z.ZodObject } : {}),
+        ...(definition.request ? { body: { required: true, content: { "application/json": { schema: definition.request } } } } : {}) },
+      responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } },
+        ...Object.fromEntries([400, 401, 403, 409, 413, 422, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) },
+    });
+  }
+  // Calibration sample: the run RPCs select the workspace like every stage.
+  app.get("/v1/workspace/sample-review", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    return context.json(RunStatusSchema.parse(await dependencies.getRunStatus(context.get("authSession"))));
+  });
+  app.post("/v1/workspace/sample-review", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    parse(Empty, await readBody(context));
+    const result = StartRunResultSchema.parse(await dependencies.startRun(context.get("authSession")));
+    // A quality checkpoint is terminal until targeting changes. Reattaching
+    // returns its saved cohort without starting another acquisition job.
+    if (result.state === "failed") return context.json(result);
+    // Enqueue active starts, including re-attachments: the run-and-attempt-scoped
+    // idempotency key makes it a no-op when the run is already enqueued and
+    // self-heals an enqueue lost after the ledger insert.
+    await dependencies.enqueueFirstRun(result.run_ref, result.attempt ?? 0);
+    return context.json(result);
+  });
+  app.get("/v1/workspace/runs/progress", async context => {
+    context.header("cache-control", "no-store");
+    const query = RunProgressQuerySchema.safeParse(context.req.query());
+    if (!query.success) throw new PublicError({ status: 400, code: "INVALID_REQUEST", message: "Supply a run_ref, optional cursor and wait_seconds from 0 to 25." });
+    return context.json(RunProgressSchema.parse(await dependencies.getRunProgress(context.get("authSession"), query.data, context.req.raw.signal)));
+  });
+  for (const [method, route, response] of [["get", "/v1/workspace/sample-review", RunStatusSchema], ["post", "/v1/workspace/sample-review", StartRunResultSchema],
+    ["get", "/v1/workspace/runs/progress", RunProgressSchema]] as const) {
+    app.openAPIRegistry.registerPath({ method, path: route, security: [{ bearerAuth: [] }],
+      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), ...(route.endsWith("progress") ? { query: RunProgressQuerySchema } : {}) },
+      responses: { 200: { description: "Calibration sample", content: { "application/json": { schema: response } } },
+        ...Object.fromEntries([400, 401, 403, 404, 409, 429, 502, 504].map(code => [code, { description: "Typed error", content: { "application/json": { schema: StageErrorSchema } } }])) },
+    });
+  }
+  for (const resource of ["business", "targeting", "research-criteria", "commercial-voice", "research-schedule", "leads"]) {
+    for (const operation of Object.values(stageOperations[resource]!)) {
+      if (!operation.responses["405"]) continue;
+      app.on(operation.method, operation.route, () => { throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: operation.description }); });
+    }
+  }
   // Dispatch locally into the existing route: its authentication, rate limit,
   // body limit, business validation, jobs and receipt projection run unchanged.
   function forward(context: Context<AppEnvironment>, method: string, route: string, body?: unknown) {
@@ -194,15 +281,6 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       return forward(context, "DELETE", `/v1/integrations/${provider}`);
     });
   }
-  // A customer-owned Apollo key is a secret and stays out of conversation
-  // tools; the CLI reads it from stdin. This route can only select the
-  // platform key, so no request body can carry a key through the connector.
-  app.post("/v1/workspaces/:workspace_ref/integrations/apollo/platform-default", async context => {
-    parse(Empty, context.req.query());
-    parse(Empty, await readBody(context));
-    const workspaceRef = parse(z.uuid(), context.req.param("workspace_ref"));
-    return forward(context, "POST", `/v1/workspaces/${workspaceRef}/integrations/apollo/key-source`, { operation: "platform_default" });
-  });
   app.post("/v1/workspace/sending-accounts/disconnect", async context => {
     parse(Empty, context.req.query());
     const input = parse(SendingAccountDisconnectSchema, await readBody(context));
@@ -212,24 +290,13 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       : forward(context, "POST", "/v1/linkedin/disconnect", { workspace: current, confirm: true });
   });
 
-  for (const stage of Object.keys(stageOperations)) {
+  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads"].includes(stage))) {
     app.get(`/v1/workspace/${stage}`, async context => {
       context.header("cache-control", "no-store");
       const session = context.get("authSession");
       if (stage === "summary") {
-        const query = parse(SummaryQuerySchema, context.req.query());
-        return context.json(await getWorkspaceSummary(dependencies, session, query.workspace));
-      }
-      if (stage === "business") {
         parse(Empty, context.req.query());
-        const state = WorkspaceStatusSchema.parse(await dependencies.getWorkspace(session));
-        return context.json(BusinessStageSchema.parse({ workspace: state,
-          configuration: state.state === "needs_workspace" ? null : await dependencies.getConfig(session, "workspace"),
-          website: state.state === "needs_workspace" ? null : await readComponent(async () => {
-            const value = BusinessWebsiteSchema.parse(await dependencies.getBusinessWebsite(session));
-            if (value.workspace_ref !== state.workspace.workspace_ref) throw forbidden();
-            return value;
-          }) }));
+        return context.json(await getWorkspaceSummary(dependencies, session));
       }
       const current = await workspace(context);
       if (stage === "crm" || stage === "notifications") {
@@ -255,24 +322,16 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
           { operation: query.operation, payload: { workspace: current, campaign_ref: query.campaign_ref } });
       }
       parse(Empty, context.req.query());
-      if (stage === "capacity") return context.json(CapacityStageSchema.parse({
-        configuration: await dependencies.getConfig(session, "workspace"), allowance: await dependencies.getApolloAllowance(session, current),
-      }));
-      if (stage === "sample-review") return forward(context, "GET", "/v1/workspace/runs");
-      const section = stage === "targeting" ? "icp" : stage === "research-criteria" ? "prompt" : "tone";
-      return context.json(WorkspaceConfigSchema.parse(await dependencies.getConfig(session, section)));
+      throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This operation is not available." });
     });
 
     app.post(`/v1/workspace/${stage}`, async context => {
       parse(Empty, context.req.query());
-      if (stage === "capacity" || stage === "summary") throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This stage is read-only." });
+      if (stage === "summary") throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This stage is read-only." });
       const body = await readBody(context);
-      if (stage === "business") return forward(context, "POST", "/v1/workspace", parse(CreateWorkspaceRequestSchema, body));
+
       const current = await workspace(context);
       const session = context.get("authSession");
-      if (["targeting", "research-criteria", "commercial-voice"].includes(stage)) {
-        return forward(context, "POST", "/v1/onboarding", parse(SubmitOnboardingRequestSchema, body));
-      }
       if (stage === "campaigns") {
         const input = parse(CampaignStageRequestSchema, body);
         if (input.request.payload.workspace !== current) throw forbidden();
@@ -295,12 +354,12 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       parse(Empty, body);
       if (stage === "crm") return context.json(authorization(await dependencies.startHubspotConnect(session)));
       if (stage === "notifications") return context.json(authorization(await dependencies.startSlackConnect(session)));
-      return forward(context, "POST", "/v1/workspace/runs");
+      throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This operation is not available." });
     });
 
     app.patch(`/v1/workspace/${stage}`, async context => {
       parse(Empty, context.req.query());
-      if (["summary", "capacity", "sample-review", "sending-accounts"].includes(stage)) {
+      if (["summary", "sending-accounts"].includes(stage)) {
         throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This stage has no supported configuration changes through PATCH." });
       }
       const current = await workspace(context);
@@ -321,18 +380,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         const input = parse(NotificationStagePatchSchema, body);
         return forward(context, "PUT", input.operation === "destination" ? "/v1/notifications/destinations/slack" : "/v1/notifications/routes", input.values);
       }
-      if (stage === "business") {
-        const input = parse(BusinessStagePatchSchema, body);
-        if (input.section === "website") {
-          const result = BusinessWebsiteSchema.parse(await dependencies.setBusinessWebsite(context.get("authSession"), input));
-          if (result.workspace_ref !== current) throw forbidden();
-          return context.json(result);
-        }
-        return forward(context, "PATCH", "/v1/config", input);
-      }
-      const schema = stage === "targeting" ? TargetingStagePatchSchema
-        : stage === "research-criteria" ? ResearchStagePatchSchema : VoiceStagePatchSchema;
-      return forward(context, "PATCH", "/v1/config", parse(schema, body));
+      throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This operation is not available." });
     });
   }
 }

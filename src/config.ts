@@ -11,6 +11,9 @@ import type { MailiverySettings } from "./email-warmup.js";
 import type { WarmupSetupSettings } from "./warmup-setup.js";
 import type { McpSettings } from "./mcp.js";
 
+/** Dashboard origin used for research links unless LIFTY_DASHBOARD_ORIGIN overrides it. */
+export const DEFAULT_DASHBOARD_ORIGIN = "https://liftygtm.com";
+
 type Environment = Record<string, string | undefined>;
 
 export interface ServiceConfig {
@@ -149,7 +152,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const warmupBaseUrl = environment.LIFTY_WARMUP_PUBLIC_BASE_URL?.trim()
     ? secureUrl(environment.LIFTY_WARMUP_PUBLIC_BASE_URL.trim(), "LIFTY_WARMUP_PUBLIC_BASE_URL")
     : publicBaseUrl;
-  const dashboardUrl = secureUrl(environment.LIFTY_DASHBOARD_ORIGIN?.trim() || "https://liftygtm.com", "LIFTY_DASHBOARD_ORIGIN");
+  const dashboardUrl = secureUrl(environment.LIFTY_DASHBOARD_ORIGIN?.trim() || DEFAULT_DASHBOARD_ORIGIN, "LIFTY_DASHBOARD_ORIGIN");
   if (dashboardUrl.protocol !== "https:" || dashboardUrl.username || dashboardUrl.password || dashboardUrl.port || dashboardUrl.pathname !== "/" || dashboardUrl.search || dashboardUrl.hash) {
     throw new Error("LIFTY_DASHBOARD_ORIGIN must be an HTTPS origin without credentials, port or path.");
   }

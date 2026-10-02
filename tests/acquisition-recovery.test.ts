@@ -3,7 +3,7 @@ import {createCurrentClient as createApp} from "./current-client.js";
 import {createAcquisitionRecoveryOperations} from "../src/acquisition-recovery.js";
 import {createAcquisitionVerificationTrigger,createFirstRunTrigger} from "../src/trigger-client.js";
 const workspace="22222222-2222-4222-8222-222222222222",run="11111111-1111-4111-8111-111111111111",next="33333333-3333-4333-8333-333333333333",recovery="44444444-4444-4444-8444-444444444444";
-const path=`/v1/workspaces/${workspace}/apollo/recovery/${run}`;
+const path=`/v1/workspaces/${workspace}/research/recovery/${run}`;
 const status={workspace_ref:workspace,first_run_ref:run,current_acquisition_ref:run,all_acquisition_refs:[run],attempt:0,can_restart:false,blocker:"terminal_proof_required",recovery_ref:recovery,recovery_state:"queued"};
 const restart={workspace_ref:workspace,first_run_ref:run,previous_acquisition_ref:run,current_acquisition_ref:next,all_acquisition_refs:[run,next],attempt:1,state:"queued"};
 const post=(operation="request",extra:Record<string,unknown>={})=>({method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({operation,expected_acquisition_ref:run,...extra})});

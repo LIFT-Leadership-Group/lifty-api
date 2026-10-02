@@ -12,14 +12,22 @@ The CLI still uses Supabase Auth to sign in and refresh its session. Workspace
 reads and writes go only through this API. The API verifies the JWT against the
 project JWKS, creates a user-scoped Supabase client, and delegates to:
 
-- `public.get_lifty_workspace_status()`
-- `public.create_lifty_workspace(name text, description text)`
-- `public.submit_lifty_onboarding(draft jsonb)` — draft-gated push receipt (LIF-656)
-- `public.get_lifty_onboarding_status()` — import status + secret-free summary (LIF-656)
-- `public.start_lifty_run()` — first ICP run start with the platform Apollo default (LIF-657)
-- `public.get_lifty_run_status()` — run state + researched results (LIF-657)
-- `public.create_lifty_hubspot_connect_intent()`
-- `public.get_lifty_hubspot_connection()`
+- `public.get_lifty_workspace_status()` and `list_lifty_member_workspaces()`
+- `public.get_lifty_business_profile(p_workspace_id)` / `create_lifty_business_profile(p_payload,p_workspace_id)` / `patch_lifty_business_profile(p_workspace_id,p_payload)`
+- `public.get_lifty_targeting()` / `patch_lifty_targeting()`
+- `public.get_lifty_research_criteria()` / `patch_lifty_research_criteria()`
+- `public.get_lifty_commercial_voice()` / `patch_lifty_commercial_voice()`
+- `public.get_lifty_setup_draft()` / `save_lifty_setup_draft()` / `discard_lifty_setup_draft()`
+- `public.get_lifty_setup_context()` / `submit_lifty_setup(p_workspace_id,p_expected_draft_version)` / `get_lifty_setup_status()`
+- `public.retire_lifty_workspace(p_payload)` — LIFT-admin-only delete of a workspace without history, identity-confirmed, with consumed budgets preserved
+- `public.start_lifty_run()` / `get_lifty_run_status()`
+- `public.create_lifty_hubspot_connect_intent()` / `get_lifty_hubspot_connection()`
+
+Business operations validate typed input at the API and independently at SQL,
+then use the authenticated client directly. Resource PATCHes are synchronous
+CAS. Setup saves a server draft and submits targeting plus criteria atomically.
+The RPC catalog owns membership, lifecycle, locking, version conflicts and
+receipt replay; no Business import or config-update task is enqueued.
 
 The browser callback exchanges and immediately refreshes the HubSpot grant,
 verifies the exact reviewed scopes and portal, and persists it through the
@@ -35,8 +43,8 @@ both app and API URLs. The DigitalOcean default ingress keeps serving the same
 app as a non-canonical fallback host.
 
 The database remains responsible for actor identity (`auth.uid()`), RLS,
-validation, idempotency, advisory locking, and atomic provisioning. The service
-does not duplicate that business logic.
+validation, idempotency, advisory locking, and atomic provisioning. The API validates the public contract and safely projects database errors; SQL
+independently enforces persistence invariants.
 
 The request-scoped Supabase client aborts each database request after 10 seconds.
 
@@ -52,7 +60,7 @@ The request-scoped Supabase client aborts each database request after 10 seconds
 | `HUBSPOT_CLIENT_SECRET` | Encrypted app-level secret for the HubSpot LIFTY app |
 | `SLACK_CLIENT_ID` | Client ID for the Slack OAuth app |
 | `SLACK_CLIENT_SECRET` | App-level secret for Slack OAuth |
-| `TRIGGER_SECRET_KEY` | Trigger.dev prod secret key used to enqueue `lifty-onboarding-import` |
+| `TRIGGER_SECRET_KEY` | Trigger.dev key for initial research, CRM and notification tasks |
 | `TRIGGER_API_URL` | Optional; defaults to `https://api.trigger.dev` |
 | `HOST` | Bind host, default `0.0.0.0` |
 | `PORT` | Bind port, default `3000` |
@@ -65,7 +73,7 @@ termination and per-IP/per-token rate limiting belong at the deployment ingress.
 
 Merging runtime changes to `main` starts the `Deploy` GitHub Actions workflow.
 Follow that run: it runs `npm run verify`, deploys the exact main SHA, waits for
-it to become active, and probes health, readiness (including CRM), OpenAPI and
+it to become active, and probes health, readiness (including CRM), OpenAPI, v6 Business/setup public context and
 fail-closed authentication. Do not run a second deploy or repeat those public
 probes after the workflow passes. Human documentation-only pushes are excluded;
 Markdown shipped under `src/agent-context/` still triggers deployment.
@@ -73,7 +81,10 @@ Markdown shipped under `src/agent-context/` still triggers deployment.
 Configure the publishable Supabase and encrypted HubSpot values above when
 setting up the host; founders do not set them locally. Keep the service private
 from browser integrations (no CORS allowlist). Release prerequisite migrations
-through their owning CI before merging the dependent API. For LIF-897, deploy
+through their owning CI before merging the dependent API. For LIF-1173, deploy the Business resource migration and compatible Jobs
+consumers before this API. Publish the v6 CLI before or alongside the API;
+v5 calls intentionally return 409. Retire queued legacy Business jobs only
+after they drain. For LIF-897, deploy
 its database capability and replay ledger first, then the Jobs task
 `lifty-crm-mapping-sync`, then this API. The public smoke checks both
 `/readyz/crm` (`lifty-crm-company.v1`) and `/readyz/crm-mapping`
@@ -87,7 +98,7 @@ following the canary constraints below. Do not run the entire provisioning flow
 for documentation or deploy-tooling changes.
 
 Logs contain request ID, method, path, status, and public error code. They must
-not contain bearer tokens, request bodies, onboarding drafts, or database error
+not contain bearer tokens, request bodies, Business drafts, or database error
 details.
 
 ## Environments and database (decision 2026-08-31, LIF-617)
@@ -100,12 +111,19 @@ catalog (RLS by workspace, locked-down grants, backend-only secrets) under the
 LIF-617 track.
 
 This repository carries no migration root. The LIFTY schema (workspaces,
-memberships, onboarding submissions, provisioning RPCs from LIF-607) lives in
+memberships, typed Business resources and versioned RPCs) lives in
 the GTM engine migration ledger and changes through the same flow as every
 other GTM engine migration. The only Supabase configuration this repo owns is
 the runtime environment of the App Platform app (`SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_JWKS_URL`). HubSpot app credentials and
 `PUBLIC_BASE_URL` are also owned by that DigitalOcean runtime.
+
+The LIF-1174 API revision (client contract v7) requires the Functions migration
+that adds the research schedule, weekly ledger and the `p_workspace_id` forms of
+`start_lifty_run`, `get_lifty_run_status` and `get_lifty_run_progress`. Deploy
+that migration first; an older database makes these operations return 502
+"unavailable", never a guessed state. Weekly research links use
+`LIFTY_DASHBOARD_ORIGIN`, the same owner as sample research links.
 
 ## DigitalOcean staging
 
@@ -154,8 +172,10 @@ they perform no persistent writes.
 The database migrations live in the GTM engine repository, not here. Roll back
 the DigitalOcean deployment to the previous exact commit and mark affected
 HubSpot connections `reconnect_required` if a provider-grant regression is
-suspected. Existing provisioning idempotency makes a same-draft retry safe.
+suspected. Setup receipt replay makes retrying the exact submitted draft version safe.
+Rollback must retain the Business schema and consumer compatibility; do not
+restore a v5-only API against new resource writes without an explicit plan.
 
 ## Request limits
 
-`POST /v1/workspace`, `POST /v1/onboarding`, and `POST /v1/workspace/runs` share a budget of ten requests per authenticated user per minute per API process. Exhaustion returns 429 `RATE_LIMITED` with `Retry-After`. The in-memory budget resets on restart and is not shared across replicas. Per-IP and fleet-wide limiting belong at ingress. Reads and OAuth callbacks do not consume this budget.
+`POST /v1/workspace/business`, `POST /v1/workspace/setup`, and `POST /v1/workspace/sample-review` share a budget of ten requests per authenticated user per minute per API process. Exhaustion returns 429 `RATE_LIMITED` with `Retry-After`. The in-memory budget resets on restart and is not shared across replicas. Per-IP and fleet-wide limiting belong at ingress. Reads and OAuth callbacks do not consume this budget.

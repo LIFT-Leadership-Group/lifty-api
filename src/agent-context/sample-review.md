@@ -11,10 +11,12 @@ Preserve historical policy and grades; old cohorts are not new research.
 
 ## First setup and required inputs
 
-After configuration is imported, read the capacity stage before new discovery.
-POST has an empty object body and reuses the existing bounded first-run
-operation. It starts/retrieves the initial cohort; it does not repeatedly buy
-new leads until a desired grade appears. Use the returned `run_ref` with
+After setup is imported, POST with an empty object body starts or re-attaches
+the five-person sample for the current targeting. It uses five people of this
+week's research volume (see `context research-schedule`); with fewer than five
+left it returns 409 `RESEARCH_LIMIT_REACHED` with `resets_at` and starts
+nothing. Give the founder that reset time. It does not repeatedly research new
+people until a desired grade appears. Use the returned `run_ref` with
 `sample-review.progress` while work is pending. The first read returns immediately;
 pass its `cursor` and `wait_seconds: 25` on the next call to wait for a change.
 Keep one request open at a time. Report newly researched people as they appear,
@@ -31,15 +33,34 @@ a persisted event history: intermediate changes can be coalesced, and partial
 research may already exist when an attempt resumes. Preserve every actual grade.
 
 A failed run is terminal; a read error is not. Retry a failed read with the same
-run and cursor, never start discovery or research recovery automatically. Stop
+run and cursor; never start a new sample automatically. Stop
 waiting on terminal success/failure, cancellation, or a founder change of task.
 Host tools may buffer output; Lifty returns progress as changes are observed,
 but cannot guarantee the host narrates each lead in real time.
 
+## Failure reasons
+
+A failed sample's `error_code` is one of these customer reasons:
+
+- `research_limit_reached`: this week's volume ran out. Give `resets_at`
+  from `research-schedule status`; start again after it.
+- `search_exhausted`: the targeting ran out of new matching people. Propose
+  one specific wider targeting change and, once agreed, a new sample.
+- `research_failed`: a technical failure. Retry once with POST; it reuses the
+  saved people and completed research.
+- `calibration_sample_incomplete`: some people lack current research, a valid
+  profile URL or a rationale. Explain the gap, then retry once.
+- `calibration_review_required`: an older sample stopped for a grade check
+  that no longer applies; POST reviews the same people again.
+
 ## Later edits
 
-PATCH is unsupported (405): no grade editing, new sample approval store or
-persisted stage ledger. A targeting/rubric change goes through its own stage.
+Grades, evidence and sample approval are not editable. A targeting/rubric
+change goes through its own stage.
+When several people were disqualified for the same reason a search filter can
+express (industry, company size, location), propose that Targeting filter so
+research is not spent on people who cannot fit; evidence-only reasons stay in
+the research criteria.
 Founder acceptance stays a conversation decision; never claim it was saved as
 a new product feature. A saved shortfall requires diagnosis before more work.
 
@@ -54,9 +75,9 @@ from targeting quality, founder acceptance and outreach eligibility.
 Preserve historical policies and actual grades. An explicit POST retry of a
 failed `tier_a_v1` or `qualified_ab_v1` run adopts the current review policy
 using its saved cohort. Do not acquire replacements to chase A/B grades.
-Missing current research, a valid profile or rationale still needs recovery;
-`calibration_sample_incomplete` reports that evidence gap. Respect allowance.
-A status error is not a failed
+Missing current research, a valid profile or rationale still needs a retry;
+`calibration_sample_incomplete` reports that evidence gap. Respect the weekly
+research limit. A status error is not a failed
 run. No new discovery is required merely to connect an account or draft outreach
 with chosen saved leads; exact sending approval remains separate.
 

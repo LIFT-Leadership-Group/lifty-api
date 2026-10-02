@@ -1,69 +1,9 @@
-# Business
+# Commercial profile
 
-Purpose: establish which business the founder is configuring and preserve its
-confirmed description. Read `references.common` first.
+Read the saved profile before asking. It owns identity, website, description, value proposition, offerings and problems solved. Follow references.interview from the founder's first message: its voice, the one-line first reply and the single research pass. Present one compact hypothesis from the website and public evidence, then ask the founder to confirm or correct it. When evidence is thin, ask one useful question. Never invent problems or ask twice for confirmed facts. Do not infer the website from the founder's email domain.
 
-## Read current state
+Create the workspace explicitly with name and nullable website_url; login only authenticates. Save each inferred field/item with its website or public_research source, and founder-confirmed values as confirmed without source. Candidate URLs stay suggestions until confirmed. The business checkpoint is complete only with a confirmed value proposition, offering and problem solved.
 
-Use `operations.get`. It returns workspace existence and the saved workspace
-configuration, or null configuration before provisioning. Use the actual
-name/description and `website.value.website_url` when available; never ask for an already saved value again.
+PATCH uses expected_version and supplied fields. Omitted values remain; null clears optional values, lists replace, name cannot be cleared. Profile edits regenerate nothing. New research and drafts read confirmed values with their version; inferred values never reach Scout or writers. Approved campaigns retain their profile and voice pins.
 
-## First setup and required inputs
-
-POST provisions the authenticated founder's workspace with required `name`
-and optional nullable `description` and `website_url`. Save the primary URL
-when the founder supplies or confirms it, including during first setup. Explain the proposed name/description
-using the founder's confirmed business information. A workspace already linked
-to this account is a reason to read it, not to create another one.
-
-## Later edits
-
-PATCH uses `section: workspace` and `values` containing only confirmed name
-or description changes. Preserve unrelated configuration. These direct edits
-do not require locally generating an ICP/research artifact. Read back the
-business stage and confirm the saved text.
-
-## User-facing behavior and errors
-
-Explain what the business does and what changed, not its internal identifiers.
-The daily discovery target displayed in workspace configuration is read-only;
-use the capacity stage to inspect it. Do not patch capacity, workspace ownership,
-suspension or membership. For `WORKSPACE_AMBIGUOUS`, ask which workspace the
-user means; never choose one yourself. For a suspended workspace, stop and
-explain the restriction; do not choose another tenant.
-After an uncertain edit, GET the saved business values before retrying. If a
-submission receipt was returned, check that exact receipt with update_status.
-The generated-configuration resolve operation does not apply to metadata edits.
-
-## Retire a workspace
-
-`retire` permanently deletes a LIFTY-created workspace. Use it only when the
-founder explicitly asks to delete that workspace and confirms its exact ID,
-slug and name; never retire a workspace to fix an error or restart onboarding.
-Disconnect email and HubSpot first. A workspace with LinkedIn history cannot be
-retired. Mailbox send counters are preserved. After retirement, the founder
-starts again with a new workspace and a new identity.
-
-## Delete your login
-
-`delete_login` permanently deletes the signed-in user's own Lifty login, never
-anyone else's. Use it only when that user explicitly asks to delete their login
-and types its exact email. It is refused while the login still belongs to any
-workspace, so retire (or leave) every workspace first. After deletion, that
-session stops working, and using Lifty again needs a new sign-up.
-
-## Saved website
-
-GET exposes `website` separately from the legacy configuration. An available
-null `website_url` means no confirmed primary site; unavailable means retry the
-read, not ask the founder to provide it again. Research `candidates` retain
-useful onboarding sources but are never confirmed choices. Offer those known
-URLs for confirmation instead of claiming no site was saved anywhere.
-
-To save a confirmed primary URL, PATCH `section: website`, `values: {website_url}`
-and the current website `expected_version`. Explicit null clears the confirmed
-URL. This update is immediate and changes no campaign copy or sending status.
-Name/description edits still use `section: workspace`; do not combine them with
-a website edit. If the version is stale or the write outcome is uncertain, GET
-and reconcile the saved URL before retrying. No research URL is auto-promoted.
+After an uncertain write, read the current resource before retrying. On VERSION_CONFLICT read its new version and reconcile the intended edit. Founders cannot delete a workspace; only a LIFT admin deletes one, and never one with history. Login deletion belongs to the account guide.

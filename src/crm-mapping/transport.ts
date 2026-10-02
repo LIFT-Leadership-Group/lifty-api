@@ -53,7 +53,7 @@ function storageError(error: unknown): MappingError {
   const names: Record<string, string> = {
     unauthenticated: "UNAUTHORIZED",
     lifty_crm_service_forbidden: "CRM_MAPPING_NOT_CONFIGURED",
-    lifty_workspace_ambiguous: "WORKSPACE_AMBIGUOUS",
+    lifty_workspace_ambiguous: "WORKSPACE_SELECTION_REQUIRED",
     lifty_workspace_missing: "WORKSPACE_NOT_READY",
     lifty_workspace_suspended: "WORKSPACE_SUSPENDED",
     lifty_company_mapping_unsupported: "WORKSPACE_UNSUPPORTED",

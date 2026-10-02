@@ -28,7 +28,7 @@ describe("resumable research observations", () => {
     const f = fixture(); const signal = controller().signal;
     const first = await f.progress(f.session, query(), signal);
     expect(first).toMatchObject({ changed: true, terminal: false, leads_researched: 0, leads: initial.leads });
-    expect(f.rpc).toHaveBeenCalledWith("get_lifty_run_progress", { p_run_ref: run });
+    expect(f.rpc).toHaveBeenCalledWith("get_lifty_run_progress", { p_run_ref: run, p_workspace_id: null });
     const completed = { ...initial, leads_researched: 1, leads: [{ ...initial.leads[0], research_available: true, tier: "C", fit_rationale: "Confirmed mismatch" }] };
     f.read.mockResolvedValueOnce({ data: initial, error: null }).mockResolvedValueOnce({ data: completed, error: null });
     const next = f.progress(f.session, query({ cursor: first.cursor }), signal);
@@ -66,7 +66,7 @@ describe("resumable research observations", () => {
   it("reanalyzes authorization on every read and stops immediately after membership revocation", async () => {
     vi.useFakeTimers(); const f = fixture(); const signal = controller().signal;
     const first = await f.progress(f.session, query(), signal);
-    f.read.mockResolvedValueOnce({ data: initial, error: null }).mockResolvedValueOnce({ data: null, error: { code: "PT404", message: "secret" } });
+    f.read.mockResolvedValueOnce({ data: initial, error: null }).mockResolvedValueOnce({ data: null, error: { code: "PT404", message: "RUN_NOT_FOUND" } });
     const waiting = f.progress(f.session, query({ cursor: first.cursor }), signal);
     const rejected = expect(waiting).rejects.toMatchObject({ status: 404, code: "RUN_NOT_FOUND" });
     await vi.advanceTimersByTimeAsync(2000); await rejected;
@@ -119,7 +119,8 @@ describe("resumable research observations", () => {
 
   it("rejects mismatched runs, oversized snapshots and uncurated internal fields", async () => {
     const f = fixture(); const signal = controller().signal;
-    for (const data of [{ ...initial, run_ref: workspace }, { ...initial, provider_trace: "private" }, { ...initial, leads: Array(26).fill(initial.leads[0]) }]) {
+    for (const data of [{ ...initial, run_ref: workspace }, { ...initial, provider_trace: "private" }, { ...initial, leads: Array(26).fill(initial.leads[0]) },
+      { ...initial, state: "failed", error_code: "lifty_apollo_allowance_exhausted" }]) {
       f.read.mockResolvedValue({ data, error: null });
       await expect(f.progress(f.session, query(), signal)).rejects.toMatchObject({ status: 502, code: "RUN_PROGRESS_INVALID" });
     }
@@ -127,7 +128,7 @@ describe("resumable research observations", () => {
 });
 
 describe("progress route and published operation", () => {
-  const headers = { "x-lifty-client-contract": "lifty-cli-context.v5" };
+  const headers = { "x-lifty-client-contract": "lifty-cli-context.v7" };
   it("requires current authentication before reading progress", async () => {
     const getRunProgress = vi.fn();
     const response = await createApp({ getRunProgress }).request(`/v1/workspace/runs/progress?run_ref=${run}`, { headers });

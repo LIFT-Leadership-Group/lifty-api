@@ -1,55 +1,9 @@
-import type { SubmissionOptions } from "./onboarding-state.js";
+
 import type { AuthSession } from "./app.js";
-import {
-  ConfigUpdateContextSchema,
-  type ConfigUpdateContext,
-  ConfigUpdateStatusSchema,
-  type ConfigUpdateStatus,
-  ConfigUpdateSubmissionSchema,
-  type ConfigUpdateRequest,
-  type ConfigUpdateSubmission,
-  type ConfigSection,
-  CreateWorkspaceResultSchema,
-  type CreateWorkspaceRequest,
-  type CreateWorkspaceResult,
-  DisconnectResultSchema,
-  type DisconnectResult,
-  OnboardingContextSchema,
-  type OnboardingContext,
-  type LocalOnboardingConfiguration,
-  OnboardingStatusSchema,
-  type OnboardingStatus,
-  OnboardingSubmissionSchema,
-  type OnboardingSubmission,
-  type Provider,
-  RunStatusSchema,
-  type RunStatus,
-  StartRunResultSchema,
-  type StartRunResult,
-  StartCrmSyncResultSchema,
-  type StartCrmSyncResult,
-  CrmSyncStatusSchema,
-  type CrmSyncStatus,
-  WorkspaceConfigSchema,
-  type WorkspaceConfig,
-  WorkspaceStatusSchema,
-  type WorkspaceStatus,
-  NotificationConfigSchema,
-  type NotificationConfig,
-  NotificationDestinationSchema,
-  type NotificationDestination,
-  NotificationRouteSchema,
-  type NotificationRoute,
-  NotificationTestResultSchema,
-  type NotificationTestResult,
-  SetNotificationRouteRequestSchema,
-  type SetNotificationRouteRequest,
-  SlackNotificationChannelsSchema,
-  type SlackNotificationChannels,
-  UpsertNotificationDestinationRequestSchema,
-  type UpsertNotificationDestinationRequest,
-} from "./contracts.js";
+import { DisconnectResultSchema, type DisconnectResult, type Provider, RunStatusSchema, type RunStatus, StartRunResultSchema, type StartRunResult, StartCrmSyncResultSchema, type StartCrmSyncResult, CrmSyncStatusSchema, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus, NotificationConfigSchema, type NotificationConfig, NotificationDestinationSchema, type NotificationDestination, NotificationRouteSchema, type NotificationRoute, NotificationTestResultSchema, type NotificationTestResult, SetNotificationRouteRequestSchema, type SetNotificationRouteRequest, SlackNotificationChannelsSchema, type SlackNotificationChannels, UpsertNotificationDestinationRequestSchema, type UpsertNotificationDestinationRequest } from "./contracts.js";
 import { PublicError } from "./errors.js";
+import { rpcFailure } from "./rpc-errors.js";
+import { DEFAULT_DASHBOARD_ORIGIN } from "./config.js";
 
 interface RpcClient {
   rpc<T>(
@@ -88,74 +42,21 @@ function invalidResponse(cause: unknown): PublicError {
   });
 }
 
-/** The reason token after a `lifty_config_invalid:` marker, or null. Fixed server vocabulary — safe to surface. */
-function configInvalidReason(message: string): string | null {
-  const match = /^lifty_config_invalid:\s*([a-z0-9_]{1,80})/.exec(message);
-  return match?.[1] ?? null;
-}
-
 function mapRpcError(error: unknown): PublicError {
   const candidate = error as { code?: unknown; message?: unknown };
   const code = typeof candidate?.code === "string" ? candidate.code : "";
   const message = typeof candidate?.message === "string" ? candidate.message : "";
-
-  if (code === "PT409" && ["lifty_onboarding_state_stale", "lifty_onboarding_workspace_changed", "lifty_onboarding_key_conflict"].includes(message)) {
-    return new PublicError({ status: 409, code: message === "lifty_onboarding_key_conflict" ? "ONBOARDING_KEY_CONFLICT" : "ONBOARDING_STATE_STALE",
-      message: "Read the latest onboarding state before retrying. An idempotency key must always identify the exact same draft and configuration.", cause: error });
-  }
   if (code === "PT409" && message.includes("lifty_workspace_ambiguous")) {
-    return new PublicError({ status: 409, code: "WORKSPACE_AMBIGUOUS",
-      message: "You belong to several Lifty workspaces. Name the workspace you want to use.", cause: error });
+    return new PublicError({ status: 409, code: "WORKSPACE_SELECTION_REQUIRED",
+      message: "You belong to several workspaces. Choose one with the x-lifty-workspace header (--workspace in the CLI).", cause: error });
   }
   if (code === "PT403" && message.includes("lifty_workspace_forbidden")) {
     return new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN",
       message: "You don't belong to that workspace. Run whoami to list yours.", cause: error });
   }
-  if (code === "PT409" && message.includes("lifty_workspace_selection_read_only")) {
-    return new PublicError({ status: 409, code: "WORKSPACE_SELECTION_READ_ONLY",
-      message: "A selected workspace can only be read. Use an operation that takes the workspace to change it.", cause: error });
-  }
   if (code === "PT409" && message.includes("lifty_workspace_suspended")) {
     return new PublicError({ status: 409, code: "WORKSPACE_SUSPENDED",
       message: "This workspace is suspended. Contact LIFT support.", cause: error });
-  }
-
-  if (code === "PT409" && message.includes("lifty_multi_lane_config_unsupported")) {
-    return new PublicError({
-      status: 409,
-      code: "MULTI_LANE_CONFIG_UNSUPPORTED",
-      message: "This workspace's ICP lanes are managed outside LIFTY. Use the LIFT admin tools to change lane targeting.",
-      cause: error,
-    });
-  }
-
-  if (message.includes("lifty_config_local_required")) return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED", message: "Generate this update from the current generation context and include its configuration. Hosted configuration generation is no longer supported; CLI users should update LIFTY first.", cause: error });
-  if (message.includes("lifty_config_context_stale")) return new PublicError({ status: 409, code: "CONFIG_CONTEXT_STALE", message: "The configuration or Scout base changed. Fetch fresh config context and regenerate the update locally.", cause: error });
-  if (message.includes("lifty_config_local_invalid")) return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_INVALID", message: "Repair the update using the configuration schema and generation rules from fresh config context.", cause: error });
-  if (message.includes("lifty_config_local_mismatch")) return new PublicError({ status: 409, code: "LOCAL_CONFIGURATION_MISMATCH", message: "The local update differs from its stored receipt. Fetch fresh config context and regenerate.", cause: error });
-  if (code === "PT400" && message.includes("lifty_configuration_required")) {
-    return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_REQUIRED",
-      message: "Read the current onboarding context and include the generated configuration with this submission. CLI users should update LIFTY and its onboarding skill first.", cause: error });
-  }
-  if (code === "PT400" && message.startsWith("lifty_configuration_invalid:")) {
-    return new PublicError({ status: 422, code: "LOCAL_CONFIGURATION_INVALID",
-      message: "Regenerate the local configuration using the current onboarding contract and context.", cause: error });
-  }
-  if (code === "PT409" && message.includes("lifty_configuration_mismatch")) {
-    return new PublicError({ status: 409, code: "LOCAL_CONFIGURATION_MISMATCH",
-      message: "The configuration does not match the onboarding receipt. Fetch fresh onboarding context and push the local configuration again.", cause: error });
-  }
-  if (code === "PT409" && message.includes("lifty_onboarding_context_stale")) {
-    return new PublicError({ status: 409, code: "ONBOARDING_CONTEXT_STALE",
-      message: "The workspace or Scout rules changed. Fetch fresh onboarding context and regenerate the local configuration before pushing.", cause: error });
-  }
-  if (code === "PT409" && message.includes("lifty_onboarding_already_configured")) {
-    return new PublicError({
-      status: 409,
-      code: "ONBOARDING_ALREADY_CONFIGURED",
-      message: "This workspace is already configured. Change it with the stage update operation instead of submitting onboarding again.",
-      cause: error,
-    });
   }
 
   if (code === "PT409" && message.includes("workspace_already_exists")) {
@@ -163,42 +64,6 @@ function mapRpcError(error: unknown): PublicError {
       status: 409,
       code: "WORKSPACE_ALREADY_EXISTS",
       message: "This account already has a LIFTY workspace.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_not_configured")) {
-    return new PublicError({
-      status: 409,
-      code: "RUN_NOT_CONFIGURED",
-      message: "This workspace has no configuration yet. Submit the onboarding configuration first.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_already_completed")) {
-    return new PublicError({
-      status: 409,
-      code: "RUN_ALREADY_COMPLETED",
-      message: "The first research run already exists for this workspace. Read its status instead of starting another.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_workspace_suspended")) {
-    return new PublicError({
-      status: 409,
-      code: "WORKSPACE_SUSPENDED",
-      message: "This workspace is suspended. Contact LIFT support.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_run_unavailable")) {
-    return new PublicError({
-      status: 409,
-      code: "RUN_UNAVAILABLE",
-      message: "LIFTY cannot start a run for this workspace right now. Contact LIFT support.",
       cause: error,
     });
   }
@@ -284,65 +149,11 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
-  if (code === "PT409" && message.includes("lifty_config_missing_icp")) {
-    return new PublicError({
-      status: 409,
-      code: "CONFIG_NOT_READY",
-      message: "This workspace has no configuration yet. Submit the onboarding configuration first.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_prompt_hand_tuned")) {
-    return new PublicError({
-      status: 409,
-      code: "PROMPT_HAND_TUNED",
-      message: "The research prompt for this workspace was hand-tuned by LIFT and is not regenerated automatically. Contact LIFT support to change it.",
-      cause: error,
-    });
-  }
-
   if (code === "PT409" && message.includes("lifty_workspace_missing")) {
     return new PublicError({
       status: 409,
       code: "WORKSPACE_MISSING",
       message: "This account has no Lifty workspace yet. Create the workspace first.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_config_update_in_flight")) {
-    return new PublicError({
-      status: 409,
-      code: "CONFIG_UPDATE_IN_FLIGHT",
-      message: "Another configuration change is still being applied. Check its status and send this update again once it has landed.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_config_missing_prompt")) {
-    return new PublicError({
-      status: 409,
-      code: "CONFIG_NOT_READY",
-      message: "This workspace has no research prompt yet. Submit the onboarding configuration first.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT409" && message.includes("lifty_config_update_not_retryable")) {
-    return new PublicError({
-      status: 409,
-      code: "CONFIG_UPDATE_NOT_RETRYABLE",
-      message: "That config update is not in a failed state, so there is nothing to retry.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT404" && message.includes("lifty_config_update_missing")) {
-    return new PublicError({
-      status: 404,
-      code: "CONFIG_UPDATE_NOT_FOUND",
-      message: "No config update with that reference exists for this workspace.",
       cause: error,
     });
   }
@@ -356,36 +167,6 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
-  if (code === "PT400" && message.startsWith("lifty_draft_invalid:")) {
-    return new PublicError({
-      status: 422,
-      code: "DRAFT_INVALID",
-      message: "The onboarding draft did not pass server validation.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT400" && message.startsWith("lifty_workspace_invalid:")) {
-    return new PublicError({
-      status: 422,
-      code: "WORKSPACE_INVALID",
-      message: "The workspace request did not pass server validation.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT400" && message.startsWith("lifty_config_invalid:")) {
-    const reason = configInvalidReason(message);
-    return new PublicError({
-      status: 422,
-      code: "CONFIG_INVALID",
-      message: reason
-        ? `The config update did not pass server validation (${reason}).`
-        : "The config update did not pass server validation.",
-      cause: error,
-    });
-  }
-
   if (code === "PT400" && message.includes("lifty_provider_invalid")) {
     return new PublicError({
       status: 400,
@@ -395,29 +176,11 @@ function mapRpcError(error: unknown): PublicError {
     });
   }
 
-  if (code === "PT413" && message.startsWith("lifty_workspace_too_large:")) {
-    return new PublicError({
-      status: 413,
-      code: "WORKSPACE_FIELD_TOO_LARGE",
-      message: "The workspace request exceeds the server safety limits.",
-      cause: error,
-    });
-  }
-
-  if (code === "PT413" && message.startsWith("lifty_config_too_large:")) {
-    return new PublicError({
-      status: 413,
-      code: "CONFIG_TOO_LARGE",
-      message: "The config update exceeds the server safety limits.",
-      cause: error,
-    });
-  }
-
   if (code === "PT413") {
     return new PublicError({
       status: 413,
       code: "DRAFT_TOO_LARGE",
-      message: "The onboarding draft exceeds the server safety limits.",
+      message: "The request exceeds the server safety limits.",
       cause: error,
     });
   }
@@ -467,86 +230,21 @@ export async function getWorkspaceStatus(
   return parsed.data;
 }
 
-export async function createWorkspace(
-  session: AuthSession,
-  input: CreateWorkspaceRequest,
-): Promise<CreateWorkspaceResult> {
-  const { data, error } = await getRpcClient(session).rpc<CreateWorkspaceResult>(
-    input.website_url === undefined ? "create_lifty_workspace" : "create_lifty_business",
-    { name: input.name, description: input.description ?? null, ...(input.website_url === undefined ? {} : { website_url: input.website_url }) },
-  );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
-
-  const parsed = CreateWorkspaceResultSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) {
-    throw invalidResponse(parsed.error);
-  }
-  return parsed.data;
-}
-
-export async function submitOnboarding(
-  session: AuthSession,
-  draft: Record<string, unknown>,
-  configuration: LocalOnboardingConfiguration,
-  options: SubmissionOptions = {},
-): Promise<OnboardingSubmission> {
-  const { data, error } = await getRpcClient(session).rpc<OnboardingSubmission>(
-    "submit_lifty_onboarding",
-    { draft, configuration, ...options },
-  );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
-
-  const parsed = OnboardingSubmissionSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) {
-    throw invalidResponse(parsed.error);
-  }
-  return parsed.data;
-}
-
-export async function getOnboardingContext(
-  session: AuthSession,
-): Promise<OnboardingContext> {
-  const { data, error } = await getRpcClient(session).rpc<OnboardingContext>(
-    "get_lifty_onboarding_context",
-  );
-  if (error) throw mapRpcError(error);
-  const parsed = OnboardingContextSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) throw invalidResponse(parsed.error);
-  return parsed.data;
-}
-
-export async function getOnboardingStatus(
-  session: AuthSession,
-): Promise<OnboardingStatus> {
-  const { data, error } = await getRpcClient(session).rpc<OnboardingStatus>(
-    "get_lifty_onboarding_status",
-  );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
-
-  const parsed = OnboardingStatusSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) {
-    throw invalidResponse(parsed.error);
-  }
-  return parsed.data;
-}
+// Calibration runs use the workspace the database selects for the session
+// (shared rule, p_workspace_id null); it also enforces suspension and the
+// weekly research limit.
+const runUnavailable = (operation: string) => ({
+  operation,
+  code: "SAMPLE_REVIEW_UNAVAILABLE",
+  message: "The research sample could not be verified. Read sample-review before retrying.",
+});
 
 export async function startRun(session: AuthSession): Promise<StartRunResult> {
   const { data, error } = await getRpcClient(session).rpc<StartRunResult>(
     "start_lifty_run",
+    { p_workspace_id: null },
   );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
+  if (error) throw rpcFailure(error, runUnavailable("start_lifty_run"));
 
   const parsed = StartRunResultSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
@@ -555,14 +253,12 @@ export async function startRun(session: AuthSession): Promise<StartRunResult> {
   return parsed.data;
 }
 
-export async function getRunStatus(session: AuthSession, dashboardOrigin = "https://liftygtm.com"): Promise<RunStatus> {
+export async function getRunStatus(session: AuthSession, dashboardOrigin = DEFAULT_DASHBOARD_ORIGIN): Promise<RunStatus> {
   const { data, error } = await getRpcClient(session).rpc<RunStatus>(
     "get_lifty_run_status",
+    { p_workspace_id: null },
   );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
+  if (error) throw rpcFailure(error, runUnavailable("get_lifty_run_status"));
 
   const parsed = RunStatusSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
@@ -612,37 +308,6 @@ export async function getCrmSyncStatus(
   return parsed.data;
 }
 
-// ---------------------------------------------------------------- P6 (LIF-669)
-
-/** get_lifty_config: all sections, or one. Secret-free by construction in the RPC. */
-export async function getConfig(
-  session: AuthSession,
-  section: ConfigSection | null,
-): Promise<WorkspaceConfig> {
-  const { data, error } = await getRpcClient(session).rpc<WorkspaceConfig>(
-    "get_lifty_config",
-    section ? { section } : undefined,
-  );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
-
-  const parsed = WorkspaceConfigSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) {
-    throw invalidResponse(parsed.error);
-  }
-  return parsed.data;
-}
-
-export async function getConfigUpdateContext(session: AuthSession): Promise<ConfigUpdateContext> {
-  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateContext>("get_lifty_config_update_context");
-  if (error) throw configRpcError(error, "get_lifty_config_update_context");
-  const parsed = ConfigUpdateContextSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) throw invalidResponse(parsed.error);
-  return parsed.data;
-}
-
 // Keep raw PostgREST messages/details in the cause only. They can contain user
 // data or SQL; logs get a bounded code and a static operation name instead.
 function configRpcError(error: unknown, operation: string): PublicError {
@@ -653,80 +318,6 @@ function configRpcError(error: unknown, operation: string): PublicError {
     diagnostics: { upstream_operation: operation, ...(code ? { upstream_code: code } : {}),
       upstream_kind: code === "XX001" ? "database_storage" : code === "57014" ? "database_timeout" : code ? "database_error" : "transport" },
   });
-}
-
-export async function resolveConfigUpdate(session: AuthSession, payload: ConfigUpdateRequest): Promise<ConfigUpdateStatus> {
-  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateStatus>("resolve_lifty_config_update", { payload });
-  if (error) throw configRpcError(error, "resolve_lifty_config_update");
-  const parsed = ConfigUpdateStatusSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) throw invalidResponse(parsed.error);
-  return parsed.data;
-}
-
-/** submit_lifty_config_update: the P6.1 write seam (digests, routing matrix, synchronous direct writes). */
-export async function submitConfigUpdate(
-  session: AuthSession,
-  payload: ConfigUpdateRequest,
-): Promise<ConfigUpdateSubmission> {
-  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateSubmission>(
-    "submit_lifty_config_update",
-    { payload },
-  );
-
-  if (error) {
-    throw configRpcError(error, "submit_lifty_config_update");
-  }
-
-  const parsed = ConfigUpdateSubmissionSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) {
-    throw invalidResponse(parsed.error);
-  }
-  return parsed.data;
-}
-
-/** get_lifty_config_update_status: one submission by ref, or the latest when ref is null. */
-export async function getConfigUpdateStatus(
-  session: AuthSession,
-  submissionRef: string | null,
-): Promise<ConfigUpdateStatus> {
-  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateStatus>(
-    "get_lifty_config_update_status",
-    submissionRef ? { p_submission_ref: submissionRef } : undefined,
-  );
-
-  if (error) {
-    throw configRpcError(error, "get_lifty_config_update_status");
-  }
-
-  const parsed = ConfigUpdateStatusSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) {
-    throw invalidResponse(parsed.error);
-  }
-  return parsed.data;
-}
-
-/**
- * requeue_lifty_config_update: flip the actor's failed submission back to pending
- * before the fresh enqueue, so a poll never reads the stale failure (LIF-672).
- */
-export async function requeueConfigUpdate(
-  session: AuthSession,
-  submissionRef: string,
-): Promise<ConfigUpdateStatus> {
-  const { data, error } = await getRpcClient(session).rpc<ConfigUpdateStatus>(
-    "requeue_lifty_config_update",
-    { p_submission_ref: submissionRef },
-  );
-
-  if (error) {
-    throw mapRpcError(error);
-  }
-
-  const parsed = ConfigUpdateStatusSchema.safeParse(unwrapSingleRow(data));
-  if (!parsed.success) {
-    throw invalidResponse(parsed.error);
-  }
-  return parsed.data;
 }
 
 /** disconnect_lifty_integration: the one destructive founder verb (confirmation is the skill's job). */

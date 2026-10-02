@@ -35,7 +35,7 @@ export const CompanyMappingReceiptSchema = z.object({
   verified: z.literal(true),
 });
 export class CompanyMappingError extends PublicError {
-  readonly issues: z.infer<typeof Issue>[];
+  override readonly issues: z.infer<typeof Issue>[];
   constructor(
     code: string,
     status: number,

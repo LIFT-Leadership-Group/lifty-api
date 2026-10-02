@@ -168,6 +168,13 @@ run_smoke() {
     "$ingress/openapi.json" \
     | jq -e '.openapi == "3.1.0"' >/dev/null
 
+  curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
+    "$ingress/v1/context/business?client_contract=lifty-cli-context.v7" \
+    | jq -e '.task == "business" and .operations.get.route == "/v1/workspace/business" and .operations.patch.method == "PATCH"' >/dev/null
+  curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
+    "$ingress/v1/context/setup?client_contract=lifty-cli-context.v7" \
+    | jq -e '.task == "setup" and .operations.delete_draft.method == "DELETE" and .operations.generation_context.route == "/v1/workspace/setup/context"' >/dev/null
+
   auth_status="$(curl --silent --show-error --connect-timeout 5 --max-time 20 \
     --output "$auth_body" --write-out '%{http_code}' \
     "$ingress/v1/workspace")"
@@ -192,7 +199,7 @@ run_smoke() {
 
   rm -rf -- "$smoke_dir"
   trap - EXIT
-  printf 'Smoke checks passed: %s%s\n' "$ingress" "${primary:+ and https://$primary}"
+  printf 'Smoke checks passed: %s%s (v6 Business/setup catalog)\n' "$ingress" "${primary:+ and https://$primary}"
 }
 
 deploy_app() {
@@ -262,7 +269,7 @@ Commands:
   logs [options]     Read bounded logs (--tail N, --type TYPE)
   deploy <full-sha> [--force-rebuild]
                      Deploy and verify one exact remote commit (reuse eligible builds)
-  smoke              Probe health, readiness, OpenAPI, and fail-closed auth
+  smoke              Probe health, readiness, OpenAPI, v6 context, and fail-closed auth
   help                Show this help
 
 Environment:

@@ -161,7 +161,7 @@ describe("explicit member email API routes",()=>{
       const production=createProductionApp({host:"127.0.0.1",port:3000,supabase:{supabaseUrl:base,publishableKey:"public",jwks:{keys:[jwks]}},
         hubspot:{clientId:"client",clientSecret:"secret",publicBaseUrl:"https://api.lifty.test",supabaseUrl:base,publishableKey:"public"},
         slack:null,trigger:{apiUrl:"https://api.trigger.test",secretKey:"secret"}});
-      const response=await production.request("/v1/email/accounts?workspace=lift",{headers:{authorization:`Bearer ${jwt}`,"x-lifty-client-contract":"lifty-cli-context.v5"}});
+      const response=await production.request("/v1/email/accounts?workspace=lift",{headers:{authorization:`Bearer ${jwt}`,"x-lifty-client-contract":"lifty-cli-context.v7"}});
       expect(response.status).toBe(200);expect(await response.json()).toEqual(accounts);
       expect(upstream.mock.calls.map(call=>String(call[0]))).toEqual([`${base}/rest/v1/rpc/lifty_session_active`,`${edge}/member/accounts?workspace=lift`]);
     }finally{vi.unstubAllGlobals();}

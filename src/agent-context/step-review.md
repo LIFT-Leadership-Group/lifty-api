@@ -17,9 +17,12 @@ why lower-fit leads missed. Use only returned profile URLs.
 
 Ask one question: does this sample confirm the targeting, or what should
 change? A change clarifies only the affected decision, then follows
-`summary_context` task `targeting` or `research-criteria` (generated PATCH,
-receipt, readback) and reruns the sample. Never relabel grades, widen the
-market or invent fit. `references.calibration` covers diagnosis.
+`summary_context` task `targeting` or `research-criteria` (synchronous versioned PATCH,
+readback) and reruns the sample. Never relabel grades, widen the
+market or invent fit. When several leads missed for the same reason a search
+filter can express (industry, company size, location), propose that Targeting
+filter: research costs time and budget, and the filter keeps it on people who
+can fit. `references.calibration` covers diagnosis.
 
 ## 3. CRM (optional)
 

@@ -43,7 +43,7 @@ function storageError(error: unknown): MappingError {
   const value = RpcError.safeParse(error);
   const names: Record<string, string> = {
     unauthenticated: "UNAUTHORIZED", lifty_crm_service_forbidden: "COMPANY_MAPPING_NOT_CONFIGURED",
-    lifty_workspace_ambiguous: "WORKSPACE_AMBIGUOUS", lifty_workspace_missing: "WORKSPACE_NOT_READY",
+    lifty_workspace_ambiguous: "WORKSPACE_SELECTION_REQUIRED", lifty_workspace_missing: "WORKSPACE_NOT_READY",
     lifty_workspace_suspended: "WORKSPACE_SUSPENDED", lifty_company_mapping_unsupported: "WORKSPACE_UNSUPPORTED",
     lifty_hubspot_reconnect_required: "HUBSPOT_RECONNECT_REQUIRED", lifty_hubspot_connection_unavailable: "HUBSPOT_NOT_CONNECTED",
     lifty_company_mapping_forbidden: "FORBIDDEN_WORKSPACE", lifty_company_mapping_stale: "STALE_CONTEXT",

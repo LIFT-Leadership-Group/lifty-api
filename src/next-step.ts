@@ -1,206 +1,377 @@
 import type { AppDependencies, AuthSession } from "./app.js";
 import { getAgentContext } from "./agent-context.js";
-import { WorkspaceStatusSchema, OnboardingStatusSchema, RunStatusSchema, HubspotConnectionStatusSchema,
-  CrmSyncStatusSchema, type HubspotConnectionStatus, type CrmSyncStatus } from "./contracts.js";
-import { OnboardingStateSchema, type OnboardingState } from "./onboarding-state.js";
+import {
+  BusinessGetSchema,
+  TargetingGetSchema,
+  CriteriaGetSchema,
+  SetupDraftGetSchema,
+  SetupStatusSchema,
+  type SetupGatesSchema,
+} from "./business-contracts.js";
 import { NextStepSchema, type NextStep } from "./next-step-contracts.js";
-import { interviewGates, type InterviewGate, type InterviewGates } from "./interview-gates.js";
+import {
+  RunStatusSchema,
+  CrmSyncStatusSchema,
+  HubspotConnectionStatusSchema,
+} from "./contracts.js";
+import { readComponent } from "./workspace-summary.js";
 import { WorkspaceCampaignResult } from "./workspace-campaign-contracts.js";
 import { PublicError } from "./errors.js";
-
-// Only the persisted-state readers belong here. Provider connection "status"
-// operations can bind accounts, record health and remove provider duplicates.
-// Campaign "status" is a stable database read (no preparation or activation).
-// HubSpot connection and CRM sync are database reads that only shape the
-// review step's CRM action; their failure never blocks the next step.
-type NextStepReads = Pick<AppDependencies, "getWorkspace" | "getOnboardingState" | "getOnboardingStatus" | "getRunStatus" | "workspaceCampaign">
-  & Partial<Pick<AppDependencies, "getHubspotConnection" | "getCrmSyncStatus">>;
-
-interface Step {
-  state: NextStep["state"]; step: NextStep["step"]; reason: string; section: NextStep["section"];
-  actions: (string | null)[]; tools: string[];
-  // Playbook returned inline, and the stage whose full guide summary_context serves.
-  guide: string; context: string | null;
-  gates?: InterviewGates | null; receipt?: Record<string, unknown> | null;
-}
-
-const ASK: Record<InterviewGate, string> = {
-  company: "what the company sells and to whom (name and a plain description)",
-  motion: "the primary sales motion and the outcome it drives (park any other motion)",
-  market: "target industries plus a numeric size range and its unit",
-  exclusions: "at least one hard exclusion: who must never be targeted",
-  boundaries: "search boundaries: company HQ countries, buyer location and headcount, each a limit or explicitly unrestricted",
-  persona: "the first buyer: decision maker or influencer, first-contact titles and the organizational tell",
+import { z } from "zod";
+import { stageOperations } from "./stage-contracts.js";
+import { operationToolNames } from "./operation-names.js";
+import type { RunErrorCodeSchema } from "./contracts.js";
+// Tool ids are derived from the operation catalog used by HTTP and MCP; a
+// retired operation fails here instead of being recommended.
+const tool = (resource: string, operation: string) => {
+  if (!stageOperations[resource]?.[operation]) throw new Error(`Unknown catalog operation ${resource}.${operation}`);
+  return operationToolNames(resource, operation)[0]!;
 };
-const SUBMIT_AND_FOLLOW = "Read targeting_onboarding_status every few seconds until imported or failed; never POST again to check. Then call next_step.";
-
-function interviewStep(saved: OnboardingState, workspaceMissing: boolean): Step {
-  const gates = interviewGates(saved.state === "saved" ? saved.draft : null);
-  const revision = saved.revision;
-  const create = workspaceMissing ? "After the founder confirms the company, create the workspace once with business_post {name, description, website_url}." : null;
-  const save = `Save each confirmed block with business_onboarding_save (expected_revision ${revision} or the latest returned, configuration null); its gates.next is the next question. Do not call next_step between blocks.`;
-  const finish = "When a save returns draft_ready true, play back the target in two to four lines and call next_step.";
-  let actions: (string | null)[];
-  if (saved.state === "none") {
-    actions = [
-      "Reply to the founder in one line now with what you will look into; then research their website and public profiles once.",
-      "Play back your read in one message: what they sell, to whom, the primary motion, industries and a numeric size range. Ask them to confirm or correct it.",
-      create, save, "Ask the remaining gates one block at a time, leading with your hypothesis.", finish,
-    ];
-  } else if (gates.next) {
-    const later = gates.missing.slice(1);
-    actions = [
-      "Resume from the saved draft: do not research again or repeat confirmed answers.", create,
-      `Ask next: ${ASK[gates.next]}. Lead with your hypothesis and say why it changes the search.`,
-      later.length ? `Still missing after that: ${later.join(", ")}.` : null, save, finish,
-    ];
-  } else if (saved.state === "saved" && !saved.draft_ready) {
-    actions = [
-      "Every interview decision is saved but the draft has technical problems: fix gates.issues yourself, without asking the founder.",
-      `Save the corrected draft with business_onboarding_save (expected_revision ${revision}, configuration null) and check draft_ready.`,
-      create, "When draft_ready is true, call next_step.",
-    ];
-  } else {
-    actions = [create ?? "The interview is complete.", "Call next_step."];
-  }
-  return { state: "action_required", step: workspaceMissing ? "business" : "interview",
-    reason: workspaceMissing ? "workspace_missing" : "confirmed_interview_needed", section: "leads", actions,
-    tools: ["business_onboarding_state", "business_onboarding_save", ...(workspaceMissing ? ["business_get", "business_post"] : [])],
-    guide: "step-interview", context: "onboarding", gates };
-}
-
-function crmAction(hubspot: HubspotConnectionStatus | null, sync: CrmSyncStatus | null): string {
-  const flow = "crm_mapping_context (company setup with crm_patch if not ready), crm_sync_start, crm_sync_status";
-  if (!hubspot) return "Read crm_get before offering HubSpot; if it stays unreadable, say the CRM status is unknown and continue.";
-  if (hubspot.status === "not_connected") return `Ask once whether they want these leads and their research in HubSpot (optional). Yes: crm_post, show the link, crm_get with its attempt_ref, then ${flow}. No, or another CRM: continue.`;
-  if (hubspot.reconnect_required) return "HubSpot needs reconnecting: offer a fresh crm_post link and verify it with crm_get before any sync.";
-  if (!sync) return "HubSpot is connected: read crm_sync_status before offering a sync of these leads.";
-  if (sync.state === "none") return `HubSpot is connected and nothing is synced yet: offer to sync these leads: ${flow}.`;
-  if (sync.state === "queued" || sync.state === "running") return `A HubSpot sync is in progress (run_ref ${sync.run_ref}): read crm_sync_status until it finishes, then report contacts and companies delivered.`;
-  if (sync.state === "succeeded") return `The last HubSpot sync finished (${sync.leads_synced ?? sync.requested_leads} leads): include it in the recap; crm_records returns record links if asked.`;
-  return `The last HubSpot sync failed (${sync.error_code ?? "no reason recorded"}): explain it and offer one retry with crm_sync_start.`;
-}
-
-async function readCrm(dependencies: NextStepReads, session: AuthSession, workspaceRef: string) {
-  const settle = async <T>(read: (() => Promise<unknown>) | undefined, parse: (value: unknown) => T) => {
-    try { return read ? parse(await read()) : null; } catch { return null; }
+// Customer reasons for a failed sample and the one next move for each.
+const sampleFailures: Record<z.infer<typeof RunErrorCodeSchema>, { action: string; tools: string[] }> = {
+  research_limit_reached: {
+    action: `This week's research limit was reached. Read ${tool("research-schedule", "status")} and give the founder its resets_at; start the sample again with ${tool("sample-review", "post")} after that time. Volume does not carry over and the limit is not raised by retrying.`,
+    tools: [tool("research-schedule", "status"), tool("sample-review", "post")],
+  },
+  search_exhausted: {
+    action: `The search ran out of new matching people. Propose one specific wider targeting change; after the founder agrees, save it with ${tool("targeting", "patch")} and its expected_version, then start a new sample with ${tool("sample-review", "post")}.`,
+    tools: [tool("targeting", "get"), tool("targeting", "patch"), tool("sample-review", "post")],
+  },
+  research_failed: {
+    action: `Research failed for a technical reason. Retry once with ${tool("sample-review", "post")}; it reuses the saved people and completed research. If it fails again, tell the founder LIFT is looking into it.`,
+    tools: [tool("sample-review", "post")],
+  },
+  calibration_sample_incomplete: {
+    action: `Some people lack current research, a valid profile URL or a fit rationale. Explain the gap, then retry once with ${tool("sample-review", "post")}; it reuses the saved people.`,
+    tools: [tool("sample-review", "post")],
+  },
+  calibration_review_required: {
+    action: `This older sample stopped for a grade check that no longer applies. ${tool("sample-review", "post")} reviews the same saved people under the current policy without new research.`,
+    tools: [tool("sample-review", "post")],
+  },
+};
+type Reads = Pick<
+  AppDependencies,
+  | "businessOperation"
+  | "getRunStatus"
+  | "workspaceCampaign"
+  | "getHubspotConnection"
+  | "getCrmSyncStatus"
+>;
+// The session forwards the caller's workspace selection; every read below
+// resolves the same workspace through the shared database rule.
+export async function getNextStep(
+  deps: Reads,
+  session: AuthSession,
+): Promise<NextStep> {
+  const read = (key: string) => deps.businessOperation(session, key);
+  const business = BusinessGetSchema.parse(await read("business.get"));
+  const ref = business.workspace?.workspace_ref ?? null;
+  let saved: Record<string, unknown> | null = null;
+  const response = (
+    state: NextStep["state"],
+    step: NextStep["step"],
+    reason: string,
+    actions: string[],
+    tools: string[],
+    context = "business",
+    receipt: Record<string, unknown> | null = null,
+    gates: z.infer<typeof SetupGatesSchema> | null = null,
+    section: NextStep["section"] = "leads",
+  ) => {
+    const guide = getAgentContext(
+      context === "sample-review"
+        ? state === "review"
+          ? "step-review"
+          : "step-sample"
+        : context,
+    );
+    if (!guide) throw new Error("Missing next-step guide");
+    return NextStepSchema.parse({
+      state,
+      step,
+      reason,
+      section,
+      actions,
+      gates,
+      workspace_ref: ref,
+      recommended_tools: tools,
+      guide,
+      context_task: context,
+      saved,
+      receipt,
+    });
   };
-  const [hubspot, sync] = await Promise.all([
-    settle(dependencies.getHubspotConnection && (() => dependencies.getHubspotConnection!(session)), value => HubspotConnectionStatusSchema.parse(value)),
-    settle(dependencies.getCrmSyncStatus && (() => dependencies.getCrmSyncStatus!(session)), value => CrmSyncStatusSchema.parse(value)),
+  if (!business.workspace || !business.profile)
+    return response(
+      "action_required",
+      "business",
+      "workspace_missing",
+      [
+        "Research the supplied website once and present one concise business hypothesis. Ask the founder to confirm or correct it, then create the workspace with business_post. Login alone creates nothing.",
+      ],
+      [tool("business", "post"), tool("business", "get")],
+    );
+  if (business.workspace.workspace_ref !== ref)
+    throw new PublicError({
+      status: 403,
+      code: "WORKSPACE_FORBIDDEN",
+      message: "The resource does not belong to the selected workspace.",
+    });
+  if (business.workspace.state === "suspended")
+    return response(
+      "blocked",
+      "business",
+      "workspace_suspended",
+      ["Explain that the workspace is suspended and stop changes."],
+      [tool("business", "get")],
+    );
+  if (!business.profile.confirmation.complete)
+    return response(
+      "action_required",
+      "business",
+      "business_confirmation_needed",
+      [
+        `Confirm or correct the missing commercial profile values: ${business.profile.confirmation.missing.join(", ")}. Save confirmed values with business_patch and its expected_version. Do not ask again for already confirmed values.`,
+      ],
+      [tool("business", "get"), tool("business", "patch")],
+    );
+  const [targeting, criteria, status] = await Promise.all([
+    read("targeting.get").then((value) => TargetingGetSchema.parse(value)),
+    read("research-criteria.get").then((value) =>
+      CriteriaGetSchema.parse(value),
+    ),
+    read("setup.status").then((value) => SetupStatusSchema.parse(value)),
   ]);
-  // A receipt for another workspace is not evidence about this one.
-  return { hubspot, sync: sync && sync.state !== "none" && sync.workspace.workspace_ref !== workspaceRef ? null : sync };
-}
-
-// The saved draft stays useful for the recap; after import the generated
-// configuration and submission receipt only cost context.
-function savedView(saved: OnboardingState, imported: boolean): Record<string, unknown> | null {
-  if (saved.state === "none") return null;
-  const { gates: _gates, ...rest } = saved;
-  if (!imported) return rest;
-  return { state: rest.state, revision: rest.revision, workspace_ref: rest.workspace_ref, draft: rest.draft, updated_at: rest.updated_at };
-}
-
-export async function getNextStep(dependencies: NextStepReads, session: AuthSession): Promise<NextStep> {
-  const workspace = WorkspaceStatusSchema.parse(await dependencies.getWorkspace(session));
-  const workspaceRef = workspace.workspace?.workspace_ref ?? null;
-  let savedForResponse: Record<string, unknown> | null = null;
-  const response = (step: Step) => {
-    const guide = getAgentContext(step.guide);
-    if (!guide) throw new Error("Missing next-step context");
-    return NextStepSchema.parse({ state: step.state, step: step.step, reason: step.reason, section: step.section,
-      actions: step.actions.filter((action): action is string => action !== null), gates: step.gates ?? null,
-      workspace_ref: workspaceRef, recommended_tools: step.tools, guide, context_task: step.context,
-      saved: savedForResponse, receipt: step.receipt ?? null });
-  };
-  if (workspace.state === "suspended") return response({ state: "blocked", step: "business", reason: "workspace_suspended", section: "leads",
-    actions: ["The workspace is suspended: explain the restriction and stop. Do not choose another workspace."],
-    tools: ["business_get"], guide: "business", context: "business" });
-  const saved = OnboardingStateSchema.parse(await dependencies.getOnboardingState(session));
-  const requireWorkspace = (ref: string | null) => {
-    if (ref !== null && ref !== workspaceRef) throw new PublicError({ status: 502, code: "ONBOARDING_STATE_UNAVAILABLE", message: "The current workspace and saved onboarding do not match. Retry the read before making changes." });
-  };
-  if (saved.state === "saved") requireWorkspace(saved.workspace_ref);
-  savedForResponse = savedView(saved, false);
-  if (workspace.state === "needs_workspace") return response(interviewStep(saved, true));
-
-  // Imports remain authoritative even for legacy CLI sessions with no draft cache.
-  const onboarding = OnboardingStatusSchema.parse(await dependencies.getOnboardingStatus(session));
-  if (onboarding.state !== "none") requireWorkspace(onboarding.workspace.workspace_ref);
-  if (onboarding.state === "pending") return response({ state: "pending", step: "import", reason: "import_pending", section: "leads",
-    actions: [`The search setup (submission ${onboarding.submission_ref}) is importing; tell the founder their search is being set up.`, SUBMIT_AND_FOLLOW],
-    tools: ["targeting_onboarding_status"], guide: "step-submission", context: "targeting", receipt: onboarding });
-  if (onboarding.state === "failed") return response({ state: "blocked", step: "import", reason: "import_failed", section: "leads",
-    actions: ["Read targeting_onboarding_status for the saved error.",
-      "Repair per references.configuration: at most three technical repairs, regenerating from fresh targeting_onboarding_context; a new idempotency_key only after a definite rejection.",
-      "Ask the founder only for missing business intent, then submit with targeting_post and follow targeting_onboarding_status."],
-    tools: ["targeting_onboarding_status", "business_onboarding_state", "targeting_onboarding_context", "targeting_post"],
-    guide: "step-configuration", context: "targeting", receipt: onboarding });
-  if (onboarding.state === "imported") {
-    savedForResponse = savedView(saved, true);
-    const run = RunStatusSchema.parse(await dependencies.getRunStatus(session));
-    if (run.state !== "none") requireWorkspace(run.workspace.workspace_ref);
-    if (run.state === "none") return response({ state: "action_required", step: "sample-review", reason: "sample_not_started", section: "leads",
-      actions: ["capacity_get: confirm discovery allowance remains (when exhausted, give the reset time).",
-        "sample_review_post with body {} and keep its run_ref.",
-        "Tell the founder you are finding and researching five matching people, that it takes a few minutes, and that you will share each one as it lands.",
-        "sample_review_progress with run_ref, then with the returned cursor and wait_seconds 25 until terminal; narrate each new lead in one line.",
-        "When terminal, call next_step."],
-      tools: ["capacity_get", "sample_review_post", "sample_review_progress"], guide: "step-sample", context: "sample-review", receipt: onboarding });
-    if (run.state === "queued" || run.state === "running") return response({ state: "pending", step: "sample-review", reason: "sample_pending", section: "leads",
-      actions: [`sample_review_progress with run_ref ${run.run_ref}, then with the returned cursor and wait_seconds 25 until terminal. Narrate each newly researched lead in one line.`,
-        "One request at a time: no sleeps and never POST again to check progress.", "When terminal, call next_step."],
-      tools: ["sample_review_progress"], guide: "step-sample", context: "sample-review", receipt: run });
-    if (run.state === "failed") return response({ state: "blocked", step: "sample-review", reason: "sample_failed", section: "leads",
-      actions: ["sample_review_get to read the failure and any saved evidence.",
-        "Explain it plainly. Retry once with sample_review_post only for a technical research failure; for exhausted allowance give the reset time.",
-        "Offer to continue with outreach setup using saved leads while the search waits."],
-      tools: ["sample_review_get", "sample_review_post"], guide: "step-sample-failed", context: "sample-review", receipt: run });
-    // Sample acceptance is not persisted. A saved campaign is the evidence that
-    // the founder moved past the sample; without one the sample is the resting
-    // point, which is also where a lead-only founder stays.
-    if (workspaceRef === null) throw new Error("Missing workspace reference");
-    const campaign = WorkspaceCampaignResult.parse(await dependencies.workspaceCampaign(session, { operation: "status", payload: { workspace: workspaceRef } }));
-    requireWorkspace(campaign.workspace_ref);
-    if (campaign.state === "unconfigured") {
-      const { hubspot, sync } = await readCrm(dependencies, session, workspaceRef);
-      return response({ state: "review", step: "sample-review", reason: "sample_ready_for_founder_review", section: "leads",
-        actions: ["Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps.",
-          "Ask one question: does this confirm the targeting, or what should change? A change goes through summary_context task targeting or research-criteria, then a new sample.",
-          crmAction(hubspot, sync),
-          "Close Section 1 in at most six lines (target, the leads and their grade mix, the CRM result), then ask whether to set up LinkedIn outreach now; yes: summary_context task campaigns."],
-        tools: ["sample_review_get", "crm_get", "crm_post", "crm_mapping_context", "crm_patch", "crm_sync_start", "crm_sync_status", "summary_context"],
-        guide: "step-review", context: "sample-review", receipt: run });
-    }
-    const receipt = { state: campaign.state, outreach_enabled: campaign.outreach_enabled, version_ref: campaign.version_ref,
-      preparation: campaign.preparation?.state ?? null, blockers: campaign.blockers };
-    // The campaigns guide with its references is ~300 KB; inlining it on every
-    // resume stalls chat connectors. Return the workspace resume guide and let
-    // the client fetch the campaigns guide when the founder works on it.
-    const tools = ["campaigns_get", "summary_context"];
-    const campaignStep = (state: Step["state"], reason: string, action: string) =>
-      response({ state, step: "campaign", reason, section: "outreach", actions: [action, "For changes or approval read summary_context task campaigns first."],
-        tools, guide: "summary", context: "campaigns", receipt });
-    if (campaign.state === "active") return campaignStep("complete", "campaign_active", "Onboarding is complete: help with the founder's request instead of restarting setup; campaigns_get has the live campaign.");
-    if (campaign.state === "paused") return campaignStep("action_required", "campaign_paused", "The saved campaign is paused: read campaigns_get and explain why; resume only with the founder's explicit approval.");
-    if (campaign.preparation?.state === "pending") return campaignStep("pending", "campaign_preparing", "Campaign preparation is running: read campaigns_get until it is ready or failed.");
-    if (campaign.preparation?.state === "failed") return campaignStep("blocked", "campaign_preparation_failed", "Campaign preparation failed: read campaigns_get for its errors and repair them.");
-    return campaignStep("action_required", "campaign_draft", `Resume the saved campaign draft with campaigns_get and continue to its exact preview and approval.${campaign.blockers.length ? ` Blockers: ${campaign.blockers.join(", ")}.` : ""}`);
+  for (const value of [targeting, criteria, status])
+    if (value.workspace_ref !== ref)
+      throw new PublicError({
+        status: 403,
+        code: "WORKSPACE_FORBIDDEN",
+        message: "The resource does not belong to the selected workspace.",
+      });
+  if (!targeting.targeting || !criteria.criteria || !criteria.criteria.text) {
+    if (status.state === "imported")
+      return response(
+        "blocked",
+        "import",
+        "setup_resource_unavailable",
+        [
+          "The saved setup receipt exists but a required resource is unavailable. Retry setup_status and resource reads; do not submit another setup.",
+        ],
+        [
+          tool("setup", "status"),
+          tool("targeting", "get"),
+          tool("research-criteria", "get"),
+        ],
+        "setup",
+        status,
+      );
+    const draft = SetupDraftGetSchema.parse(await read("setup.get_draft"));
+    if (draft.workspace_ref !== ref)
+      throw new PublicError({
+        status: 403,
+        code: "WORKSPACE_FORBIDDEN",
+        message: "The draft does not belong to the selected workspace.",
+      });
+    saved = draft;
+    if (!draft.draft || draft.gates.missing.length || draft.gates.issues.length)
+      return response(
+        "action_required",
+        "interview",
+        "confirmed_interview_needed",
+        [
+          "Resume the workspace server draft. Ask only its next missing gate, leading with a hypothesis; save every confirmed block with setup_patch_draft and the returned expected_version. Exclusions need at least one evidence-based disqualifier or an excluded industry code filter; an empty parked-motions list is a valid decision.",
+          "When gates are complete, call next_step.",
+        ],
+        [tool("setup", "get_draft"), tool("setup", "patch_draft")],
+        "setup",
+        null,
+        draft.gates,
+      );
+    if (!draft.generated_criteria)
+      return response(
+        "action_required",
+        "configuration",
+        "configuration_needed",
+        [
+          "Read setup_generation_context, generate only Scout criteria from the saved draft and current base, then save them with setup_patch_draft. Bind source_versions to the profile, resulting draft version and base version.",
+        ],
+        [tool("setup", "generation_context"), tool("setup", "patch_draft")],
+        "setup",
+      );
+    return response(
+      "action_required",
+      "submission",
+      "configuration_saved",
+      [
+        `Submit once with setup_post {expected_draft_version:${draft.version}}. After a lost response use setup_status; a saved receipt proves both resources were created. This does not activate research or outreach.`,
+      ],
+      [tool("setup", "post"), tool("setup", "status")],
+      "setup",
+    );
   }
-  if (saved.state === "none" || !saved.draft_ready) return response(interviewStep(saved, false));
-  const revision = saved.revision;
-  if (!saved.configuration) return response({ state: "action_required", step: "configuration", reason: "configuration_needed", section: "leads",
-    actions: ["Tell the founder in one line that you are building their search and research rules.",
-      "Read targeting_onboarding_context (generation rules, configuration schema, context_version).",
-      "Generate icp_config and scout_overlay from the saved draft per references.configuration; copy contract_version and context_version unchanged.",
-      `Save the unchanged draft with the configuration via business_onboarding_save (expected_revision ${revision}).`,
-      "Submit once with targeting_post {draft, configuration, expected_revision returned by that save, idempotency_key: one stable key you keep}.",
-      SUBMIT_AND_FOLLOW],
-    tools: ["targeting_onboarding_context", "business_onboarding_save", "targeting_post", "targeting_onboarding_status"],
-    guide: "step-configuration", context: "targeting" });
-  return response({ state: "action_required", step: "submission", reason: "configuration_saved", section: "leads",
-    actions: [`Submit once with targeting_post using the saved draft and configuration, expected_revision ${revision} and ${saved.idempotency_key ? `the saved idempotency_key ${saved.idempotency_key}` : "one new stable idempotency_key you keep"}.`,
-      SUBMIT_AND_FOLLOW],
-    tools: ["targeting_post", "targeting_onboarding_status"], guide: "step-submission", context: "targeting" });
+  // Resource heads are authoritative even when configured outside setup.
+  const run = RunStatusSchema.parse(
+    await deps.getRunStatus(session),
+  );
+  if (run.state !== "none" && run.workspace.workspace_ref !== ref)
+    throw new PublicError({
+      status: 403,
+      code: "WORKSPACE_FORBIDDEN",
+      message: "The research run does not belong to the selected workspace.",
+    });
+  if (run.state === "none")
+    return response(
+      "action_required",
+      "sample-review",
+      "sample_not_started",
+      [
+        `${tool("sample-review", "post")} with body {} and keep its run_ref. The sample uses five people of this week's research volume; with fewer than five left it returns RESEARCH_LIMIT_REACHED and resets_at: give the founder that reset time.`,
+        "Tell the founder you are finding and researching five matching people, that it takes a few minutes, and that you will share each one as it lands.",
+        `${tool("sample-review", "progress")} with run_ref, then the returned cursor and wait_seconds 25 until terminal. Keep one request open and narrate each new lead in one line.`,
+        "When terminal, call next_step. This bounded initial sample does not activate weekly research or outreach.",
+      ],
+      [tool("sample-review", "post"), tool("sample-review", "progress")],
+      "sample-review",
+    );
+  if (["queued", "running"].includes(run.state))
+    return response(
+      "pending",
+      "sample-review",
+      "sample_pending",
+      [
+        `${tool("sample-review", "progress")} with run_ref ${run.run_ref}, then the returned cursor and wait_seconds 25 until terminal. Narrate each newly researched lead in one line.`,
+        "One request at a time: no sleeps and never POST again to check progress.",
+        "When terminal, call next_step.",
+      ],
+      [tool("sample-review", "progress")],
+      "sample-review",
+      run,
+    );
+  if (run.state === "failed") {
+    const failure = sampleFailures[run.error_code ?? "research_failed"];
+    return response(
+      "blocked",
+      "sample-review",
+      "sample_failed",
+      [
+        `The sample stopped with reason ${run.error_code ?? "research_failed"}. Read ${tool("sample-review", "get")} for the saved people and explain the reason plainly.`,
+        failure.action,
+        "Saved leads stay usable; outreach setup does not have to wait for the sample.",
+      ],
+      [tool("sample-review", "get"), ...failure.tools],
+      "sample-review",
+      run,
+    );
+  }
+  const campaign = WorkspaceCampaignResult.parse(
+    await deps.workspaceCampaign(session, {
+      operation: "status",
+      payload: { workspace: ref! },
+    }),
+  );
+  if (campaign.workspace_ref !== ref)
+    throw new PublicError({
+      status: 403,
+      code: "WORKSPACE_FORBIDDEN",
+      message: "The campaign does not belong to the selected workspace.",
+    });
+  if (campaign.state === "unconfigured") {
+    const crm = await readComponent(async () =>
+      HubspotConnectionStatusSchema.parse(
+        await deps.getHubspotConnection(session),
+      ),
+    );
+    let crmAction =
+      "Read crm_get before offering CRM sync; its saved connection is currently unavailable. A leads-only workspace can remain here.";
+    if (crm.status === "available") {
+      if (crm.value.status !== "connected")
+        crmAction =
+          "Ask once whether the founder wants these leads and their research in their CRM. Connect only after a separate explicit request; a leads-only workspace can remain here.";
+      else if (crm.value.reconnect_required)
+        crmAction =
+          "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
+      else {
+        const sync = await readComponent(async () => {
+          const value = CrmSyncStatusSchema.parse(
+            await deps.getCrmSyncStatus(session),
+          );
+          if (value.state !== "none" && value.workspace.workspace_ref !== ref)
+            throw new PublicError({
+              status: 403,
+              code: "WORKSPACE_FORBIDDEN",
+              message:
+                "The CRM sync does not belong to the selected workspace.",
+            });
+          return value;
+        });
+        if (sync.status === "unavailable")
+          crmAction =
+            "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
+        else if (sync.value.state === "none")
+          crmAction =
+            "The CRM connection is saved and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_sync_start, then crm_sync_status.";
+        else if (["queued", "running"].includes(sync.value.state))
+          crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
+        else if (sync.value.state === "succeeded")
+          crmAction = `The CRM sync finished (${sync.value.leads_synced ?? 0} leads). Do not repeat it just to check status.`;
+        else
+          crmAction = `The CRM sync failed (${sync.value.error_code ?? "unknown"}). Read crm_sync_status and resolve its blocker before offering a retry.`;
+      }
+    }
+    return response(
+      "review",
+      "sample-review",
+      "sample_ready_for_founder_review",
+      [
+        "Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps. Include lower-fit profiles and explain their mismatch.",
+        "Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample.",
+        crmAction,
+        "Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach now; yes: summary_context task campaigns. A leads-only founder can stop here. If not now, accept it and do not ask again this session.",
+      ],
+      [
+        tool("sample-review", "get"),
+        tool("crm", "get"),
+        tool("crm", "post"),
+        tool("crm", "mapping_context"),
+        tool("crm", "patch"),
+        tool("crm", "sync_start"),
+        tool("crm", "sync_status"),
+        tool("summary", "context"),
+      ],
+      "sample-review",
+      run,
+    );
+  }
+  const state =
+    campaign.state === "active"
+      ? "complete"
+      : campaign.preparation?.state === "pending"
+        ? "pending"
+        : campaign.preparation?.state === "failed"
+          ? "blocked"
+          : "action_required";
+  return response(
+    state,
+    "campaign",
+    campaign.preparation?.state === "pending"
+      ? "campaign_preparing"
+      : campaign.preparation?.state === "failed"
+        ? "campaign_preparation_failed"
+        : `campaign_${campaign.state}`,
+    [
+      "Read campaigns_get for the saved campaign and relevant blockers. Resume, prepare or activate only with explicit founder approval; Business changes never activate outreach.",
+    ],
+    [tool("campaigns", "get"), tool("summary", "context")],
+    "summary",
+    {
+      state: campaign.state,
+      version_ref: campaign.version_ref,
+      preparation: campaign.preparation?.state ?? null,
+      blockers: campaign.blockers,
+    },
+    null,
+    "outreach",
+  );
 }

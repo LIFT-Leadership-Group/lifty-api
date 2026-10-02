@@ -50,7 +50,7 @@ it("native API workflow uses scoped user RPCs and provider readback; exact retry
 });
 it.each(["lifty_company_mapping_forbidden","lifty_workspace_ambiguous","lifty_crm_service_forbidden"])("denied storage %s prevents every provider request",async message=>{
  const f=fixture();f.rpc.mockResolvedValue({data:null,error:{message}});
- await expect(f.run(f.session,"context")).rejects.toMatchObject({code:message.includes("forbidden")?(message.includes("service")?"COMPANY_MAPPING_NOT_CONFIGURED":"FORBIDDEN_WORKSPACE"):"WORKSPACE_AMBIGUOUS"});expect(f.provider).not.toHaveBeenCalled();
+ await expect(f.run(f.session,"context")).rejects.toMatchObject({code:message.includes("forbidden")?(message.includes("service")?"COMPANY_MAPPING_NOT_CONFIGURED":"FORBIDDEN_WORKSPACE"):"WORKSPACE_SELECTION_REQUIRED"});expect(f.provider).not.toHaveBeenCalled();
 });
 it("wrong provider portal fails before schema mutation and does not publish",async()=>{
  const f=fixture();f.provider.mockResolvedValue(Response.json({portalId:999}));

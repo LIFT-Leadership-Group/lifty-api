@@ -302,6 +302,8 @@ case "$url" in
   */readyz/crm-mapping) printf '%s' '{"status":"${mappingStatus}","capability":"${mappingVersion}"}' ;;
   */readyz) printf '%s' '{"status":"ready"}' ;;
   */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
+  */v1/context/business\\?client_contract=lifty-cli-context.v7) printf '%s' '{"task":"business","operations":{"get":{"route":"/v1/workspace/business"},"patch":{"method":"PATCH"}}}' ;;
+  */v1/context/setup\\?client_contract=lifty-cli-context.v7) printf '%s' '{"task":"setup","operations":{"delete_draft":{"method":"DELETE"},"generation_context":{"route":"/v1/workspace/setup/context"}}}' ;;
   */v1/workspace)
     output=''
     while [[ $# -gt 0 ]]; do
@@ -338,7 +340,9 @@ esac
         "Smoke checks passed: https://api.example.test",
       );
       const curlCalls = readFileSync(calls, "utf8").trim().split("\n");
-      expect(curlCalls).toHaveLength(6);
+      expect(curlCalls).toHaveLength(8);
+      expect(curlCalls.join("\n")).toContain("/v1/context/business?client_contract=lifty-cli-context.v7");
+      expect(curlCalls.join("\n")).toContain("/v1/context/setup?client_contract=lifty-cli-context.v7");
       expect(curlCalls.join("\n")).toContain("https://api.example.test/readyz/crm");
       expect(curlCalls.join("\n")).toContain("https://api.example.test/readyz/crm-mapping");
       for (const call of curlCalls) {
@@ -381,6 +385,8 @@ case "$url" in
   */readyz/crm-mapping) printf '%s' '{"status":"ready","capability":"lifty-crm-mapping.v1"}' ;;
   */readyz) printf '%s' '{"status":"ready"}' ;;
   */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
+  */v1/context/business\\?client_contract=lifty-cli-context.v7) printf '%s' '{"task":"business","operations":{"get":{"route":"/v1/workspace/business"},"patch":{"method":"PATCH"}}}' ;;
+  */v1/context/setup\\?client_contract=lifty-cli-context.v7) printf '%s' '{"task":"setup","operations":{"delete_draft":{"method":"DELETE"},"generation_context":{"route":"/v1/workspace/setup/context"}}}' ;;
   */v1/workspace)
     output=''
     while [[ $# -gt 0 ]]; do
@@ -398,7 +404,7 @@ esac
       const result = spawnSync("bash", [script, "smoke"], { encoding: "utf8",
         env: { ...process.env, FAKE_CURL_CALLS: calls, PATH: `${fakeBin}:${process.env.PATH ?? ""}` } });
       const curlCalls = readFileSync(calls, "utf8").trim().split("\n");
-      expect(curlCalls).toHaveLength(8);
+      expect(curlCalls).toHaveLength(10);
       expect(curlCalls.join("\n")).toContain("https://api.canonical.test/.well-known/oauth-protected-resource/mcp");
       if (!shouldPass) {
         expect(result.status).not.toBe(0);
@@ -687,6 +693,8 @@ case "$url" in
   */readyz/crm-mapping) printf '%s' '{"status":"ready","capability":"lifty-crm-mapping.v1"}' ;;
   */readyz) printf '%s' '{"status":"ready"}' ;;
   */openapi.json) printf '%s' '{"openapi":"3.1.0"}' ;;
+  */v1/context/business\\?client_contract=lifty-cli-context.v7) printf '%s' '{"task":"business","operations":{"get":{"route":"/v1/workspace/business"},"patch":{"method":"PATCH"}}}' ;;
+  */v1/context/setup\\?client_contract=lifty-cli-context.v7) printf '%s' '{"task":"setup","operations":{"delete_draft":{"method":"DELETE"},"generation_context":{"route":"/v1/workspace/setup/context"}}}' ;;
   */v1/workspace)
     output=''
     while [[ $# -gt 0 ]]; do

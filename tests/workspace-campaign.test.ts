@@ -13,7 +13,7 @@ const preview: WorkspaceCampaignOutput = { workspace_ref: workspace, version_ref
     email: { ...configuration.email, sender: "founder@example.test", delays_days: [0, 3, 4, 4, 4] }, email_entry: "direct", not_before: null,
     personalization_fields: ["first_name", "last_name", "company_name"], stop_on_reply: true, graph: { schema_version: "journey_graph.v1.1" } } };
 const control = { workspace, version_ref: version, digest, confirm: true as const };
-const headers = { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v5" };
+const headers = { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v7" };
 
 describe("workspace campaign setup", () => {
   it("requires the full five-email preparation without lead selection or a date/time", () => {

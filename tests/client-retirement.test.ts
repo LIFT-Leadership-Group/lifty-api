@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 
-const current = "lifty-cli-context.v5";
-const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4"];
-const tasks = ["onboarding", "workspace", "campaign", "stages", "business", "targeting", "research-criteria",
-  "sample-review", "commercial-voice", "crm", "sending-accounts", "campaigns", "notifications", "capacity"];
+const current = "lifty-cli-context.v7";
+const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6"];
+const tasks = ["setup", "account", "campaign", "stages", "business", "targeting", "research-criteria",
+  "sample-review", "commercial-voice", "crm", "sending-accounts", "campaigns", "notifications"];
 
 describe("retired client contracts", () => {
   it.each(retired)("rejects %s on every public context without exposing executable guidance", async version => {
@@ -20,10 +20,10 @@ describe("retired client contracts", () => {
     }
   });
 
-  it.each([undefined, ...retired, "unknown", "lifty-cli-context.v6"])("rejects private requests from %s before any business handler", async version => {
+  it.each([undefined, ...retired, "unknown"])("rejects private requests from %s before any business handler", async version => {
     const business = vi.fn(async () => { throw new Error("retired client reached business state"); });
     const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
-      getWorkspace: business, getConfig: business, startRun: business, submitOnboarding: business,
+      getWorkspace: business, businessOperation: business, startRun: business,
       startHubspotConnect: business, startSlackConnect: business, startEmailConnect: business,
       startLinkedinConnect: business, log: () => {} });
     const contract = await (await app.request("/openapi.json")).json();
@@ -47,7 +47,7 @@ describe("retired client contracts", () => {
 
   it("keeps v5 context and authenticated stage reads usable", async () => {
     const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
-      getWorkspace: async () => ({ state: "needs_workspace", workspace: null, next_action: "provision_workspace" }) });
+      listMemberWorkspaces: async () => ({workspaces:[]}), businessOperation: async () => ({workspace:null,profile:null}) });
     for (const task of tasks) {
       const response = await app.request(`/v1/context/${task}?client_contract=${current}`);
       expect(response.status).toBe(200);
@@ -55,7 +55,7 @@ describe("retired client contracts", () => {
     }
     const response = await app.request("/v1/workspace/business", { headers: { "x-lifty-client-contract": current } });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ workspace: { state: "needs_workspace" }, configuration: null });
+    expect(await response.json()).toMatchObject({ workspace:null, profile:null });
   });
 
   it("documents the required current client header on every authenticated operation", async () => {

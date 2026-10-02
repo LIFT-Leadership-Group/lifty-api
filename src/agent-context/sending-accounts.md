@@ -2,13 +2,14 @@
 
 Start with `whoami`. If it lists several workspaces and the user has not named
 one, ask which workspace they mean, naming the listed workspaces, before any
-other read. Do not try `summary_get` or GET to find out. For a named or chosen
-workspace that `whoami` does not mark `founder_default`, start with
+other read. Do not try `summary_get` or GET to find out; send the chosen
+workspace with every call as `references.common` describes. For a LIFT-managed
+client workspace (`self_service: false` in `whoami`), start with
 `client_accounts` below using its exact slug, and never use the founder
-operations for it. `WORKSPACE_AMBIGUOUS` from a founder read means the same:
-ask which workspace, then continue with `client_accounts`.
+operations for it. `WORKSPACE_SELECTION_REQUIRED` means the same: ask which
+workspace, then continue.
 
-For the `founder_default` workspace (always the case with a single workspace),
+For a self-service workspace (always the case with a single workspace),
 refresh `summary_get` with approval before proposing setup or changes in a new
 authenticated session.
 Do not infer a founder workspace from summary or create a founder profile to
@@ -288,5 +289,5 @@ Lifty reconnects that account instead of creating another one, and a mailbox
 held live by another workspace fails before any link is issued. Never interpret a failed read as disconnected or a
 previous connected grant as the new attempt. A verified connection does not
 authorize any email, message or invitation; use campaign previews and explicit
-approval/activation before sending. Connection can proceed while sample review
-or new-discovery allowance is blocked.
+approval/activation before sending. Connection can proceed while the sample
+or new research is waiting for the weekly reset.

@@ -96,10 +96,14 @@ export function createSupabaseAuthenticator(
     )) {
       return { ok: false, reason: "invalid_session" };
     }
+    // The caller's workspace selection travels with every RPC of this session;
+    // the database applies the one selection rule (implicit with a single
+    // membership, required with several) to reads and writes alike.
+    const selection = request.headers.get("x-lifty-workspace")?.trim();
     const client = createContextClient({
       auth: { token: data.token, keyName: data.keyName ?? null },
       env,
-      supabaseOptions: { global: { fetch: timeoutFetch } },
+      supabaseOptions: { global: { fetch: timeoutFetch, ...(selection ? { headers: { "x-lifty-workspace": selection } } : {}) } },
     });
     // Signature/expiry validation cannot detect logout or server-side session
     // revocation. Query only the caller's session through the RLS-scoped client

@@ -59,7 +59,7 @@ and wait. Reuse an explicit choice; a connected account does not choose its
 channel. Keep disconnected channels available as connection options. Explain
 the requested journey, current/future audience and stop-on-reply before writing
 copy. Ask only for missing intent or required account declarations. Pending
-calibration or exhausted discovery allowance does not prevent drafting.
+calibration or a reached weekly research limit does not prevent drafting.
 
 ## Composition and outreach overlay
 
@@ -76,8 +76,8 @@ chosen purpose, voice and previously approved content.
   of three texts. Existing shared defaults may supply a bank when omitted;
   preparation reports missing or invalid templates. Read the saved bank before
   modifying it. Generated mode and templates are distinct supported choices.
-- This `overlay` is the campaign's **outreach** overlay. The generated onboarding
-  configuration and Scout research overlay configure discovery/research; they
+- This `overlay` is the campaign's **outreach** overlay. The typed targeting
+  resource and Scout criteria configure discovery/research; they
   do not configure outreach copy. Use campaign operations for outreach changes.
 
 An overlay should work for future recipients. Sample-specific observations are
@@ -473,12 +473,10 @@ without approval of the exact recipient, account and copy.
   exact recipient/copy for individual campaigns. Preparation never sends.
 - Never request, print or summarize tokens, keys, callback payloads or credentials.
 - Never disconnect without the founder's explicit yes in this conversation.
-- Configuration changes use the relevant stage's PATCH and generated-artifact
-  workflow where that stage requires one. Campaign graph/mode/overlay edits use
-  campaign modify. Do not repeat first onboarding for an already-configured workspace.
-- Multi-lane and protected-prompt restrictions stay in force; do not combine
-  lanes, replace hand-tuned prompts or route around a rejection.
+- Configuration changes use the owning resource's versioned PATCH. Campaign
+  graph/mode/overlay edits use campaign modify. Do not submit setup again for
+  an already-configured workspace or route around a rejection.
 
-Before new discovery, GET capacity for actual used/reserved/remaining slots and
-its reset time. Exhaustion does not prevent account setup, saved-lead review or
-drafting; never bypass reservations through retries, dry runs or manual inserts.
+Weekly research volume and its reset time are on `research-schedule status`.
+A reached limit does not prevent account setup, saved-lead review or drafting;
+never work around it through retries, dry runs or manual inserts.

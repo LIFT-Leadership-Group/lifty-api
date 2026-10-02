@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import type { EnqueueFirstRun } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
+import { rpcFailure } from "./rpc-errors.js";
 
 export const AcquisitionRecoveryBody = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("status") }).strict(),
@@ -68,32 +69,13 @@ type RpcClient = {
   rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>;
 };
 
-const messages: Record<string, string> = {
-  unauthenticated: "Sign in to LIFTY before recovering acquisition.",
-  acquisition_forbidden: "Choose a first run from the selected workspace that you belong to.",
-  acquisition_stale: "The acquisition changed. Read recovery status and use its exact current reference.",
-  acquisition_parent_history_incomplete: "Earlier task attempts cannot be verified completely. Contact LIFT support; this acquisition remains blocked.",
-  acquisition_not_recoverable: "This first run has no failed acquisition that can be verified for recovery.",
-  acquisition_in_progress: "Acquisition work is still active. It must finish before a restart can be verified.",
-  recovery_restart_required: "This acquisition has ended. Use the explicit recovery restart with its current reference.",
-};
-
-function failed(error: unknown): never {
-  const parsed = z.object({
-    code: z.string().optional(),
-    message: z.string().optional(),
-  }).safeParse(error);
-  const code = parsed.success ? parsed.data.message ?? "" : "";
-  const known = Object.hasOwn(messages, code);
-  const status = known && parsed.success && /^PT(401|403|409)$/.test(parsed.data.code ?? "")
-    ? Number(parsed.data.code!.slice(2))
-    : 502;
-  throw new PublicError({
-    status,
-    code: known ? code.toUpperCase() : "ACQUISITION_RECOVERY_UNAVAILABLE",
-    message: known
-      ? messages[code]!
-      : "LIFTY could not confirm acquisition recovery. Retry the same exact references; no new acquisition is chosen automatically.",
+// Operator-only (not in the customer catalog). Typed database errors map
+// through the shared table; anything else is an unconfirmed recovery.
+function failed(error: unknown, operation = "acquisition_recovery"): never {
+  throw rpcFailure(error, {
+    operation,
+    code: "ACQUISITION_RECOVERY_UNAVAILABLE",
+    message: "LIFTY could not confirm acquisition recovery. Retry the same exact references; no new acquisition is chosen automatically.",
   });
 }
 
@@ -137,10 +119,10 @@ export function createAcquisitionRecoveryOperations(deps: {
           ? {}
           : { p_expected_acquisition_ref: choice.expected_acquisition_ref }),
       });
-    } catch {
-      failed(null);
+    } catch (cause) {
+      failed(cause, rpcName);
     }
-    if (response.error) failed(response.error);
+    if (response.error) failed(response.error, rpcName);
 
     const schema = choice.operation === "restart"
       ? AcquisitionRestartResult

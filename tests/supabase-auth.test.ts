@@ -60,6 +60,26 @@ describe("Supabase authentication boundary", () => {
     expect((await call(claims)).ok).toBe(false);
     expect(upstream).toHaveBeenCalledTimes(2);
   });
+  it("forwards the caller's workspace selection on every database call of the session", async () => {
+    // The database applies the one selection rule; the API only carries the header.
+    const { jwks, token } = await jwtFixture();
+    const upstream = vi.fn<typeof fetch>(async () => new Response("true", { headers: { "content-type": "application/json" } }));
+    const authenticate = createSupabaseAuthenticator({ supabaseUrl: "https://project.supabase.test", publishableKey: "sb_publishable_test", jwks },
+      { fetch: upstream });
+    const selected = await authenticate(new Request("https://api.lifty.test/v1/workspace/business", {
+      headers: { authorization: `Bearer ${token}`, "x-lifty-workspace": "acme" },
+    }));
+    if (!selected.ok) throw new Error("expected a session");
+    await (selected.session.client as { rpc(name: string): Promise<unknown> }).rpc("get_lifty_business_profile");
+    const sent = upstream.mock.calls.map(call => new Headers(call[1]?.headers).get("x-lifty-workspace"));
+    expect(sent).toEqual(["acme", "acme"]);
+    upstream.mockClear();
+    const implicit = await authenticate(new Request("https://api.lifty.test/v1/workspace/business", {
+      headers: { authorization: `Bearer ${token}` },
+    }));
+    expect(implicit.ok).toBe(true);
+    expect(new Headers(upstream.mock.calls[0]?.[1]?.headers).has("x-lifty-workspace")).toBe(false);
+  });
   it("aborts an upstream request when the Supabase deadline expires", async () => {
     const hangingFetch: typeof fetch = async (_input, init) =>
       await new Promise((_resolve, reject) => {
