@@ -201,7 +201,9 @@ const LaneFilters = {
   person_locations: list(),
   company: CompanyTargetingSchema,
 };
-export const PersonaSchema = z.object({ id: z.uuid(), ...PersonaValues }).strict();
+// Persona ids are opaque server ids. Migrated personas carry md5-derived ids
+// without RFC 4122 version/variant bits, so accept any GUID shape.
+export const PersonaSchema = z.object({ id: z.guid(), ...PersonaValues }).strict();
 export const TargetingLaneSchema = z
   .object({ id: z.uuid(), personas: unique(PersonaSchema, 30, (value) => value.id).min(1), ...LaneFilters })
   .strict();
@@ -258,7 +260,7 @@ export const CriteriaPatchSchema = changed({
 
 // Lane changes: {id, ...} patches a lane (omitted fields stay), {id, remove:
 // true} removes it, and a lane without id is added. Personas without id are new.
-const PersonaInputSchema = z.object({ id: z.uuid().optional(), ...PersonaValues }).strict();
+const PersonaInputSchema = z.object({ id: z.guid().optional(), ...PersonaValues }).strict();
 const LanePersonas = unique(PersonaInputSchema, 30, (value) => value.id ?? `name:${value.name}`).min(1);
 export const TargetingLaneChangeSchema = z.union([
   z.object({ id: z.uuid(), remove: z.literal(true) }).strict(),

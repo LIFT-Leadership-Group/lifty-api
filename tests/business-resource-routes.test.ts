@@ -384,6 +384,20 @@ describe("typed Business direct HTTP boundary", () => {
       ).toBe(422);
     expect(h.rpc).toHaveBeenCalledOnce();
   });
+  it("reads and patches personas whose migrated ids are not RFC 4122 UUIDs", async () => {
+    // The Business migration derived persona ids from md5, without version or
+    // variant bits; they are opaque server ids and must round-trip.
+    const persona = { ...laneFixture.personas[0], id: "a518ff8c-30d3-bafd-cf8f-5a371160e6b2" };
+    const lane = { ...laneFixture, personas: [persona] };
+    const h = harness({
+      workspace_ref: workspaceRef,
+      targeting: { version: 1, updated_at: profileFixture.updated_at, lanes: [lane] },
+    });
+    expect((await h.request("/v1/workspace/targeting")).status).toBe(200);
+    const body = { expected_version: 1, lanes: [{ id: lane.id, personas: [persona] }] };
+    expect((await h.request("/v1/workspace/targeting", "PATCH", body)).status).toBe(200);
+    expect(h.rpc).toHaveBeenLastCalledWith("patch_lifty_targeting", { p_workspace_id: null, p_payload: body });
+  });
   it("saves voice version0 directly and rejects unrelated business facts", async () => {
     const h = harness({
       workspace_ref: workspaceRef,
