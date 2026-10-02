@@ -57,15 +57,6 @@ ${channel === "email" ? emailDeclaration() : linkedinDeclaration()}
 <p class="reassurance">Connecting does not start outreach. You review and approve your outreach before anything is sent.</p>`, pendingSubmitScript);
 }
 
-/** A used link confirms receipt instead of replaying the sign-in. */
-export function renderConnectReceivedPage(): string {
-  return page("Authorization received", `<div class="symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></div>
-<h1>We received your authorization</h1>
-<p class="intro">Return to Lifty to check your connection.</p>
-<div class="next-step"><strong>You can close this tab</strong><p>Lifty confirms when the account is ready.</p></div>
-<p class="reassurance">Connecting does not start outreach.</p>`);
-}
-
 export function renderConnectMessagePage(title: string, message: string): string {
   return page(title, `<h1>${escape(title)}</h1><p class="intro">${escape(message)}</p>`);
 }

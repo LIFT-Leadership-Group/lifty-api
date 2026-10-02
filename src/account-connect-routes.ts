@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createConfirmationRouter, type ConfirmationLog } from "./connection-confirmation.js";
 import type { AccountConnection, ConnectOutcome } from "./account-connection.js";
-import { renderConnectMessagePage, renderConnectPage, renderConnectReceivedPage } from "./connect-page.js";
+import { renderConnectMessagePage, renderConnectPage } from "./connect-page.js";
 import { hostedReturnError } from "./hosted-return-error.js";
 import { PENDING_SUBMIT_SCRIPT_HASH } from "./lifty-brand.js";
 import { PublicError } from "./errors.js";
@@ -22,7 +22,7 @@ export function createAccountConnectRouter(connection: AccountConnection,
     c.html(renderConnectMessagePage(title, text), status);
   const render = (c: Context, channel: ConnectChannel, intent: string, outcome: ConnectOutcome) => {
     if (outcome.kind === "redirect") return c.redirect(outcome.url, 303);
-    if (outcome.kind === "received") return c.html(renderConnectReceivedPage());
+    if (outcome.kind === "checking") return c.redirect(`/connect/${channel}/return?intent=${encodeURIComponent(intent)}`, 303);
     return c.html(renderConnectPage(channel, intent, outcome.senderName));
   };
   app.use("/connect/*", async (c, next) => {

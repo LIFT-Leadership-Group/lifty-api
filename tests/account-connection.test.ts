@@ -147,12 +147,34 @@ describe("Lifty connect page", () => {
 
   it("acknowledges an authorization already received instead of issuing another link", async () => {
     const db = attemptDb(); db.declaration = { mailbox_use: "habitual" }; db.authorization.received = true;
-    const { provider } = stub(db);
-    const response = await app().request(`/connect/email?intent=${encodeURIComponent(intent())}`);
-    expect(response.status).toBe(200);
-    expect(await response.text()).toContain("We received your authorization");
+    const { provider } = stub(db); const state = intent();
+    const response = await app().request(`/connect/email?intent=${encodeURIComponent(state)}`);
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`/connect/email/return?intent=${encodeURIComponent(state)}`);
     expect(db.ops).toEqual(["context"]); expect(provider.calls).toEqual([]);
   });
+  it.each(["provider", "save_link"])("keeps a lost %s response pending and never reissues the claimed link", async lost => {
+    const db = attemptDb();
+    const { fetchImpl, provider } = stub(db);
+    const original = fetchImpl.getMockImplementation()!;
+    let dropped = false;
+    fetchImpl.mockImplementation(async (input, init) => {
+      const response = await original(input, init);
+      const target = lost === "provider" ? String(input).endsWith("/auth/link")
+        : String(init?.body).includes('"p_operation":"save_link"');
+      if (target && !dropped) { dropped = true; throw new DOMException("response lost", "TimeoutError"); }
+      return response;
+    });
+    const server = app();
+    const response = await server.request("/connect/email", form(`intent=${encodeURIComponent(intent())}&mailbox_use=habitual`));
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toContain("/connect/email/return?intent=");
+    expect(db.ops).not.toContain("fail");
+    expect(db.state).toBe("pending");
+    await server.request(`/connect/email?intent=${encodeURIComponent(intent())}`);
+    expect(provider.calls).toEqual(["POST /v2/auth/link"]);
+  });
+
 });
 
 describe("shared confirmation for sending accounts", () => {
@@ -163,7 +185,7 @@ describe("shared confirmation for sending accounts", () => {
     expect(shell.status).toBe(200);
     expect(await shell.text()).toContain("Checking your connection");
     const hinted = await server.request("/connect/email/return/status", status("email", state, "canceled"));
-    expect(await hinted.json()).toEqual({ status: "failed", reason: "canceled" });
+    expect(await hinted.json()).toEqual({ status: "pending" });
     expect(db.ops).toEqual(["context", "return_error"]);
     expect(db.state).toBe("pending");
     // The signed authorization arrives later (another tab): it wins.

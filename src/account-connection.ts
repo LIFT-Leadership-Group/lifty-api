@@ -2,7 +2,7 @@ import { z } from "zod";
 import { connectionFetch, type ConfirmationResult } from "./connection-confirmation.js";
 import { openConnectAttempt, sealConnectAttempt, type ConnectChannel } from "./connect-state.js";
 import { createAccountProvider, IdentityMismatch, ProviderTransport, type AccountProviderSettings, type ExpectedIdentity } from "./account-provider.js";
-import { HostedReturnError, hostedReturnReason } from "./hosted-return-error.js";
+import { HostedReturnError } from "./hosted-return-error.js";
 import { parseHostedAuthOrigin } from "./hosted-auth-branding.js";
 import { unipileV2AuthState } from "./unipile-v2-state.js";
 import { PublicError } from "./errors.js";
@@ -43,7 +43,7 @@ const RevocationContext = z.object({ revocable: z.boolean(), transport: Provider
 export type ConnectOutcome =
   | { kind: "declare"; senderName: string }
   | { kind: "redirect"; url: string }
-  | { kind: "received" };
+  | { kind: "checking" };
 export type EmailDeclaration = { mailbox_use: "habitual" | "dedicated" };
 export type LinkedinDeclaration = { habitual_personal_account: true; no_other_automation: true };
 
@@ -115,7 +115,7 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
   // Claim the single link for this attempt, or reuse the one already issued.
   async function handoff(channel: ConnectChannel, intent: string, current: Snapshot): Promise<ConnectOutcome> {
     const attempt = current.attempt;
-    if (attempt.internal_state === "completed" || current.authorization.received) return { kind: "received" };
+    if (attempt.internal_state === "completed" || current.authorization.received) return { kind: "checking" };
     if (attempt.state === "expired") throw rpcError({ message: "account_attempt_expired" });
     if (attempt.state === "failed") throw rpcError({ message: "account_attempt_unavailable" });
     if (!attempt.declaration) return { kind: "declare", senderName: attempt.sender.name };
@@ -123,7 +123,7 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     const claim = attempt.internal_state === "pending" ? await snapshot(channel, "issue_link", { attempt_id: attempt.id }) : current;
     if (!claim.claimed) {
       if (claim.attempt.internal_state === "ready" && claim.attempt.hosted_url) return { kind: "redirect", url: hosted(claim.attempt.hosted_url) };
-      throw new PublicError({ status: 409, code: "CONNECT_LINK_PENDING", message: "Your sign-in is being prepared. Open the link again in a moment." });
+      return { kind: "checking" };
     }
     try {
       const state = unipileV2AuthState(channel, attempt.id, key(channel));
@@ -133,10 +133,9 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
       await rpc(channel, "save_link", { attempt_id: attempt.id, url });
       return { kind: "redirect", url: hosted(url) };
     } catch {
-      // The claimed link could not be issued; end this attempt so the agent can
-      // start a fresh one instead of leaving it claimed forever.
-      try { await rpc(channel, "fail", { attempt_id: attempt.id, reason: "provider_rejected" }); } catch { /* status explains it */ }
-      throw new PublicError({ status: 503, code: "CONNECT_UNAVAILABLE", message: "Lifty could not open the sign-in. Ask Lifty for a new connection link." });
+      // A lost provider/save response cannot prove rejection. Retain the claim
+      // so retries only read this attempt; late signed authorization can finish it.
+      return { kind: "checking" };
     }
   }
 
@@ -185,8 +184,12 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
       // A provider-reported error explains a missing authorization; it never
       // overrides a signed one and leaves the attempt open.
       if (returnError && !current.authorization.received && current.attempt.internal_state !== "completed") {
-        if (current.attempt.internal_state === "ready") await rpc(channel, "return_error", { attempt_id: id, return_error: returnError });
-        return { status: "failed", reason: hostedReturnReason[returnError] };
+        if (current.attempt.internal_state === "ready" && current.authorization.return_error !== returnError) {
+          await rpc(channel, "return_error", { attempt_id: id, return_error: returnError });
+        }
+        // Browser hints are not terminal evidence. Keep polling so a delayed
+        // authorization can still establish the authoritative outcome.
+        return result(current);
       }
       current = await reconcile(channel, current);
       return result(current);
