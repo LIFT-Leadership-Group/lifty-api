@@ -1,0 +1,20 @@
+{
+  "bindings": [
+    {
+      "binding_ref": "507601a4-2bea-4309-8ac0-78104951ed43",
+      "pending_runs": 1,
+      "revision_ref": "02dbabcc-4e62-42c0-b77b-74c0594a52c8",
+      "admitted_runs": 1,
+      "prepared_runs": 0,
+      "continuing_runs": 1,
+      "recorded_gate_reasons": []
+    }
+  ],
+  "workspace": {
+    "name": "LIF1188 Contract",
+    "state": "ready_for_connections",
+    "workspace_ref": "b139419b-d84b-490e-965c-567f5d904c75"
+  },
+  "campaign_ref": "07a164c6-f3a4-4973-9507-70df5f5b388e",
+  "intent_active": false
+}

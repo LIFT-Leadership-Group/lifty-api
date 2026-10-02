@@ -116,3 +116,43 @@ export const CampaignsSchema = z.object({ ...Workspace, campaigns: z.array(Campa
 export const CampaignActivationResultSchema = CampaignResultSchema.extend({ journey: JourneySchema }).strict();
 export type JourneyPolicy = z.infer<typeof JourneyPolicySchema>;
 export type CampaignPolicy = z.infer<typeof CampaignPolicySchema>;
+
+export const CampaignTestCreateSchema = PublishSchema.extend({ request_ref: Ref,
+  sample: z.union([z.object({ lead_refs: z.array(Ref).min(1).max(20).refine(values => new Set(values).size === values.length) }).strict(),
+    z.object({ baseline_test_ref: Ref }).strict()]),
+}).strict();
+export const CampaignTestPathSchema = CampaignPathSchema.extend({ test_ref: Ref }).strict();
+const TestSummary = z.object({ test_ref: Ref, request_ref: Ref, campaign_ref: Ref, revision_ref: Ref, digest: Digest,
+  sample_ref: Ref, baseline_test_ref: Ref.nullable(), status: z.enum(["queued", "running", "completed", "failed"]), created_at: Timestamp,
+}).strict();
+const TestOutput = z.object({ output_ref: Ref, digest: Digest, created_at: Timestamp,
+  content: z.union([z.object({ linkedin_messages: z.array(z.object({ text: text(3000) }).strict()).min(1).max(3) }).strict(),
+    z.object({ email_steps: z.array(z.object({ subject: text(300), text: text(20000), delay_minutes: z.number().int().min(0).max(43200) }).strict()).min(4).max(5) }).strict()]),
+  context: z.object({ revision_ref: Ref, digest: Digest, profile_version: Version, voice_version: z.number().int().nonnegative(),
+    sender_id: Ref, sender_version: Version, prompt_digest: Digest }).strict(),
+}).strict();
+export const CampaignTestSchema = TestSummary.extend({ samples: z.array(z.object({ lead_ref: Ref, lab_run_ref: Ref,
+  status: z.enum(["queued", "running", "succeeded", "failed", "canceled"]), baseline_output_ref: Ref.nullable(), output: TestOutput.nullable(),
+}).strict()).min(1).max(20), context_changes: z.array(z.literal("composition_context_changed")), }).strict();
+export const CampaignTestResultSchema = z.object({ ...Workspace, test: CampaignTestSchema }).strict();
+export const CampaignTestsSchema = z.object({ ...Workspace, tests: z.array(TestSummary).max(100), next_cursor: Ref.nullable() }).strict();
+
+export const CampaignMessagePathSchema = z.object({ message_ref: Ref }).strict();
+export const CampaignMessageReviseSchema = z.object({ request_ref: Ref, source_digest: Digest,
+  expected_review_status: z.enum(["pending", "enroll_failed"]), changes: z.union([
+    z.object({ text: text(3000) }).strict(),
+    z.object({ steps: z.array(z.object({ position: z.number().int().min(1).max(6), subject: text(300).refine(value => !/[\r\n]/.test(value)).optional(), text: text(20000) }).strict()).min(1).max(6).refine(steps => new Set(steps.map(step => step.position)).size === steps.length) }).strict(),
+  ]),
+}).strict();
+export const CampaignMessageSchema = z.object({ message_ref: Ref, lead_ref: Ref, channel: z.enum(["email", "linkedin"]),
+  status: z.string().nullable(), review_status: z.string().nullable(), is_draft: z.boolean().nullable(), content: z.string(),
+  steps: z.array(z.object({ position: z.number().int().positive(), subject: z.string(), text: z.string() }).strict()).nullable(),
+  source_message_ref: Ref.nullable(), sender_id: Ref.nullable(), sender_version: Version.nullable(), source_digest: Digest, created_at: Timestamp,
+}).strict();
+export const CampaignMessageResultSchema = z.object({ ...Workspace, message: CampaignMessageSchema }).strict();
+export const CampaignRuntimeSchema = z.object({ ...Workspace, campaign_ref: Ref, intent_active: z.boolean(),
+  bindings: z.array(z.object({ binding_ref: Ref, revision_ref: Ref, admitted_runs: z.number().int().nonnegative(),
+    continuing_runs: z.number().int().nonnegative(), prepared_runs: z.number().int().nonnegative(), pending_runs: z.number().int().nonnegative(),
+    recorded_gate_reasons: z.array(z.object({ reason: z.enum(["delay_pending", "schedule_pending", "delivery_slot_pending", "intent_paused", "recorded_gate_pending", "composition_held"]), count: z.number().int().positive() }).strict()),
+  }).strict()),
+}).strict();

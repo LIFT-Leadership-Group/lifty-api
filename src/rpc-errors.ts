@@ -58,6 +58,13 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   OUTREACH_REVISION_MISMATCH: "Read the resource and use its exact revision and digest.",
   OUTREACH_APPROVAL_REQUIRED: "Publish the exact chosen revision before activating it.",
   OUTREACH_CONFIGURATION_REQUIRED: "Save and approve the complete journey and its campaign revisions, then activate that exact journey binding.",
+  OUTREACH_MESSAGE_MOVED: "This message is no longer the exact unapproved draft you read. Read its current review state before retrying.",
+  OUTREACH_MESSAGE_SIGNATURE_UNAVAILABLE: "This draft has no exact saved person/signature version. Restore that provenance before correcting it; current Identity cannot substitute.",
+  OUTREACH_REQUEST_CONFLICT: "This request reference already records another payload. Recover its saved test or use a new reference for a new request.",
+  OUTREACH_BASELINE_UNAVAILABLE: "Choose a completed saved test from this campaign as the baseline.",
+  OUTREACH_SAMPLE_UNAVAILABLE: "This sample lacks saved research. Choose researched leads before testing.",
+  OUTREACH_SAMPLE_SENDER_CONFLICT: "The saved sample person is not permitted by this revision. Preserve that person and repair the permitted senders.",
+  OUTREACH_COPY_INVALID: "Repair the saved message content using the campaign schema.",
   OUTREACH_SENDER_CONFLICT: "The lead's assigned person is not permitted for this campaign. Preserve its assignment and resolve the conflict.",
   // Calibration sample runs.
   RUN_NOT_CONFIGURED:

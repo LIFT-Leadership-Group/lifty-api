@@ -24,7 +24,7 @@ describe("canonical Outreach member transport", () => {
           : name.includes("journey") ? { workspace, journey: name === "publish_lifty_journey" ? { ...journey, draft_revision: revision(journeyPolicy, true), revisions: [revision(journeyPolicy, true)] } : journey }
             : name === "activate_lifty_campaign" ? { workspace, campaign: { ...campaign, state: "active", effective_revision: revision(policy, true) }, journey: { ...journey, active_binding: binding } }
               : { workspace, campaign: name === "publish_lifty_campaign" ? { ...campaign, draft_revision: revision(policy, true), revisions: [revision(policy, true)] } : campaign });
-    for (const { action, resource, definition } of outreachEntries()) {
+    for (const { action, resource, definition } of outreachEntries().filter(entry => entry.action !== "runtime" && !entry.action.startsWith("tests_") && !entry.action.startsWith("message_") && entry.action !== "test_detail")) {
       const ref = resource === "journeys" ? journeyRef : campaignRef;
       const body = action === "post" ? resource === "journeys" ? { name: "Journey", policy: journeyPolicy } : { name: "LinkedIn", journey_ref: journeyRef, channel: "linkedin", policy }
         : action === "draft_patch" ? { expected_version: 1, revision_ref: revisionRef, changes: resource === "journeys" ? { audience: { kind: "qualified" } } : { instructions: "New instructions" } }
@@ -84,7 +84,7 @@ describe("canonical Outreach member transport", () => {
     const h = harness(() => ({ workspace, campaign: { ...campaign, revisions: [{ ...revision(policy, true), digest: "b".repeat(64) }] } }));
     expect((await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/publish`, { expected_version: 1, revision_ref: revisionRef, digest })).status).toBe(502);
   });
-  it("catalog and MCP expose only core routes; old aliases and pending test/editor routes are unavailable", async () => {
+  it("catalog and MCP expose implemented routes; old aliases and pending editor routes are unavailable", async () => {
     const tools = getStageMcpTools();
     for (const { key, resource, action, definition } of outreachEntries()) {
       const context = getAgentContext(resource);

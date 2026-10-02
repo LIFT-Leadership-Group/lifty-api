@@ -30,6 +30,31 @@ function definition(resource: "journeys" | "campaigns", action: string, method: 
     description,
   };
 }
+function testDefinition(action: "tests_get" | "tests_post" | "test_detail"): Definition {
+  const read = action !== "tests_post";
+  const detail = action === "test_detail";
+  return { method: read ? "GET" : "POST", route: `/v1/workspace/campaigns/{campaign_ref}/tests${detail ? "/{test_ref}" : ""}`,
+    rpc: detail ? "get_lifty_campaign_test" : read ? "get_lifty_campaign_tests" : "create_lifty_campaign_test",
+    path: detail ? c.CampaignTestPathSchema : c.CampaignPathSchema, query: action === "tests_get" ? c.PageQuerySchema : Empty,
+    request: read ? null : c.CampaignTestCreateSchema, response: action === "tests_get" ? c.CampaignTestsSchema : c.CampaignTestResultSchema,
+    invalid, success: read ? 200 : 202, cli: { operation: action },
+    args: input => ({ p_campaign_id: input.path.campaign_ref, ...(detail ? { p_test_id: input.path.test_ref } : {}),
+      ...(action === "tests_get" ? { p_query: input.query } : read ? {} : { p_payload: input.body }) }),
+    description: action === "tests_post" ? "Queue an isolated saved candidate test with exact revision/digest/CAS and idempotent request_ref. Sample at most 20 explicit leads or reuse a completed baseline's exact leads and saved before outputs. Compose after only; disclose changed context. Preview person is provenance, never lead assignment. Does not enroll, approve, activate or send."
+      : detail ? "Read saved signed test outputs and exact provenance. Pending is authoritative; baseline outputs are never regenerated."
+        : "Discover durable saved test receipts after a lost response or in a fresh session. Paginated summaries contain no output bodies.",
+  };
+}
+function messageDefinition(revise: boolean): Definition {
+  return { method: revise ? "POST" : "GET", route: `/v1/workspace/campaign-messages/{message_ref}${revise ? "/revisions" : ""}`,
+    rpc: revise ? "revise_lifty_campaign_message" : "get_lifty_campaign_message", path: c.CampaignMessagePathSchema, query: Empty,
+    request: revise ? c.CampaignMessageReviseSchema : null, response: c.CampaignMessageResultSchema, invalid, success: revise ? 201 : 200,
+    cli: { operation: revise ? "message_revisions_post" : "message_get" }, args: input => ({ p_message_id: input.path.message_ref,
+      ...(revise ? { p_payload: input.body } : {}) }),
+    description: revise ? "Correct an actual still-unapproved per-lead saved draft into a new pending revision using exact source_digest/review state and idempotent request_ref. Preserve old bytes, person/signature, source and template/prompt/library provenance. Existing reviewer approval path applies; never approves or sends. Approved/sent/superseded messages and missing signature pins are rejected."
+      : "Read an actual saved per-lead message in the selected workspace. No canonical campaign membership is inferred for historical drafts. Does not generate, approve, activate or send.",
+  };
+}
 export const outreachOperationDefinitions = {
   journeys: {
     get: definition("journeys", "get", "GET", null, c.JourneysSchema, "Read saved journeys in the selected workspace. Unknown reads are unavailable, not an empty audience."),
@@ -40,6 +65,13 @@ export const outreachOperationDefinitions = {
     activate: definition("journeys", "activate", "POST", c.JourneyActivateSchema, c.JourneyResultSchema, "Activate an exact approved journey with exact approved campaign revisions for future entrants. Paused/unready campaigns may be pinned but gain no sending intent. Existing runs retain their binding; missing branches remain pending."),
   },
   campaigns: {
+    runtime: { ...definition("campaigns", "runtime", "GET", null, c.CampaignRuntimeSchema,
+      "Read derived native admissions and continuing/pending/prepared runs grouped by exact binding/revision, plus recorded gate reasons only. Intent is separate from execution/readiness. No recorded reason does not prove ready; failed reads remain unavailable."), rpc: "get_lifty_campaign_runtime" },
+    message_get: messageDefinition(false),
+    message_revisions_post: messageDefinition(true),
+    tests_get: testDefinition("tests_get"),
+    tests_post: testDefinition("tests_post"),
+    test_detail: testDefinition("test_detail"),
     get: definition("campaigns", "get", "GET", null, c.CampaignsSchema, "Read channel campaigns, optionally by journey_ref/channel. Uses the selected workspace; no singleton workspace configuration or provider selector."),
     detail: definition("campaigns", "detail", "GET", null, c.CampaignResultSchema, "Read one campaign's intent, immutable draft/approval history and effective revision derived from its journey binding. Account readiness is independent and is not inferred from this resource."),
     post: definition("campaigns", "post", "POST", c.CampaignCreateSchema, c.CampaignResultSchema, "Save an inactive unapproved channel campaign draft. Refer to canonical sender_ids; several named senders may be permitted but each lead retains one immutable person. Graph attachment is a separate journey draft edit. Never sends."),
@@ -66,6 +98,34 @@ export async function executeOutreachOperation(session: AuthSession, key: string
   if (!parsed.success) throw new PublicError({ status: 502, ...unavailable });
   // A response for another resource cannot confirm this operation's outcome.
   const value = parsed.data as { journey?: { journey_ref: string }; campaign?: { campaign_ref: string } };
+  if (entry.action === "runtime") {
+    if (c.CampaignRuntimeSchema.parse(parsed.data).campaign_ref !== input.path.campaign_ref)
+      throw new PublicError({ status: 502, ...unavailable });
+    return parsed.data;
+  }
+  if (entry.action === "message_get" || entry.action === "message_revisions_post") {
+    const message = c.CampaignMessageResultSchema.parse(parsed.data).message;
+    if (entry.action === "message_get" ? message.message_ref !== input.path.message_ref
+      : message.message_ref === input.path.message_ref || message.source_message_ref !== input.path.message_ref
+        || !message.sender_id || !message.sender_version)
+      throw new PublicError({ status: 502, ...unavailable });
+    return parsed.data;
+  }
+  if (entry.action.startsWith("tests_") || entry.action === "test_detail") {
+    const receipt = parsed.data as { test?: { campaign_ref: string; test_ref: string }; tests?: Array<{ campaign_ref: string }> };
+    if (receipt.test ? receipt.test.campaign_ref !== input.path.campaign_ref || (input.path.test_ref && receipt.test.test_ref !== input.path.test_ref)
+      : receipt.tests?.some(test => test.campaign_ref !== input.path.campaign_ref)) throw new PublicError({ status: 502, ...unavailable });
+    if (entry.action === "tests_post") {
+      const saved = c.CampaignTestResultSchema.parse(parsed.data).test;
+      const requested = input.body as z.infer<typeof c.CampaignTestCreateSchema>;
+      if (saved.request_ref !== requested.request_ref || saved.revision_ref !== requested.revision_ref || saved.digest !== requested.digest
+        || ("baseline_test_ref" in requested.sample ? saved.baseline_test_ref !== requested.sample.baseline_test_ref
+          : saved.baseline_test_ref !== null || saved.samples.length !== requested.sample.lead_refs.length
+            || saved.samples.some(sample => !("lead_refs" in requested.sample) || !requested.sample.lead_refs.includes(sample.lead_ref))))
+        throw new PublicError({ status: 502, ...unavailable });
+    }
+    return parsed.data;
+  }
   if ((input.path.journey_ref && value.journey?.journey_ref !== input.path.journey_ref)
     || (input.path.campaign_ref && value.campaign?.campaign_ref !== input.path.campaign_ref))
     throw new PublicError({ status: 502, ...unavailable });

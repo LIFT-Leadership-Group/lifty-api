@@ -1,0 +1,155 @@
+{
+  "test_pending": {
+    "test": {
+      "digest": "11758f2d2eaaad61f5545e3f864e2c76a0300f4bcaa687c64f43279537f0fc6e",
+      "status": "queued",
+      "samples": [
+        {
+          "output": null,
+          "status": "queued",
+          "lead_ref": "8aa14dae-ad51-4bf8-9cf4-8263b72d1ce9",
+          "lab_run_ref": "b4045def-b500-4ded-a306-e624af8345bf",
+          "baseline_output_ref": null
+        }
+      ],
+      "test_ref": "282c1e02-f6e5-47ab-a590-03b6ba08cae4",
+      "created_at": "2026-10-02T17:09:32.63297+00:00",
+      "sample_ref": "83760929-43ce-47a0-b1e9-65a1e55925d7",
+      "request_ref": "2b5dd50c-59a1-459d-a1fe-4be8d0ab4c62",
+      "campaign_ref": "fe639bbf-285d-43b8-b58a-bad47b850c5c",
+      "revision_ref": "60cf314c-6f52-4138-a0a6-b8c4f4b43a54",
+      "context_changes": [],
+      "baseline_test_ref": null
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "be72c055-61c2-41ef-aa27-d079708dc4a5"
+    }
+  },
+  "test_completed": {
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "be72c055-61c2-41ef-aa27-d079708dc4a5"
+    },
+    "test": {
+      "digest": "11758f2d2eaaad61f5545e3f864e2c76a0300f4bcaa687c64f43279537f0fc6e",
+      "status": "completed",
+      "samples": [
+        {
+          "output": {
+            "digest": "57eb6615ddf9211ee194e4a7968e34079145c25ed3cabf3bcf8a3ae63ee2bafc",
+            "content": {
+              "email_steps": [
+                {
+                  "text": "Confirmed message\n\nRegards, Pinned Person",
+                  "subject": "Confirmed subject",
+                  "delay_minutes": 0
+                },
+                {
+                  "text": "Confirmed message\n\nRegards, Pinned Person",
+                  "subject": "Confirmed subject",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message\n\nRegards, Pinned Person",
+                  "subject": "Confirmed subject",
+                  "delay_minutes": 4320
+                },
+                {
+                  "text": "Confirmed message\n\nRegards, Pinned Person",
+                  "subject": "Confirmed subject",
+                  "delay_minutes": 4320
+                }
+              ]
+            },
+            "context": {
+              "digest": "11758f2d2eaaad61f5545e3f864e2c76a0300f4bcaa687c64f43279537f0fc6e",
+              "sender_id": "eed6a3a7-cea0-4cc1-90ba-3aa9c3eb7413",
+              "revision_ref": "60cf314c-6f52-4138-a0a6-b8c4f4b43a54",
+              "prompt_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "voice_version": 0,
+              "sender_version": 1,
+              "profile_version": 1
+            },
+            "created_at": "2026-10-02T17:09:33.182783+00:00",
+            "output_ref": "4c7d3b76-26a7-41a6-97ee-21d60e3e96ae"
+          },
+          "status": "succeeded",
+          "lead_ref": "8aa14dae-ad51-4bf8-9cf4-8263b72d1ce9",
+          "lab_run_ref": "b4045def-b500-4ded-a306-e624af8345bf",
+          "baseline_output_ref": null
+        }
+      ],
+      "test_ref": "282c1e02-f6e5-47ab-a590-03b6ba08cae4",
+      "created_at": "2026-10-02T17:09:32.63297+00:00",
+      "sample_ref": "83760929-43ce-47a0-b1e9-65a1e55925d7",
+      "request_ref": "2b5dd50c-59a1-459d-a1fe-4be8d0ab4c62",
+      "campaign_ref": "fe639bbf-285d-43b8-b58a-bad47b850c5c",
+      "revision_ref": "60cf314c-6f52-4138-a0a6-b8c4f4b43a54",
+      "context_changes": [],
+      "baseline_test_ref": null
+    }
+  },
+  "tests_list": {
+    "tests": [
+      {
+        "digest": "11758f2d2eaaad61f5545e3f864e2c76a0300f4bcaa687c64f43279537f0fc6e",
+        "status": "queued",
+        "test_ref": "0eddb985-905e-49d2-9091-f78052b46d07",
+        "created_at": "2026-10-02T17:09:33.364094+00:00",
+        "sample_ref": "b4bdc2a6-67fc-429e-b899-8ac79dbb0add",
+        "request_ref": "0ebc5e2c-1236-434a-a6d7-779d24ae6f30",
+        "campaign_ref": "fe639bbf-285d-43b8-b58a-bad47b850c5c",
+        "revision_ref": "60cf314c-6f52-4138-a0a6-b8c4f4b43a54",
+        "baseline_test_ref": "282c1e02-f6e5-47ab-a590-03b6ba08cae4"
+      },
+      {
+        "digest": "11758f2d2eaaad61f5545e3f864e2c76a0300f4bcaa687c64f43279537f0fc6e",
+        "status": "completed",
+        "test_ref": "282c1e02-f6e5-47ab-a590-03b6ba08cae4",
+        "created_at": "2026-10-02T17:09:32.63297+00:00",
+        "sample_ref": "83760929-43ce-47a0-b1e9-65a1e55925d7",
+        "request_ref": "2b5dd50c-59a1-459d-a1fe-4be8d0ab4c62",
+        "campaign_ref": "fe639bbf-285d-43b8-b58a-bad47b850c5c",
+        "revision_ref": "60cf314c-6f52-4138-a0a6-b8c4f4b43a54",
+        "baseline_test_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "be72c055-61c2-41ef-aa27-d079708dc4a5"
+    },
+    "next_cursor": null
+  },
+  "baseline_candidate": {
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "be72c055-61c2-41ef-aa27-d079708dc4a5"
+    },
+    "test": {
+      "digest": "11758f2d2eaaad61f5545e3f864e2c76a0300f4bcaa687c64f43279537f0fc6e",
+      "status": "queued",
+      "samples": [
+        {
+          "output": null,
+          "status": "queued",
+          "lead_ref": "8aa14dae-ad51-4bf8-9cf4-8263b72d1ce9",
+          "lab_run_ref": "cb937780-2c5e-464c-9cd1-406a0effbccf",
+          "baseline_output_ref": "4c7d3b76-26a7-41a6-97ee-21d60e3e96ae"
+        }
+      ],
+      "test_ref": "0eddb985-905e-49d2-9091-f78052b46d07",
+      "created_at": "2026-10-02T17:09:33.364094+00:00",
+      "sample_ref": "b4bdc2a6-67fc-429e-b899-8ac79dbb0add",
+      "request_ref": "0ebc5e2c-1236-434a-a6d7-779d24ae6f30",
+      "campaign_ref": "fe639bbf-285d-43b8-b58a-bad47b850c5c",
+      "revision_ref": "60cf314c-6f52-4138-a0a6-b8c4f4b43a54",
+      "context_changes": [],
+      "baseline_test_ref": "282c1e02-f6e5-47ab-a590-03b6ba08cae4"
+    }
+  }
+}

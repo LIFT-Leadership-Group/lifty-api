@@ -1,0 +1,810 @@
+{
+  "journey_detail": {
+    "journey": {
+      "name": "Coordinated",
+      "version": 6,
+      "revisions": [
+        {
+          "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+          "content": {
+            "graph": {
+              "stops": [
+                "reply",
+                "meeting_booked",
+                "suppression",
+                "manual_stop"
+              ],
+              "entries": [
+                {
+                  "trigger": {
+                    "type": "start"
+                  },
+                  "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+                },
+                {
+                  "trigger": {
+                    "step": 2,
+                    "type": "sent",
+                    "after": {
+                      "days": 3
+                    },
+                    "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+                  },
+                  "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417"
+                }
+              ]
+            },
+            "audience": {
+              "kind": "qualified"
+            }
+          },
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:51.447332+00:00"
+          },
+          "created_at": "2026-10-02T16:58:51.391526+00:00",
+          "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+        },
+        {
+          "digest": "c5675dd8ede33dda608cd896cb861bd48ff796faceac39c59ed60ec24c06b24c",
+          "content": {
+            "graph": {
+              "stops": [
+                "reply",
+                "meeting_booked",
+                "suppression",
+                "manual_stop"
+              ],
+              "entries": []
+            },
+            "audience": {
+              "kind": "qualified"
+            }
+          },
+          "approval": null,
+          "created_at": "2026-10-02T16:58:50.459794+00:00",
+          "revision_ref": "3d6cf0c9-4086-4f3b-b4d9-e68db8090947"
+        }
+      ],
+      "journey_ref": "890f2381-c268-4d29-8034-0ba302f5673a",
+      "active_binding": {
+        "digest": "458c0d4c42d52557084fe1f790baa5b9d917d0a71669c8747d7fdcb25f7ae5cb",
+        "journey": {
+          "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+          "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+        },
+        "campaigns": [
+          {
+            "revision": {
+              "digest": "cdcb55beea67b02be6b80b7f7b50e328c2e8e79d5ec0f45b34da3fb834a4b53d",
+              "revision_ref": "dc81c899-b458-42b6-a4bf-b51bdd7a07cc"
+            },
+            "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417"
+          },
+          {
+            "revision": {
+              "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+              "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+            },
+            "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+          }
+        ],
+        "binding_ref": "38972bf2-7a7d-4f64-a073-2fec7dad58dc"
+      },
+      "draft_revision": {
+        "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+        "content": {
+          "graph": {
+            "stops": [
+              "reply",
+              "meeting_booked",
+              "suppression",
+              "manual_stop"
+            ],
+            "entries": [
+              {
+                "trigger": {
+                  "type": "start"
+                },
+                "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+              },
+              {
+                "trigger": {
+                  "step": 2,
+                  "type": "sent",
+                  "after": {
+                    "days": 3
+                  },
+                  "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+                },
+                "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417"
+              }
+            ]
+          },
+          "audience": {
+            "kind": "qualified"
+          }
+        },
+        "approval": {
+          "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+          "approved_at": "2026-10-02T16:58:51.447332+00:00"
+        },
+        "created_at": "2026-10-02T16:58:51.391526+00:00",
+        "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+      }
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "ce08e221-4783-45a2-aee7-531b683fd365"
+    }
+  },
+  "campaign_detail": {
+    "campaign": {
+      "name": "linkedin",
+      "state": "paused",
+      "channel": "linkedin",
+      "version": 8,
+      "revisions": [
+        {
+          "digest": "5ce9640d674d2f6e1236c3cb880d5e912716abd28f66de5dc2020aa53c7827f6",
+          "content": {
+            "steps": [
+              {
+                "delay": {
+                  "days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/Argentina/Buenos_Aires",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+              "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+            ],
+            "compose_mode": "generate",
+            "instructions": "Race A",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": null,
+          "created_at": "2026-10-02T16:58:53.241192+00:00",
+          "revision_ref": "00ef4856-90b7-4860-a9d3-c285b868e113"
+        },
+        {
+          "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+          "content": {
+            "steps": [
+              {
+                "delay": {
+                  "days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/Argentina/Buenos_Aires",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+              "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+            ],
+            "compose_mode": "generate",
+            "instructions": "A new exact successor.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:52.529147+00:00"
+          },
+          "created_at": "2026-10-02T16:58:52.407513+00:00",
+          "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+        },
+        {
+          "digest": "d3b206203de4e3e585bfb7f07f337361fe5537679897b61c7435741e11a53d1a",
+          "content": {
+            "steps": [
+              {
+                "delay": {
+                  "days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/Argentina/Buenos_Aires",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+              "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+            ],
+            "compose_mode": "generate",
+            "instructions": "Use confirmed evidence only.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:51.220835+00:00"
+          },
+          "created_at": "2026-10-02T16:58:50.573553+00:00",
+          "revision_ref": "9f9f6736-5997-45a4-8e3d-e4e7e25cee3a"
+        }
+      ],
+      "journey_ref": "890f2381-c268-4d29-8034-0ba302f5673a",
+      "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600",
+      "draft_revision": {
+        "digest": "5ce9640d674d2f6e1236c3cb880d5e912716abd28f66de5dc2020aa53c7827f6",
+        "content": {
+          "steps": [
+            {
+              "delay": {
+                "days": 0
+              },
+              "position": 1
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 2
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/Argentina/Buenos_Aires",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+            "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+          ],
+          "compose_mode": "generate",
+          "instructions": "Race A",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": null,
+        "created_at": "2026-10-02T16:58:53.241192+00:00",
+        "revision_ref": "00ef4856-90b7-4860-a9d3-c285b868e113"
+      },
+      "effective_revision": {
+        "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+        "content": {
+          "steps": [
+            {
+              "delay": {
+                "days": 0
+              },
+              "position": 1
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 2
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/Argentina/Buenos_Aires",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+            "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+          ],
+          "compose_mode": "generate",
+          "instructions": "A new exact successor.",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": {
+          "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+          "approved_at": "2026-10-02T16:58:52.529147+00:00"
+        },
+        "created_at": "2026-10-02T16:58:52.407513+00:00",
+        "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+      }
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "ce08e221-4783-45a2-aee7-531b683fd365"
+    }
+  },
+  "journeys_list": {
+    "journeys": [
+      {
+        "name": "Coordinated",
+        "version": 6,
+        "journey_ref": "890f2381-c268-4d29-8034-0ba302f5673a",
+        "active_binding": {
+          "digest": "458c0d4c42d52557084fe1f790baa5b9d917d0a71669c8747d7fdcb25f7ae5cb",
+          "journey": {
+            "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+            "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+          },
+          "campaigns": [
+            {
+              "revision": {
+                "digest": "cdcb55beea67b02be6b80b7f7b50e328c2e8e79d5ec0f45b34da3fb834a4b53d",
+                "revision_ref": "dc81c899-b458-42b6-a4bf-b51bdd7a07cc"
+              },
+              "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417"
+            },
+            {
+              "revision": {
+                "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+                "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+              },
+              "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+            }
+          ],
+          "binding_ref": "38972bf2-7a7d-4f64-a073-2fec7dad58dc"
+        },
+        "draft_revision": {
+          "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:51.447332+00:00"
+          },
+          "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+        }
+      }
+    ],
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "ce08e221-4783-45a2-aee7-531b683fd365"
+    },
+    "next_cursor": null
+  },
+  "campaigns_list": {
+    "campaigns": [
+      {
+        "name": "email",
+        "state": "paused",
+        "channel": "email",
+        "version": 2,
+        "journey_ref": "890f2381-c268-4d29-8034-0ba302f5673a",
+        "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417",
+        "draft_revision": {
+          "digest": "cdcb55beea67b02be6b80b7f7b50e328c2e8e79d5ec0f45b34da3fb834a4b53d",
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:51.277792+00:00"
+          },
+          "revision_ref": "dc81c899-b458-42b6-a4bf-b51bdd7a07cc"
+        },
+        "effective_revision": {
+          "digest": "cdcb55beea67b02be6b80b7f7b50e328c2e8e79d5ec0f45b34da3fb834a4b53d",
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:51.277792+00:00"
+          },
+          "revision_ref": "dc81c899-b458-42b6-a4bf-b51bdd7a07cc"
+        }
+      },
+      {
+        "name": "linkedin",
+        "state": "paused",
+        "channel": "linkedin",
+        "version": 8,
+        "journey_ref": "890f2381-c268-4d29-8034-0ba302f5673a",
+        "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600",
+        "draft_revision": {
+          "digest": "5ce9640d674d2f6e1236c3cb880d5e912716abd28f66de5dc2020aa53c7827f6",
+          "approval": null,
+          "revision_ref": "00ef4856-90b7-4860-a9d3-c285b868e113"
+        },
+        "effective_revision": {
+          "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:52.529147+00:00"
+          },
+          "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+        }
+      }
+    ],
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "ce08e221-4783-45a2-aee7-531b683fd365"
+    },
+    "next_cursor": null
+  },
+  "campaign_activation": {
+    "journey": {
+      "name": "Coordinated",
+      "version": 6,
+      "revisions": [
+        {
+          "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+          "content": {
+            "graph": {
+              "stops": [
+                "reply",
+                "meeting_booked",
+                "suppression",
+                "manual_stop"
+              ],
+              "entries": [
+                {
+                  "trigger": {
+                    "type": "start"
+                  },
+                  "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+                },
+                {
+                  "trigger": {
+                    "step": 2,
+                    "type": "sent",
+                    "after": {
+                      "days": 3
+                    },
+                    "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+                  },
+                  "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417"
+                }
+              ]
+            },
+            "audience": {
+              "kind": "qualified"
+            }
+          },
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:51.447332+00:00"
+          },
+          "created_at": "2026-10-02T16:58:51.391526+00:00",
+          "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+        },
+        {
+          "digest": "c5675dd8ede33dda608cd896cb861bd48ff796faceac39c59ed60ec24c06b24c",
+          "content": {
+            "graph": {
+              "stops": [
+                "reply",
+                "meeting_booked",
+                "suppression",
+                "manual_stop"
+              ],
+              "entries": []
+            },
+            "audience": {
+              "kind": "qualified"
+            }
+          },
+          "approval": null,
+          "created_at": "2026-10-02T16:58:50.459794+00:00",
+          "revision_ref": "3d6cf0c9-4086-4f3b-b4d9-e68db8090947"
+        }
+      ],
+      "journey_ref": "890f2381-c268-4d29-8034-0ba302f5673a",
+      "active_binding": {
+        "digest": "458c0d4c42d52557084fe1f790baa5b9d917d0a71669c8747d7fdcb25f7ae5cb",
+        "journey": {
+          "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+          "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+        },
+        "campaigns": [
+          {
+            "revision": {
+              "digest": "cdcb55beea67b02be6b80b7f7b50e328c2e8e79d5ec0f45b34da3fb834a4b53d",
+              "revision_ref": "dc81c899-b458-42b6-a4bf-b51bdd7a07cc"
+            },
+            "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417"
+          },
+          {
+            "revision": {
+              "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+              "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+            },
+            "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+          }
+        ],
+        "binding_ref": "38972bf2-7a7d-4f64-a073-2fec7dad58dc"
+      },
+      "draft_revision": {
+        "digest": "443a5aa760d117f00858e3580b09c90cbfac13090f5fd36a466cf73ffc67ecb8",
+        "content": {
+          "graph": {
+            "stops": [
+              "reply",
+              "meeting_booked",
+              "suppression",
+              "manual_stop"
+            ],
+            "entries": [
+              {
+                "trigger": {
+                  "type": "start"
+                },
+                "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+              },
+              {
+                "trigger": {
+                  "step": 2,
+                  "type": "sent",
+                  "after": {
+                    "days": 3
+                  },
+                  "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600"
+                },
+                "campaign_ref": "1f6986e4-63b6-4b40-997c-cc1102503417"
+              }
+            ]
+          },
+          "audience": {
+            "kind": "qualified"
+          }
+        },
+        "approval": {
+          "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+          "approved_at": "2026-10-02T16:58:51.447332+00:00"
+        },
+        "created_at": "2026-10-02T16:58:51.391526+00:00",
+        "revision_ref": "1a893bc7-e409-4229-970f-1a5b0ee66234"
+      }
+    },
+    "campaign": {
+      "name": "linkedin",
+      "state": "active",
+      "channel": "linkedin",
+      "version": 6,
+      "revisions": [
+        {
+          "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+          "content": {
+            "steps": [
+              {
+                "delay": {
+                  "days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/Argentina/Buenos_Aires",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+              "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+            ],
+            "compose_mode": "generate",
+            "instructions": "A new exact successor.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:52.529147+00:00"
+          },
+          "created_at": "2026-10-02T16:58:52.407513+00:00",
+          "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+        },
+        {
+          "digest": "d3b206203de4e3e585bfb7f07f337361fe5537679897b61c7435741e11a53d1a",
+          "content": {
+            "steps": [
+              {
+                "delay": {
+                  "days": 0
+                },
+                "position": 1
+              },
+              {
+                "delay": {
+                  "days": 3
+                },
+                "position": 2
+              }
+            ],
+            "schedule": {
+              "end": "17:00",
+              "start": "09:00",
+              "timezone": "America/Argentina/Buenos_Aires",
+              "weekdays": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            "sender_ids": [
+              "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+              "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+            ],
+            "compose_mode": "generate",
+            "instructions": "Use confirmed evidence only.",
+            "voice_version": 0,
+            "profile_version": 1
+          },
+          "approval": {
+            "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+            "approved_at": "2026-10-02T16:58:51.220835+00:00"
+          },
+          "created_at": "2026-10-02T16:58:50.573553+00:00",
+          "revision_ref": "9f9f6736-5997-45a4-8e3d-e4e7e25cee3a"
+        }
+      ],
+      "journey_ref": "890f2381-c268-4d29-8034-0ba302f5673a",
+      "campaign_ref": "f801cf49-ea9f-47b4-9fc9-d799a21fb600",
+      "draft_revision": {
+        "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+        "content": {
+          "steps": [
+            {
+              "delay": {
+                "days": 0
+              },
+              "position": 1
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 2
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/Argentina/Buenos_Aires",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+            "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+          ],
+          "compose_mode": "generate",
+          "instructions": "A new exact successor.",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": {
+          "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+          "approved_at": "2026-10-02T16:58:52.529147+00:00"
+        },
+        "created_at": "2026-10-02T16:58:52.407513+00:00",
+        "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+      },
+      "effective_revision": {
+        "digest": "ba1092c9b2a796a50e2df5128150d9c2ceb53e583fa2edcb35201808e8fe1f30",
+        "content": {
+          "steps": [
+            {
+              "delay": {
+                "days": 0
+              },
+              "position": 1
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 2
+            }
+          ],
+          "schedule": {
+            "end": "17:00",
+            "start": "09:00",
+            "timezone": "America/Argentina/Buenos_Aires",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "sender_ids": [
+            "12d85098-75ce-48f5-af66-01f7dbdf2fe7",
+            "f76f85a1-dbf0-4461-ad37-385c81a24d2d"
+          ],
+          "compose_mode": "generate",
+          "instructions": "A new exact successor.",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": {
+          "actor_ref": "8668fb0f-3d44-454a-ba08-4bfe3ec602a0",
+          "approved_at": "2026-10-02T16:58:52.529147+00:00"
+        },
+        "created_at": "2026-10-02T16:58:52.407513+00:00",
+        "revision_ref": "f3b0e08d-5598-4a6b-b6be-1cf6149ab9b0"
+      }
+    },
+    "workspace": {
+      "name": "LIF1188 Contract",
+      "state": "ready_for_connections",
+      "workspace_ref": "ce08e221-4783-45a2-aee7-531b683fd365"
+    }
+  }
+}
