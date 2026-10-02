@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
-import { EmailConnectRequest } from "./email-contracts.js";
+import { EmailWorkspace } from "./email-contracts.js";
 
 // LIF-1063: Mailivery placement tests for a mailbox Mailivery already warms.
 // Members queue one test through public.lifty_email_connection_placement with
@@ -9,7 +9,7 @@ import { EmailConnectRequest } from "./email-contracts.js";
 // seeds from that mailbox. Nothing here calls the provider or spends credits.
 
 export const PlacementStatusRequest = z.object({
-  workspace: EmailConnectRequest.shape.workspace,
+  workspace: EmailWorkspace,
   connection_ref: z.uuid().optional(),
 }).strict();
 export type PlacementStatusInput = z.infer<typeof PlacementStatusRequest>;

@@ -3,7 +3,12 @@ import { z } from "zod";
 import { PublicError } from "./errors.js";
 import { parseHostedAuthOrigin } from "./hosted-auth-branding.js";
 import { ProviderIdentifier, type UnipileTransport, type VerifiedTransport } from "./unipile-transport.js";
-import type { LinkedinIdentity } from "./linkedin-provider.js";
+
+export type LinkedinHealth = "running" | "credentials" | "locked" | "disconnected" | "errored" | "unknown";
+export interface LinkedinIdentity {
+  accountId: string; profileId: string; profileUrl: string | null; displayName: string | null;
+  healthy: boolean; healthStatus: LinkedinHealth;
+}
 
 export interface UnipileV2Settings {
   accessToken: string;
@@ -38,11 +43,12 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
   function fail(code = "UNIPILE_UNAVAILABLE", status = 502): never {
     throw new PublicError({code, status, message: "LIFTY could not verify this connection. Check status and reconnect if needed."});
   }
-  async function request(path: string, body?: Record<string, unknown>, method: "GET" | "POST" | "DELETE" = body ? "POST" : "GET"): Promise<unknown> {
+  async function request(path: string, body?: Record<string, unknown>, method: "GET" | "POST" | "DELETE" = body ? "POST" : "GET", deadline?: AbortSignal): Promise<unknown> {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeoutMs);
+    const signal = deadline ? AbortSignal.any([controller.signal, deadline]) : controller.signal;
     try {
       const response = await fetchImpl(`https://api.unipile.com/v2/${path}`, {
-        method, redirect: "error", signal: controller.signal,
+        method, redirect: "error", signal,
         headers: {"X-API-KEY": settings.accessToken, accept: "application/json", ...(body ? {"content-type": "application/json"} : {})},
         ...(body ? {body: JSON.stringify(body)} : {}),
       });
@@ -56,7 +62,7 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
       const chunks: Uint8Array[] = []; let size = 0;
       await response.body.pipeTo(new WritableStream<Uint8Array>({write(chunk) {
         size += chunk.byteLength; if (size > 1_048_576) fail(); chunks.push(chunk);
-      }}), {signal: controller.signal});
+      }}), {signal});
       return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
     } catch (error) {
       if (error instanceof PublicError) throw error;
@@ -156,37 +162,11 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     } catch { /* Optional display metadata. */ }
     return {accountId: canonical, profileId: parsed.data.id, profileUrl, displayName: parsed.data.display_name || null, healthy, healthStatus, verifiedTransport};
   }
-  const AccountList = z.object({object: z.literal("Accounts"), data: z.array(z.object({id: ProviderIdentifier, provider: z.string(),
-    status: z.string(), is_locked: z.boolean(), metadata: z.object({v1_account_id: ProviderIdentifier.optional()}).passthrough().optional()}).passthrough()),
-    has_more: z.boolean().optional()}).passthrough();
-  /** Accounts of one provider visible to this application. Read-only; identity still needs an authenticated SELF read. */
-  async function listAccounts(provider: "linkedin" | "google"): Promise<{id: string; v1AccountId: string | null; healthy: boolean}[]> {
-    const found: {id: string; v1AccountId: string | null; healthy: boolean}[] = [];
-    for (let page = 0, offset = 0; page < 5; page++, offset += 100) {
-      const parsed = AccountList.safeParse(await request(`accounts/?provider=${provider}&limit=100&offset=${offset}`));
-      if (!parsed.success) fail();
-      for (const item of parsed.data.data) found.push({id: item.id, v1AccountId: item.metadata?.v1_account_id ?? null, healthy: !item.is_locked && item.status === "running"});
-      if (!parsed.data.has_more) break;
-    }
-    return found;
-  }
-  /** Authenticated SELF profile identifier of a LinkedIn account; the only owner evidence V2 accepts. */
-  async function readOwnerProfileId(accountId: string): Promise<string> {
-    const parsed = Profile.safeParse(await request(`${encodeURIComponent(ProviderIdentifier.parse(accountId))}/users/me`));
-    if (!parsed.success) fail();
-    return parsed.data.id;
-  }
-  /** Verified primary sender of a Google account, or null when none is verified. */
-  async function readPrimarySenderEmail(accountId: string): Promise<string | null> {
-    const parsed = Senders.safeParse(await request(`${encodeURIComponent(ProviderIdentifier.parse(accountId))}/email-senders`));
-    if (!parsed.success) fail();
-    const primary = parsed.data.data.find(sender => sender.is_primary && sender.verification_status === "verified");
-    return primary ? primary.email.toLowerCase() : null;
-  }
-  /** Removes a V2 account that this attempt created or that is a verified unreferenced duplicate. */
-  async function deleteAccount(accountId: string): Promise<void> {
+  /** Removes Lifty's access to exactly this V2 account. A 404 means it is already gone. */
+  async function deleteAccount(accountId: string, deadline?: AbortSignal): Promise<"deleted" | "not_found"> {
     if (!/^acc_[A-Za-z0-9_-]{1,251}$/.test(accountId)) fail("UNIPILE_IDENTITY_MISMATCH", 409);
-    await request(`accounts/${encodeURIComponent(accountId)}`, undefined, "DELETE");
+    try { await request(`accounts/${encodeURIComponent(accountId)}`, undefined, "DELETE", deadline); return "deleted"; }
+    catch (error) { if (error instanceof PublicError && error.code === "UNIPILE_ACCOUNT_NOT_FOUND") return "not_found"; throw error; }
   }
-  return {createLink, readEmailIdentity, readLinkedinIdentity, listAccounts, readOwnerProfileId, readPrimarySenderEmail, deleteAccount};
+  return {createLink, readEmailIdentity, readLinkedinIdentity, deleteAccount};
 }

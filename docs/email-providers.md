@@ -2,10 +2,10 @@
 
 New connections use Lifty's branded Unipile V2 Google application. Google is the
 only provider offered for new email connections while V2 identity verification
-for other providers is unavailable. Existing V1 Gmail/Google Workspace,
-Outlook/Microsoft 365 and IMAP/SMTP accounts retain their reconnect flow through
-the provider values `GOOGLE`, `OUTLOOK`, and `MAIL`; this release does not migrate
-or delete them. See [client connection rollout](client-email-v2.md).
+for other providers is unavailable. Reconnecting an account still bound through
+V1 is not possible through V2 hosted sign-in while preserving its canonical
+account; the database reports `CONNECT_UNAVAILABLE` for it (LIF-1182). See the
+README section "Senders and sending accounts".
 
 The existing habitual-mailbox declaration, workspace
 ownership, exact account binding, and ten-email daily budget still apply.

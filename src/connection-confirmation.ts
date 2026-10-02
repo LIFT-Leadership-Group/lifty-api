@@ -10,9 +10,8 @@ export const CONNECTION_FLOWS = {
   hubspot: { path:'/hubspot/callback', label:'HubSpot', entries:['/hubspot/start'] },
   slack: { path:'/slack/callback', label:'Slack', entries:['/slack/start'] },
   warmup: { path:'/warmup/google/callback', label:'email warmup', entries:['/warmup/setup','/warmup/received'] },
-  email: { path:'/unipile/v2/email/return', label:'email', entries:['/unipile/start'] },
-  linkedin: { path:'/unipile/v2/linkedin/return', label:'LinkedIn', entries:['/unipile/linkedin/start'] },
-  'client-email': { path:'/unipile/v2/client-email/return', label:'email', entries:['/unipile/client-email/start'] },
+  email: { path:'/connect/email/return', label:'email', entries:['/connect/email'] },
+  linkedin: { path:'/connect/linkedin/return', label:'LinkedIn', entries:['/connect/linkedin'] },
 } as const;
 export type ConnectionFlow = keyof typeof CONNECTION_FLOWS;
 export const ConfirmationResult = z.discriminatedUnion('status', [
@@ -78,7 +77,7 @@ const scriptHash = createHash('sha256').update(CONFIRMATION_SCRIPT).digest('base
 export function renderConfirmationPage(flow:ConnectionFlow, valid=true) {
   const {label}=CONNECTION_FLOWS[flow];
   return renderLiftyPage({title:valid?'Checking your connection':'Connection needs attention',content:
-    `<section id="confirmation" data-label="${label}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin','client-email'].includes(flow)?'intent':'state'}" aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${valid?'Checking your connection':'Connection needs attention'}</h1><p id="confirmation-detail" class="intro">${valid?'Lifty is verifying your '+label+' connection. This page will update automatically.':'Return to Lifty to check this attempt and get the next step.'}</p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
+    `<section id="confirmation" data-label="${label}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}" aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${valid?'Checking your connection':'Connection needs attention'}</h1><p id="confirmation-detail" class="intro">${valid?'Lifty is verifying your '+label+' connection. This page will update automatically.':'Return to Lifty to check this attempt and get the next step.'}</p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
 }
 export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string};
 export function createConfirmationRouter(flow:ConnectionFlow, adapter:ConfirmationAdapter, options:{prefix?:string;origin?:string;log?:(event:ConfirmationLog)=>void}={}) {
@@ -91,7 +90,7 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
   app.get(path,c=>{
     headers(c);
     const q=new URL(c.req.url).searchParams;
-    const key=['email','linkedin','client-email'].includes(flow)?'intent':'state';
+    const key=['email','linkedin'].includes(flow)?'intent':'state';
     const parsed=Input.safeParse({state:q.get(key)??'',...(q.has('code')?{code:q.get('code')}:{}),...(q.has('error')?{denied:true}:{})});
     let valid=parsed.success && [key,'code','error'].every(key=>q.getAll(key).length<=1);
     if(valid&&parsed.success){try{adapter.validate(parsed.data,c);}catch{valid=false;}}

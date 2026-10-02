@@ -4,7 +4,7 @@ import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import { ConnectionAttemptStatusSchema } from "./stage-contracts.js";
 
-export type ConnectionProvider = "hubspot" | "slack" | "linkedin" | "email";
+export type ConnectionProvider = "hubspot" | "slack";
 export type ConnectionAttemptStatus = z.infer<typeof ConnectionAttemptStatusSchema>;
 
 /** Read the existing durable provider intent through the caller's DB session. */

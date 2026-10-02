@@ -573,7 +573,7 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
     mailbox_ref: source.mailbox_ref,
     workspace: { workspace_ref: source.workspace_ref, slug: workspace?.slug ?? null, name: workspace?.name ?? null },
     email: source.email, domain: source.domain,
-    senders: source.senders.map(sender => ({ sender_ref: sender.sender_ref, name: sender.name, is_active: sender.is_active })),
+    senders: source.senders.map(sender => ({ sender_ref: sender.sender_ref, name: sender.name })),
     identity: presentIdentity(source),
     providers: {
       sending: unique([...(source.smartlead ? ["smartlead"] : []), ...connections.filter(item => item.status === "connected").map(item => item.provider)]),
@@ -654,7 +654,7 @@ export function presentDeliverability(source: DeliverabilitySource, now: Date, o
       detail: options.detail ?? null },
     filters: {
       workspaces: source.filters.workspaces.map(({ workspace_ref, slug, name, is_active }) => ({ workspace_ref, slug, name, is_active })),
-      senders: source.filters.senders, unassigned_count: source.filters.unassigned_count,
+      senders: source.filters.senders.map(({ sender_ref, workspace_ref, name, mailbox_count }) => ({ sender_ref, workspace_ref, name, mailbox_count })), unassigned_count: source.filters.unassigned_count,
     },
     workspace_health: source.workspace_health.map(presentWorkspaceHealth),
     mailboxes: source.mailboxes.map(mailbox => presentMailbox(mailbox, workspaces, now,

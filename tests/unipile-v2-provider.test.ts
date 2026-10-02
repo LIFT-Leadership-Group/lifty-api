@@ -1,7 +1,6 @@
 import { describe,it,expect } from "vitest";
 import { createUnipileV2Provider } from "../src/unipile-v2-provider.js";
 import { UnipileTransport } from "../src/unipile-transport.js";
-import { versionedHostedAuthUrl } from "../src/hosted-auth-branding.js";
 
 const transport:UnipileTransport={api_version:"v2",connection_ref:null,canonical_account_id:"legacy_account",provider_namespace:"unipile:legacy",
   account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",generation:1,owner_profile_id:null,user_id:"owner",v1_account_id:"legacy_account",hosted_auth_origin:"https://connect-v2.lifty.test"};
@@ -94,12 +93,6 @@ describe("Unipile V2 authenticated contract",()=>{
     await expect(h.provider.createLink({channel:"email",state:"opaque",redirectUri:"https://api.lifty.test/return",expiresAt:"2026-09-18T00:00:00.000Z",
       transport:{...transport,hosted_auth_origin:"https://auth.unipile.com"}})).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
     expect(h.calls).toHaveLength(0);
-  });
-  it("preserves V1 links and returns V2 links unchanged across configured domains",()=>{
-    const origins=["https://connect-v2.lifty.test","https://old-v2.lifty.test"];
-    expect(versionedHostedAuthUrl("https://account.unipile.com/?opaque=old","https://connect.lifty.test",origins)).toBe("https://connect.lifty.test/?opaque=old");
-    for(const origin of origins)expect(versionedHostedAuthUrl(`${origin}/?opaque=old`,"https://connect.lifty.test",origins)).toBe(`${origin}/?opaque=old`);
-    expect(versionedHostedAuthUrl("https://foreign.test/?opaque=x","https://connect.lifty.test",origins)).toBeNull();
   });
   it("never retries or exposes errors containing provider secrets",async()=>{
     const h=harness({status:503});

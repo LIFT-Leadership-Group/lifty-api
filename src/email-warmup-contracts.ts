@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { EmailConnectRequest } from "./email-contracts.js";
+import { EmailWorkspace } from "./email-contracts.js";
 
 export const REQUIRED_WARMUP_ACTIVE_DAYS = 21;
 
 export const WarmupWorkspaceRequest = z.object({
-  workspace: EmailConnectRequest.shape.workspace,
+  workspace: EmailWorkspace,
   connection_ref: z.uuid().optional(),
 }).strict();
 export type WarmupWorkspaceInput = z.infer<typeof WarmupWorkspaceRequest>;

@@ -37,13 +37,13 @@ export function mcpResourceMetadata(settings: McpSettings) {
 const whoami: Tool = {
   name: "whoami",
   title: "Signed-in Lifty user",
-  description: "Return the signed-in Lifty user's ID and the workspaces they belong to. Call this first. With several workspaces and none named, ask which one before reading workspace state. Tools without a workspace parameter act only on the workspace marked founder_default; for any other workspace use tools that take it, such as summary_get with workspace. workspaces is null when the list could not be read; retry instead of assuming one workspace.",
+  description: "Return the signed-in Lifty user's ID and the workspaces they belong to. Call this when you do not yet know which workspace the user works in. With one workspace, tools need no workspace input. With several, ask which one, remember the choice in your memory for this user, and pass it as workspace on every tool call; never pick one yourself. workspaces is null when the list could not be read; retry instead of assuming one workspace.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   outputSchema: { type: "object", properties: {
     user_id: { type: "string" },
     workspaces: { type: ["array", "null"], items: { type: "object", properties: {
-      workspace_ref: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, active: { type: "boolean" }, founder_default: { type: "boolean" }, self_service: { type: "boolean" },
-    }, required: ["workspace_ref", "slug", "name", "active", "founder_default", "self_service"], additionalProperties: false } },
+      workspace_ref: { type: "string" }, slug: { type: "string" }, name: { type: "string" }, active: { type: "boolean" },
+    }, required: ["workspace_ref", "slug", "name", "active"], additionalProperties: false } },
   }, required: ["user_id", "workspaces"], additionalProperties: false },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 };
@@ -52,7 +52,8 @@ const whoami: Tool = {
 // the order of work instead of discovering it from long stage guides.
 export const MCP_INSTRUCTIONS = [
   "Lifty sets up a founder's outbound: Section 1 finds leads (interview, search, five researched leads, optional HubSpot sync); Section 2 sets up outreach, LinkedIn first.",
-  "Start with whoami, then next_step. Before any research or long read, reply to the founder in one line with what you are doing.",
+  "Use the workspace the user chose before, from your memory, and pass it as workspace on every tool call. If you do not know it, call whoami; with several workspaces ask which one and remember the answer. WORKSPACE_SELECTION_REQUIRED or WORKSPACE_FORBIDDEN means ask again; never switch to another workspace on your own.",
+  "Then call next_step. Before any research or long read, reply to the founder in one line with what you are doing.",
   "next_step returns actions to do in order, the interview gates still missing, and a short guide for the current step. Fetch a full stage guide with summary_context only when an action or an edge case needs it.",
   "Nothing is sent without the founder's explicit approval of the exact campaign preview. Never ask for passwords, tokens or provider credentials.",
 ].join("\n");

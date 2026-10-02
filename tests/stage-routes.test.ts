@@ -2,8 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp, type AppDependencies, type AuthSession } from "../src/app.js";
 import { PublicError } from "../src/errors.js";
 import { stageOperations } from "../src/stage-contracts.js";
-import { EmailConnectionStatus } from "../src/email-contracts.js";
-import { LinkedinConnectionStatus, LINKEDIN_POLICY } from "../src/linkedin-contracts.js";
 
 const current = "22222222-2222-4222-8222-222222222222";
 const foreign = "33333333-3333-4333-8333-333333333333";
@@ -19,19 +17,11 @@ const base: Partial<AppDependencies> = {
   authenticate: async () => ({ ok: true, session }), getWorkspace: async () => workspace,
  log: () => {},
 };
-function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v7") {
+function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v8") {
   return app.request(`/v1/workspace/${stage}${query}`, { method,
     headers: { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": `lifty-cli-context.${client}` },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-const emailStatus = (() => { const result = EmailConnectionStatus.parse({ provider: "unipile", channel: "email", workspace_ref: current,
-  status: "connected", email: "founder@example.test", mailbox_use: "personal", daily_limit: 10,
-  warmup_required: false, sending_enabled: false, connection_ref: foreign, intent_ref: null, failure_code: null }); if (result.status !== "connected") throw new Error("fixture"); return result; })();
-const linkedinStatus = (() => { const result = LinkedinConnectionStatus.parse({ provider: "unipile", channel: "linkedin", workspace_ref: current,
-  status: "connected", profile_id: "Founder", profile_url: "https://www.linkedin.com/in/founder/", display_name: "Founder",
-  timezone: "America/Argentina/Buenos_Aires", account_use: "personal", other_automation: false, policy: LINKEDIN_POLICY,
-  health_status: "running", sending_enabled: false, connection_ref: foreign, intent_ref: null, failure_code: null }); if (result.status !== "connected") throw new Error("fixture"); return result; })();
-
 describe("authenticated workspace stage adapters", () => {
   it("authenticates all stage methods including unsupported writes; context remains public", async () => {
     const app = createApp();
@@ -41,13 +31,13 @@ describe("authenticated workspace stage adapters", () => {
     expect((await app.request("/v1/context/business")).status).toBe(200);
   });
 
-  it.each(["v7"])("applies the existing calibration gate and enqueues one run for %s", async version => {
+  it.each(["v8"])("applies the existing calibration gate and enqueues one run for %s", async version => {
     const start = vi.fn(async () => ({ state: "queued" as const, run_ref: attemptRef, requested_leads: 5, workspace: workspace.workspace, created: true }));
     const enqueue = vi.fn(async () => ({ id: "job" }));
     const app = createApp({ ...base, startRun: start, enqueueFirstRun: enqueue });
     expect((await request(app, "sample-review", "POST", {}, "", version)).status).toBe(200);
     expect(enqueue).toHaveBeenCalledExactlyOnceWith(attemptRef, 0);
-    expect((await request(app, "sample-review", "POST", {}, "", "v6")).status).toBe(409);
+    expect((await request(app, "sample-review", "POST", {}, "", "v7")).status).toBe(409);
     expect(start).toHaveBeenCalledExactlyOnceWith(session);
   });
 
@@ -69,8 +59,6 @@ describe("provider authorization stages", () => {
   const flows = [
     { provider: "hubspot", stage: "crm", input: {}, query: "" },
     { provider: "slack", stage: "notifications", input: {}, query: "" },
-    { provider: "email", stage: "sending-accounts", input: { channel: "email" }, query: "channel=email&" },
-    { provider: "linkedin", stage: "sending-accounts", input: { channel: "linkedin", timezone: "America/Argentina/Buenos_Aires", account_use: "personal", other_automation: false }, query: "channel=linkedin&" },
   ] as const;
   for (const flow of flows) {
     it(`${flow.provider}: hands off real link, verifies the exact pending/reconnected attempt, preserves read failures and expiry`, async () => {
@@ -84,20 +72,12 @@ describe("provider authorization stages", () => {
         return { status: state, attempt_ref: ref };
       });
       const url = `https://api.lifty.test/${flow.provider}/real-authorization`;
-      const startEmail = vi.fn(async () => ({ ...emailStatus, status: "pending" as const, intent_ref: attemptRef,
-        connect_url: url, expires_in_seconds: 600, expires_at: expires }));
-      const startLinkedin = vi.fn(async () => ({ ...linkedinStatus, status: "pending" as const, sending_enabled: false as const,
-        intent_ref: attemptRef, connect_url: url, expires_in_seconds: 600, expires_at: expires }));
-      const ordinaryEmail = vi.fn(async () => emailStatus); const ordinaryLinkedin = vi.fn(async () => linkedinStatus);
-      const app = createApp({ ...base, getConnectionAttempt: getAttempt, getEmailConnection: ordinaryEmail, getLinkedinConnection: ordinaryLinkedin,
+      const app = createApp({ ...base, getConnectionAttempt: getAttempt,
         startHubspotConnect: async () => ({ provider: "hubspot", attempt_ref: attemptRef, expires_at: expires, connect_url: url, expires_in_seconds: 600 }),
-        startSlackConnect: async () => ({ provider: "slack", attempt_ref: attemptRef, expires_at: expires, connect_url: url, expires_in_seconds: 600 }),
-        startEmailConnect: startEmail, startLinkedinConnect: startLinkedin });
+        startSlackConnect: async () => ({ provider: "slack", attempt_ref: attemptRef, expires_at: expires, connect_url: url, expires_in_seconds: 600 }) });
       const started = await request(app, flow.stage, "POST", flow.input);
       expect(started.status).toBe(200);
       expect(await started.json()).toEqual({ status: "authorization_required", attempt_ref: attemptRef, connection_url: url, expires_at: expires });
-      if (flow.provider === "email") expect(startEmail).toHaveBeenCalledWith(session, { workspace: current, reconnect: true });
-      if (flow.provider === "linkedin") expect(startLinkedin).toHaveBeenCalledWith(session, { workspace: current, timezone: flow.input.timezone, account_use: "personal", other_automation: false, reconnect: true });
       const query = `?${flow.query}attempt_ref=${attemptRef}`;
       expect(await (await request(app, flow.stage, "GET", undefined, query)).json()).toMatchObject({ status: "pending", attempt_ref: attemptRef, retry_after_seconds: 3 });
       readFails = true;
@@ -105,64 +85,11 @@ describe("provider authorization stages", () => {
       readFails = false;
       expect(await (await request(app, flow.stage, "GET", undefined, query)).json()).toMatchObject({ status: "pending", attempt_ref: attemptRef });
       state = "connected";
-      const reads = ordinaryEmail.mock.calls.length + ordinaryLinkedin.mock.calls.length;
       expect(await (await request(app, flow.stage, "GET", undefined, query)).json()).toEqual({ status: "connected", attempt_ref: attemptRef, verified: true });
-      expect(ordinaryEmail.mock.calls.length + ordinaryLinkedin.mock.calls.length).toBe(reads);
       state = "expired";
       expect(await (await request(app, flow.stage, "GET", undefined, query)).json()).toMatchObject({ status: "expired", attempt_ref: attemptRef });
       state = "denied";
       expect(await (await request(app, flow.stage, "GET", undefined, query)).json()).toMatchObject({ status: "denied", attempt_ref: attemptRef });
     });
   }
-  it("passes explicit email reselection to the current workspace and returns its new attempt", async () => {
-    const startEmail = vi.fn(async () => ({ ...emailStatus, status: "pending" as const, email: null, mailbox_use: null,
-      intent_ref: nextAttempt, connect_url: "https://api.lifty.test/unipile/start?intent=new-selection", expires_in_seconds: 600, expires_at: expires }));
-    const app = createApp({ ...base, startEmailConnect: startEmail });
-    const response = await request(app, "sending-accounts", "POST", { channel: "email", select_account: true });
-    expect(response.status).toBe(200);
-    expect(startEmail).toHaveBeenCalledWith(session, { workspace: current, reconnect: true, select_account: true });
-    expect(await response.json()).toEqual({ status: "authorization_required", attempt_ref: nextAttempt,
-      connection_url: "https://api.lifty.test/unipile/start?intent=new-selection", expires_at: expires });
-  });
-  it.each([
-    { channel: "email", select_account: "true" },
-    { channel: "email", select_account: true, email: "injected@example.test" },
-    { channel: "email", select_account: true, email_provider: "outlook" },
-    { channel: "email", select_account: true, account_id: "foreign" },
-    { channel: "email", select_account: true, workspace: foreign },
-    { channel: "email", select_account: true, transport: { api_version: "v1" } },
-    { channel: "linkedin", timezone: "America/Argentina/Buenos_Aires", account_use: "personal", other_automation: false, select_account: true },
-  ])("rejects unsafe reselection input before starting authorization: %j", async input => {
-    const startEmail = vi.fn(), startLinkedin = vi.fn();
-    const app = createApp({ ...base, startEmailConnect: startEmail, startLinkedinConnect: startLinkedin });
-    expect((await request(app, "sending-accounts", "POST", input)).status).toBe(400);
-    expect(startEmail).not.toHaveBeenCalled(); expect(startLinkedin).not.toHaveBeenCalled();
-  });
-  it.each(["email", "linkedin"] as const)("%s: reports a hosted return error category for the exact attempt", async channel => {
-    const pending = { status: "pending" as const, attempt_ref: attemptRef, expires_at: expires, retry_after_seconds: 3 };
-    const failed = (ref: string, code: string) => channel === "email"
-      ? { ...emailStatus, status: "failed" as const, intent_ref: ref, failure_code: code }
-      : { ...linkedinStatus, status: "failed" as const, intent_ref: ref, failure_code: code };
-    const query = `?channel=${channel}&attempt_ref=${attemptRef}`;
-    for (const [read, expected] of [
-      [failed(attemptRef, "account_exists"), { status: "failed", attempt_ref: attemptRef, error_code: "account_exists" }],
-      [failed(nextAttempt, "authorization_cancelled"), pending],
-      [failed(attemptRef, "identity_mismatch"), pending],
-    ] as const) {
-      const currentRead = vi.fn(async () => read as never);
-      const app = createApp({ ...base, getEmailConnection: currentRead, getLinkedinConnection: currentRead, getConnectionAttempt: async () => pending });
-      expect(await (await request(app, "sending-accounts", "GET", undefined, query)).json()).toEqual(expected);
-    }
-  });
-  it("keeps a completed attempt authoritative while a newer reconnect is pending", async () => {
-    const currentRead = vi.fn(async () => ({ ...emailStatus, status: "pending" as const, intent_ref: nextAttempt }));
-    const app = createApp({ ...base, getEmailConnection: currentRead,
-      getConnectionAttempt: async (_session, _provider, ref) => ref === attemptRef
-        ? { status: "connected", attempt_ref: ref, verified: true }
-        : { status: "pending", attempt_ref: ref, expires_at: expires, retry_after_seconds: 3 } });
-    expect(await (await request(app, "sending-accounts", "GET", undefined, `?channel=email&attempt_ref=${attemptRef}`)).json()).toEqual({ status: "connected", attempt_ref: attemptRef, verified: true });
-    expect(currentRead).not.toHaveBeenCalled();
-    expect(await (await request(app, "sending-accounts", "GET", undefined, `?channel=email&attempt_ref=${nextAttempt}`)).json()).toMatchObject({ status: "pending", attempt_ref: nextAttempt });
-    expect(currentRead).toHaveBeenCalledWith(session, current, nextAttempt);
-  });
 });

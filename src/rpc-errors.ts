@@ -10,7 +10,7 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   INVALID_REQUEST: "Repair the request using the current operation schema.",
   WORKSPACE_FORBIDDEN: "You do not belong to this workspace.",
   WORKSPACE_SELECTION_REQUIRED:
-    "You belong to several workspaces. Choose one with the x-lifty-workspace header (--workspace in the CLI).",
+    "You belong to several workspaces. Choose one with the x-lifty-workspace header (lifty use <workspace> in the CLI).",
   WORKSPACE_SUSPENDED: "This workspace is suspended. Contact LIFT support.",
   WORKSPACE_NOT_READY: "Create a workspace before continuing.",
   VERSION_CONFLICT:
@@ -45,6 +45,14 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   WEEK_NOT_MONDAY: "Choose a week by its Monday (UTC) in YYYY-MM-DD form.",
   RESEARCH_LIMIT_REACHED:
     "This week's research limit has fewer than five people left for a sample. Start it again after the returned reset time.",
+  // Senders and sending accounts (LIF-1182).
+  SENDER_INVALID: "Repair the sender fields.",
+  SENDER_NOT_FOUND: "This sender is not available in the selected workspace. Read senders for current ids.",
+  ACCOUNT_NOT_FOUND: "This sending account is not available in the selected workspace. Read sending-accounts for current ids.",
+  ACCOUNT_DISCONNECTED: "This account is disconnected. Reconnect it before resuming.",
+  LINKEDIN_ALREADY_CONNECTED: "This sender already has a LinkedIn account. Reconnect that account instead of connecting another.",
+  CONNECTION_ATTEMPT_NOT_FOUND: "This connection attempt is not available in the selected workspace.",
+  CONNECT_UNAVAILABLE: "Lifty cannot open a sign-in for this account right now. Try again later or contact LIFT support.",
   // Calibration sample runs.
   RUN_NOT_CONFIGURED:
     "Save targeting and research criteria before starting the sample.",
@@ -76,7 +84,7 @@ const DATABASE_TOKENS: Record<string, string> = {
   LIFTY_WORKSPACE_FORBIDDEN: "WORKSPACE_FORBIDDEN",
 };
 
-const STATUS = new Set([400, 401, 403, 404, 409, 413, 422, 429]);
+const STATUS = new Set([400, 401, 403, 404, 409, 413, 422, 429, 503]);
 const DatabaseError = z.object({
   code: z.string().optional(),
   message: z.string().optional(),

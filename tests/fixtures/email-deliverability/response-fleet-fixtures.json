@@ -33,21 +33,18 @@
     "sender_ref": "10392000-0000-4000-8000-000000000001",
     "workspace_ref": "10391000-0000-4000-8000-000000000001",
     "name": "Dana Smith",
-    "is_active": true,
     "mailbox_count": 3
    },
    {
     "sender_ref": "10392000-0000-4000-8000-000000000003",
     "workspace_ref": "10391000-0000-4000-8000-000000000002",
     "name": "Dana Smith",
-    "is_active": true,
     "mailbox_count": 2
    },
    {
     "sender_ref": "10392000-0000-4000-8000-000000000002",
     "workspace_ref": "10391000-0000-4000-8000-000000000001",
     "name": "Lee Park",
-    "is_active": true,
     "mailbox_count": 2
    }
   ],
@@ -132,8 +129,7 @@
    "senders": [
     {
      "sender_ref": "10392000-0000-4000-8000-000000000002",
-     "name": "Lee Park",
-     "is_active": true
+     "name": "Lee Park"
     }
    ],
    "identity": {
@@ -565,13 +561,11 @@
    "senders": [
     {
      "sender_ref": "10392000-0000-4000-8000-000000000001",
-     "name": "Dana Smith",
-     "is_active": true
+     "name": "Dana Smith"
     },
     {
      "sender_ref": "10392000-0000-4000-8000-000000000002",
-     "name": "Lee Park",
-     "is_active": true
+     "name": "Lee Park"
     }
    ],
    "identity": {
@@ -824,8 +818,7 @@
    "senders": [
     {
      "sender_ref": "10392000-0000-4000-8000-000000000001",
-     "name": "Dana Smith",
-     "is_active": true
+     "name": "Dana Smith"
     }
    ],
    "identity": {
@@ -1634,8 +1627,7 @@
    "senders": [
     {
      "sender_ref": "10392000-0000-4000-8000-000000000001",
-     "name": "Dana Smith",
-     "is_active": true
+     "name": "Dana Smith"
     }
    ],
    "identity": {
@@ -2006,8 +1998,7 @@
    "senders": [
     {
      "sender_ref": "10392000-0000-4000-8000-000000000003",
-     "name": "Dana Smith",
-     "is_active": true
+     "name": "Dana Smith"
     }
    ],
    "identity": {
@@ -2332,8 +2323,7 @@
    "senders": [
     {
      "sender_ref": "10392000-0000-4000-8000-000000000003",
-     "name": "Dana Smith",
-     "is_active": true
+     "name": "Dana Smith"
     }
    ],
    "identity": {

@@ -10,40 +10,35 @@ import {
 import {
   AuthorizationRequiredSchema,
   ConnectionAttemptStatusSchema,
-  SendingAccountStartSchema,
   stageOperations,
 } from "../src/stage-contracts.js";
 
 describe("runtime context discovery and connection handoff", () => {
-  it("publishes explicit client mailbox and connection-scoped warmup operations", () => {
+  it("publishes the Identity catalog and connection-scoped warmup operations", () => {
     const context = getAgentContext("sending-accounts")!,
       operations = context.operations!;
-    expect(operations.client_accounts).toMatchObject({
-      method: "GET",
-      route: "/v1/email/accounts",
-      request: { query: { required: ["workspace"] } },
+    expect(Object.fromEntries(Object.entries(operations).filter(([key]) => !/^(warmup_|placement_|deliverability)/.test(key))
+      .map(([key, operation]) => [key, `${operation.method} ${operation.route}`]))).toEqual({
+      context: "GET /v1/context/sending-accounts",
+      get: "GET /v1/workspace/sending-accounts",
+      connect: "POST /v1/workspace/sending-accounts/connect",
+      attempt: "GET /v1/workspace/sending-accounts/attempts/{id}",
+      reconnect: "POST /v1/workspace/sending-accounts/{id}/reconnect",
+      pause: "POST /v1/workspace/sending-accounts/{id}/pause",
+      resume: "POST /v1/workspace/sending-accounts/{id}/resume",
+      disconnect: "POST /v1/workspace/sending-accounts/{id}/disconnect",
     });
-    expect(operations.client_connect).toMatchObject({
-      method: "POST",
-      route: "/v1/email/accounts/connect",
-      request: {
-        body: {
-          required: ["workspace", "sender_ref", "email", "protocol_version"],
-        },
-      },
+    expect(operations.connect!.request.body).toMatchObject({ required: ["sender_id", "channel"], additionalProperties: false });
+    expect(Object.keys(operations.disconnect!.responses)).toEqual(expect.arrayContaining(["200", "202"]));
+    expect(Object.fromEntries(Object.entries(getAgentContext("senders")!.operations!).map(([key, operation]) => [key, `${operation.method} ${operation.route}`]))).toEqual({
+      context: "GET /v1/context/senders",
+      get: "GET /v1/workspace/senders",
+      post: "POST /v1/workspace/senders",
+      patch: "PATCH /v1/workspace/senders/{id}",
+      delete: "POST /v1/workspace/senders/{id}/delete",
     });
-    expect(operations.client_connect_status).toMatchObject({
-      method: "POST",
-      route: "/v1/email/accounts/connect/status",
-      request: {
-        body: {
-          anyOf: [
-            { required: ["workspace", "attempt_ref"] },
-            { required: ["workspace", "connection_ref"] },
-          ],
-        },
-      },
-    });
+    expect(getAgentContext("senders")!.instructions).toContain("lifty post senders delete");
+    expect(getAgentContext("senders")!.instructions).toContain("lifty context senders");
     for (const action of ["status", "start", "pause", "resume", "remove"]) {
       const operation = operations[`warmup_${action}`]!;
       expect(operation.route).toBe(
@@ -58,7 +53,7 @@ describe("runtime context discovery and connection handoff", () => {
         },
       });
     }
-    expect(context.instructions).toContain("Do not infer a founder workspace");
+    expect(getAgentContext("senders")!.instructions).toContain("they are never identifiers");
     expect(context.instructions).toContain(
       "Warmup resume never resumes campaigns",
     );
@@ -177,25 +172,7 @@ describe("runtime context discovery and connection handoff", () => {
         expires_at: pending.expires_at,
       }).success,
     ).toBe(true);
-    expect(
-      SendingAccountStartSchema.safeParse({
-        channel: "email",
-        select_account: true,
-      }).success,
-    ).toBe(true);
-    expect(
-      SendingAccountStartSchema.safeParse({
-        channel: "email",
-        select_account: "true",
-      }).success,
-    ).toBe(false);
-    expect(
-      SendingAccountStartSchema.safeParse({
-        channel: "email",
-        email: "asked-before-link@example.test",
-      }).success,
-    ).toBe(false);
-    for (const stage of ["crm", "sending-accounts", "notifications"]) {
+    for (const stage of ["crm", "notifications"]) {
       const context = getAgentContext(stage)!;
       expect(context.references.connections).toContain("retry_after_seconds");
       expect(context.references.connections).toContain(
@@ -219,11 +196,9 @@ describe("runtime context discovery and connection handoff", () => {
       "Slack workspace consent",
     );
     expect(getAgentContext("sending-accounts")!.instructions).toContain(
-      "hosted LinkedIn",
+      "Lifty's connect page asks the person's declaration",
     );
-    expect(getAgentContext("sending-accounts")!.instructions).toContain(
-      "hosted email",
-    );
+    expect(getAgentContext("sending-accounts")!.references.connections).toBeUndefined();
   });
 });
 
@@ -254,6 +229,20 @@ describe("customer surfaces name no provider or retired volume knob", () => {
     // The scanner must actually see codes, or an empty scan would pass.
     expect(publicCodes).toEqual(expect.arrayContaining(["RESEARCH_STATUS_UNAVAILABLE", "LEADS_UNAVAILABLE", "STAGE_OPERATION_UNSUPPORTED"]));
     for (const [name, text] of Object.entries(surfaces)) expect(text.match(retired)?.[0], name).toBeUndefined();
+  });
+  // LIF-1182: the account provider is masked on every Identity surface.
+  it("names no account provider on Identity routes, tools, guides, codes or browser paths", async () => {
+    const identity = ["senders", "sending-accounts"].flatMap(stage => Object.entries(stageOperations[stage]!)
+      .filter(([key]) => !/^(warmup_|placement_|deliverability)/.test(key)).map(([key, operation]) => ({ stage, key, operation })));
+    const app = createApp();
+    const surfaces: Record<string, string> = {
+      catalog: JSON.stringify(identity),
+      mcp: JSON.stringify(getStageMcpTools().filter(tool => /^(senders|sending_accounts)_/.test(tool.name) && !/warmup|placement|deliverability/.test(tool.name))),
+      guides: ["senders", "sending-accounts", "stage-common", "summary"].map(name => readFileSync(new URL(`../src/agent-context/${name}.md`, import.meta.url), "utf8")).join("\n"),
+      codes: JSON.stringify(Object.keys(RPC_ERROR_MESSAGES)),
+      routes: JSON.stringify(app.routes.map(route => route.path)),
+    };
+    for (const [name, text] of Object.entries(surfaces)) expect(text.match(/unipile/i)?.[0], name).toBeUndefined();
   });
   it("keeps the sample's operations to get, post and progress", () => {
     expect(Object.keys(stageOperations["sample-review"]!).sort()).toEqual(["get", "post", "progress"]);

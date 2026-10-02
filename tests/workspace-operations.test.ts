@@ -64,7 +64,7 @@ describe("notification configuration operations", () => {
     notification_types: [
       "reply.requires_action" as const,
       "meeting.booked" as const,
-      "integration.disconnected" as const,
+      "sending_account.needs_reconnect" as const,
       "system.test" as const,
     ],
     slack: {

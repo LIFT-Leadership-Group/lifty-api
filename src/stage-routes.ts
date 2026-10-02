@@ -1,7 +1,7 @@
 import { businessEntries, validateBusinessRequest } from "./business-operations.js";
 import { researchEntries, validateResearchInput } from "./research-operations.js";
-import { readSenderRoster, readSenderSignatures, saveSenderSignature, SenderSignatureRequest } from "./sender-choice.js";
-import { getWorkspaceSummary, readComponent } from "./workspace-summary.js";
+import { identityEntries, validateIdentityInput } from "./identity-operations.js";
+import { getWorkspaceSummary } from "./workspace-summary.js";
 import { getNextStep } from "./next-step.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
@@ -20,17 +20,13 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { AppDependencies, AppEnvironment } from "./app.js";
 import type { ConnectionProvider } from "./connection-attempt.js";
 import { PublicError } from "./errors.js";
-import { HostedReturnError } from "./hosted-return-error.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
-import { EmailConnectionStatus } from "./email-contracts.js";
-import { LinkedinConnectionStatus } from "./linkedin-contracts.js";
 import { HubspotConnectionStatusSchema, NotificationConfigSchema, RunStatusSchema, StartRunResultSchema, WorkspaceStatusSchema } from "./contracts.js";
 import {
   AuthorizationRequiredSchema,
   CampaignStagePatchSchema, CampaignStageQuerySchema, CampaignStageRequestSchema,
-   ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
-  NotificationStagePatchSchema, SendingAccountDisconnectSchema, SendingAccountQuerySchema,
-  SendingAccountStartSchema, StageErrorSchema, stageOperations,
+  ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
+  NotificationStagePatchSchema, StageErrorSchema, stageOperations,
 } from "./stage-contracts.js";
 
 const Empty = z.object({}).strict();
@@ -119,6 +115,28 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         ...Object.fromEntries([400, 401, 403, 409, 413, 422, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) },
     });
   }
+  // Senders and sending accounts (LIF-1182): catalog-defined routes resolved by
+  // the database from x-lifty-workspace, like Business and Research.
+  for (const { key, definition } of identityEntries()) {
+    app.on(definition.method, definition.route.replace(/\{(\w+)\}/g, ":$1"), async (context: Context<AppEnvironment>) => {
+      context.header("cache-control", "no-store");
+      const path = validateIdentityInput(definition.path, context.req.param(), { status: 400, code: "INVALID_REQUEST" }) as Record<string, string>;
+      const query = validateIdentityInput(definition.query, readQuery(context, definition.query), { status: 400, code: "INVALID_REQUEST" }) as Record<string, unknown>;
+      const body = definition.request
+        ? validateIdentityInput(definition.request, await readBody(context, definition.invalid.status === 422 ? definition.invalid.code : undefined), definition.invalid)
+        : undefined;
+      const result = await dependencies.identityOperation(context.get("authSession"), key, { path, query, body }, context.req.raw.signal);
+      return context.json(result.body as Record<string, unknown>, result.status);
+    });
+    app.openAPIRegistry.registerPath({ method: definition.method.toLowerCase() as "get" | "post" | "patch", path: definition.route, security: [{ bearerAuth: [] }],
+      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), ...(definition.path instanceof z.ZodObject && Object.keys(definition.path.shape).length ? { params: definition.path } : {}),
+        ...(definition.method === "GET" ? { query: definition.query as z.ZodObject } : {}),
+        ...(definition.request ? { body: { required: true, content: { "application/json": { schema: definition.request } } } } : {}) },
+      responses: { [definition.success === 201 ? 201 : 200]: { description: definition.description, content: { "application/json": { schema: definition.response } } },
+        ...(definition.success === 202 ? { 202: { description: "Accounts blocked; access removal at the provider is not yet confirmed. Repeat the request to finish it.", content: { "application/json": { schema: definition.response } } } } : {}),
+        ...Object.fromEntries([400, 401, 403, 404, 409, 413, 422, 429, 502, 503].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) },
+    });
+  }
   // Calibration sample: the run RPCs select the workspace like every stage.
   app.get("/v1/workspace/sample-review", async context => {
     context.header("cache-control", "no-store");
@@ -180,19 +198,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
   }
   async function attempt(context: Context<AppEnvironment>, provider: ConnectionProvider, ref: string, workspaceRef: string) {
     parse(z.uuid(), ref);
-    const session = context.get("authSession");
-    let result = await dependencies.getConnectionAttempt(session, provider, ref, workspaceRef);
-    if ((provider === "email" || provider === "linkedin") && result.status === "pending") {
-      // Reconcile a callback hint/read provider health without mistaking the old
-      // grant for this attempt. A read failure throws and never invents a state.
-      const current = provider === "email" ? await dependencies.getEmailConnection(session, workspaceRef, ref)
-        : await dependencies.getLinkedinConnection(session, workspaceRef, ref);
-      result = await dependencies.getConnectionAttempt(session, provider, ref, workspaceRef);
-      // A provider error reported on the hosted return page stays a hint and
-      // leaves the stored attempt open; the channel status carries its category.
-      const hint = current.status === "failed" && current.intent_ref === ref ? HostedReturnError.safeParse(current.failure_code) : null;
-      if (result.status === "pending" && hint?.success) result = { status: "failed", attempt_ref: ref, error_code: hint.data };
-    }
+    const result = await dependencies.getConnectionAttempt(context.get("authSession"), provider, ref, workspaceRef);
     if (result.attempt_ref !== ref) throw new PublicError({ status: 502, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization could not be verified. Retry the same attempt." });
     return context.json(ConnectionAttemptStatusSchema.parse(result));
   }
@@ -253,23 +259,6 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     return forward(context, "GET", `/v1/integrations/hubspot/company-mapping/context?workspace_ref=${encodeURIComponent(current)}`);
   });
 
-  app.get("/v1/workspace/sending-accounts/senders", async context => {
-    context.header("cache-control", "no-store");
-    parse(Empty, context.req.query());
-    return context.json(await readSenderRoster(context.get("authSession"), await workspace(context)));
-  });
-  app.get("/v1/workspace/sending-accounts/signature", async context => {
-    context.header("cache-control", "no-store");
-    parse(Empty, context.req.query());
-    return context.json(await readSenderSignatures(context.get("authSession"), await workspace(context)));
-  });
-  app.post("/v1/workspace/sending-accounts/signature", async context => {
-    context.header("cache-control", "no-store");
-    parse(Empty, context.req.query());
-    const input = parse(SenderSignatureRequest, await readBody(context));
-    return context.json(await saveSenderSignature(context.get("authSession"), await workspace(context), input));
-  });
-
   // Disconnection stays in the existing handlers. These POST adapters exist
   // because stage operations cannot express DELETE, and they pin the current
   // workspace instead of accepting one from the caller.
@@ -281,16 +270,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       return forward(context, "DELETE", `/v1/integrations/${provider}`);
     });
   }
-  app.post("/v1/workspace/sending-accounts/disconnect", async context => {
-    parse(Empty, context.req.query());
-    const input = parse(SendingAccountDisconnectSchema, await readBody(context));
-    const current = await workspace(context);
-    return input.channel === "email"
-      ? forward(context, "POST", "/v1/email/disconnect", { workspace: current })
-      : forward(context, "POST", "/v1/linkedin/disconnect", { workspace: current, confirm: true });
-  });
 
-  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads"].includes(stage))) {
+  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads", "senders", "sending-accounts"].includes(stage))) {
     app.get(`/v1/workspace/${stage}`, async context => {
       context.header("cache-control", "no-store");
       const session = context.get("authSession");
@@ -304,12 +285,6 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         if (query.attempt_ref) return attempt(context, stage === "crm" ? "hubspot" : "slack", query.attempt_ref, current);
         return stage === "crm" ? context.json(HubspotConnectionStatusSchema.parse(await dependencies.getHubspotConnection(session)))
           : context.json(NotificationConfigSchema.parse(await dependencies.getNotificationConfig(session)));
-      }
-      if (stage === "sending-accounts") {
-        const query = parse(SendingAccountQuerySchema, context.req.query());
-        if (query.attempt_ref) return attempt(context, query.channel, query.attempt_ref, current);
-        return query.channel === "email" ? context.json(EmailConnectionStatus.parse(await dependencies.getEmailConnection(session, current)))
-          : context.json(LinkedinConnectionStatus.parse(await dependencies.getLinkedinConnection(session, current)));
       }
       if (stage === "campaigns") {
         const query = parse(CampaignStageQuerySchema, context.req.query());
@@ -339,18 +314,6 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
           await dependencies.workspaceCampaign(context.get("authSession"), input.request)));
         return forward(context, "POST", input.channel === "email" ? "/v1/email/campaign" : "/v1/linkedin/campaign", input.request);
       }
-      if (stage === "sending-accounts") {
-        const input = parse(SendingAccountStartSchema, body);
-        const result = input.channel === "email"
-          ? await dependencies.startEmailConnect(session, { workspace: current, reconnect: true,
-            ...(input.sender ? { sender: input.sender } : {}),
-            ...(input.select_account === undefined ? {} : { select_account: input.select_account }) })
-          : await dependencies.startLinkedinConnect(session, { workspace: current, timezone: input.timezone,
-            account_use: input.account_use, other_automation: input.other_automation, reconnect: true,
-            ...(input.sender ? { sender: input.sender } : {}) });
-        if (result.status !== "pending") throw new PublicError({ status: 502, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The new authorization attempt could not be started." });
-        return context.json(authorization(result));
-      }
       parse(Empty, body);
       if (stage === "crm") return context.json(authorization(await dependencies.startHubspotConnect(session)));
       if (stage === "notifications") return context.json(authorization(await dependencies.startSlackConnect(session)));
@@ -359,7 +322,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
 
     app.patch(`/v1/workspace/${stage}`, async context => {
       parse(Empty, context.req.query());
-      if (["summary", "sending-accounts"].includes(stage)) {
+      if (stage === "summary") {
         throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This stage has no supported configuration changes through PATCH." });
       }
       const current = await workspace(context);

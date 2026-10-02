@@ -942,19 +942,14 @@ const syncFixture = {
   completed_at: null,
   workspace: runFixture.workspace,
 };
-const emailFixture = {
-  provider: "unipile" as const,
-  channel: "email" as const,
-  workspace_ref: workspaceRef,
-  status: "connected" as const,
-  email: "founder@example.test",
-  mailbox_use: "personal" as const,
-  daily_limit: 10,
-  warmup_required: false,
-  sending_enabled: false as const,
-  connection_ref: laneFixture.id,
-  intent_ref: null,
-  failure_code: null,
+const sendersFixture = {
+  workspace: { workspace_ref: workspaceRef, name: "Example", state: "ready_for_connections" },
+  senders: [{ id: laneFixture.id, version: 1, name: "Ana Pérez", signature: null, booking_url: null, accounts: [{
+    id: laneFixture.personas[0]!.id, sender_id: laneFixture.id, channel: "email" as const, identity: "ana@example.test",
+    status: "connected" as const, state: "active" as const, checked_at: profileFixture.updated_at, observation: { state: "verified" as const },
+    connected_at: profileFixture.updated_at, disconnected_at: null, access_revoked_at: null,
+    declaration: { mailbox_use: "habitual" as const, declared_by: null, declared_at: profileFixture.updated_at },
+    sends: { today: 1, last_7_days: 3 } }] }],
 };
 const summaryReads: Partial<AppDependencies> = {
   getWorkspace: async () => ({
@@ -966,13 +961,7 @@ const summaryReads: Partial<AppDependencies> = {
   workspaceCampaign: async () => campaignFixture,
   getHubspotConnection: async () => crmConnected,
   getCrmSyncStatus: async () => syncFixture,
-  getEmailConnection: async () => emailFixture,
-  getLinkedinConnection: async () => ({
-    provider: "unipile",
-    channel: "linkedin",
-    workspace_ref: workspaceRef,
-    status: "not_connected",
-  }),
+  identityOperation: async () => ({ status: 200, body: sendersFixture }),
 };
 
 describe("resource resumption preserves research, campaign and CRM decisions", () => {
@@ -1073,6 +1062,26 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
         expect.objectContaining({ userId: "founder" }),
         { operation: "status", payload: { workspace: workspaceRef } },
       );
+    },
+  );
+  it.each([
+    ["draft", ["sending_account_missing"], "sending_account_missing", "sending-accounts", ["senders_get", "sending_accounts_connect", "sending_accounts_attempt"]],
+    ["active", ["sending_account_needs_reconnect"], "sending_account_needs_reconnect", "sending-accounts", ["sending_accounts_get", "sending_accounts_reconnect"]],
+    ["draft", ["signature_missing", "email_warmup_required"], "signature_missing", "senders", ["senders_get", "senders_patch"]],
+  ] as const)(
+    "turns the campaign's %s Identity blocker %j into one roster-first next move",
+    async (state, blockers, reason, task, tools) => {
+      const h = harness(undefined, null, {
+        getRunStatus: async () => runFixture,
+        workspaceCampaign: async () => ({ ...campaignFixture, configuration: sharedCampaignFixture, state,
+          outreach_enabled: state === "active", version_ref: laneFixture.id, digest: "a".repeat(64),
+          preparation: { state: "ready", errors: [] }, blockers: [...blockers] }),
+      });
+      const result = await (await h.request("/v1/workspace/next-step")).json();
+      expect(result).toMatchObject({ step: "campaign", section: "outreach", state: "action_required", reason, context_task: task,
+        guide: { task }, receipt: { blockers } });
+      expect(result.recommended_tools).toEqual(expect.arrayContaining([...tools]));
+      expect(result.actions[0]).toContain(tools[0]);
     },
   );
   it.each(["campaign", "run"])(
@@ -1222,12 +1231,10 @@ describe("summary keeps independent tenant-scoped state", () => {
           last_sync: { state: "running", leads_synced: 1 },
         },
       },
-      email: { status: "available", value: { sending_enabled: false } },
-      linkedin: {
-        status: "available",
-        value: { connection_status: "not_connected" },
-      },
+      senders: { status: "available", value: sendersFixture.senders },
+      detail_operations: { senders: "senders.get", sending_accounts: "sending-accounts.get" },
     });
+    for (const retired of ["self_service", "mailboxes", "email", "linkedin"]) expect(result).not.toHaveProperty(retired);
     expect(result).not.toHaveProperty("config_update");
     expect(result).not.toHaveProperty("onboarding");
     expect(result.run.value).not.toHaveProperty("leads");
@@ -1241,12 +1248,8 @@ describe("summary keeps independent tenant-scoped state", () => {
       researchOperation: async () => {
         throw new PublicError({ status: 502, code: "RESEARCH_SCHEDULE_UNAVAILABLE", message: "secret schedule" });
       },
-      getEmailConnection: async () => {
-        throw new PublicError({
-          status: 409,
-          code: "EMAIL_ACCOUNT_TAKEN",
-          message: "Secret ownership detail",
-        });
+      identityOperation: async () => {
+        throw new PublicError({ status: 502, code: "IDENTITY_UNAVAILABLE", message: "Secret identity detail" });
       },
     });
     const result = await (await h.request("/v1/workspace/summary")).json();
@@ -1254,7 +1257,7 @@ describe("summary keeps independent tenant-scoped state", () => {
       status: "unavailable",
       next_action: "retry_read",
     });
-    expect(result.email).toEqual({
+    expect(result.senders).toEqual({
       status: "unavailable",
       next_action: "retry_read",
     });
@@ -1297,7 +1300,7 @@ describe("summary keeps independent tenant-scoped state", () => {
     });
     expect((await h.request("/v1/workspace/summary")).status).toBe(409);
   });
-  it.each(["run", "crm", "email"])(
+  it.each(["run", "crm", "senders"])(
     "rejects foreign %s state while summarizing a selected workspace",
     async (component) => {
       const foreign = "55555555-5555-4555-8555-555555555555";
@@ -1321,10 +1324,8 @@ describe("summary keeps independent tenant-scoped state", () => {
                 }),
               }
             : {
-                getEmailConnection: async () => ({
-                  ...emailFixture,
-                  workspace_ref: foreign,
-                }),
+                identityOperation: async () => ({ status: 200 as const, body: {
+                  ...sendersFixture, workspace: { ...sendersFixture.workspace, workspace_ref: foreign } } }),
               }),
       });
       expect((await h.request("/v1/workspace/summary")).status).toBe(403);
@@ -1349,54 +1350,12 @@ describe("summary keeps independent tenant-scoped state", () => {
     const h = harness(undefined, null, { ...summaryReads, getWorkspace });
     expect((await h.request("/v1/workspace/summary")).status).toBe(409);
   });
-  it("reads a selected client roster instead of a founder mailbox", async () => {
-    const email = vi.fn();
-    const sender = laneFixture.id;
-    const accounts = vi.fn(async () => ({
-      workspace_ref: workspaceRef,
-      workspace_slug: "example",
-      senders: [{ sender_ref: sender, display_name: "David" }],
-      accounts: [
-        {
-          connection_ref: laneFixture.personas[0]!.id,
-          sender_ref: sender,
-          email: "david@example.test",
-          status: "connected" as const,
-          campaign_send_paused: true,
-        },
-      ],
-      campaign_release_required: true as const,
-      required_active_days: 21 as const,
-    }));
-    const h = harness(undefined, null, {
-      ...summaryReads,
-      listMemberWorkspaces: async () => ({
-        workspaces: [{ ...membershipFixture, self_service: false }],
-      }),
-      getEmailConnection: email,
-      getEmailAccounts: accounts,
-    });
-    const result = await (
-      await h.request("/v1/workspace/summary", "GET", undefined, {
-        "x-lifty-workspace": "example",
-      })
-    ).json();
-    expect(result).toMatchObject({
-      self_service: false,
-      email: null,
-      mailboxes: {
-        status: "available",
-        value: {
-          senders: 1,
-          accounts: [{ sender_name: "David", email: "david@example.test" }],
-        },
-      },
-    });
-    expect(email).not.toHaveBeenCalled();
-    expect(accounts).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ userId: "founder" }),
-      { workspace: workspaceRef },
-    );
+  it("reads senders once through the shared pure roster read, the same for every workspace", async () => {
+    const identity = vi.fn(async () => ({ status: 200 as const, body: sendersFixture }));
+    const h = harness(undefined, null, { ...summaryReads, identityOperation: identity });
+    const result = await (await h.request("/v1/workspace/summary", "GET", undefined, { "x-lifty-workspace": "example" })).json();
+    expect(result.senders).toEqual({ status: "available", value: sendersFixture.senders });
+    expect(identity).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: "founder" }), "senders.get", { path: {}, query: {}, body: undefined });
   });
   it("rejects aggregate writes and missing authorization", async () => {
     const h = harness(undefined, null, summaryReads);

@@ -2,15 +2,12 @@ import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 
+// Membership discovery only. No field selects a workspace or a policy: the
+// caller chooses and sends x-lifty-workspace. Other database keys are stripped.
 export const MemberWorkspace = z.object({
   workspace_ref: z.uuid(), slug: z.string().min(1).max(100), name: z.string().min(1).max(500), active: z.boolean(),
-  // Operations without a workspace parameter act on this one; never guess it.
-  founder_default: z.boolean(),
-  // Lifty-created; the others are LIFT-managed client workspaces.
-  self_service: z.boolean(),
-}).strict();
-export const MemberWorkspacesResult = z.object({ workspaces: z.array(MemberWorkspace).max(200) }).strict()
-  .refine(value => value.workspaces.filter(workspace => workspace.founder_default).length <= 1, "At most one founder default.");
+});
+export const MemberWorkspacesResult = z.object({ workspaces: z.array(MemberWorkspace).max(200) }).strict();
 export type MemberWorkspacesOutput = z.infer<typeof MemberWorkspacesResult>;
 
 function failed(error: unknown): never {

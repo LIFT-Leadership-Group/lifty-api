@@ -176,7 +176,7 @@ const SourceMailbox = z.object({
   workspace_managed_by: z.enum(["lift", "lifty"]).nullish(),
   email: Email,
   domain: z.string().max(253),
-  senders: z.array(z.object({ sender_ref: Uuid, name: z.string().max(200), is_active: z.boolean() })).max(50),
+  senders: z.array(z.object({ sender_ref: Uuid, name: z.string().max(200) })).max(50),
   identity: z.object({ status: z.enum(["resolved", "ambiguous_owner", "unassigned"]) }),
   connections: z.array(SourceConnection).max(50),
   smartlead: SourceSmartlead.nullish(),
@@ -210,7 +210,7 @@ export const DeliverabilitySource = z.object({
   query: z.object({ sender: z.string().max(40).nullish(), mailbox: z.string().max(254).nullish(), history_limit: z.number().int(), limit: z.number().int() }),
   filters: z.object({
     workspaces: z.array(SourceWorkspace).max(1000),
-    senders: z.array(z.object({ sender_ref: Uuid, workspace_ref: Uuid, name: z.string().max(200), is_active: z.boolean(), mailbox_count: Count })).max(5000),
+    senders: z.array(z.object({ sender_ref: Uuid, workspace_ref: Uuid, name: z.string().max(200), mailbox_count: Count })).max(5000),
     unassigned_count: Count,
   }),
   workspace_health: z.array(SourceWorkspace.extend({
@@ -357,7 +357,7 @@ export const DeliverabilityMailbox = z.object({
   workspace: z.object({ workspace_ref: Uuid, slug: z.string().max(100).nullable(), name: z.string().max(200).nullable() }).strict(),
   email: Email,
   domain: z.string().max(253),
-  senders: z.array(z.object({ sender_ref: Uuid, name: z.string().max(200), is_active: z.boolean() }).strict()).max(50),
+  senders: z.array(z.object({ sender_ref: Uuid, name: z.string().max(200) }).strict()).max(50),
   identity: state(IdentityCode),
   providers: z.object({ sending: z.array(Provider).max(5), warmup: z.array(Provider).max(5), placement: z.array(Provider).max(5) }).strict(),
   status: state(MailboxStatusCode),
@@ -420,7 +420,7 @@ export const DeliverabilityResponse = z.object({
     limit: z.number().int().min(1).max(100), detail: z.literal("placement").nullable() }).strict(),
   filters: z.object({
     workspaces: z.array(z.object({ workspace_ref: Uuid, slug: z.string().max(100), name: z.string().max(200), is_active: z.boolean() }).strict()).max(1000),
-    senders: z.array(z.object({ sender_ref: Uuid, workspace_ref: Uuid, name: z.string().max(200), is_active: z.boolean(), mailbox_count: Count }).strict()).max(5000),
+    senders: z.array(z.object({ sender_ref: Uuid, workspace_ref: Uuid, name: z.string().max(200), mailbox_count: Count }).strict()).max(5000),
     unassigned_count: Count,
   }).strict(),
   workspace_health: z.array(WorkspaceHealth).max(1000),

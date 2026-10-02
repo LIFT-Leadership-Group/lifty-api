@@ -175,12 +175,14 @@ it.each(["DASHBOARD_READ_ONLY_MODE","CONSUMER_READ_ONLY_MODE"])("preserves compa
 describe("staged V2 configuration",()=>{
   const baseline={...validEnvironment,UNIPILE_DSN:"https://api1.unipile.com:13111",UNIPILE_ACCESS_TOKEN:"v1-test",
     LIFTY_EMAIL_SERVER_KEY:"e".repeat(40),LIFTY_LINKEDIN_SERVER_KEY:"l".repeat(40)};
-  it("does not change existing V1 credentials when V2 is configured",()=>{
+  it("configures one account connection with per-channel keys; the earlier API is kept only for access removal",()=>{
     const config=loadConfig({...baseline,UNIPILE_V2_ACCESS_TOKEN:"v2-test",UNIPILE_V2_APPLICATION_ID:"app_test",
       UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://connect-v2.lifty.test,https://previous-v2.lifty.test"});
-    expect(config.email).toMatchObject({dsn:baseline.UNIPILE_DSN,accessToken:"v1-test",v2:{accessToken:"v2-test",applicationId:"app_test"}});
-    expect(config.linkedin?.v2).toEqual(config.email?.v2);
-    expect(config.unipileV2HostedAuthOrigins).toEqual(["https://connect-v2.lifty.test","https://previous-v2.lifty.test"]);
+    expect(config.accounts).toMatchObject({serverKeys:{email:"e".repeat(40),linkedin:"l".repeat(40)},
+      provider:{v1:{dsn:baseline.UNIPILE_DSN,accessToken:"v1-test"},v2:{accessToken:"v2-test",applicationId:"app_test",
+        hostedAuthOrigins:["https://connect-v2.lifty.test","https://previous-v2.lifty.test"]}}});
+    expect(loadConfig(baseline).accounts).toBeNull();
+    expect(()=>loadConfig({...baseline,UNIPILE_ACCESS_TOKEN:""})).toThrow(/UNIPILE_DSN and UNIPILE_ACCESS_TOKEN/);
   });
   it.each([
     {UNIPILE_V2_ACCESS_TOKEN:"token"},{UNIPILE_V2_APPLICATION_ID:"app_test"},
@@ -191,6 +193,9 @@ describe("staged V2 configuration",()=>{
     {UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"app_test"},
     {UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"app_test",UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://auth.unipile.com"},
     {UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"app_test",UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://connect-v2.lifty.test,https://auth.unipile.com"},
+    ...["http://connect.liftygtm.com","https://connect.liftygtm.com:8443","https://connect.liftygtm.com/path","https://connect.liftygtm.com?x=1",
+      "https://connect.liftygtm.com#x","https://localhost","https://127.0.0.1","https://[::1]","https://*.liftygtm.com","not a url"]
+      .map(origin=>({UNIPILE_V2_ACCESS_TOKEN:"token",UNIPILE_V2_APPLICATION_ID:"app_test",UNIPILE_V2_HOSTED_AUTH_ORIGINS:origin})),
   ])("rejects incomplete or unsafe V2 config %j",extra=>{expect(()=>loadConfig({...baseline,...extra})).toThrow();});
 });
 
