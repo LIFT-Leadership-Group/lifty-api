@@ -36,7 +36,14 @@ start: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/), end: z.string().regex(/^
 }).strict().refine(value => value.start < value.end, "The local sending window must end after it starts.");
 const LaneName = z.string().regex(/^[a-z][a-z0-9_]{0,39}$/);
 const Subject = text(300).refine(value => !/[\r\n]/.test(value));
-const Template = z.object({ subject: Subject.optional(), text: text(20000) }).strict();
+const CatalogId = z.string().min(1).max(100).regex(/^[A-Za-z0-9._-]+$/);
+const Arm = z.enum(["direct", "pain", "personal", "strategic"]);
+const line = (max: number) => text(max).refine(value => !/[\r\n]/.test(value));
+const Template = z.object({ subject: Subject.optional(), text: text(20000),
+  id: CatalogId.optional(), arms: z.array(Arm).min(1).max(4).refine(values => new Set(values).size === values.length).optional(),
+  variant: CatalogId.optional(), coverage: z.enum(["broad", "signal_specific"]).optional(),
+  fit: line(2000).optional(), slots_spec: line(4000).optional(),
+}).strict();
 const Variant = Template.extend({ lane: LaneName.optional(), opener: z.enum(["cold", "linkedin_bridge"]).optional() }).strict();
 const Step = z.object({ position: z.number().int().min(1).max(5), delay: DelaySchema,
   template: Template.optional(), variants: z.array(Variant).min(1).max(40).optional(),
@@ -59,7 +66,18 @@ const CampaignPolicyFields = z.object({
 function laneNames(lanes: z.infer<typeof LanesSchema> | undefined): Array<string | undefined> {
   return lanes ? [...new Set([...lanes.rules.map(rule => rule.lane), lanes.default])] : [undefined];
 }
+function catalogOpener(variant: z.infer<typeof Variant>) {
+  return variant.opener ?? (variant.variant?.endsWith("-cold") ? "cold"
+    : variant.variant?.endsWith("-bridge") ? "linkedin_bridge" : undefined);
+}
+function templateFamily(variant: z.infer<typeof Variant>) {
+  return variant.variant?.replace(/-(cold|bridge|both)$/, "") ?? "";
+}
 export const CampaignPolicySchema = CampaignPolicyFields.superRefine((policy, context) => {
+  const templates = policy.steps.flatMap(step => step.template ? [step.template] : step.variants ?? []);
+  const catalog = templates.some(template => [template.id, template.arms, template.variant, template.coverage, template.fit, template.slots_spec].some(value => value !== undefined));
+  if (catalog && (!templates.every(template => template.id && template.arms) || new Set(templates.map(template => template.id)).size !== templates.length))
+    context.addIssue({ code: "custom", path: ["steps"], message: "An authored catalog retains distinct source IDs and permitted arms for every template." });
   if (policy.lanes && policy.compose_mode !== "templates")
     context.addIssue({ code: "custom", path: ["lanes"], message: "Content lanes route saved templates." });
   policy.steps.forEach((step, index) => {
@@ -72,15 +90,28 @@ export const CampaignPolicySchema = CampaignPolicyFields.superRefine((policy, co
     if (step.template && policy.lanes)
       context.addIssue({ code: "custom", path: ["steps", index, "template"], message: "Campaigns with content lanes save one variant per lane." });
     if (step.variants) {
-      const openers = step.variants.some(variant => variant.opener) ? ["cold", "linkedin_bridge"] : [undefined];
+      if (catalog && step.variants.some(variant => variant.variant?.endsWith("-both") && (index !== 0 || variant.opener)))
+        context.addIssue({ code: "custom", path: ["steps", index, "variants"], message: "Prior-email templates are retained only as dormant first-step source records." });
+      const routes = catalog && index === 0 ? step.variants.filter(variant => !variant.variant?.endsWith("-both")) : step.variants;
+      const openerFor = (variant: z.infer<typeof Variant>) => catalog && index === 0 ? catalogOpener(variant) : variant.opener;
+      const openers = routes.some(variant => openerFor(variant)) ? ["cold", "linkedin_bridge"] : [undefined];
       if (openers[0] && index !== 0)
         context.addIssue({ code: "custom", path: ["steps", index, "variants"], message: "Only the first email has cold and linkedin_bridge openers." });
-      if (!policy.lanes && !openers[0])
+      if (!catalog && !policy.lanes && !openers[0])
         context.addIssue({ code: "custom", path: ["steps", index, "variants"], message: "Variants require content lanes or first-email openers." });
       const expected = laneNames(policy.lanes).flatMap(lane => openers.map(opener => `${lane ?? ""}|${opener ?? ""}`));
-      const keys = step.variants.map(variant => `${variant.lane ?? ""}|${variant.opener ?? ""}`);
-      if (keys.length !== expected.length || new Set(keys).size !== keys.length || keys.some(key => !expected.includes(key)))
-        context.addIssue({ code: "custom", path: ["steps", index, "variants"], message: "Save exactly one variant for every lane and opener." });
+      const keys = routes.map(variant => `${variant.lane ?? ""}|${openerFor(variant) ?? ""}`);
+      if (catalog ? expected.some(key => !keys.includes(key)) || keys.some(key => !expected.includes(key))
+        : keys.length !== expected.length || new Set(keys).size !== keys.length || keys.some(key => !expected.includes(key)))
+        context.addIssue({ code: "custom", path: ["steps", index, "variants"], message: "Keep every required lane and opener; implicit templates have exactly one variant per route." });
+      if (catalog && index === 0 && openers[0]) {
+        const families = new Set(routes.flatMap(variant => variant.arms?.map(arm => `${variant.lane ?? ""}|${templateFamily(variant)}|${arm}`) ?? []));
+        for (const family of families) {
+          if (openers.some(opener => !routes.some(variant => openerFor(variant) === opener
+            && variant.arms?.some(arm => `${variant.lane ?? ""}|${templateFamily(variant)}|${arm}` === family))))
+            context.addIssue({ code: "custom", path: ["steps", index, "variants"], message: "Keep both openers for each authored research route." });
+        }
+      }
     }
   });
 });
@@ -98,10 +129,29 @@ export function campaignChannelIssues(policy: z.infer<typeof CampaignPolicySchem
         issues.push("LinkedIn templates have text only, at most 3000 characters.");
     }
     if (channel === "email" && step.position === 1 && step.variants) {
-      for (const lane of laneNames(policy.lanes)) {
-        if (new Set(step.variants.filter(variant => variant.lane === lane).map(variant => variant.subject)).size > 1)
-          issues.push("Both openers of a lane start the same thread: use one subject per lane.");
+      const subjects = new Map<string, Set<string | undefined>>();
+      for (const variant of step.variants) {
+        const routes = variant.id ? variant.arms?.map(arm => `${variant.lane ?? ""}|${templateFamily(variant)}|${arm}`) ?? [] : [variant.lane ?? ""];
+        for (const route of routes) {
+          const saved = subjects.get(route) ?? new Set(); saved.add(variant.subject); subjects.set(route, saved);
+        }
       }
+      if ([...subjects.values()].some(values => values.size > 1))
+        issues.push("Both openers of a saved route start the same thread: use one subject per route.");
+    }
+    if (channel === "linkedin" && step.variants?.some(variant => variant.opener || catalogOpener(variant)))
+      issues.push("Only Email templates have cold and linkedin_bridge openers.");
+  }
+  const first = policy.steps[0];
+  const firstTemplates = first?.template ? [{ ...first.template, lane: undefined }] : first?.variants ?? [];
+  if (firstTemplates.some(template => template.id)) {
+    const routes = firstTemplates.filter(template => !template.variant?.endsWith("-both"))
+      .flatMap(template => template.arms?.map(arm => ({ arm, lane: template.lane, family: templateFamily(template) })) ?? []);
+    for (const step of policy.steps.slice(1)) {
+      const choices = step.template ? [{ ...step.template, lane: undefined }] : step.variants ?? [];
+      if (routes.some(route => !choices.some(template => template.arms?.includes(route.arm)
+        && template.lane === route.lane && (channel === "linkedin" || templateFamily(template) === route.family))))
+        issues.push("Every authored first-step route must retain a compatible template in each later step.");
     }
   }
   return [...new Set(issues)];
@@ -172,7 +222,7 @@ const TestSummary = z.object({ test_ref: Ref, request_ref: Ref, campaign_ref: Re
   baseline_test_ref: Ref.nullable(), status: z.enum(["queued", "running", "completed", "failed"]), created_at: Timestamp,
 }).strict();
 const Selection = z.object({ lane: z.string().nullable(), opener: z.enum(["cold", "linkedin_bridge"]).nullable(),
-  template_ids: z.array(z.string().min(1).max(100)).min(1).max(5).optional() }).strict();
+  template_ids: z.array(z.string().min(1).max(100)).min(1).max(5).optional(), approach_type: Arm.optional() }).strict();
 const TestOutput = z.object({ output_ref: Ref, digest: Digest, created_at: Timestamp,
   content: z.union([z.object({ linkedin_messages: z.array(z.object({ text: text(3000) }).strict()).min(1).max(3) }).strict(),
     z.object({ email_steps: z.array(z.object({ subject: text(300), text: text(20000), delay_minutes: z.number().int().min(0).max(43200) }).strict()).min(4).max(5) }).strict()]),
