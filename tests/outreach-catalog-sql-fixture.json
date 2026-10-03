@@ -1,0 +1,382 @@
+{
+  "campaign": {
+    "name": "Exact catalog",
+    "state": "inactive",
+    "channel": "email",
+    "version": 1,
+    "revisions": [
+      {
+        "digest": "6ddd6c3faa8e69238955e6c4d3508f3b385e84e33ccd2fe28d6e1115ba65f387",
+        "content": {
+          "start": [
+            {
+              "type": "journey_start"
+            }
+          ],
+          "steps": [
+            {
+              "delay": {
+                "days": 0
+              },
+              "position": 1,
+              "variants": [
+                {
+                  "id": "e1-direct-cold",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "direct"
+                  ],
+                  "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                  "subject": "direct thread",
+                  "variant": "direct-cold",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                },
+                {
+                  "id": "e1-direct-bridge",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "direct"
+                  ],
+                  "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                  "subject": "direct thread",
+                  "variant": "direct-bridge",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                },
+                {
+                  "id": "e1-pain-cold",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "pain"
+                  ],
+                  "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                  "subject": "pain thread",
+                  "variant": "pain-cold",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                },
+                {
+                  "id": "e1-pain-bridge",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "pain"
+                  ],
+                  "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                  "subject": "pain thread",
+                  "variant": "pain-bridge",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 2,
+              "variants": [
+                {
+                  "id": "e2-direct",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "direct"
+                  ],
+                  "text": "Hi {first_name}, verified copy 2.",
+                  "variant": "direct",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                },
+                {
+                  "id": "e2-pain",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "pain"
+                  ],
+                  "text": "Hi {first_name}, verified copy 2.",
+                  "variant": "pain",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 3,
+              "variants": [
+                {
+                  "id": "e3-direct",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "direct"
+                  ],
+                  "text": "Hi {first_name}, verified copy 3.",
+                  "variant": "direct",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                },
+                {
+                  "id": "e3-pain",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "pain"
+                  ],
+                  "text": "Hi {first_name}, verified copy 3.",
+                  "variant": "pain",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                }
+              ]
+            },
+            {
+              "delay": {
+                "days": 3
+              },
+              "position": 4,
+              "variants": [
+                {
+                  "id": "e4-direct",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "direct"
+                  ],
+                  "text": "Hi {first_name}, verified copy 4.",
+                  "variant": "direct",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                },
+                {
+                  "id": "e4-pain",
+                  "fit": "Confirmed evidence",
+                  "arms": [
+                    "pain"
+                  ],
+                  "text": "Hi {first_name}, verified copy 4.",
+                  "variant": "pain",
+                  "coverage": "broad",
+                  "slots_spec": "{first_name}: exact first name"
+                }
+              ]
+            }
+          ],
+          "schedule": {
+            "end": "23:59",
+            "start": "00:00",
+            "timezone": "UTC",
+            "weekdays": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          "sender_ids": [
+            "62658775-2075-4a4f-869e-f98f6f64cd47"
+          ],
+          "compose_mode": "templates",
+          "instructions": "Approved evidence only.",
+          "voice_version": 0,
+          "profile_version": 1
+        },
+        "approval": null,
+        "created_at": "2026-10-02T23:59:16.18163+00:00",
+        "revision_ref": "3b8aedb1-df36-4f87-b07a-6ef73d2c7ab3"
+      }
+    ],
+    "journey_ref": "ebc090ae-cddb-4bc1-ab14-cae474e02dc4",
+    "campaign_ref": "b4aa1e66-ebec-4d69-b28c-8c338153d364",
+    "draft_revision": {
+      "digest": "6ddd6c3faa8e69238955e6c4d3508f3b385e84e33ccd2fe28d6e1115ba65f387",
+      "content": {
+        "start": [
+          {
+            "type": "journey_start"
+          }
+        ],
+        "steps": [
+          {
+            "delay": {
+              "days": 0
+            },
+            "position": 1,
+            "variants": [
+              {
+                "id": "e1-direct-cold",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "direct"
+                ],
+                "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                "subject": "direct thread",
+                "variant": "direct-cold",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              },
+              {
+                "id": "e1-direct-bridge",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "direct"
+                ],
+                "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                "subject": "direct thread",
+                "variant": "direct-bridge",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              },
+              {
+                "id": "e1-pain-cold",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "pain"
+                ],
+                "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                "subject": "pain thread",
+                "variant": "pain-cold",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              },
+              {
+                "id": "e1-pain-bridge",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "pain"
+                ],
+                "text": "Hi {first_name}, verified copy 1 from {sender_first_name}.",
+                "subject": "pain thread",
+                "variant": "pain-bridge",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              }
+            ]
+          },
+          {
+            "delay": {
+              "days": 3
+            },
+            "position": 2,
+            "variants": [
+              {
+                "id": "e2-direct",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "direct"
+                ],
+                "text": "Hi {first_name}, verified copy 2.",
+                "variant": "direct",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              },
+              {
+                "id": "e2-pain",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "pain"
+                ],
+                "text": "Hi {first_name}, verified copy 2.",
+                "variant": "pain",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              }
+            ]
+          },
+          {
+            "delay": {
+              "days": 3
+            },
+            "position": 3,
+            "variants": [
+              {
+                "id": "e3-direct",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "direct"
+                ],
+                "text": "Hi {first_name}, verified copy 3.",
+                "variant": "direct",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              },
+              {
+                "id": "e3-pain",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "pain"
+                ],
+                "text": "Hi {first_name}, verified copy 3.",
+                "variant": "pain",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              }
+            ]
+          },
+          {
+            "delay": {
+              "days": 3
+            },
+            "position": 4,
+            "variants": [
+              {
+                "id": "e4-direct",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "direct"
+                ],
+                "text": "Hi {first_name}, verified copy 4.",
+                "variant": "direct",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              },
+              {
+                "id": "e4-pain",
+                "fit": "Confirmed evidence",
+                "arms": [
+                  "pain"
+                ],
+                "text": "Hi {first_name}, verified copy 4.",
+                "variant": "pain",
+                "coverage": "broad",
+                "slots_spec": "{first_name}: exact first name"
+              }
+            ]
+          }
+        ],
+        "schedule": {
+          "end": "23:59",
+          "start": "00:00",
+          "timezone": "UTC",
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ]
+        },
+        "sender_ids": [
+          "62658775-2075-4a4f-869e-f98f6f64cd47"
+        ],
+        "compose_mode": "templates",
+        "instructions": "Approved evidence only.",
+        "voice_version": 0,
+        "profile_version": 1
+      },
+      "approval": null,
+      "created_at": "2026-10-02T23:59:16.18163+00:00",
+      "revision_ref": "3b8aedb1-df36-4f87-b07a-6ef73d2c7ab3"
+    },
+    "active_revision": null
+  },
+  "workspace": {
+    "name": "External contracts",
+    "state": "ready_for_connections",
+    "workspace_ref": "b12a1960-5ce6-4896-9bff-b0ba5d4e0e75"
+  }
+}
