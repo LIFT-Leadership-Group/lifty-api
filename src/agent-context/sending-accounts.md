@@ -109,7 +109,8 @@ compute dates yourself.
   Start warmup only if the founder says yes.
 - `outreach` (a dedicated sending mailbox): warmup is required. The mailbox
   needs a healthy check after 21 active warmup days, followed by placement,
-  before it can send. Paused days and days with a problem don't count, so the date moves later if either
+  before it can send. Lifty starts that placement test by itself when warmup
+  finishes. Paused days and days with a problem don't count, so the date moves later if either
   happens. Give the returned date and suggest what to prepare meanwhile:
   targeting, copy and schedule.
 
@@ -127,7 +128,10 @@ Warmup never pauses or resumes campaigns.
 `warmup_start` returns the setup link. Show it as "Set up warmup for your
 mailbox". The page shows the mailbox, the sender name warmup emails will use
 (from the sender's profile) and one "Continue with Google" button. Lifty sets
-the warmup schedule and volume; the founder fills in nothing. Google must
+the warmup schedule and volume; the founder fills in nothing. The page also
+says that when warmup ends, Lifty sends one test email from the mailbox to
+about 20-40 test inboxes to measure deliverability, and that continuing
+accepts warmup and this test. Say so before sharing the link. Google must
 verify that exact address before Lifty shares access with the warmup service,
 once, without storing or logging the tokens. The setup flow does not create
 another email address. If the returned link or status does not support Google
@@ -169,7 +173,15 @@ Mailivery and only for a mailbox Mailivery is already warming. Read
 `placement_status` with the explicit `workspace` and, when the workspace has
 more than one warmed mailbox, its `connection_ref`.
 
-Only call `placement_start` after the user explicitly agrees to what it does.
+When warmup finishes, Lifty queues one test by itself (`test.automatic:
+true`). Accepting warmup covered it, so do not ask for consent again or call
+`placement_start` for it. It uses a fixed short business email signed with the
+sender's signature, never campaign content. Repeated checks never start a
+second automatic test. If it could not start and nothing was sent or billed
+(for example, no test credits), Lifty tries again within a day.
+
+Only call `placement_start` when the user asks for another test, after they
+explicitly agree to what it does.
 Mailivery sends one email from that mailbox to roughly 20-40 of its seed
 inboxes, and each test uses one Mailivery test credit. Use the subject and
 plain-text body of the first email of the real sequence, and send

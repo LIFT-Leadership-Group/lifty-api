@@ -7,6 +7,8 @@ import { EmailWorkspace } from "./email-contracts.js";
 // Members queue one test through public.lifty_email_connection_placement with
 // their own session; the Jobs worker creates it in Mailivery, which sends its
 // seeds from that mailbox. Nothing here calls the provider or spends credits.
+// Since 2026-10-05 Lifty also queues one test by itself when a mailbox finishes
+// warmup; accepting warmup covers it (origin `warmup_complete`).
 
 export const PlacementStatusRequest = z.object({
   workspace: EmailWorkspace,
@@ -30,7 +32,7 @@ const StoredStatus = z.object({
   gates_sending: z.boolean(), last_passed_at: timestamp.nullable(), passing_until: timestamp.nullable(),
   test: z.object({
     placement_ref: z.uuid(), status: z.enum(["queued", "creating", "ambiguous", "running", "completed", "failed"]),
-    test_ref: z.string().regex(/^[1-9][0-9]{0,17}$/).nullable(), total_seeds: count.nullable(),
+    origin: z.enum(["member", "warmup_complete"]), test_ref: z.string().regex(/^[1-9][0-9]{0,17}$/).nullable(), total_seeds: count.nullable(),
     requested_at: timestamp, completed_at: timestamp.nullable(), passed: z.boolean().nullable(),
     failure_code: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/).nullable(), policy_version: z.string().max(200).nullable(),
     samples: z.object({ gmail: Counts, microsoft: Counts, overall: Counts }).nullable(),
@@ -54,6 +56,7 @@ export const ConnectionPlacementStatus = z.object({
   test: z.object({
     placement_ref: z.uuid(),
     state: z.enum(["pending", "running", "uncertain", "passed", "failed", "did_not_run"]),
+    automatic: z.boolean(),
     label: z.string().min(1).max(300),
     test_ref: z.string().nullable(),
     total_seeds: count.nullable(),
@@ -94,6 +97,8 @@ const failureMessages: Record<string, string> = {
   placement_warmup_required: "Mailivery warmup stopped before the test started. Nothing was sent.",
   placement_target_changed: "The mailbox or its requester changed before the test started. Nothing was sent.",
 };
+// Codes that prove Mailivery created nothing; SQL retries an automatic test after these a day later.
+const notCreated = new Set(["insufficient_credits", "workspace_suspended", "connection_required", "placement_warmup_required", "placement_target_changed"]);
 
 function mapRpcError(error: unknown): never {
   const parsed = z.object({ message: z.string().optional() }).safeParse(error);
@@ -110,17 +115,19 @@ export function presentConnectionPlacement(stored: z.infer<typeof StoredStatus>)
   const t = stored.test;
   let test: ConnectionPlacementStatus["test"] = null;
   if (t) {
+    const automatic = t.origin === "warmup_complete";
+    const retry = automatic && t.failure_code && notCreated.has(t.failure_code) ? " Lifty tries the automatic test again within a day." : "";
     const failure = t.status === "failed" && t.failure_code ? { code: t.failure_code,
-      message: failureMessages[t.failure_code] ?? "The test did not complete. This is not a placement result." } : null;
+      message: `${failureMessages[t.failure_code] ?? "The test did not complete. This is not a placement result."}${retry}` } : null;
     const state = t.status === "completed" ? (t.passed ? "passed" : "failed") : t.status === "queued" ? "pending"
       : t.status === "ambiguous" ? "uncertain" : t.status === "failed" ? "did_not_run" : "running";
     const summary = t.samples ? ` Gmail inbox ${pct(t.samples.gmail.inbox, t.samples.gmail.total)}, Microsoft inbox ${pct(t.samples.microsoft.inbox, t.samples.microsoft.total)}, spam ${pct(t.samples.overall.spam, t.samples.overall.total)}.` : "";
     const label = state === "passed" ? `Passed.${summary}` : state === "failed" ? `Failed.${summary} Passing needs Gmail inbox of at least 70%, some Microsoft inbox and at most 40% spam.`
-      : state === "pending" ? "Queued. Lifty creates the test in Mailivery within about 5 minutes."
+      : state === "pending" ? `Queued${automatic ? " automatically because warmup finished" : ""}. Lifty creates the test in Mailivery within about 5 minutes.`
       : state === "uncertain" ? "Checking whether Mailivery created the test. Lifty will not create a second one; wait for the next check."
       : state === "running" ? "Mailivery is sending the test from this mailbox and measuring placement. This usually takes 10-20 minutes."
       : `Did not run. ${failure?.message ?? ""}`.trim();
-    test = { placement_ref: t.placement_ref, state, label, test_ref: t.test_ref, total_seeds: t.total_seeds, requested_at: t.requested_at,
+    test = { placement_ref: t.placement_ref, state, automatic, label, test_ref: t.test_ref, total_seeds: t.total_seeds, requested_at: t.requested_at,
       completed_at: t.completed_at, failure, counts: t.status === "completed" ? t.samples : null };
   }
   const blocked = stored.blocked_reason ? { code: stored.blocked_reason.replace(/^email_/, ""),
