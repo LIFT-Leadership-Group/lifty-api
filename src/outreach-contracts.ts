@@ -22,6 +22,7 @@ const StartCondition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("journey_start") }).strict(),
   z.object({ type: z.literal("sent"), campaign_ref: Ref, step: z.number().int().min(1).max(10), after: DelaySchema }).strict(),
   z.object({ type: z.literal("unaccepted"), campaign_ref: Ref, after: z.object({ business_days: DayCount }).strict() }).strict(),
+  z.object({ type: z.literal("linkedin_first_dm_skipped"), campaign_ref: Ref }).strict(),
 ]);
 export const StartSchema = z.array(StartCondition).min(1).max(3).superRefine((conditions, context) => {
   if (new Set(conditions.map(condition => JSON.stringify(condition))).size !== conditions.length)
@@ -117,6 +118,8 @@ export const CampaignPolicySchema = CampaignPolicyFields.superRefine((policy, co
 });
 export function campaignChannelIssues(policy: z.infer<typeof CampaignPolicySchema>, channel: "email" | "linkedin") {
   const issues: string[] = [];
+  if (channel !== "email" && policy.start.some(condition => condition.type === "linkedin_first_dm_skipped"))
+    issues.push("Only an Email Campaign may start after a LinkedIn first DM is skipped.");
   if (channel === "email" && (policy.steps.length < 4 || policy.steps.length > 5)) issues.push("The executable adapter supports four or five saved emails.");
   if (channel === "linkedin" && policy.steps.length > 3) issues.push("The executable adapter supports one to three saved LinkedIn messages after the invitation.");
   for (const step of policy.steps) {
@@ -249,8 +252,25 @@ export const CampaignMessageSchema = z.object({ message_ref: Ref, lead_ref: Ref,
   status: z.string().nullable(), review_status: z.string().nullable(), is_draft: z.boolean().nullable(), content: z.string(),
   steps: z.array(z.object({ position: z.number().int().positive(), subject: z.string(), text: z.string() }).strict()).nullable(),
   source_message_ref: Ref.nullable(), sender_id: Ref.nullable(), sender_version: Version.nullable(), source_digest: Digest, created_at: Timestamp,
+  account_id: Ref.nullable(), sender_name: z.string().nullable(), lead_name: z.string().nullable(), lead_email: z.string().nullable(),
+  lead_linkedin_url: z.string().nullable(), review_reason: z.string().nullable(), action_ref: Ref.nullable(), run_ref: Ref.nullable(),
+  campaign_ref: Ref.nullable(), direction: z.enum(["inbound", "outbound"]),
+  delivery_state: z.enum(["confirmed", "scheduled", "planned", "unknown"]), sent_at: Timestamp.nullable(),
+}).strict().refine(message => message.direction !== "outbound" || message.delivery_state !== "confirmed" || message.sent_at !== null,
+  "Confirmed outbound delivery requires its saved receipt time.");
+export const CampaignMessageResultSchema = z.object({ ...Workspace, message: CampaignMessageSchema,
+  history: z.array(CampaignMessageSchema).max(100), history_complete: z.boolean(),
+  revisions: z.array(CampaignMessageSchema).max(100), revisions_complete: z.boolean(),
 }).strict();
-export const CampaignMessageResultSchema = z.object({ ...Workspace, message: CampaignMessageSchema }).strict();
+export const CampaignReviewsQuerySchema = z.object({ channel: z.enum(["linkedin", "email"]).optional(),
+  review_status: z.enum(["pending", "enroll_failed", "approved", "suppressed"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(), after: Ref.optional(),
+}).strict();
+export const CampaignReviewsSchema = z.object({ ...Workspace, messages: z.array(CampaignMessageSchema).max(100), next_after: Ref.nullable() }).strict();
+export const CampaignMessageReviewSchema = z.object({ action: z.enum(["approve", "skip", "retry"]), source_digest: Digest,
+  expected_review_status: z.enum(["pending", "enroll_failed"]), reason: text(2000).optional(),
+}).strict().refine(value => value.action !== "retry" || value.expected_review_status === "enroll_failed", "Retry requires a saved review failure.")
+  .refine(value => value.action !== "skip" || value.reason !== undefined, "Explain why this message is being skipped.");
 export const CampaignRuntimeSchema = z.object({ ...Workspace, campaign_ref: Ref, intent_active: z.boolean(),
   executable_versions: z.array(z.object({ executable_version_ref: Ref, revision_ref: Ref, started_journeys: z.number().int().nonnegative(),
     continuing_journeys: z.number().int().nonnegative(), prepared_journeys: z.number().int().nonnegative(), pending_journeys: z.number().int().nonnegative(),

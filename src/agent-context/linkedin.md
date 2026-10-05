@@ -24,10 +24,13 @@ approved, active Campaign that permits that sender.
 
 ## People already connected to the sender
 
-Lifty sends them no invitation. Their first message waits for review in the
-Lifty dashboard, where a reviewer approves, edits or skips it; nothing is sent
-before approval. Skipping stops LinkedIn for that person only; an email
-Campaign of the same Journey that is already active can still start for them.
+Lifty sends them no invitation. Their first message waits for review. Read
+`lifty context campaigns` for `reviews_get`, the exact saved message and its
+history, immutable corrections and `message_review_post`. The Lifty dashboard
+uses the same review workflow. Show the saved message and exact account to the
+founder, then record only the decision they request. Nothing is sent before
+approval. Skipping stops LinkedIn for that person only; an Email Campaign of
+the same Journey that is already active can still start for them.
 
 ## Read activity
 
@@ -64,7 +67,9 @@ normally. Otherwise it says why the account's due LinkedIn work waits:
   still running; its LinkedIn work finishes first, then this one starts.
   Expected. A paused earlier Campaign still counts as running.
 - `awaiting_review`: a first message to an already-connected person waits for
-  review. Ask the founder to review it in the Lifty dashboard.
+  review. Read the saved queue with Campaigns `reviews_get`, show the exact
+  message and account, and ask the founder for their decision. They can also
+  review it in the Lifty dashboard.
 - `outside_schedule`: the Campaign's sending hours are closed. Expected; work
   continues in the next window.
 - `daily_limit_reached`: the account reached its daily LinkedIn limit.

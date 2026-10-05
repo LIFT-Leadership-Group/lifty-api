@@ -154,7 +154,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     app.on(definition.method, definition.route.replace(/\{([^}]+)\}/g, ":$1"), async context => {
       context.header("cache-control", "no-store");
       const path = validateOutreachInput(definition.path, context.req.param(), { status: 400, code: "INVALID_REQUEST" }) as Record<string, string>;
-      const query = validateOutreachInput(definition.query, context.req.query(), { status: 400, code: "INVALID_REQUEST" }) as Record<string, unknown>;
+      const query = validateOutreachInput(definition.query, readQuery(context, definition.query), { status: 400, code: "INVALID_REQUEST" }) as Record<string, unknown>;
       const body = definition.request ? validateOutreachInput(definition.request, await readBody(context, definition.invalid.code), definition.invalid) : undefined;
       const result = definition.response.parse(await dependencies.outreachOperation(context.get("authSession"), key, { path, query, body }));
       return context.json(result, definition.success);

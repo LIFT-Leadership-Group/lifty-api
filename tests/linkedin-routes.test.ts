@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
-// Hand-written from the coordinator's "Contract: get linkedin" until the SQL
-// function exists. Replace it with a receipt captured from
-// public.get_lifty_linkedin on a real database, like outreach-sql-fixtures.json.
+// Captured from public.get_lifty_linkedin in the real local Identity SQL suite.
+// It includes two distinct senders and confirmed, attributable event counts.
 import receipt from "./linkedin-sql-fixture.json" with { type: "json" };
 
 // LIF-1190 `get linkedin`: the catalog route calls the member RPC with the

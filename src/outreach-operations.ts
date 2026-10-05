@@ -55,6 +55,18 @@ function messageDefinition(revise: boolean): Definition {
       : "Read an actual saved per-lead message in the selected workspace. No canonical campaign membership is inferred for historical drafts. Does not generate, approve, activate or send.",
   };
 }
+function reviewDefinition(read: boolean): Definition {
+  return { method: read ? "GET" : "POST",
+    route: read ? "/v1/workspace/campaign-reviews" : "/v1/workspace/campaign-messages/{message_ref}/review",
+    rpc: read ? "get_lifty_campaign_reviews" : "review_lifty_campaign_message",
+    path: read ? Empty : c.CampaignMessagePathSchema, query: read ? c.CampaignReviewsQuerySchema : Empty,
+    request: read ? null : c.CampaignMessageReviewSchema, response: read ? c.CampaignReviewsSchema : c.CampaignMessageResultSchema,
+    invalid, success: 200, cli: { operation: read ? "reviews_get" : "message_review_post" },
+    args: input => read ? { p_query: input.query } : { p_message_id: input.path.message_ref, p_payload: input.body },
+    description: read ? "Read the selected workspace's saved Campaign review queue, including the exact person, account and action. Paginated, read-only; failed reads stay unavailable. Members and operators use the same workflow."
+      : "Review one exact saved LinkedIn message using source_digest and expected_review_status. Approve queues only the reviewed bytes; it never activates a Campaign. Skip closes the LinkedIn branch and allows its active Email Campaign to start, without global suppression. Retry returns a failed review to pending only after confirming that no begun, unknown or confirmed send could be replayed.",
+  };
+}
 export const outreachOperationDefinitions = {
   journeys: {
     get: definition("journeys", "get", "GET", null, c.JourneysSchema, "Read saved Journeys in the selected workspace with their selected revision and executable version. Unknown reads are unavailable, not an empty audience."),
@@ -65,6 +77,8 @@ export const outreachOperationDefinitions = {
     activate: definition("journeys", "activate", "POST", c.ActivateSchema, c.JourneyResultSchema, "Use one exact approved Journey revision for new Journey starts. The executable version is derived automatically from it and each activated Campaign's selected revision; started Journeys keep theirs. Campaign intent is unchanged."),
   },
   campaigns: {
+    reviews_get: reviewDefinition(true),
+    message_review_post: reviewDefinition(false),
     runtime: { ...definition("campaigns", "runtime", "GET", null, c.CampaignRuntimeSchema,
       "Read started Journeys of this Campaign grouped by the executable version and Campaign revision they retain: started, continuing, prepared and pending, plus recorded gate reasons only. Intent is separate from execution and readiness. No recorded reason does not prove ready; failed reads remain unavailable."), rpc: "get_lifty_campaign_runtime" },
     message_get: messageDefinition(false),
@@ -74,7 +88,7 @@ export const outreachOperationDefinitions = {
     test_detail: testDefinition("test_detail"),
     get: definition("campaigns", "get", "GET", null, c.CampaignsSchema, "Read channel Campaigns, optionally by journey_ref or channel. Uses the selected workspace; no provider selector."),
     detail: definition("campaigns", "detail", "GET", null, c.CampaignResultSchema, "Read one Campaign: start rules, sequence, templates or instructions, delays, schedule, senders, its draft/approval history, the revision selected for new Journey starts and its intent (inactive, active or paused). Account readiness is independent."),
-    post: definition("campaigns", "post", "POST", c.CampaignCreateSchema, c.CampaignResultSchema, "Save an inactive unapproved channel Campaign draft in a Journey: start rules (journey_start, or sent/unaccepted relative to another Campaign of the Journey), steps, templates or generated-writing instructions, delays, schedule and canonical sender_ids. Several persons may be permitted; each lead keeps one person. Never sends."),
+    post: definition("campaigns", "post", "POST", c.CampaignCreateSchema, c.CampaignResultSchema, "Save an inactive unapproved channel Campaign draft in a Journey: start rules (journey_start, sent/unaccepted relative to another Campaign, or Email after linkedin_first_dm_skipped), steps, templates or generated-writing instructions, delays, schedule and canonical sender_ids. Several persons may be permitted; each lead keeps one person. Never sends."),
     draft_patch: definition("campaigns", "draft_patch", "PATCH", c.CampaignDraftSchema, c.CampaignResultSchema, "Change supplied fields into an unapproved immutable draft using expected_version and source revision_ref. Active approved work continues; pause, readiness and incident holds and started Journeys are unchanged."),
     publish: definition("campaigns", "publish", "POST", c.PublishSchema, c.CampaignResultSchema, "Approve one exact revision/digest; records actor/time. It never activates, resumes or sends."),
     activate: definition("campaigns", "activate", "POST", c.ActivateSchema, c.CampaignActivationResultSchema, "Use one exact approved revision for new Journey starts and set active intent. The same action resumes after a pause: retained work continues under its original revisions. A Campaign that starts after another Campaign joins the executable version once that Campaign is activated. Account, readiness and incident gates still apply."),
@@ -103,13 +117,39 @@ export async function executeOutreachOperation(session: AuthSession, key: string
       throw new PublicError({ status: 502, ...unavailable });
     return parsed.data;
   }
+  if (["message_get", "message_revisions_post", "message_review_post"].includes(entry.action)) {
+    const { message, history, revisions } = c.CampaignMessageResultSchema.parse(parsed.data);
+    if (message.direction !== "outbound" || history.some(item => item.lead_ref !== message.lead_ref || item.channel !== message.channel
+      || !message.account_id || item.account_id !== message.account_id)
+      || revisions.some(item => item.lead_ref !== message.lead_ref || item.channel !== message.channel || item.account_id !== message.account_id))
+      throw new PublicError({ status: 502, ...unavailable });
+  }
   if (entry.action === "message_get" || entry.action === "message_revisions_post") {
-    const message = c.CampaignMessageResultSchema.parse(parsed.data).message;
+    const receipt = c.CampaignMessageResultSchema.parse(parsed.data);
+    const message = receipt.message;
     if (entry.action === "message_get" ? message.message_ref !== input.path.message_ref
       : message.message_ref === input.path.message_ref || message.source_message_ref !== input.path.message_ref
         || !message.sender_id || !message.sender_version)
       throw new PublicError({ status: 502, ...unavailable });
     return parsed.data;
+  }
+  if (entry.action === "reviews_get") {
+    const receipt = c.CampaignReviewsSchema.parse(parsed.data);
+    const query = input.query as z.infer<typeof c.CampaignReviewsQuerySchema>;
+    if (receipt.messages.length > (query.limit ?? 100) || receipt.messages.some(message => message.direction !== "outbound" ||
+      (query.channel && message.channel !== query.channel) || (query.review_status && message.review_status !== query.review_status)))
+      throw new PublicError({ status: 502, ...unavailable });
+    return receipt;
+  }
+  if (entry.action === "message_review_post") {
+    const receipt = c.CampaignMessageResultSchema.parse(parsed.data);
+    const request = input.body as z.infer<typeof c.CampaignMessageReviewSchema>;
+    const expected = { approve: "approved", skip: "suppressed", retry: "pending" }[request.action];
+    if (receipt.message.message_ref !== input.path.message_ref || receipt.message.review_status !== expected
+      || receipt.message.channel !== "linkedin"
+      || (request.action === "approve" && (!receipt.message.account_id || !receipt.message.sender_id || !receipt.message.sender_name)))
+      throw new PublicError({ status: 502, ...unavailable });
+    return receipt;
   }
   if (entry.action.startsWith("tests_") || entry.action === "test_detail") {
     const receipt = parsed.data as { test?: { campaign_ref: string; test_ref: string }; tests?: Array<{ campaign_ref: string }> };
