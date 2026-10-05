@@ -10,6 +10,7 @@ import receipt from "./linkedin-sql-fixture.json" with { type: "json" };
 // database-resolved workspace, validates the query before any read, and never
 // turns an unknown or malformed read into zero activity.
 const senderId = receipt.accounts[0]!.sender_id;
+const otherSender = "77777777-7777-4777-8777-777777777777";
 type Rpc = (name: string, args: Record<string, unknown>) => unknown;
 function harness(rpc: Rpc) {
   const calls: { name: string; args: Record<string, unknown> }[] = [];
@@ -26,16 +27,26 @@ const dbError = (code: string, message: string) => Object.assign(new Error(messa
 
 describe("LinkedIn activity route", () => {
   it("reads every LinkedIn account of the selected workspace, or one sender's, through the documented RPC", async () => {
-    const one = { ...receipt, accounts: [receipt.accounts[0]] };
-    const h = harness((_name, args) => (args.p_query as { sender_id?: string }).sender_id ? one : receipt);
+    const { today, last_7_days } = receipt.accounts[0]!;
+    const one = { ...receipt, today, last_7_days, accounts: [receipt.accounts[0]] };
+    // A known sender without a LinkedIn account: true zeros, not an unknown read.
+    const zero = { invitations_sent: 0, invitations_accepted: 0, messages_sent: 0, replies_received: 0 };
+    const none = { ...receipt, today: zero, last_7_days: zero, accounts: [] };
+    const h = harness((_name, args) => {
+      const sender = (args.p_query as { sender_id?: string }).sender_id;
+      return sender === senderId ? one : sender === otherSender ? none : receipt;
+    });
     const all = await h.read();
     expect(all.status).toBe(200);
     expect(all.headers.get("cache-control")).toBe("no-store");
     expect(await all.json()).toEqual(receipt);
     expect(await (await h.read(`?sender_id=${senderId}`)).json()).toEqual(one);
+    const empty = await h.read(`?sender_id=${otherSender}`);
+    expect([empty.status, await empty.json()]).toEqual([200, none]);
     expect(h.calls).toEqual([
       { name: "get_lifty_linkedin", args: { p_workspace_id: null, p_query: {} } },
       { name: "get_lifty_linkedin", args: { p_workspace_id: null, p_query: { sender_id: senderId } } },
+      { name: "get_lifty_linkedin", args: { p_workspace_id: null, p_query: { sender_id: otherSender } } },
     ]);
   });
 
@@ -43,14 +54,14 @@ describe("LinkedIn activity route", () => {
     "rejects the query %s with repair issues before any read", async query => {
       const h = harness(() => { throw new Error("must not be called"); });
       const response = await h.read(query);
-      expect(response.status).toBe(422);
+      expect(response.status).toBe(400);
       const { error } = await response.json();
       expect(error.code).toBe("INVALID_REQUEST");
       expect(error.issues.length).toBeGreaterThan(0);
       expect(h.calls).toEqual([]);
     });
 
-  it("returns a generic not-found for an unknown or foreign sender", async () => {
+  it("returns a generic not-found for an unknown, foreign or deleted sender", async () => {
     const h = harness(() => { throw dbError("PT404", "SENDER_NOT_FOUND"); });
     const response = await h.read(`?sender_id=${senderId}`);
     expect(response.status).toBe(404);

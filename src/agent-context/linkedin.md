@@ -42,13 +42,16 @@ including paused and disconnected ones so past work stays counted:
   people: two replies from one person count twice. Queued or uncertain sends
   do not count until confirmed. An existing connection is not an accepted
   invitation, and earlier conversation shown for review is not a reply.
-  Workspace totals count each event once.
+  The top-level totals count each event once.
 - Each account's `id` and `sender_id`, its connection `status` and usage
   `state` (as in `sending-accounts`), and its `waiting_reason`.
 
-An unknown `sender_id`, or one from another workspace, returns
-`SENDER_NOT_FOUND`. `LINKEDIN_STATUS_UNAVAILABLE` means the read failed: retry
-it, and never report zero activity or a stopped account from a failed read.
+With `sender_id`, the top-level totals and `accounts` cover only that
+sender's LinkedIn account. A sender without a LinkedIn account returns no
+accounts and zero counts; those zeros are real. `SENDER_NOT_FOUND` means the
+sender is not in this workspace or was deleted. `LINKEDIN_STATUS_UNAVAILABLE`
+means the read failed: retry it, and never report zero activity or a stopped
+account from a failed read.
 Reading never changes anything: it does not contact LinkedIn or start, retry
 or release work.
 

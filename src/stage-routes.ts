@@ -138,7 +138,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     });
   }
   // LinkedIn activity (LIF-1190): one read, its workspace resolved by the
-  // database like Identity. An invalid query is a 422 repair, as published.
+  // database like Identity.
   for (const { key, definition } of linkedinEntries()) {
     app.get(definition.route, async context => {
       context.header("cache-control", "no-store");
@@ -148,7 +148,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     app.openAPIRegistry.registerPath({ method: "get", path: definition.route, security: [{ bearerAuth: [] }],
       request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), query: definition.query as z.ZodObject },
       responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } },
-        ...Object.fromEntries([401, 403, 404, 409, 422, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) } });
+        ...Object.fromEntries([400, 401, 403, 404, 409, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) } });
   }
   for (const { key, definition } of outreachEntries()) {
     app.on(definition.method, definition.route.replace(/\{([^}]+)\}/g, ":$1"), async context => {

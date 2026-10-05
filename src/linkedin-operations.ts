@@ -19,9 +19,9 @@ export const linkedinOperationDefinitions = {
   linkedin: {
     get: {
       method: "GET", route: "/v1/workspace/linkedin", rpc: "get_lifty_linkedin", path: Empty,
-      query: LinkedinQuerySchema, request: null, invalid: { status: 422, code: "INVALID_REQUEST" },
+      query: LinkedinQuerySchema, request: null, invalid: { status: 400, code: "INVALID_REQUEST" },
       response: LinkedinActivitySchema, success: 200, args: input => ({ p_query: input.query }),
-      description: "Read LinkedIn activity today (since 00:00 UTC) and over the last 7 days, the same periods as the Senders page: invitations sent and accepted, messages sent and replies received, as confirmed events (not people), for the workspace and each LinkedIn account, optionally one sender_id's. Each account also shows its connection status, usage state and why its due work waits. Read-only; never contacts LinkedIn or changes work.",
+      description: "Read LinkedIn activity today (since 00:00 UTC) and over the last 7 days, the same periods as the Senders page: invitations sent and accepted, messages sent and replies received, as confirmed events (not people), for the workspace and each LinkedIn account. With sender_id, totals and accounts cover only that sender's account; a sender without a LinkedIn account has no accounts and true zero counts. Each account also shows its connection status, usage state and why its due work waits. Read-only; never contacts LinkedIn or changes work.",
     },
   },
 } satisfies Record<string, Record<string, IdentityDefinition>>;
