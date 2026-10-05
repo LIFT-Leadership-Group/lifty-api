@@ -230,19 +230,29 @@ describe("customer surfaces name no provider or retired volume knob", () => {
     expect(publicCodes).toEqual(expect.arrayContaining(["RESEARCH_STATUS_UNAVAILABLE", "LEADS_UNAVAILABLE", "STAGE_OPERATION_UNSUPPORTED"]));
     for (const [name, text] of Object.entries(surfaces)) expect(text.match(retired)?.[0], name).toBeUndefined();
   });
-  // LIF-1182: the account provider is masked on every Identity surface.
-  it("names no account provider on Identity routes, tools, guides, codes or browser paths", async () => {
-    const identity = ["senders", "sending-accounts"].flatMap(stage => Object.entries(stageOperations[stage]!)
-      .filter(([key]) => !/^(warmup_|placement_|deliverability)/.test(key)).map(([key, operation]) => ({ stage, key, operation })));
+  // LIF-1182, LIF-1190 (D4): no customer stage names the sending-account provider.
+  // Excluded: the Email deliverability surface (warmup, placement, deliverability),
+  // owned by the Email block (LIF-1186); its deliverability read still reports
+  // provider "unipile" for direct mailboxes (email-deliverability.ts).
+  it("names no account provider on any customer stage's routes, tools, guides, codes or browser paths", async () => {
+    const emailOwned = { key: /^(warmup_|placement_|deliverability)/, tool: /^sending_accounts_(warmup_|placement_|deliverability)/,
+      path: /^\/v1\/email\/(warmup|placement|deliverability|campaign\/placement)/ };
     const app = createApp();
+    const openapi = await (await app.request("/openapi.json")).json() as { paths: Record<string, unknown> };
     const surfaces: Record<string, string> = {
-      catalog: JSON.stringify(identity),
-      mcp: JSON.stringify(getStageMcpTools().filter(tool => /^(senders|sending_accounts)_/.test(tool.name) && !/warmup|placement|deliverability/.test(tool.name))),
-      guides: ["senders", "sending-accounts", "stage-common", "summary"].map(name => readFileSync(new URL(`../src/agent-context/${name}.md`, import.meta.url), "utf8")).join("\n"),
-      codes: JSON.stringify(Object.keys(RPC_ERROR_MESSAGES)),
+      catalog: JSON.stringify(Object.entries(stageOperations).map(([stage, operations]) =>
+        [stage, Object.entries(operations).filter(([key]) => stage !== "sending-accounts" || !emailOwned.key.test(key))])),
+      openapi: JSON.stringify({ ...openapi, paths: Object.fromEntries(Object.entries(openapi.paths).filter(([path]) => !emailOwned.path.test(path))) }),
+      mcp: JSON.stringify(getStageMcpTools().filter(tool => !emailOwned.tool.test(tool.name))),
+      guides: readdirSync(new URL("../src/agent-context/", import.meta.url)).filter(name => name.endsWith(".md"))
+        .map(name => readFileSync(new URL(`../src/agent-context/${name}`, import.meta.url), "utf8")).join("\n"),
+      codes: JSON.stringify(RPC_ERROR_MESSAGES) + publicCodes.join(" "),
       routes: JSON.stringify(app.routes.map(route => route.path)),
     };
-    for (const [name, text] of Object.entries(surfaces)) expect(text.match(/unipile/i)?.[0], name).toBeUndefined();
+    // The filters must keep the LinkedIn connection and every other stage in scope.
+    expect(surfaces.catalog).toContain("/v1/workspace/sending-accounts/connect");
+    expect(surfaces.mcp).toContain("campaigns_activate");
+    for (const [name, text] of Object.entries(surfaces)) expect(text.match(/unipile|heyreach/i)?.[0], name).toBeUndefined();
   });
   it("keeps the sample's operations to get, post and progress", () => {
     expect(Object.keys(stageOperations["sample-review"]!).sort()).toEqual(["get", "post", "progress"]);
