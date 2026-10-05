@@ -47,7 +47,7 @@ export const blockingMessages: Record<string, string> = {
   warmup_start_rejected: "Warmup didn't start yet. Our team has been alerted and will follow up.",
   warmup_resume_rejected: "Warmup didn't resume yet. Our team has been alerted and will follow up.",
   workspace_suspended: "Warmup is paused because this workspace is suspended. Resume it once the workspace is active again.",
-  account_disconnected: "Warmup is paused because this email account is disconnected. It resumes when you reconnect the same account.",
+  account_disconnected: "Warmup is paused because this email account is disconnected. It can resume after you reconnect the same account, if you have not paused it and its health checks pass.",
   warmup_setup_pending: "Warmup setup may still be completing. Removal stays pending until Lifty can verify and clean it up; it will not create another warmup. Contact support if this persists.",
 };
 
@@ -117,7 +117,7 @@ export function addUtcDays(now: Date, days: number): string {
 
 /** Maps the contract status object to the public shape. Pure; exported for tests.
  * The go-live message describes warmup's own contribution (LIF-1228): a
- * habitual mailbox is never held by warmup; a dedicated one needs its verified
+ * habitual mailbox skips the initial period; a dedicated one needs its verified
  * initial period; afterwards only warmup spam holds it. */
 export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): WarmupStatus {
   const binding = stored.binding;
@@ -142,10 +142,10 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
       message: `${spam.spam_count} of ${spam.sent} warmup emails landed in spam over the last ${spam.window_days} days. Lifty holds this mailbox's sending until a later check is below the limit. Warmup keeps running.` };
   } else if (!stored.warmup_required) {
     goLive = { kind: "now", date: addUtcDays(now, 0), remaining_active_days: null,
-      message: "Warmup does not hold this mailbox. It is optional for a mailbox you already use." };
+      message: "No initial warmup period is required for this habitual mailbox. Placement is the next readiness check; measured warmup spam can still hold sending." };
   } else if (stored.warmup_complete) {
     goLive = { kind: "unlocked", date: addUtcDays(now, 0), remaining_active_days: 0,
-      message: "The initial warmup period is complete. Keep warmup running while campaigns send; Lifty holds the mailbox only if warmup emails start landing in spam." };
+      message: "The initial warmup period is complete. Placement is the next readiness check. Keep warmup running; measured spam can hold sending independently of campaign or account pauses." };
   } else {
     const remaining = Math.max(0, required - activeDays);
     if (remaining === 0) {
@@ -166,6 +166,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
     warmup_required: stored.warmup_required,
     required_active_days: required,
     state,
+    user_paused: binding?.user_paused ?? false, connection_paused: binding?.connection_paused ?? false,
     state_label: label(state, binding?.requested_action ?? null, storedReason),
     requested_action: binding?.requested_action ?? null,
     blocking_reason: blocking,
@@ -176,7 +177,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
     initial_period_complete: stored.warmup_complete,
     spam: spam ? { spam_count: spam.spam_count, sent: spam.sent, window_days: spam.window_days,
       holds_sending: spam.blocking, warning: spam.warning, observed_at: spam.observed_at } : null,
-    outreach_unlocked: stored.warmup_ready,
+    warmup_ready: stored.warmup_ready,
     recommended_go_live: goLive,
   });
 }

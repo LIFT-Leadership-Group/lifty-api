@@ -12,7 +12,7 @@ const styles = `
 `;
 function shell(title:string, body:string) { return renderLiftyPage({ title: `${escape(title)} · Lifty`, content: body, styles }); }
 export function renderWarmupSetupPage(record:WarmupSetupRecord, intent:string, csrf:string):string {
-  if (record.state !== "draft") return renderWarmupReceipt("Authorization in progress", "Return to your agent to check warmup status. If Google authorization was interrupted, run warmup start for a new link. A handoff already sent to Mailivery will not be repeated.");
+  if (record.state !== "draft") return renderWarmupReceipt("Authorization in progress", "Return to your agent to check warmup status. If Google authorization was interrupted, run warmup start for a new link. An authorization already submitted for warmup will not be repeated.");
   return shell("Set up email warmup", `<h1>Warm up your mailbox.</h1>
 <div class="mailbox"><strong>${escape(record.email)}</strong></div>
 <form method="post" action="setup" data-pending="Opening Google…"><input type="hidden" name="intent" value="${escape(intent)}"><input type="hidden" name="csrf" value="${escape(csrf)}">

@@ -167,7 +167,7 @@ describe("deliverability route", () => {
     expect((await forbidden.json()).error.code).toBe("DELIVERABILITY_WORKSPACE_FORBIDDEN");
     const bare = createApp({ authenticate: async () => ({ ok: true, session: { userId: userA, client: {} } }), log: () => {} });
     const unconfigured = await bare.request("/v1/email/deliverability?workspace=fixture-a",
-      { headers: { authorization: "Bearer a", "x-lifty-client-contract": "lifty-cli-context.v9" } });
+      { headers: { authorization: "Bearer a", "x-lifty-client-contract": "lifty-cli-context.v10" } });
     expect(unconfigured.status).toBe(503);
   });
 

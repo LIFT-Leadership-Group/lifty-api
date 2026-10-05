@@ -21,9 +21,9 @@ configured Hono app for programmatic use.
 from the same catalog used by HTTP and MCP. Public context works before login
 and contains no tenant values or Scout base.
 
-The supported client contract is `lifty-cli-context.v9`. The CLI requests it
+The supported client contract is `lifty-cli-context.v10`. The CLI requests it
 through the public `client_contract` query and sends
-`x-lifty-client-contract: lifty-cli-context.v9` on authenticated requests.
+`x-lifty-client-contract: lifty-cli-context.v10` on authenticated requests.
 Missing, retired or unknown contracts return 409 `CONTEXT_CLIENT_UNSUPPORTED`
 after authentication. Invalid sessions return 401. Public unversioned links
 show current documentation. Health, login and provider browser callbacks keep
@@ -254,22 +254,26 @@ never fall back to the legacy Mailivery hosted form. Distinct connections
 under one actual sender have distinct binding references in the provider
 tags, so each mailbox is reconciled independently.
 
-Client status additionally includes `connection_ref`, `campaign_send_paused`
-and `campaign_release_required: true`. The 21-day requirement counts active,
-healthy warmup days for each mailbox, beginning with its actual warmup.
-`outreach_unlocked` describes warmup eligibility only: campaigns remain
-paused until an operator explicitly releases that connection. After a fresh
-healthy check and 21 active days, a paused connection reports
-`recommended_go_live.kind: "awaiting_release"`. A projected date is the
-earliest readiness review, not an automatic release date. Verify each
-mailbox's evidence and keep its campaign pause through the entire warmup.
+Warmup status includes the selected `connection_ref`, `initial_period_complete`,
+`warmup_ready`, `spam`, `user_paused` and `connection_paused`. It does not expose
+provider identity or campaign-pause fields. `warmup_ready` describes only this
+mailbox's warmup contribution; it is never permission to activate a campaign.
+A new/dedicated mailbox needs a healthy check after 21 active warmup days,
+then placement. A mailbox declared habitual proceeds to placement immediately
+after connection, without that initial warmup period. Measured warmup spam can
+hold either type (`recommended_go_live.kind: "held"`). Missing metrics or fewer
+than 20 measured sends cannot clear an existing spam hold. A projected date is
+the earliest initial-period completion, not an automatic campaign launch.
 
-Deploy in order: the LIF-1000 connection-scoped database contract, then the
-Jobs runtime that admits new Unipile connections without Smartlead IDs,
-then this API. Complete that rollout before sharing David's connection or
-warmup links. API verification covers request propagation and response
-contracts; the database release owns workspace isolation and persistent
-campaign holds.
+User pause, connection suspension and deliverability remain independent.
+Reconnection can release only the connection suspension, after warmup health
+checks pass. A clean spam measurement releases only the spam hold; it does not
+resume a user-paused warmup or activate campaigns.
+
+Deploy the independent-pause migration first, then Jobs (which requires
+`lif1228.warmup.v3`), then this API together with a CLI release supporting
+`lifty-cli-context.v10`. The frozen next.33 package uses v9 and is not a v10
+release artifact. Older clients receive an explicit upgrade response.
 
 ## Shared deliverability read (LIF-1042)
 

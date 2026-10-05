@@ -101,14 +101,15 @@ After the email account is connected, call `warmup_status` and use its
 `mailbox_use` and `recommended_go_live` to explain what happens next. Do not
 compute dates yourself.
 
-- `personal` (a mailbox the person already uses, declared habitual): warmup
-  never holds this mailbox and is optional. Explain the tradeoff in plain
+- `personal` (a mailbox the person already uses, declared habitual): initial
+  warmup is optional. Placement follows connection without a warmup wait;
+  measured warmup spam can still hold sending. Explain the tradeoff in plain
   words: a warmup service gets access to the mailbox, and warmup emails and
   their replies pass through the inbox. In return it builds sending reputation.
   Start warmup only if the founder says yes.
 - `outreach` (a dedicated sending mailbox): warmup is required. The mailbox
-  needs a healthy check after 21 active warmup days before it can send. Paused
-  days and days with a problem don't count, so the date moves later if either
+  needs a healthy check after 21 active warmup days, followed by placement,
+  before it can send. Paused days and days with a problem don't count, so the date moves later if either
   happens. Give the returned date and suggest what to prepare meanwhile:
   targeting, copy and schedule.
 
@@ -116,8 +117,9 @@ Once the initial period is complete (`initial_period_complete: true`), warmup
 keeps running while campaigns send. Warmup holds the mailbox again only if
 warmup emails start landing in spam: `spam.holds_sending: true` and
 `recommended_go_live.kind: "held"`. Say how many landed in spam and that
-sending resumes by itself once a later check is below the limit.
-`outreach_unlocked` is warmup's contribution only. Campaign activation,
+only the spam hold clears after a later sufficient measurement is below the
+limit. User pauses, disconnection and placement holds remain independent.
+`warmup_ready` is warmup's contribution only. Campaign activation,
 placement checks and campaign or sender pauses are separate; never claim
 sending is enabled from warmup status alone.
 Warmup never pauses or resumes campaigns.
@@ -146,7 +148,10 @@ retried automatically: check status and involve support, rather than trying
 another account or bypassing the setup hold.
 
 Disconnecting the email account pauses its warmup; reconnecting the same
-account resumes it. Pausing the account itself (its active switch) stops
+account clears only that suspension, after health verification. A user pause
+(`user_paused`) stays until the user explicitly resumes warmup; a connection
+suspension (`connection_paused`) and any spam hold are separate.
+Pausing the account itself (its active switch) stops
 prospect sends only; warmup keeps running.
 
 Use `warmup_pause`, `warmup_resume` or `warmup_remove` only when the founder

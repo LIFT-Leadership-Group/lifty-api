@@ -17,7 +17,7 @@ const base: Partial<AppDependencies> = {
   authenticate: async () => ({ ok: true, session }), getWorkspace: async () => workspace,
  log: () => {},
 };
-function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v9") {
+function request(app: ReturnType<typeof createApp>, stage: string, method = "GET", body?: unknown, query = "", client = "v10") {
   return app.request(`/v1/workspace/${stage}${query}`, { method,
     headers: { authorization: "Bearer scoped", "content-type": "application/json", "x-lifty-client-contract": `lifty-cli-context.${client}` },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -31,7 +31,7 @@ describe("authenticated workspace stage adapters", () => {
     expect((await app.request("/v1/context/business")).status).toBe(200);
   });
 
-  it.each(["v9"])("applies the existing calibration gate and enqueues one run for %s", async version => {
+  it.each(["v10"])("applies the existing calibration gate and enqueues one run for %s", async version => {
     const start = vi.fn(async () => ({ state: "queued" as const, run_ref: attemptRef, requested_leads: 5, workspace: workspace.workspace, created: true }));
     const enqueue = vi.fn(async () => ({ id: "job" }));
     const app = createApp({ ...base, startRun: start, enqueueFirstRun: enqueue });

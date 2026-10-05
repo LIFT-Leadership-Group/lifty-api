@@ -19,7 +19,7 @@ function stored(overrides: Partial<StoredWarmupStatus> = {}, bindingOverrides: R
   return {
     workspace_ref: workspace, connection_ref: connection, email: "founder@example.test", mailbox_use: "outreach", warmup_required: true, required_active_days: 21,
     binding: bindingOverrides === null ? null : { binding_ref: binding, sender_ref: sender, state: "warming", requested_action: null, blocking_reason: null,
-      provider_campaign_bound: true, last_readback_at: "2026-09-22T14:00:00Z", snapshot, created_at: "2026-09-10T10:00:00Z", ...bindingOverrides } as StoredWarmupStatus["binding"],
+      user_paused: false, connection_paused: false, provider_campaign_bound: true, last_readback_at: "2026-09-22T14:00:00Z", snapshot, created_at: "2026-09-10T10:00:00Z", ...bindingOverrides } as StoredWarmupStatus["binding"],
     evidence: { active_duration_days: 12, healthy: true, passed: false, observed_at: "2026-09-22T14:00:00Z", fresh: true },
     warmup_complete: false, warmup_spam: null, warmup_blocker: "email_warmup_required", warmup_ready: false,
     ...overrides,
@@ -60,7 +60,7 @@ describe("warmup status presentation", () => {
     const status = presentWarmupStatus(stored(), now);
     expect(WarmupStatus.parse(status)).toEqual(status);
     expect(status).toMatchObject({ connection_ref: connection, state: "warming", state_label: "Warming up", active_days: 12, required_active_days: 21,
-      warmup_required: true, initial_period_complete: false, outreach_unlocked: false, spam: null, today: { warmup_emails: 9, ramp_target: 15 },
+      warmup_required: true, initial_period_complete: false, warmup_ready: false, spam: null, today: { warmup_emails: 9, ramp_target: 15 },
       checks: { spf: "valid", dmarc: "valid", mx: "valid" }, last_checked_at: "2026-09-22T14:00:00Z", blocking_reason: null });
     expect(status.recommended_go_live).toMatchObject({ kind: "projected", date: "2026-10-01", remaining_active_days: 9 });
     expect(status.recommended_go_live.message).toContain("Paused days");
@@ -75,18 +75,18 @@ describe("warmup status presentation", () => {
     }
   });
 
-  it("tells a habitual mailbox that warmup does not hold it", () => {
+  it("tells a habitual mailbox to proceed to placement while preserving the spam guard", () => {
     const status = presentWarmupStatus(stored({ mailbox_use: "personal", warmup_required: false, warmup_blocker: null, warmup_ready: true }), now);
-    expect(status).toMatchObject({ warmup_required: false, outreach_unlocked: true,
+    expect(status).toMatchObject({ warmup_required: false, warmup_ready: true,
       recommended_go_live: { kind: "now", date: "2026-09-22", remaining_active_days: null } });
-    expect(status.recommended_go_live.message).toMatch(/Warmup does not hold this mailbox/);
+    expect(status.recommended_go_live.message).toMatch(/No initial warmup period is required/);
   });
 
   it("reports a completed initial period only from the database predicate, even when the latest check is stale", () => {
     const done = presentWarmupStatus(stored({ ...complete, evidence: { ...complete.evidence, fresh: false } }), now);
-    expect(done).toMatchObject({ initial_period_complete: true, outreach_unlocked: true,
+    expect(done).toMatchObject({ initial_period_complete: true, warmup_ready: true,
       recommended_go_live: { kind: "unlocked", date: "2026-09-22", remaining_active_days: 0 } });
-    expect(done.recommended_go_live.message).toMatch(/only if warmup emails start landing in spam/);
+    expect(done.recommended_go_live.message).toMatch(/measured spam can hold sending independently/);
     // Enough days but no completing healthy check: no date is promised.
     const waiting = presentWarmupStatus(stored({ evidence: { active_duration_days: 22, healthy: false, passed: false, observed_at: "2026-09-20T14:00:00Z", fresh: false } }), now);
     expect(waiting.recommended_go_live).toMatchObject({ kind: "awaiting_check", date: null, remaining_active_days: 0 });
@@ -94,14 +94,15 @@ describe("warmup status presentation", () => {
 
   it("explains a spam hold with the measured counts and never calls it ready", () => {
     const spam = { spam_count: 3, sent: 20, window_days: 7, blocking: true, warning: true, observed_at: "2026-09-22T14:00:00Z" };
-    const held = presentWarmupStatus(stored({ ...complete, warmup_spam: spam, warmup_blocker: "email_warmup_spam", warmup_ready: false }), now);
-    expect(held).toMatchObject({ outreach_unlocked: false, initial_period_complete: true,
+    const held = presentWarmupStatus(stored({ ...complete, warmup_spam: spam, warmup_blocker: "email_warmup_spam", warmup_ready: false }, { state: "paused", user_paused: true, connection_paused: true, blocking_reason: "dns_invalid" }), now);
+    expect(held).toMatchObject({ warmup_ready: false, initial_period_complete: true,
+      user_paused: true, connection_paused: true, blocking_reason: { code: "dns_invalid" },
       spam: { spam_count: 3, sent: 20, window_days: 7, holds_sending: true, warning: true },
       recommended_go_live: { kind: "held", date: null } });
     expect(held.recommended_go_live.message).toMatch(/^3 of 20 warmup emails landed in spam over the last 7 days\. Lifty holds/);
     // A warning below the limit is reported without holding.
     const warned = presentWarmupStatus(stored({ ...complete, warmup_spam: { ...spam, spam_count: 1, blocking: false } }), now);
-    expect(warned).toMatchObject({ outreach_unlocked: true, spam: { holds_sending: false, warning: true }, recommended_go_live: { kind: "unlocked" } });
+    expect(warned).toMatchObject({ warmup_ready: true, spam: { holds_sending: false, warning: true }, recommended_go_live: { kind: "unlocked" } });
   });
 
   it("never projects earlier than the evidence allows when no evidence exists", () => {
@@ -130,7 +131,7 @@ describe("warmup status presentation", () => {
     const status = presentWarmupStatus(stored({ connection_ref: null, email: null, mailbox_use: null, warmup_required: false, evidence: null,
       warmup_blocker: null, warmup_ready: false }, null), now);
     expect(status).toMatchObject({ connection_ref: null, state: "not_started", state_label: "Not started", requested_action: null,
-      outreach_unlocked: false, recommended_go_live: { kind: "connect_email", date: null } });
+      warmup_ready: false, recommended_go_live: { kind: "connect_email", date: null } });
     expect(Object.keys(status)).not.toContain("binding");
     expect(JSON.stringify(status)).not.toContain(sender);
   });

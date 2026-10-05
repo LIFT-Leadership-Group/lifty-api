@@ -47,6 +47,7 @@ export const StoredWarmupStatus = z.object({
   binding: z.object({
     binding_ref: z.uuid(), sender_ref: z.uuid(), state: WarmupBindingState,
     requested_action: WarmupRequestedAction.nullable(),
+    user_paused: z.boolean(), connection_paused: z.boolean(),
     blocking_reason: z.string().max(64).nullable(),
     provider_campaign_bound: z.boolean(),
     last_readback_at: timestamp.nullable(),
@@ -86,6 +87,7 @@ export const WarmupStatus = z.object({
   warmup_required: z.boolean(),
   required_active_days: z.number().int().min(1).max(365),
   state: WarmupState,
+  user_paused: z.boolean(), connection_paused: z.boolean(),
   state_label: z.string().min(1).max(120),
   requested_action: WarmupRequestedAction.nullable(),
   blocking_reason: z.object({ code: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), message: z.string().min(1).max(300) }).strict().nullable(),
@@ -98,7 +100,7 @@ export const WarmupStatus = z.object({
   spam: WarmupSpam.nullable(),
   // Warmup's own contribution only: true when warmup does not hold this mailbox.
   // Campaign activation, placement and pauses are separate checks.
-  outreach_unlocked: z.boolean(),
+  warmup_ready: z.boolean(),
   recommended_go_live: WarmupGoLive,
 }).strict();
 export type WarmupStatus = z.infer<typeof WarmupStatus>;

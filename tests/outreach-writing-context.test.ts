@@ -9,7 +9,7 @@ describe("outreach writing context", () => {
     const playbooks: string[] = [];
     const antiSlopLists: string[] = [];
     for (const task of ["journeys", "campaigns"]) {
-      const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v9`);
+      const response = await app.request(`/v1/context/${task}?client_contract=lifty-cli-context.v10`);
       expect(response.status).toBe(200);
       const context = await response.json();
       expect(context.references.writing).toEqual(expect.any(String));
