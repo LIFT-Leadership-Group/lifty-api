@@ -23,6 +23,8 @@ it("shows only the mailbox, the sender name it will use and one Google button, w
   expect(html).toContain("Lifty shares this access with Mailivery to send and receive warmup mail.");
   expect(html).toContain('href="https://liftygtm.com/privacy-policy"');
   expect(html).toContain("Warmup emails go out as Ada Lovelace.");
+  // LIF-1063: accepting warmup also accepts the automatic placement test.
+  expect(html).toContain("When warmup ends, Lifty sends one test email from this mailbox to about 20–40 test inboxes to measure deliverability. Continuing accepts warmup and this test.");
   expect(html).not.toMatch(/type="password"|name="email"|name="method"|name="emails_per_day"|name="reply_rate"|name="first_name"|name="last_name"|name="timezone"|App Password|Unipile/);
   expect(res.headers.get("set-cookie")).toMatch(/__Host-lifty-warmup-browser=.+HttpOnly.+Secure.+SameSite=Lax/);
   expect(res.headers.get("cache-control")).toBe("no-store, no-transform");

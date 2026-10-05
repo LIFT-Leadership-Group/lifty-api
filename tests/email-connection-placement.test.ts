@@ -8,7 +8,7 @@ const stored = (test: Record<string, unknown> | null = null, extra: Record<strin
   workspace_ref: workspace, connection_ref: connection, email: "david@liftygtm.com", provider: "mailivery", method: "connected_mailbox",
   can_request: test === null, blocked_reason: test === null ? null : "email_placement_in_progress", gates_sending: true,
   last_passed_at: null, passing_until: null, test, ...extra });
-const test = (extra: Record<string, unknown>) => ({ placement_ref: "10630000-0000-4000-8000-000000000001", status: "queued", test_ref: null,
+const test = (extra: Record<string, unknown>) => ({ placement_ref: "10630000-0000-4000-8000-000000000001", status: "queued", origin: "member", test_ref: null,
   total_seeds: null, requested_at: "2026-10-17T12:00:00.000000+00:00", completed_at: null, passed: null, failure_code: null,
   policy_version: null, samples: null, ...extra });
 const samples = { gmail: { total: 10, inbox: 8, spam: 2, missing: 0 }, microsoft: { total: 10, inbox: 3, spam: 5, missing: 2 },
@@ -29,6 +29,18 @@ describe("connection placement presentation", () => {
     const failed = presentConnectionPlacement(stored(test({ status: "failed", failure_code: "insufficient_credits" })) as never);
     expect(failed.test).toMatchObject({ state: "did_not_run", failure: { code: "insufficient_credits" } });
     expect(presentConnectionPlacement(stored(null, { gates_sending: false }) as never).rule).toMatch(/advisory/);
+  });
+
+  it("says when Lifty started the test after warmup and when it tries again", () => {
+    const queued = presentConnectionPlacement(stored(test({ origin: "warmup_complete" })) as never);
+    expect(queued.test).toMatchObject({ state: "pending", automatic: true,
+      label: "Queued automatically because warmup finished. Lifty creates the test in Mailivery within about 5 minutes." });
+    const noCredits = presentConnectionPlacement(stored(test({ origin: "warmup_complete", status: "failed", failure_code: "insufficient_credits" })) as never);
+    expect(noCredits.test?.failure?.message).toMatch(/Lifty tries the automatic test again within a day\.$/);
+    // A test Mailivery may have run is never retried automatically.
+    const timedOut = presentConnectionPlacement(stored(test({ origin: "warmup_complete", status: "failed", failure_code: "provider_timeout" })) as never);
+    expect(timedOut.test?.failure?.message).not.toMatch(/again within a day/);
+    expect(presentConnectionPlacement(stored(test({})) as never).test?.automatic).toBe(false);
   });
 
   it("maps database refusals to safe public errors and checks the returned connection", async () => {
