@@ -169,10 +169,10 @@ run_smoke() {
     | jq -e '.openapi == "3.1.0"' >/dev/null
 
   curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
-    "$ingress/v1/context/business?client_contract=lifty-cli-context.v8" \
+    "$ingress/v1/context/business?client_contract=lifty-cli-context.v9" \
     | jq -e '.task == "business" and .operations.get.route == "/v1/workspace/business" and .operations.patch.method == "PATCH"' >/dev/null
   curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
-    "$ingress/v1/context/setup?client_contract=lifty-cli-context.v8" \
+    "$ingress/v1/context/setup?client_contract=lifty-cli-context.v9" \
     | jq -e '.task == "setup" and .operations.delete_draft.method == "DELETE" and .operations.generation_context.route == "/v1/workspace/setup/context"' >/dev/null
 
   auth_status="$(curl --silent --show-error --connect-timeout 5 --max-time 20 \

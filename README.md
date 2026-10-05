@@ -21,9 +21,9 @@ configured Hono app for programmatic use.
 from the same catalog used by HTTP and MCP. Public context works before login
 and contains no tenant values or Scout base.
 
-The supported client contract is `lifty-cli-context.v8`. The CLI requests it
+The supported client contract is `lifty-cli-context.v9`. The CLI requests it
 through the public `client_contract` query and sends
-`x-lifty-client-contract: lifty-cli-context.v8` on authenticated requests.
+`x-lifty-client-contract: lifty-cli-context.v9` on authenticated requests.
 Missing, retired or unknown contracts return 409 `CONTEXT_CLIENT_UNSUPPORTED`
 after authentication. Invalid sessions return 401. Public unversioned links
 show current documentation. Health, login and provider browser callbacks keep

@@ -128,7 +128,7 @@ describe("resumable research observations", () => {
 });
 
 describe("progress route and published operation", () => {
-  const headers = { "x-lifty-client-contract": "lifty-cli-context.v8" };
+  const headers = { "x-lifty-client-contract": "lifty-cli-context.v9" };
   it("requires current authentication before reading progress", async () => {
     const getRunProgress = vi.fn();
     const response = await createApp({ getRunProgress }).request(`/v1/workspace/runs/progress?run_ref=${run}`, { headers });

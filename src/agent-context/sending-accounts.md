@@ -86,77 +86,75 @@ disconnect the old one.
 
 Warmup, placement and inbox health keep their own operations. They take the
 explicit `workspace` and, as `connection_ref`, the email account's `id` from
-`sending_accounts_get`; `connection_ref` is required when the workspace has
-several email accounts. GET inputs belong in query; POST inputs belong in body.
-Mailivery authorization is a separate Google OAuth step from the account
-connection. Show the returned branded setup link for that exact mailbox; the
-owner must choose the same Google account again. There is no app-password
-fallback.
+`sending_accounts_get`. With one email account, `connection_ref` can be
+omitted; with several it is required and the operation returns
+`EMAIL_MAILBOX_SELECTION_REQUIRED` without it. GET inputs belong in query;
+POST inputs belong in body. Every workspace uses the same operations, and each
+mailbox has its own warmup: starting one never stops another.
 
-Keep every requested connection's campaigns paused throughout its own 21
-active warmup days, starting from its actual Mailivery warmup. Paused days and
-problem days do not count. Read the returned progress and recommendation;
-do not calculate release from the day a link was generated. A healthy check
-from the last 24 hours is also required. `outreach_unlocked` is warmup
-eligibility only. `campaign_send_paused` reports the separate campaign hold;
-`campaign_release_required: true` means an operator must explicitly release
-campaign sending after review. `awaiting_release` confirms that warmup alone
-has not enabled campaigns. Never claim sending is enabled just because the
-warmup reaches 21 days.
+Warmup authorization is a separate Google step from the account connection.
+Show the returned Lifty setup link for that exact mailbox; the owner must
+choose the same Google account again. Warmup setup uses Google OAuth only.
+Never request an App Password or route the founder to a password form.
 
-Use `warmup_pause`, `warmup_resume` or `warmup_remove` with the same two
-selectors when requested. Warmup resume never resumes campaigns. Report each mailbox
-separately; readiness or consent for one cannot satisfy another mailbox.
+After the email account is connected, call `warmup_status` and use its
+`mailbox_use` and `recommended_go_live` to explain what happens next. Do not
+compute dates yourself.
 
-After the email account is connected, call `warmup_status` with the explicit
-`workspace` (and `connection_ref` when needed) in query. Its `mailbox_use`
-decides what to tell the founder: `personal` is a mailbox the person already
-uses (declared habitual) and `outreach` a dedicated sending mailbox. Use the returned `recommended_go_live` message and
-date; do not compute your own.
+- `personal` (a mailbox the person already uses, declared habitual): warmup
+  never holds this mailbox and is optional. Explain the tradeoff in plain
+  words: a warmup service gets access to the mailbox, and warmup emails and
+  their replies pass through the inbox. In return it builds sending reputation.
+  Start warmup only if the founder says yes.
+- `outreach` (a dedicated sending mailbox): warmup is required. The mailbox
+  needs a healthy check after 21 active warmup days before it can send. Paused
+  days and days with a problem don't count, so the date moves later if either
+  happens. Give the returned date and suggest what to prepare meanwhile:
+  targeting, copy and schedule.
 
-- `personal`: campaigns can start now and warmup is optional. Explain the
-  tradeoff in plain words. Mailivery gets access to the mailbox, and warmup
-  emails and their replies pass through the inbox. In return it builds sending
-  reputation. Start warmup only if the founder says yes.
-- `outreach`: warmup is required before any campaign sends. Lifty needs 21
-  active warmup days. Paused days and days with a problem don't count, so the
-  go-live date moves later if either happens. Give the returned date and
-  suggest what to prepare meanwhile: targeting, copy and schedule. Campaign
-  previews can be prepared and approved now; activation waits for the unlock.
+Once the initial period is complete (`initial_period_complete: true`), warmup
+keeps running while campaigns send. Warmup holds the mailbox again only if
+warmup emails start landing in spam: `spam.holds_sending: true` and
+`recommended_go_live.kind: "held"`. Say how many landed in spam and that
+sending resumes by itself once a later check is below the limit.
+`outreach_unlocked` is warmup's contribution only. Campaign activation,
+placement checks and campaign or sender pauses are separate; never claim
+sending is enabled from warmup status alone.
+Warmup never pauses or resumes campaigns.
 
-`warmup_start` with the same `workspace` in body returns the actual setup
-link. When it points to Lifty, show it as "Set up warmup for your mailbox".
-The page shows the mailbox, asks for the name on warmup emails and has one
-"Continue with Google" button. Lifty sets the warmup settings. Google must
-verify that exact address before Lifty sends tokens to Mailivery. Lifty
-forwards those tokens once without storing or logging them. The setup flow
-does not create another email address.
-
-Warmup setup uses Google OAuth only. Never request an App Password or route the
-founder to a legacy password form or Microsoft consent flow. Mailivery needs
-separate mailbox access; the account connection's grant cannot be reused. If the returned link
-or status does not support the current Lifty Google setup, report the actual
-blocker and involve support. Do not create another account or invent a link.
+`warmup_start` returns the setup link. Show it as "Set up warmup for your
+mailbox". The page shows the mailbox, the sender name warmup emails will use
+(from the sender's profile) and one "Continue with Google" button. Lifty sets
+the warmup schedule and volume; the founder fills in nothing. Google must
+verify that exact address before Lifty shares access with the warmup service,
+once, without storing or logging the tokens. The setup flow does not create
+another email address. If the returned link or status does not support Google
+setup, report the actual blocker and involve support. Do not create another
+account or invent a link.
 
 After the founder finishes, read `warmup_status` again. The state moves from
-waiting for the Mailivery connection to warming after Lifty's next check.
+waiting for authorization to warming after Lifty's next check.
 `warmup_start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
 verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
 another Lifty workspace already warms the same mailbox. It fails with
 `EMAIL_WARMUP_DNS_INVALID`, without creating a link, when the mailbox domain
 has no valid SPF, DMARC or MX record. Tell the founder which record the
-message names and call `warmup_start` again once it is published. After a removal,
-status shows `Removed`; `warmup_start` can set up a new warmup with a new link only
-when previous provider creation is resolved. An ambiguous handoff is never
+message names and call `warmup_start` again once it is published. After a
+removal, status shows `Removed`; `warmup_start` can set up a new warmup with a
+new link only when previous setup is resolved. An ambiguous handoff is never
 retried automatically: check status and involve support, rather than trying
 another account or bypassing the setup hold.
 
+Disconnecting the email account pauses its warmup; reconnecting the same
+account resumes it. Pausing the account itself (its active switch) stops
+prospect sends only; warmup keeps running.
+
 Use `warmup_pause`, `warmup_resume` or `warmup_remove` only when the founder
-asks, with the same `workspace` in body. Lifty applies
-the request at its next check. A pending removal wins over pause or resume,
-and resume on a running warmup only cancels a pending pause. For an `outreach`
-account, pausing or removing warmup delays or blocks sending; say so and get
-an explicit yes first.
+asks, with the same selectors in body. Lifty applies the request at its next
+check. A pending removal wins over pause or resume, and resume on a running
+warmup only cancels a pending pause. For a dedicated mailbox that has not
+completed its initial period, pausing or removing warmup delays sending; say
+so and get an explicit yes first. Report each mailbox separately.
 
 ## Placement tests
 

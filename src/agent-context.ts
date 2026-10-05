@@ -9,7 +9,7 @@ import {
   type StageOperation,
 } from "./stage-contracts.js";
 
-export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v8";
+export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v9";
 export const CLIENT_UPGRADE_MESSAGE = `Update the installed LIFTY CLI and skill to ${STAGE_CLIENT_CONTRACT}. Earlier client contracts are retired. Reload the updated client; setup resumes from the server draft.`;
 export const AgentContextSchema = z.object({
   format: z.literal("lifty-context.v1"),

@@ -19,19 +19,6 @@ export type WarmupPolicy = z.infer<typeof WarmupPolicy>;
 export const DEFAULT_WARMUP_POLICY: WarmupPolicy = {version:1, emails_per_day:22, ramp:"normal", reply_rate:30,
   schedule:"Weekdays - 8am to 6pm", timezone:"America/New_York", audience:"inherit"};
 const name = z.string().trim().max(80).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
-// Browsers report some ICU ids that are only backward links in tzdata. PHP's
-// default identifier list (Mailivery) omits those, and a rejected create would
-// hold setup for review, so the long-standing canonical name is sent instead.
-const LEGACY_ZONES:Record<string,string> = {"America/Buenos_Aires":"America/Argentina/Buenos_Aires",
-  "America/Catamarca":"America/Argentina/Catamarca", "America/Cordoba":"America/Argentina/Cordoba",
-  "America/Jujuy":"America/Argentina/Jujuy", "America/Mendoza":"America/Argentina/Mendoza",
-  "America/Indianapolis":"America/Indiana/Indianapolis", "America/Louisville":"America/Kentucky/Louisville",
-  "America/Godthab":"America/Nuuk", "Asia/Calcutta":"Asia/Kolkata", "Asia/Saigon":"Asia/Ho_Chi_Minh",
-  "Asia/Katmandu":"Asia/Kathmandu", "Asia/Rangoon":"Asia/Yangon", "Atlantic/Faeroe":"Atlantic/Faroe"};
-// Lifty owns the warmup policy; the founder supplies only the sender name and
-// the browser supplies its timezone (an unusable one falls back to the default).
-export const WarmupSetupSelection = z.strictObject({first_name:name.pipe(z.string().min(1)), last_name:name,
-  timezone:z.string().max(100)});
 const SetupRecord = z.object({email:z.email().max(254), workspace_ref:z.uuid(), sender_ref:z.uuid(),
   expires_at:z.iso.datetime({offset:true}), state:z.enum(["draft", "authorizing", "claimed", "dispatched"]),
   policy:WarmupPolicy.nullable(), first_name:name, last_name:name});
@@ -48,8 +35,8 @@ export const hashSetupSecret = (value:string) => createHash("sha256").update(val
 function requireSecret(value:string) { if (!tokenPattern.test(value)) throw invalid(); }
 const invalid = () => new PublicError({status:400, code:"WARMUP_SETUP_INVALID", message:"This setup link or request is invalid. Run warmup start to get a new link."});
 const unavailable = () => new PublicError({status:409, code:"WARMUP_SETUP_UNAVAILABLE", message:"Setup is expired, already submitted, or the mailbox changed. Check warmup status before getting a new link."});
-const pending = () => new PublicError({status:502, code:"WARMUP_HANDOFF_PENDING", message:"The handoff to Mailivery needs checking. Lifty will not resend your tokens or create another warmup. Check warmup status or contact support."});
-const googleUnavailable = () => new PublicError({status:502, code:"WARMUP_GOOGLE_UNAVAILABLE", message:"Google authorization could not be verified. No mailbox credentials were sent to Mailivery. Run warmup start to try again."});
+const pending = () => new PublicError({status:502, code:"WARMUP_HANDOFF_PENDING", message:"The warmup handoff needs checking. Lifty will not resend your tokens or create another warmup. Check warmup status or contact support."});
+const googleUnavailable = () => new PublicError({status:502, code:"WARMUP_GOOGLE_UNAVAILABLE", message:"Google authorization could not be verified. No mailbox credentials were shared. Run warmup start to try again."});
 const IdentityClaims = z.object({email:z.email().max(254), email_verified:z.literal(true), nonce:z.string()});
 const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"), {timeoutDuration:10000,[customFetch]:connectionFetch(fetch)});
 
@@ -118,16 +105,13 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
       requireSecret(intent);
       return call("read", {intent_hash:hashSetupSecret(intent)});
     },
-    async choose(intent:string, browser:string, input:unknown):Promise<string> {
+    // LIF-1228: the platform owns the warmup policy and schedule; the sender
+    // name comes from the Identity person in the database. The browser supplies nothing.
+    async choose(intent:string, browser:string):Promise<string> {
       requireSecret(intent); requireSecret(browser);
-      const parsed = WarmupSetupSelection.safeParse(input);
-      if (!parsed.success) throw invalid();
-      const {first_name, last_name} = parsed.data;
-      const browserZone = LEGACY_ZONES[parsed.data.timezone] ?? parsed.data.timezone;
-      const policy = {...DEFAULT_WARMUP_POLICY, ...(timezone.safeParse(browserZone).success ? {timezone:browserZone} : {})};
       const state = newSetupSecret();
       const record = await call("choose", {intent_hash:hashSetupSecret(intent), browser_hash:hashSetupSecret(browser),
-        oauth_hash:hashSetupSecret(state), method:"google", first_name, last_name, policy});
+        oauth_hash:hashSetupSecret(state), method:"google", policy:DEFAULT_WARMUP_POLICY});
       const query = new URLSearchParams({client_id:settings.googleClientId, redirect_uri:redirectUri,
         response_type:"code", scope:"openid email https://mail.google.com/", access_type:"offline", prompt:"consent select_account",
         login_hint:record.email, state, nonce:mac("nonce", state, browser), code_challenge:hashPkce(mac("pkce", state, browser)), code_challenge_method:"S256"});
@@ -152,7 +136,7 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
       const identity = await (dependencies.verifyIdentity ?? verifyGoogleWarmupIdentity)(tokens.id_token, settings.googleClientId, mac("nonce", state, browser));
       // No Gmail dot/plus/alias equivalence. Stored Unipile emails are canonical lower-case.
       if (!identity.email_verified || identity.email.toLowerCase() !== record.email) throw new PublicError({status:409,
-        code:"WARMUP_IDENTITY_MISMATCH", message:`Google did not verify the mailbox connected to Lifty. No tokens were sent to Mailivery. Run warmup start and choose the same address.`});
+        code:"WARMUP_IDENTITY_MISMATCH", message:`Google did not verify the mailbox connected to Lifty. No tokens were shared. Run warmup start and choose the same address.`});
       if (!record.policy) throw unavailable();
       await call("dispatch", {...payload, verified_email:identity.email.toLowerCase()});
       const body = new FormData();

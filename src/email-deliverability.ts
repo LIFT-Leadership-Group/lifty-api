@@ -367,7 +367,7 @@ function connectionGate(mailbox: SourceMailbox, connection: SourceConnection): C
     for (const hold of connection.holds) reasons.push(reason("hold", `A safety hold is active (${hold.reason}).`));
     if (!connection.mailbox_use) reasons.push(reason("mailbox_use_required", "Say whether this is a mailbox you already use or a new outreach account before sending. Reconnect the email account to answer."));
     const unlocked = mailbox.warmup.mailivery.find(item => item.connection_ref === connection.connection_ref)?.outreach_unlocked === true;
-    if (connection.mailbox_use === "outreach" && !unlocked) reasons.push(reason("warmup_required", `A new outreach account needs ${REQUIRED_WARMUP_ACTIVE_DAYS} active warmup days and a healthy check from the last 24 hours before it can send.`));
+    if (connection.mailbox_use === "outreach" && !unlocked) reasons.push(reason("warmup_required", `Warmup holds this dedicated account: it needs a healthy check after ${REQUIRED_WARMUP_ACTIVE_DAYS} active warmup days, or its warmup emails are landing in spam. Check warmup status for which.`));
     return reasons.length > 0
       ? { gate: "lifty_campaign_checks", ...make("blocked", "Blocked", "bad", "Lifty's send checks block this connection.", reasons) }
       : { gate: "lifty_campaign_checks", ...make("no_known_blocker", "No known blocker", "watch",
