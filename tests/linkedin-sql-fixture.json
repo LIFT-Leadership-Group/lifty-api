@@ -1,0 +1,60 @@
+{
+  "today": {
+    "messages_sent": 0,
+    "invitations_sent": 1,
+    "replies_received": 1,
+    "invitations_accepted": 2
+  },
+  "accounts": [
+    {
+      "id": "07ba21cf-8988-4f38-8879-7ec25589e9e2",
+      "state": "active",
+      "today": {
+        "messages_sent": 0,
+        "invitations_sent": 1,
+        "replies_received": 0,
+        "invitations_accepted": 1
+      },
+      "status": "connected",
+      "sender_id": "cfb2c743-278c-4566-a664-15e6c476f8ae",
+      "last_7_days": {
+        "messages_sent": 0,
+        "invitations_sent": 1,
+        "replies_received": 0,
+        "invitations_accepted": 1
+      },
+      "waiting_reason": null
+    },
+    {
+      "id": "d7635496-7991-4420-b5bd-0aefcde45f44",
+      "state": "active",
+      "today": {
+        "messages_sent": 0,
+        "invitations_sent": 1,
+        "replies_received": 1,
+        "invitations_accepted": 1
+      },
+      "status": "connected",
+      "sender_id": "5669c606-8ff4-4f32-8dc6-9d52ab38d7fe",
+      "last_7_days": {
+        "messages_sent": 1,
+        "invitations_sent": 1,
+        "replies_received": 1,
+        "invitations_accepted": 1
+      },
+      "waiting_reason": null
+    }
+  ],
+  "workspace": {
+    "name": "Activity contracts",
+    "state": "ready_for_connections",
+    "workspace_ref": "a8cab02e-35df-46f7-a037-d4acf523783e"
+  },
+  "last_7_days": {
+    "messages_sent": 1,
+    "invitations_sent": 1,
+    "replies_received": 1,
+    "invitations_accepted": 2
+  },
+  "observed_at": "2026-10-05T17:31:16.351244+00:00"
+}

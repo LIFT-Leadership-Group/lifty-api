@@ -4,9 +4,9 @@ import { WorkspaceIdentitySchema } from "./business-contracts.js";
 // LIF-1182 Identity resources: senders (people) and the sending accounts they
 // own. The database owns validation, versions, observation freshness and send
 // counts; these schemas are the published request/response contract.
-const Id = z.uuid();
-const Timestamp = z.iso.datetime({ offset: true });
-const Count = z.number().int().nonnegative();
+export const Id = z.uuid();
+export const Timestamp = z.iso.datetime({ offset: true });
+export const Count = z.number().int().nonnegative();
 const Version = z.number().int().positive();
 
 export const Channel = z.enum(["email", "linkedin"]);

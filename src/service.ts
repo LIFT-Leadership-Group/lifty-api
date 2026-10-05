@@ -7,7 +7,6 @@ import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
 import { createCrmMappingReadinessCheck } from "./crm-mapping/readiness.js";
 import { createCompanyMapping } from "./company-mapping.js";
 import { createCrmMapping } from "./crm-mapping.js";
-import { createLinkedinCampaignOperations } from "./linkedin-campaign.js";
 import { createWorkspaceRetirement } from "./workspace-retirement.js";
 import { deleteOwnLogin } from "./login-deletion.js";
 import { listMemberWorkspaces } from "./member-workspaces.js";
@@ -43,7 +42,7 @@ import { createAcquisitionVerificationTrigger, createCrmSyncTrigger, createCrmMa
 import { disconnectIntegration, getCrmSyncStatus, getRunStatus, getWorkspaceStatus, getNotificationConfig, listSlackNotificationChannels, upsertNotificationDestination, setNotificationRoute, enqueueNotificationTest, startCrmSyncRun, startRun } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
-  const emailKey = config.serverKeys?.email ?? null, linkedinKey = config.serverKeys?.linkedin ?? null;
+  const emailKey = config.serverKeys?.email ?? null;
   const accounts = config.accounts ? createAccountConnection(config.accounts) : null;
   // Workspace member operations use their session. Browser setup uses a narrow,
   // server-key-protected intent RPC, never a Supabase administrative key.
@@ -89,7 +88,6 @@ export function createProductionApp(config: ServiceConfig) {
     getEmailPlacement: placement.status,
     startEmailPlacement: placement.start,
     ...(warmupSetup ? {warmupSetup} : {}),
-    ...(linkedinKey ? { linkedinCampaign: createLinkedinCampaignOperations(linkedinKey) } : {}),
     ...(emailKey ? {
       emailCampaign: createEmailCampaignOperations(emailKey),
       getEmailWarmup: warmup.status,

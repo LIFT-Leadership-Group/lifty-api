@@ -58,6 +58,17 @@ describe("supported Outreach policy boundary", () => {
     expect(CampaignDraftSchema.safeParse({ expected_version: 1, revision_ref: revisionRef, changes: { instructions: "Changed only this" } }).success).toBe(true);
     expect(CampaignDraftSchema.safeParse({ expected_version: 1, revision_ref: revisionRef, changes: { lanes: null } }).success).toBe(true);
   });
+  it("Email may start when the named LinkedIn first DM is skipped, without a delay or activation field", () => {
+    const start = [{ type: "linkedin_first_dm_skipped", campaign_ref: campaignRef }];
+    expect(create("email", { ...email, start }).success).toBe(true);
+    expect(create("email", { ...email, start: [...email.start, ...start] }).success).toBe(true);
+    for (const condition of [
+      { type: "linkedin_first_dm_skipped" },
+      { ...start[0], after: { days: 0 } },
+      { ...start[0], activate: true },
+    ]) expect(create("email", { ...email, start: [condition] }).success).toBe(false);
+    expect(create("linkedin", { ...policy, start }).success).toBe(false);
+  });
   it("exposes only supported sequence counts and receipt delays; the saved sequence owns the count", () => {
     expect(create("email", email).success).toBe(true);
     expect(create("email", { ...email, steps: email.steps.slice(0, 3) }).success).toBe(false);

@@ -1,7 +1,8 @@
 import { outreachOperationDefinitions } from "./outreach-operations.js";
 import { businessOperationDefinitions } from "./business-operations.js";
 import { researchOperationDefinitions } from "./research-operations.js";
-import { identityOperationDefinitions } from "./identity-operations.js";
+import { identityOperationDefinitions, type IdentityDefinition } from "./identity-operations.js";
+import { linkedinOperationDefinitions } from "./linkedin-operations.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
@@ -20,8 +21,6 @@ import { CompanyPlanSchema } from "./company-mapping/contract.js";
 import { WarmupWorkspaceRequest, WarmupStatus, WarmupStartResult } from "./email-warmup-contracts.js";
 import { ConnectionPlacementStatus, PlacementStartRequest, PlacementStatusRequest } from "./email-connection-placement.js";
 import { DeliverabilityQueryParams, DeliverabilityResponse } from "./email-deliverability-contracts.js";
-import { EmailCampaignRequest, EmailCampaignResult } from "./email-campaign-contracts.js";
-import { LinkedinCampaignRequest, LinkedinCampaignResult } from "./linkedin-campaign-contracts.js";
 
 const JsonSchema = z.record(z.string(), z.unknown());
 export const StageOperationSchema = z.object({
@@ -87,15 +86,17 @@ const businessCatalog = Object.fromEntries(Object.entries(businessOperationDefin
   ...("cli" in definition ? { cli: definition.cli } : {}),
   ...(resource === "business" && key === "post" ? { responses: { ...operation(definition.method, definition.route, definition.description, definition.response, definition.request).responses, "201": json(definition.response) } } : {}),
 }]))]));
-// Identity operations publish their success status: 201 for creation and,
-// for disconnect/delete, both 200 (access removal confirmed) and 202.
-const identityCatalog = Object.fromEntries(Object.entries(identityOperationDefinitions).map(([resource, entries]) => [resource, Object.fromEntries(Object.entries(entries).map(([key, definition]) => {
+// Identity and LinkedIn operations publish their success status: 201 for
+// creation and, for disconnect/delete, both 200 (access removal confirmed) and 202.
+const definitionCatalog = (definitions: Record<string, Record<string, IdentityDefinition>>) => Object.fromEntries(Object.entries(definitions).map(([resource, entries]) => [resource, Object.fromEntries(Object.entries(entries).map(([key, definition]) => {
   const base = operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query, definition.path);
   const success = json(definition.response);
   const { "200": _ok, ...errors } = base.responses;
-  return [key, { ...base, ...("cli" in definition ? { cli: definition.cli } : {}),
+  return [key, { ...base, ...(definition.cli ? { cli: definition.cli } : {}),
     responses: definition.success === 201 ? { "201": success, ...errors } : definition.success === 202 ? { "200": success, "202": success, ...errors } : base.responses }];
 }))]));
+const identityCatalog = definitionCatalog(identityOperationDefinitions);
+const linkedinCatalog = definitionCatalog(linkedinOperationDefinitions);
 const outreachCatalog = Object.fromEntries(Object.entries(outreachOperationDefinitions).map(([resource, entries]) => [resource,
   Object.fromEntries(Object.entries(entries).map(([key, definition]) => {
     const base = operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query, definition.path);
@@ -176,6 +177,10 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     ...Object.fromEntries((["pause","resume","remove"] as const).map(action=>[`warmup_${action}`,operation("POST",`/v1/email/warmup/${action}`,`${action[0]!.toUpperCase()+action.slice(1)} warmup for the explicit workspace and mailbox (connection_ref = sending account id). Warmup pause, resume and remove never pause or resume outreach campaigns.`,WarmupStatus,WarmupWorkspaceRequest)])),
   },
   ...outreachCatalog,
+  linkedin: {
+    context: stageContext("linkedin", "Read the public guide for LinkedIn outreach: what Lifty sends, who owns sequences and accounts, what the activity counts mean and why work waits. No workspace data."),
+    ...linkedinCatalog.linkedin!,
+  },
   notifications: {
     get: operation("GET", stageRoute("notifications"), "Read notification routes/destinations and Slack state, or verify the exact Slack attempt_ref.", z.union([NotificationConfigSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),
     post: operation("POST", stageRoute("notifications"), "Start Slack connection/reconnection and immediately return the workspace consent link.", AuthorizationRequiredSchema, Empty),

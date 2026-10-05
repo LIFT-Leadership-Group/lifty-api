@@ -1,49 +1,165 @@
 {
   "message_original": {
+    "history": [],
     "message": {
       "steps": null,
       "status": "draft",
       "channel": "linkedin",
       "content": "Original bytes",
+      "run_ref": null,
+      "sent_at": null,
       "is_draft": true,
-      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
-      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
-      "created_at": "2026-10-02T20:04:59.594581+00:00",
-      "message_ref": "b25c0ff2-cb3c-4604-8d2c-fa74d5ccce12",
+      "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+      "account_id": null,
+      "action_ref": null,
+      "created_at": "2026-10-05T17:29:52.215798+00:00",
+      "lead_email": "saved@message.test",
+      "message_ref": "2a7ea5e3-1288-40e7-ae37-7e5d0f198e26",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
       "review_status": "pending",
-      "source_digest": "6aeae7c2dcebd74ca1df2d3b6e7d535c54dea0cb3921494cbd400d58f6194e5c",
+      "source_digest": "60da4a41b453043f2b6b5704b5275a008a89a28b0b47875ff7c5a929b27c20c2",
+      "delivery_state": "planned",
       "sender_version": 1,
+      "lead_linkedin_url": null,
       "source_message_ref": null
     },
+    "revisions": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Original bytes",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-05T17:29:52.215798+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "2a7ea5e3-1288-40e7-ae37-7e5d0f198e26",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "60da4a41b453043f2b6b5704b5275a008a89a28b0b47875ff7c5a929b27c20c2",
+        "delivery_state": "planned",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
     "workspace": {
-      "name": "LIF1188 Contract",
+      "name": "Message revision contracts",
       "state": "ready_for_connections",
-      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
-    }
+      "workspace_ref": "b55b3370-0114-4c9b-bc82-478aeff401de"
+    },
+    "history_complete": false,
+    "revisions_complete": true
   },
   "message_revision": {
+    "history": [],
     "message": {
       "steps": null,
       "status": "draft",
       "channel": "linkedin",
       "content": "Corrected saved draft",
+      "run_ref": null,
+      "sent_at": null,
       "is_draft": true,
-      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
-      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
-      "created_at": "2026-10-02T20:04:59.731701+00:00",
-      "message_ref": "68035975-8c8a-4f97-ab5d-e364e64767aa",
+      "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+      "account_id": null,
+      "action_ref": null,
+      "created_at": "2026-10-05T17:29:52.351144+00:00",
+      "lead_email": "saved@message.test",
+      "message_ref": "695da14d-3ed9-4c47-9f2e-00debd543499",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
       "review_status": "pending",
-      "source_digest": "2f06f71390628c15a69731e18920651287a365300902206b4ba2fd2df69ed575",
+      "source_digest": "0195ac99091528b3cfd92c49f72f6ff484b90ee76aa25dbb43dc52539d3973bd",
+      "delivery_state": "planned",
       "sender_version": 1,
-      "source_message_ref": "b25c0ff2-cb3c-4604-8d2c-fa74d5ccce12"
+      "lead_linkedin_url": null,
+      "source_message_ref": "2a7ea5e3-1288-40e7-ae37-7e5d0f198e26"
     },
+    "revisions": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Original bytes",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-05T17:29:52.215798+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "2a7ea5e3-1288-40e7-ae37-7e5d0f198e26",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "superseded",
+        "source_digest": "d95ea35acb8caec89534a3af3e4a23f94009332077ee5136de4de59744ea030c",
+        "delivery_state": "planned",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      },
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Corrected saved draft",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-05T17:29:52.351144+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "695da14d-3ed9-4c47-9f2e-00debd543499",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "0195ac99091528b3cfd92c49f72f6ff484b90ee76aa25dbb43dc52539d3973bd",
+        "delivery_state": "planned",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": "2a7ea5e3-1288-40e7-ae37-7e5d0f198e26"
+      }
+    ],
     "workspace": {
-      "name": "LIF1188 Contract",
+      "name": "Message revision contracts",
       "state": "ready_for_connections",
-      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
-    }
+      "workspace_ref": "b55b3370-0114-4c9b-bc82-478aeff401de"
+    },
+    "history_complete": false,
+    "revisions_complete": true
   },
   "email_original": {
+    "history": [],
     "message": {
       "steps": [
         {
@@ -80,23 +196,98 @@
       "status": "draft",
       "channel": "email",
       "content": "Saved sequence",
+      "run_ref": null,
+      "sent_at": null,
       "is_draft": true,
-      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
-      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
-      "created_at": "2026-10-02T20:05:00.767499+00:00",
-      "message_ref": "9b87be9d-982c-4cce-a61d-e4833acf3fcf",
+      "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+      "account_id": null,
+      "action_ref": null,
+      "created_at": "2026-10-05T17:29:53.305637+00:00",
+      "lead_email": "saved@message.test",
+      "message_ref": "fc1c4457-eb05-45ef-9f34-554cf3c30d61",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
       "review_status": "pending",
-      "source_digest": "33286c0fdb2651564a53faa8fb1b3e23f6a9b5760cc112165bbcfadc708a7447",
+      "source_digest": "66cb40e745a149cfc5aa988d62890710d68c8c0cd0c7b1aa3afaf663d8accba2",
+      "delivery_state": "planned",
       "sender_version": 1,
+      "lead_linkedin_url": null,
       "source_message_ref": null
     },
+    "revisions": [
+      {
+        "steps": [
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 1
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 2
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 3
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 4
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 5
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 6
+          }
+        ],
+        "status": "draft",
+        "channel": "email",
+        "content": "Saved sequence",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-05T17:29:53.305637+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "fc1c4457-eb05-45ef-9f34-554cf3c30d61",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "66cb40e745a149cfc5aa988d62890710d68c8c0cd0c7b1aa3afaf663d8accba2",
+        "delivery_state": "planned",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
     "workspace": {
-      "name": "LIF1188 Contract",
+      "name": "Message revision contracts",
       "state": "ready_for_connections",
-      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
-    }
+      "workspace_ref": "b55b3370-0114-4c9b-bc82-478aeff401de"
+    },
+    "history_complete": false,
+    "revisions_complete": true
   },
   "email_revision": {
+    "history": [],
     "message": {
       "steps": [
         {
@@ -133,20 +324,152 @@
       "status": "draft",
       "channel": "email",
       "content": "Saved sequence",
+      "run_ref": null,
+      "sent_at": null,
       "is_draft": true,
-      "lead_ref": "4b81b1a1-1938-47d8-87f2-dfb3d28cd69d",
-      "sender_id": "d35edb1a-79f2-44a2-9d2f-3f0c2ead7cb7",
-      "created_at": "2026-10-02T20:05:00.901175+00:00",
-      "message_ref": "27f5eca3-0145-4cb6-828f-9a3fd50a0e03",
+      "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+      "account_id": null,
+      "action_ref": null,
+      "created_at": "2026-10-05T17:29:53.430669+00:00",
+      "lead_email": "saved@message.test",
+      "message_ref": "d8f0c5a7-7606-4e87-9abd-618ea0413e6e",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
       "review_status": "pending",
-      "source_digest": "c3a437b4b22efd01d536baf6fbdca2fc85d40f61b001ce401271fc3ead2e5de6",
+      "source_digest": "b709e24949548acdc381999423175a8c29b22bfca8b72d0aebbd6954b7dc98e5",
+      "delivery_state": "planned",
       "sender_version": 1,
-      "source_message_ref": "9b87be9d-982c-4cce-a61d-e4833acf3fcf"
+      "lead_linkedin_url": null,
+      "source_message_ref": "fc1c4457-eb05-45ef-9f34-554cf3c30d61"
     },
+    "revisions": [
+      {
+        "steps": [
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 1
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 2
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 3
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 4
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 5
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 6
+          }
+        ],
+        "status": "draft",
+        "channel": "email",
+        "content": "Saved sequence",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-05T17:29:53.305637+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "fc1c4457-eb05-45ef-9f34-554cf3c30d61",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "superseded",
+        "source_digest": "3c9d63f0440061833c50fb797d9932799edc9bc6bfc66004ae5761ab10f65248",
+        "delivery_state": "planned",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      },
+      {
+        "steps": [
+          {
+            "text": "Corrected body\n\nRegards, Pinned Person",
+            "subject": "Corrected subject",
+            "position": 1
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 2
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 3
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 4
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 5
+          },
+          {
+            "text": "Corrected final body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 6
+          }
+        ],
+        "status": "draft",
+        "channel": "email",
+        "content": "Saved sequence",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "ab4dccb8-0a81-467a-884f-ad9a4905741f",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "714fefcb-7fa0-4f17-a75b-d7c3b9e4f8fc",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-05T17:29:53.430669+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "d8f0c5a7-7606-4e87-9abd-618ea0413e6e",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "b709e24949548acdc381999423175a8c29b22bfca8b72d0aebbd6954b7dc98e5",
+        "delivery_state": "planned",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": "fc1c4457-eb05-45ef-9f34-554cf3c30d61"
+      }
+    ],
     "workspace": {
-      "name": "LIF1188 Contract",
+      "name": "Message revision contracts",
       "state": "ready_for_connections",
-      "workspace_ref": "1599cca8-90ca-4fbc-b44c-b21b15822869"
-    }
+      "workspace_ref": "b55b3370-0114-4c9b-bc82-478aeff401de"
+    },
+    "history_complete": false,
+    "revisions_complete": true
   }
 }

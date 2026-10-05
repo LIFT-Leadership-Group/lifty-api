@@ -1,16 +1,30 @@
 import { z } from "zod";
+import { WorkspaceIdentitySchema } from "./business-contracts.js";
+import { AccountSchema, Count, Id, Timestamp } from "./identity-contracts.js";
 
-// Shared by the LinkedIn campaign operations. Identity connect/status
-// contracts live in identity-contracts.ts.
-export const LinkedinWorkspace = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
-export const LinkedinTimezone = z.string().min(1).max(100).refine(value => {
-  // Reject fixed-offset strings; SQL validates against pg_timezone_names too.
-  if (!/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)*$/.test(value)) return false;
-  try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; }
-}, "Choose a valid IANA timezone.");
-export const LinkedinPolicy = z.object({
-  invitations_per_day: z.literal(5), invitations_per_7_days: z.literal(25), messages_per_day: z.literal(5),
-  weekdays: z.array(z.number().int().min(1).max(5)).length(5).refine(value => value.join(",") === "1,2,3,4,5"),
-  start: z.literal("09:00"), end: z.literal("17:00"),
-  spacing_minutes: z.array(z.number().int()).length(2).refine(value => value.join(",") === "15,45"),
+// LIF-1190 LinkedIn activity read. The database owns attribution, periods and
+// waiting reasons; accounts keep their canonical Identity ids, status and
+// state. Counts are confirmed events (not people) since 00:00 UTC and over the
+// rolling last seven days, the same periods as Identity `sends`.
+const Counts = z.object({
+  invitations_sent: Count,
+  invitations_accepted: Count,
+  messages_sent: Count,
+  replies_received: Count,
+}).strict();
+// Why an account's due LinkedIn work waits; null when nothing waits.
+export const WaitingReason = z.enum([
+  "prior_campaign_running", "awaiting_review", "outside_schedule", "daily_limit_reached",
+  "campaign_paused", "account_paused", "account_needs_attention", "on_hold",
+]);
+const LinkedinAccountSchema = AccountSchema.pick({ id: true, sender_id: true, status: true, state: true })
+  .extend({ today: Counts, last_7_days: Counts, waiting_reason: WaitingReason.nullable() }).strict();
+
+export const LinkedinQuerySchema = z.object({ sender_id: Id.optional() }).strict();
+export const LinkedinActivitySchema = z.object({
+  workspace: WorkspaceIdentitySchema,
+  observed_at: Timestamp,
+  today: Counts,
+  last_7_days: Counts,
+  accounts: z.array(LinkedinAccountSchema).max(5000),
 }).strict();

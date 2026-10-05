@@ -39,6 +39,15 @@ describe("runtime context discovery and connection handoff", () => {
     });
     expect(getAgentContext("senders")!.instructions).toContain("lifty post senders delete");
     expect(getAgentContext("senders")!.instructions).toContain("lifty context senders");
+    const linkedin = getAgentContext("linkedin")!;
+    expect(Object.fromEntries(Object.entries(linkedin.operations!).map(([key, operation]) => [key, `${operation.method} ${operation.route}`]))).toEqual({
+      context: "GET /v1/context/linkedin",
+      get: "GET /v1/workspace/linkedin",
+    });
+    expect(linkedin.operations!.get!.request.query).toMatchObject({ properties: { sender_id: expect.any(Object) }, additionalProperties: false });
+    expect(linkedin.instructions).toContain("lifty get linkedin → GET /v1/workspace/linkedin; MCP linkedin_get");
+    // Connecting stays Identity's: the guide points there, with no second connect operation.
+    expect(linkedin.instructions).toContain("lifty post sending-accounts connect");
     for (const action of ["status", "start", "pause", "resume", "remove"]) {
       const operation = operations[`warmup_${action}`]!;
       expect(operation.route).toBe(
@@ -202,10 +211,11 @@ describe("runtime context discovery and connection handoff", () => {
   });
 });
 
-// LIF-1174: the acquisition provider and the retired volume knobs never reach
-// a customer surface. Operators see provider details in logs and alerts only.
+// LIF-1174, LIF-1182, LIF-1190 (D4): the acquisition and sending-account providers
+// and the retired volume knobs never reach a customer surface. Operators see
+// provider details in logs and alerts only.
 describe("customer surfaces name no provider or retired volume knob", () => {
-  const retired = /apollo|allowance|capacity|daily_discovery_target|pipeline_active|tier_1|tier_2/i;
+  const retired = /apollo|unipile|heyreach|allowance|capacity|daily_discovery_target|pipeline_active|tier_1|tier_2/i;
   const source = (dir: string): string[] => readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })
     .flatMap(entry => entry.isDirectory() ? source(`${dir}${entry.name}/`)
       : entry.name.endsWith(".ts") ? [readFileSync(new URL(`${dir}${entry.name}`, import.meta.url), "utf8")] : []);
@@ -214,12 +224,14 @@ describe("customer surfaces name no provider or retired volume knob", () => {
     ...text.matchAll(/\bcode:\s*"([A-Z][A-Z0-9_]+)"/g),
     ...text.matchAll(/errorJson\([^,]+,\s*\d+,\s*"([A-Z][A-Z0-9_]+)"/g),
   ].map(match => match[1]!));
-  it("scans the catalog, OpenAPI, MCP tools, every guide and every public error code", async () => {
+  it("scans the catalog, OpenAPI, MCP tools, every guide, every public error code and every route", async () => {
     const guides = readdirSync(new URL("../src/agent-context/", import.meta.url)).filter(name => name.endsWith(".md"));
     expect(guides).toEqual(expect.arrayContaining(["research-schedule.md", "leads.md"]));
+    const app = createApp();
     const surfaces: Record<string, string> = {
       catalog: JSON.stringify(stageOperations),
-      openapi: await (await createApp().request("/openapi.json")).text(),
+      openapi: await (await app.request("/openapi.json")).text(),
+      routes: JSON.stringify(app.routes.map(route => route.path)),
       mcp: JSON.stringify(getStageMcpTools()),
       rpc_errors: JSON.stringify(RPC_ERROR_MESSAGES),
       public_codes: publicCodes.join(" "),
@@ -229,20 +241,6 @@ describe("customer surfaces name no provider or retired volume knob", () => {
     // The scanner must actually see codes, or an empty scan would pass.
     expect(publicCodes).toEqual(expect.arrayContaining(["RESEARCH_STATUS_UNAVAILABLE", "LEADS_UNAVAILABLE", "STAGE_OPERATION_UNSUPPORTED"]));
     for (const [name, text] of Object.entries(surfaces)) expect(text.match(retired)?.[0], name).toBeUndefined();
-  });
-  // LIF-1182: the account provider is masked on every Identity surface.
-  it("names no account provider on Identity routes, tools, guides, codes or browser paths", async () => {
-    const identity = ["senders", "sending-accounts"].flatMap(stage => Object.entries(stageOperations[stage]!)
-      .filter(([key]) => !/^(warmup_|placement_|deliverability)/.test(key)).map(([key, operation]) => ({ stage, key, operation })));
-    const app = createApp();
-    const surfaces: Record<string, string> = {
-      catalog: JSON.stringify(identity),
-      mcp: JSON.stringify(getStageMcpTools().filter(tool => /^(senders|sending_accounts)_/.test(tool.name) && !/warmup|placement|deliverability/.test(tool.name))),
-      guides: ["senders", "sending-accounts", "stage-common", "summary"].map(name => readFileSync(new URL(`../src/agent-context/${name}.md`, import.meta.url), "utf8")).join("\n"),
-      codes: JSON.stringify(Object.keys(RPC_ERROR_MESSAGES)),
-      routes: JSON.stringify(app.routes.map(route => route.path)),
-    };
-    for (const [name, text] of Object.entries(surfaces)) expect(text.match(/unipile/i)?.[0], name).toBeUndefined();
   });
   it("keeps the sample's operations to get, post and progress", () => {
     expect(Object.keys(stageOperations["sample-review"]!).sort()).toEqual(["get", "post", "progress"]);
