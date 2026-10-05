@@ -320,7 +320,7 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
     request:{body:{required:true,content:{"application/json":{schema:PlacementStartRequest}}}},
     responses:{200:JsonResponse(ConnectionPlacementStatus),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),413:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/email/warmup/start",operationId:"startEmailWarmup",security:[{bearerAuth:[]}],
-    description:"Start setup for the workspace's verified mailbox. OAuth-enabled servers return a one-hour Lifty setup link. Legacy servers return a signed Mailivery form link. An already-bound mailbox receives no new connection link.",
+    description:"Start warmup setup for one verified mailbox account (connection_ref when the workspace has several). Returns a one-hour Lifty setup link that authorizes the mailbox with Google. An already-bound mailbox receives no new link. Never pauses or resumes campaigns.",
     request:{body:{required:true,content:{"application/json":{schema:WarmupWorkspaceRequest}}}},
     responses:{200:JsonResponse(WarmupStartResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),429:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema),503:JsonResponse(ErrorResponseSchema)}});
   for (const operation of ["pause","resume","remove"] as const) {

@@ -41,7 +41,7 @@ describe("warmup setup OAuth handoff", () => {
   });
   it("checks PKCE, offline access, nonce and exact mailbox hint on Google's consent URL", async()=>{
     const h=harness();
-    const url=new URL(await h.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"Europe/Madrid"}));
+    const url=new URL(await h.setup.choose(secret,browser));
     expect(url.origin).toBe("https://accounts.google.com");
     expect(Object.fromEntries(url.searchParams)).toMatchObject({access_type:"offline",prompt:"consent select_account",login_hint:record.email,
       scope:"openid email https://mail.google.com/",code_challenge_method:"S256",redirect_uri:"https://api.lifty.test/warmup/google/callback"});
@@ -56,26 +56,11 @@ describe("warmup setup OAuth handoff", () => {
     expect(h.requests).toHaveLength(1);
     expect(h.writes.map(x=>x.operation)).toEqual(["claim"]);
   });
-  it("stores Lifty's default policy with the browser timezone and always chooses Google",async()=>{
+  it("chooses Google with the platform policy only; the browser supplies no name or timezone (LIF-1228)",async()=>{
     const h=harness();
-    await h.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"Europe/Madrid"});
-    expect(h.writes[0]?.payload).toMatchObject({method:"google",first_name:"Ada",last_name:"",policy:{...DEFAULT_WARMUP_POLICY,timezone:"Europe/Madrid"}});
-    const legacy=harness();
-    await legacy.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:"America/Buenos_Aires"});
-    expect(legacy.writes[0]?.payload.policy).toEqual({...DEFAULT_WARMUP_POLICY,timezone:"America/Argentina/Buenos_Aires"});
-    for (const zone of ["", "fake/zone"]) {
-      const other=harness();
-      await other.setup.choose(secret,browser,{first_name:"Ada",last_name:"",timezone:zone});
-      expect(other.writes[0]?.payload.policy).toEqual(DEFAULT_WARMUP_POLICY);
-    }
-  });
-  it("rejects founder-supplied policy, method or missing name before any write",async()=>{
-    const h=harness();
-    for (const input of [{method:"app_password",first_name:"Ada",last_name:"",timezone:"UTC"},{first_name:"Ada",last_name:"",timezone:"UTC",policy},
-      {first_name:"",last_name:"",timezone:"UTC"},{first_name:"Ada",last_name:""}]) {
-      await expect(h.setup.choose(secret,browser,input)).rejects.toMatchObject({code:"WARMUP_SETUP_INVALID"});
-    }
-    expect(h.requests).toHaveLength(0);expect(h.writes).toHaveLength(0);
+    await h.setup.choose(secret,browser);
+    expect(Object.keys(h.writes[0]!.payload).sort()).toEqual(["browser_hash","intent_hash","method","oauth_hash","policy"]);
+    expect(h.writes[0]?.payload).toMatchObject({method:"google",policy:DEFAULT_WARMUP_POLICY});
   });
   it("rejects another Google address before any Mailivery request or dispatch", async () => {
     const h = harness("other@example.test");

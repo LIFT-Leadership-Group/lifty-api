@@ -32,8 +32,14 @@ export const WarmupSnapshot = z.object({
 });
 export const WarmupBindingState = z.enum(["link_issued", "pending_consent", "warming", "paused", "problem", "removed"]);
 export const WarmupRequestedAction = z.enum(["pause", "resume", "remove"]);
+// LIF-1228: SQL's spam verdict for the latest measured window of warmup sends.
+const StoredWarmupSpam = z.object({
+  spam_count: count, sent: count, window_days: z.number().int().min(1).max(14),
+  blocking: z.boolean(), warning: z.boolean(), observed_at: timestamp,
+});
 export const StoredWarmupStatus = z.object({
   workspace_ref: z.uuid(),
+  connection_ref: z.uuid().nullable(),
   email: z.email().nullable(),
   mailbox_use: z.enum(["personal", "outreach"]).nullable(),
   warmup_required: z.boolean(),
@@ -41,6 +47,7 @@ export const StoredWarmupStatus = z.object({
   binding: z.object({
     binding_ref: z.uuid(), sender_ref: z.uuid(), state: WarmupBindingState,
     requested_action: WarmupRequestedAction.nullable(),
+    user_paused: z.boolean(), connection_paused: z.boolean(),
     blocking_reason: z.string().max(64).nullable(),
     provider_campaign_bound: z.boolean(),
     last_readback_at: timestamp.nullable(),
@@ -48,36 +55,39 @@ export const StoredWarmupStatus = z.object({
     created_at: timestamp,
   }).nullable(),
   evidence: z.object({
-    active_duration_days: count, healthy: z.boolean(), passed: z.boolean(),
+    active_duration_days: count, healthy: z.boolean().nullable(), passed: z.boolean(),
     observed_at: timestamp, fresh: z.boolean(),
   }).nullable(),
-  outreach_unlocked: z.boolean().nullable(),
-  connection_ref: z.uuid().optional(),
-  campaign_send_paused: z.boolean().optional(),
-  campaign_release_required: z.literal(true).optional(),
-}).refine(value => {
-  const fields = [value.connection_ref, value.campaign_send_paused, value.campaign_release_required];
-  return fields.every(field => field === undefined) || fields.every(field => field !== undefined);
-}, { message: "Client connection status must include campaign release state." });
+  warmup_complete: z.boolean(),
+  warmup_spam: StoredWarmupSpam.nullable(),
+  warmup_blocker: z.enum(["email_warmup_required", "email_warmup_spam"]).nullable(),
+  warmup_ready: z.boolean(),
+});
 export type StoredWarmupStatus = z.infer<typeof StoredWarmupStatus>;
 
-// Public founder-facing shape. Strict so older clients fail closed on additions.
+// Public shape. Strict so older clients fail closed on additions. No provider
+// identity appears here (LIF-1186 decision 1).
 export const WarmupState = z.enum(["not_started", ...WarmupBindingState.options]);
 const Check = z.enum(["valid", "not_valid", "unknown"]);
 export const WarmupGoLive = z.object({
-  kind: z.enum(["connect_email", "now", "unlocked", "awaiting_check", "projected", "awaiting_release"]),
+  kind: z.enum(["connect_email", "now", "unlocked", "awaiting_check", "projected", "held"]),
   date: z.iso.date().nullable(),
   remaining_active_days: z.number().int().min(0).max(365).nullable(),
   message: z.string().min(1).max(600),
 }).strict();
+export const WarmupSpam = z.object({
+  spam_count: count, sent: count, window_days: z.number().int().min(1).max(14),
+  holds_sending: z.boolean(), warning: z.boolean(), observed_at: timestamp,
+}).strict();
 export const WarmupStatus = z.object({
-  provider: z.literal("mailivery"),
   workspace_ref: z.uuid(),
+  connection_ref: z.uuid().nullable(),
   email: z.email().nullable(),
   mailbox_use: z.enum(["personal", "outreach"]).nullable(),
   warmup_required: z.boolean(),
   required_active_days: z.number().int().min(1).max(365),
   state: WarmupState,
+  user_paused: z.boolean(), connection_paused: z.boolean(),
   state_label: z.string().min(1).max(120),
   requested_action: WarmupRequestedAction.nullable(),
   blocking_reason: z.object({ code: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), message: z.string().min(1).max(300) }).strict().nullable(),
@@ -85,12 +95,13 @@ export const WarmupStatus = z.object({
   today: z.object({ warmup_emails: count.nullable(), ramp_target: count.nullable() }).strict(),
   checks: z.object({ spf: Check, dmarc: Check, mx: Check }).strict(),
   last_checked_at: timestamp.nullable(),
-  outreach_unlocked: z.boolean().nullable(),
+  // A dedicated mailbox's verified initial period (21 active days on a healthy check).
+  initial_period_complete: z.boolean(),
+  spam: WarmupSpam.nullable(),
+  // Warmup's own contribution only: true when warmup does not hold this mailbox.
+  // Campaign activation, placement and pauses are separate checks.
+  warmup_ready: z.boolean(),
   recommended_go_live: WarmupGoLive,
-  // Present only for an explicitly selected client connection. Founder output is unchanged.
-  connection_ref: z.uuid().optional(),
-  campaign_send_paused: z.boolean().optional(),
-  campaign_release_required: z.literal(true).optional(),
 }).strict();
 export type WarmupStatus = z.infer<typeof WarmupStatus>;
 export const WarmupStartResult = WarmupStatus.extend({

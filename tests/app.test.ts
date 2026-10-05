@@ -214,7 +214,7 @@ describe("LIFTY API", () => {
     const enqueued:unknown[]=[];
     const result={...startRunFixture(false),attempt:2};
     const app=createApp({authenticate:async()=>({ok:true,session:{userId:"founder",client:{}}}),startRun:async()=>result,enqueueFirstRun:async(runId,attempt)=>{enqueued.push({runId,attempt});return {id:"wake"};}});
-    const response=await app.request("/v1/workspace/sample-review",{method:"POST",headers:{"x-lifty-client-contract":"lifty-cli-context.v8"}});
+    const response=await app.request("/v1/workspace/sample-review",{method:"POST",headers:{"x-lifty-client-contract":"lifty-cli-context.v10"}});
     expect(response.status).toBe(200);expect(await response.json()).toEqual(result);
     expect(enqueued).toEqual([{runId:result.run_ref,attempt:2}]);
   });
@@ -235,7 +235,7 @@ describe("LIFTY API", () => {
 
     const response = await app.request("/v1/workspace/sample-review", {
       method: "POST",
-      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v8" },
+      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v10" },
     });
 
     expect(response.status).toBe(200);
@@ -259,7 +259,7 @@ describe("LIFTY API", () => {
 
     const response = await app.request("/v1/workspace/sample-review", {
       method: "POST",
-      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v8" },
+      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v10" },
     });
 
     expect(response.status).toBe(200);
@@ -298,7 +298,7 @@ describe("LIFTY API", () => {
     });
 
     const response = await app.request("/v1/workspace/sample-review", {
-      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v8" },
+      headers: { authorization: "Bearer valid-token", "x-lifty-client-contract": "lifty-cli-context.v10" },
     });
 
     expect(response.status).toBe(200);

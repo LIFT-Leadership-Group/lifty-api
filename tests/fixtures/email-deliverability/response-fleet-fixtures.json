@@ -247,7 +247,7 @@
      "code": "active",
      "label": "Warming · low activity · day 13 of 21",
      "tone": "watch",
-     "description": "Smartlead warmup is running, but recent warmup activity is below the minimum for a passing check.",
+     "description": "Warmup is running, but recent warmup activity is below the minimum for a passing check.",
      "reasons": [
       {
        "code": "warmup_activity_low",
@@ -263,7 +263,7 @@
        "code": "active",
        "label": "Warming · low activity",
        "tone": "watch",
-       "description": "Smartlead warmup is running, but recent warmup activity is below the minimum for a passing check.",
+       "description": "Warmup is running, but recent warmup activity is below the minimum for a passing check.",
        "reasons": [
         {
          "code": "warmup_activity_low",
@@ -872,7 +872,7 @@
      "code": "active",
      "label": "Warming · initial period complete",
      "tone": "ok",
-     "description": "Smartlead warmup is running and its latest check passed. The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns.",
+     "description": "Warmup is running and its latest check passed. The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns.",
      "reasons": []
     },
     "sources": [
@@ -883,7 +883,7 @@
        "code": "active",
        "label": "Warming",
        "tone": "ok",
-       "description": "Smartlead warmup is running and its latest check passed.",
+       "description": "Warmup is running and its latest check passed.",
        "reasons": []
       },
       "started_at": "2026-08-25T19:52:58.221Z",
@@ -1696,7 +1696,7 @@
      "code": "active",
      "label": "Warming · day 10 of 21",
      "tone": "ok",
-     "description": "Mailivery is warming this inbox.",
+     "description": "Lifty is warming this inbox.",
      "reasons": []
     },
     "sources": [
@@ -1707,7 +1707,7 @@
        "code": "active",
        "label": "Warming",
        "tone": "ok",
-       "description": "Mailivery is warming this inbox.",
+       "description": "Lifty is warming this inbox.",
        "reasons": []
       },
       "started_at": "2026-09-18T19:52:58.221Z",
@@ -2078,7 +2078,7 @@
      "code": "problem",
      "label": "Warmup failing",
      "tone": "bad",
-     "description": "Smartlead warmup is running, but its latest check failed. The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns.",
+     "description": "Warmup is running, but its latest check failed. The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns.",
      "reasons": [
       {
        "code": "warmup_health_failed",
@@ -2094,7 +2094,7 @@
        "code": "problem",
        "label": "Warmup failing",
        "tone": "bad",
-       "description": "Smartlead warmup is running, but its latest check failed.",
+       "description": "Warmup is running, but its latest check failed.",
        "reasons": [
         {
          "code": "warmup_health_failed",
