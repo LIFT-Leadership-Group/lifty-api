@@ -783,6 +783,10 @@ describe("research schedule, leads and sample share one workspace rule", () => {
     });
     await h.request("/v1/workspace/research-schedule/status");
     expect(h.rpc.mock.calls.at(-1)![1]).toEqual({ p_workspace_id: null, p_week: null });
+    // A null target returns the schedule to the plan's full limit (LIF-1247).
+    const followPlan = await h.request("/v1/workspace/research-schedule", "PATCH", { expected_version: 1, weekly_target: null });
+    expect(followPlan.status).toBe(200);
+    expect(h.rpc.mock.calls.at(-1)![1]).toEqual({ p_workspace_id: null, p_payload: { expected_version: 1, weekly_target: null } });
   });
   it.each([
     ["PATCH", "/v1/workspace/research-schedule", { weekly_target: 20 }, 422, "TARGET_INVALID", "/expected_version"],

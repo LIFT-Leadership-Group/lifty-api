@@ -41,7 +41,13 @@ export const ExpectedVersionSchema = z
 export const ResearchSchedulePatchSchema = z
   .object({
     expected_version: Count,
-    weekly_target: z.number().int().min(1).max(2_147_483_647),
+    weekly_target: z
+      .number()
+      .int()
+      .min(1)
+      .max(2_147_483_647)
+      .nullable()
+      .describe("People per week, from 1 up to the limit, or null to follow the plan's full limit."),
   })
   .strict();
 export const ResearchStatusQuerySchema = z
@@ -160,7 +166,7 @@ export const researchOperationDefinitions = {
       unavailable: schedule,
       args: () => ({}),
       description:
-        "Read the weekly research schedule: active or paused, weekly_target, this workspace's weekly research limit and the effective target (the lower of the two). Every workspace has one from creation, paused at version 0.",
+        "Read the weekly research schedule: active or paused, weekly_target, this workspace's weekly research limit and the effective target (the lower of the two). Until the founder sets a number, weekly_target follows the plan and reads as its limit. Every workspace has one from creation, paused at version 0.",
     },
     patch: {
       method: "PATCH",
@@ -173,7 +179,7 @@ export const researchOperationDefinitions = {
       unavailable: schedule,
       args: ({ body }) => ({ p_payload: body }),
       description:
-        "Synchronously change weekly_target with expected_version. It applies to the current week; people already completed or reserved stay counted. A target above the weekly research limit returns TARGET_ABOVE_LIMIT with the limit. Does not activate research.",
+        "Synchronously change weekly_target with expected_version: a number from 1 up to the limit, or null to follow the plan's full limit again, including later plan changes. It applies to the current week; people already completed or reserved stay counted. A target above the weekly research limit returns TARGET_ABOVE_LIMIT with the limit. Does not activate research.",
     },
     activate: transition(
       "activate",

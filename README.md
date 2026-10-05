@@ -54,8 +54,9 @@ replaces `dist/agent-context/`, removing retired assets. Publish a compatible v8
 CLI and dashboard alongside this API cutover; v7 is deliberately retired.
 
 Weekly research (LIF-1174) is one schedule per workspace: `weekly_target` plus
-active or paused, with CAS `expected_version`. The plan's weekly research limit
-(25 free, 100 paid, 150 managed) is read-only; a Monday 00:00 UTC week counts
+active or paused, with CAS `expected_version`. A `null` target follows the
+plan's full limit (LIF-1247). The plan's weekly research limit (25 free, 100
+paid, 150 managed; plans are set by LIFT admins, LIF-1233) is read-only; a Monday 00:00 UTC week counts
 each person once, when their first research completes, and includes the
 five-person sample. Weekly status, the calibration sample and the lead list
 read the same ledger. Like every stage, these RPCs select the workspace in the
