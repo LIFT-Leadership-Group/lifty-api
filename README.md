@@ -85,6 +85,7 @@ through one table in `src/rpc-errors.ts`; an unknown code is a 502
 - `GET /v1/workspace/leads` — researched leads, newest first, with grade/week filters and an opaque cursor
 - `GET /v1/workspace/senders`, `POST …/senders`, `PATCH …/senders/{id}`, `POST …/senders/{id}/delete` — senders (people) with versioned name, signature and booking link; soft delete
 - `GET /v1/workspace/sending-accounts`, `POST …/sending-accounts/connect`, `GET …/sending-accounts/attempts/{id}`, `POST …/sending-accounts/{id}/reconnect|pause|resume|disconnect` — accounts each sender owns
+- `GET /v1/workspace/linkedin` — read-only LinkedIn activity (confirmed invitations, acceptances, messages and replies today and over the last 7 days) and each LinkedIn account's waiting reason; reads `public.get_lifty_linkedin`
 - `GET /connect/{email|linkedin}`, `POST …` — Lifty's connect page (declaration, then sign-in); `/connect/{channel}/return` is the shared confirmation shell
 - `GET /v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}`, `POST …` — operator-only acquisition recovery for a failed first run; not in the customer catalog, MCP tools or CLI. The database allows only LIFT admins
 - `POST /v1/integrations/{provider}/connect` — short-lived connection URL

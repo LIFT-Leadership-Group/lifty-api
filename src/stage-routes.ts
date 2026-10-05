@@ -2,6 +2,7 @@ import { outreachEntries, validateOutreachInput } from "./outreach-operations.js
 import { businessEntries, validateBusinessRequest } from "./business-operations.js";
 import { researchEntries, validateResearchInput } from "./research-operations.js";
 import { identityEntries, validateIdentityInput } from "./identity-operations.js";
+import { linkedinEntries } from "./linkedin-operations.js";
 import { getWorkspaceSummary } from "./workspace-summary.js";
 import { getNextStep } from "./next-step.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
@@ -135,6 +136,19 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
         ...(definition.success === 202 ? { 202: { description: "Accounts blocked; access removal at the provider is not yet confirmed. Repeat the request to finish it.", content: { "application/json": { schema: definition.response } } } } : {}),
         ...Object.fromEntries([400, 401, 403, 404, 409, 413, 422, 429, 502, 503].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) },
     });
+  }
+  // LinkedIn activity (LIF-1190): one read, its workspace resolved by the
+  // database like Identity. An invalid query is a 422 repair, as published.
+  for (const { key, definition } of linkedinEntries()) {
+    app.get(definition.route, async context => {
+      context.header("cache-control", "no-store");
+      const query = validateIdentityInput(definition.query, readQuery(context, definition.query), definition.invalid) as Record<string, unknown>;
+      return context.json(definition.response.parse(await dependencies.linkedinOperation(context.get("authSession"), key, { path: {}, query, body: undefined })));
+    });
+    app.openAPIRegistry.registerPath({ method: "get", path: definition.route, security: [{ bearerAuth: [] }],
+      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), query: definition.query as z.ZodObject },
+      responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } },
+        ...Object.fromEntries([401, 403, 404, 409, 422, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) } });
   }
   for (const { key, definition } of outreachEntries()) {
     app.on(definition.method, definition.route.replace(/\{([^}]+)\}/g, ":$1"), async context => {
@@ -285,7 +299,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     });
   }
 
-  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads", "senders", "sending-accounts", "journeys", "campaigns"].includes(stage))) {
+  for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads", "senders", "sending-accounts", "journeys", "campaigns", "linkedin"].includes(stage))) {
     app.get(`/v1/workspace/${stage}`, async context => {
       context.header("cache-control", "no-store");
       const session = context.get("authSession");

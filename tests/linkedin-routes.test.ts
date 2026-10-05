@@ -1,0 +1,74 @@
+import { describe, expect, it, vi } from "vitest";
+import { createApp } from "../src/app.js";
+import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
+// Hand-written from the coordinator's "Contract: get linkedin" until the SQL
+// function exists. Replace it with a receipt captured from
+// public.get_lifty_linkedin on a real database, like outreach-sql-fixtures.json.
+import receipt from "./linkedin-sql-fixture.json" with { type: "json" };
+
+// LIF-1190 `get linkedin`: the catalog route calls the member RPC with the
+// database-resolved workspace, validates the query before any read, and never
+// turns an unknown or malformed read into zero activity.
+const senderId = receipt.accounts[0]!.sender_id;
+type Rpc = (name: string, args: Record<string, unknown>) => unknown;
+function harness(rpc: Rpc) {
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+  const client = { rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
+    calls.push({ name, args });
+    try { return { data: await rpc(name, args), error: null }; } catch (error) { return { data: null, error }; }
+  }) };
+  const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client } }), log: () => {} });
+  const read = (query = "") => app.request(`/v1/workspace/linkedin${query}`, {
+    headers: { authorization: "Bearer session", "x-lifty-client-contract": STAGE_CLIENT_CONTRACT, "x-lifty-workspace": "example" } });
+  return { read, calls };
+}
+const dbError = (code: string, message: string) => Object.assign(new Error(message), { code, message, details: null });
+
+describe("LinkedIn activity route", () => {
+  it("reads every LinkedIn account of the selected workspace, or one sender's, through the documented RPC", async () => {
+    const one = { ...receipt, accounts: [receipt.accounts[0]] };
+    const h = harness((_name, args) => (args.p_query as { sender_id?: string }).sender_id ? one : receipt);
+    const all = await h.read();
+    expect(all.status).toBe(200);
+    expect(all.headers.get("cache-control")).toBe("no-store");
+    expect(await all.json()).toEqual(receipt);
+    expect(await (await h.read(`?sender_id=${senderId}`)).json()).toEqual(one);
+    expect(h.calls).toEqual([
+      { name: "get_lifty_linkedin", args: { p_workspace_id: null, p_query: {} } },
+      { name: "get_lifty_linkedin", args: { p_workspace_id: null, p_query: { sender_id: senderId } } },
+    ]);
+  });
+
+  it.each(["?sender_id=not-an-id", "?channel=linkedin", `?sender_id=${senderId}&sender_id=${senderId}`])(
+    "rejects the query %s with repair issues before any read", async query => {
+      const h = harness(() => { throw new Error("must not be called"); });
+      const response = await h.read(query);
+      expect(response.status).toBe(422);
+      const { error } = await response.json();
+      expect(error.code).toBe("INVALID_REQUEST");
+      expect(error.issues.length).toBeGreaterThan(0);
+      expect(h.calls).toEqual([]);
+    });
+
+  it("returns a generic not-found for an unknown or foreign sender", async () => {
+    const h = harness(() => { throw dbError("PT404", "SENDER_NOT_FOUND"); });
+    const response = await h.read(`?sender_id=${senderId}`);
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.code).toBe("SENDER_NOT_FOUND");
+  });
+
+  it.each<[string, Rpc]>([
+    ["a database failure", () => { throw dbError("XX000", "private database detail"); }],
+    ["a missing receipt", () => null],
+    ["an unpublished field", () => ({ ...receipt, accounts: [{ ...receipt.accounts[0], next_eligible_at: receipt.observed_at }] })],
+    ["an unpublished waiting reason", () => ({ ...receipt, accounts: [{ ...receipt.accounts[0], waiting_reason: "send_paused" }] })],
+    ["another sender's account", () => receipt],
+  ])("reports %s as unavailable, never as zero activity", async (_case, rpc) => {
+    const h = harness(rpc);
+    const response = await h.read(`?sender_id=${senderId}`);
+    expect(response.status).toBe(502);
+    const text = await response.text();
+    expect(JSON.parse(text).error.code).toBe("LINKEDIN_STATUS_UNAVAILABLE");
+    expect(text).not.toMatch(/private database detail|invitations_sent/);
+  });
+});

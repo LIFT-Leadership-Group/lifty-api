@@ -39,6 +39,15 @@ describe("runtime context discovery and connection handoff", () => {
     });
     expect(getAgentContext("senders")!.instructions).toContain("lifty post senders delete");
     expect(getAgentContext("senders")!.instructions).toContain("lifty context senders");
+    const linkedin = getAgentContext("linkedin")!;
+    expect(Object.fromEntries(Object.entries(linkedin.operations!).map(([key, operation]) => [key, `${operation.method} ${operation.route}`]))).toEqual({
+      context: "GET /v1/context/linkedin",
+      get: "GET /v1/workspace/linkedin",
+    });
+    expect(linkedin.operations!.get!.request.query).toMatchObject({ properties: { sender_id: expect.any(Object) }, additionalProperties: false });
+    expect(linkedin.instructions).toContain("lifty get linkedin → GET /v1/workspace/linkedin; MCP linkedin_get");
+    // Connecting stays Identity's: the guide points there, with no second connect operation.
+    expect(linkedin.instructions).toContain("lifty post sending-accounts connect");
     for (const action of ["status", "start", "pause", "resume", "remove"]) {
       const operation = operations[`warmup_${action}`]!;
       expect(operation.route).toBe(

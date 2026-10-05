@@ -1,0 +1,30 @@
+{
+  "workspace": {
+    "name": "LIF1190 Contract",
+    "state": "ready_for_connections",
+    "workspace_ref": "22222222-2222-4222-8222-222222222222"
+  },
+  "observed_at": "2026-10-05T15:04:05.123456+00:00",
+  "today": { "invitations_sent": 3, "invitations_accepted": 1, "messages_sent": 2, "replies_received": 1 },
+  "last_7_days": { "invitations_sent": 17, "invitations_accepted": 6, "messages_sent": 9, "replies_received": 3 },
+  "accounts": [
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "sender_id": "33333333-3333-4333-8333-333333333333",
+      "status": "connected",
+      "state": "active",
+      "today": { "invitations_sent": 3, "invitations_accepted": 1, "messages_sent": 2, "replies_received": 1 },
+      "last_7_days": { "invitations_sent": 12, "invitations_accepted": 4, "messages_sent": 7, "replies_received": 2 },
+      "waiting_reason": "daily_limit_reached"
+    },
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "sender_id": "66666666-6666-4666-8666-666666666666",
+      "status": "disconnected",
+      "state": "paused",
+      "today": { "invitations_sent": 0, "invitations_accepted": 0, "messages_sent": 0, "replies_received": 0 },
+      "last_7_days": { "invitations_sent": 5, "invitations_accepted": 2, "messages_sent": 2, "replies_received": 1 },
+      "waiting_reason": null
+    }
+  ]
+}

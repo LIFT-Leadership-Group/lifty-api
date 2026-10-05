@@ -1,5 +1,6 @@
 import { historicalEmailResult, historicalOperation, HistoricalEmailResultSchema } from "./historical-outreach.js";
 import { executeOutreachOperation, type OutreachInput } from "./outreach-operations.js";
+import { executeLinkedinOperation, type LinkedinInput } from "./linkedin-operations.js";
 import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult, type AcquisitionRecoveryInput, type AcquisitionRecoveryOutput } from "./acquisition-recovery.js";
 import { RepairIssueSchema } from "./business-contracts.js";
 import { executeBusinessOperation } from "./business-operations.js";
@@ -99,6 +100,8 @@ export interface AppDependencies {
   /** Senders and sending accounts (LIF-1182); provider effects go through the account connection. */
   outreachOperation(session: AuthSession, key: string, input: OutreachInput): Promise<unknown>;
   identityOperation(session: AuthSession, key: string, input: IdentityInput, signal?: AbortSignal): Promise<IdentityResult>;
+  /** LinkedIn activity and waiting reasons (LIF-1190); read-only. */
+  linkedinOperation(session: AuthSession, key: string, input: LinkedinInput): Promise<unknown>;
   /** Browser connect page and confirmation shell for sending accounts. */
   accounts?: { connection: AccountConnection; origin: string; hostedOrigins: string[] };
   authenticate(request: Request): Promise<AuthenticationResult>;
@@ -652,6 +655,7 @@ const defaultDependencies: AppDependencies = {
   businessOperation: executeBusinessOperation,
   outreachOperation: executeOutreachOperation,
   identityOperation: (session, key, input, signal) => executeIdentityOperation(session, key, input, connectorUnavailable, signal),
+  linkedinOperation: executeLinkedinOperation,
   researchOperation: (session, key, input) => executeResearchOperation(session, key, input, DEFAULT_DASHBOARD_ORIGIN),
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");
