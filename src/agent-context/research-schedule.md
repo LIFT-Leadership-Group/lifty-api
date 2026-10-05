@@ -29,14 +29,17 @@ each week, and turn weekly research on or off. Read `references.common` first.
 ## The schedule
 
 The schedule is `weekly_target` plus `active` or `paused`. It exists from
-workspace creation at version 0, paused, with `weekly_target` equal to the
-limit. `effective_target` is the lower of `weekly_target` and the limit; a plan
-change applies its new limit at once and never rewrites the saved target.
+workspace creation at version 0, paused, following the plan: until the founder
+chooses a number, `weekly_target` reads as the limit and moves with it when the
+plan changes. `effective_target` is the lower of `weekly_target` and the limit.
+A plan change applies its new limit at once; it never rewrites a number the
+founder chose, so a chosen target below a new, higher limit stays as it is.
 
 - `patch` takes `{expected_version, weekly_target}` and nothing else. The
-  target is a whole number from 1 up to the limit; above it returns
-  `TARGET_ABOVE_LIMIT` with `limit`. The change applies to the current week;
-  people already completed or reserved stay counted. Patching never activates.
+  target is a whole number from 1 up to the limit (above it returns
+  `TARGET_ABOVE_LIMIT` with `limit`), or `null` to follow the plan's full limit
+  again. The change applies to the current week; people already completed or
+  reserved stay counted. Patching never activates.
 - `activate` and `pause` take `{expected_version}`. Activating requires saved
   targeting and research criteria (`RESEARCH_NOT_CONFIGURED` otherwise). It
   does not require a sample, a CRM or outreach. Pausing stops new admissions;
