@@ -26,7 +26,6 @@ export const EmailCampaignRequest = z.discriminatedUnion("operation", [
   request("placement-preview", { ...campaign, digest }),
   request("placement-confirm", { ...campaign, digest, placement_ref: reference, test_ref: z.string().regex(/^[A-Za-z0-9_-]{1,255}$/), seed_count: z.number().int().min(1).max(10), confirm_seeds: z.literal(true) }),
   request("suppress", { workspace, lead_ref: reference }),
-  request("provider", { workspace, channel: z.enum(["email", "linkedin"]), provider: z.enum(["unipile", "smartlead", "heyreach"]) }),
 ]);
 // Retained historical receipts and Email-owned placement consent only.
 export const HistoricalEmailCampaignRequest = z.union(EmailCampaignRequest.options.filter(option =>
@@ -74,7 +73,6 @@ export const EmailCampaignResult = z.union([
   EmailCampaignPreview,
   EmailPlacementResult,
   z.object({ lead_ref: reference, email: z.email(), workspace_ref: reference }),
-  z.object({ workspace_ref: reference, channel: z.enum(["email", "linkedin"]), provider: z.enum(["unipile", "smartlead", "heyreach"]), existing_executions_unchanged: z.literal(true) }),
   z.object({ suppressed: z.literal(true), lead_ref: reference }),
 ]);
 export type EmailCampaignOutput = z.infer<typeof EmailCampaignResult>;
@@ -89,7 +87,7 @@ export function campaignResultFor(operation: EmailCampaignInput["operation"], da
   // Preview must not fall through to the older status schema and lose its list.
   const result = operation === "placement-preview" ? EmailPlacementPreview.parse(data) :
     ["placement", "placement-status", "placement-confirm"].includes(operation) ? EmailPlacementResult.parse(data) : EmailCampaignResult.parse(data);
-  const matches = ["placement", "placement-status", "placement-confirm", "placement-preview"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "provider" ? "existing_executions_unchanged" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
+  const matches = ["placement", "placement-status", "placement-confirm", "placement-preview"].includes(operation) ? "placement_ref" in result : operation === "target" ? "email" in result : operation === "suppress" ? "suppressed" in result : "content" in result;
   if (operation === "cancel") {
     if (!("content" in result)) throw new Error("Cancellation was not confirmed.");
     const executionCanceled = result.execution_ref !== null && result.execution_state === "canceled";

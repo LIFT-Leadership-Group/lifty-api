@@ -25,8 +25,8 @@ export interface ServiceConfig {
   supabase: SupabaseAuthenticationConfig;
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
   slack: Omit<SlackConnectSettings, "fetchImpl"> | null;
-  /** Existing per-channel server capabilities (campaign, warmup and connection RPCs). */
-  serverKeys?: { email: string | null; linkedin: string | null };
+  /** Email server capability for the historical campaign and warmup RPCs; connections use `accounts`. */
+  serverKeys?: { email: string | null };
   /** Sending-account connections (LIF-1182). Null keeps connect links closed; reads still work. */
   accounts?: Omit<AccountConnectionSettings, "fetchImpl"> | null;
   /** Mailivery warmup (LIF-989). Null keeps warmup start closed. */
@@ -209,7 +209,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
       serverKey:emailKey, publicBaseUrl:warmupBaseUrl.origin, supabaseUrl:supabaseUrl.toString().replace(/\/$/, ""), publishableKey,
       googleClientId, googleClientSecret, mailivery:{apiKey:mailiveryKey},
     } : null,
-    serverKeys: { email: emailKey || null, linkedin: linkedinKey || null },
+    serverKeys: { email: emailKey || null },
     accounts: v2 && (emailKey || linkedinKey) ? {
       publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""), publishableKey,

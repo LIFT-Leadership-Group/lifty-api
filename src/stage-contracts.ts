@@ -20,8 +20,6 @@ import { CompanyPlanSchema } from "./company-mapping/contract.js";
 import { WarmupWorkspaceRequest, WarmupStatus, WarmupStartResult } from "./email-warmup-contracts.js";
 import { ConnectionPlacementStatus, PlacementStartRequest, PlacementStatusRequest } from "./email-connection-placement.js";
 import { DeliverabilityQueryParams, DeliverabilityResponse } from "./email-deliverability-contracts.js";
-import { EmailCampaignRequest, EmailCampaignResult } from "./email-campaign-contracts.js";
-import { LinkedinCampaignRequest, LinkedinCampaignResult } from "./linkedin-campaign-contracts.js";
 
 const JsonSchema = z.record(z.string(), z.unknown());
 export const StageOperationSchema = z.object({

@@ -394,25 +394,6 @@ Validation: browser-script tests execute the delivered inline JavaScript against
 
 Primary contracts: [password recovery guide](https://supabase.com/docs/guides/auth/passwords), [Auth REST schema](https://github.com/supabase/auth/blob/master/openapi.yaml), [official Auth client recovery/transport](https://github.com/supabase/auth-js/blob/master/src/GoTrueClient.ts), [redirect allowlist](https://supabase.com/docs/guides/auth/redirect-urls). No mandatory email-verification or leaked-password setting is introduced.
 
-## LinkedIn campaigns (LIF-844)
-
-`POST /v1/linkedin/campaign` accepts `{ "operation": ..., "payload": ... }`:
-
-| Operation | Payload |
-| --- | --- |
-| `prepare` | `workspace`, `lead_id`, `connection_ref`, exact plain-text `text` (1–3000 characters), optional `campaign_ref` |
-| `preview`, `status` | `workspace`, `campaign_ref` |
-| `approve`, `activate`, `pause`, `cancel` | `workspace`, `campaign_ref`, exact `digest`, `confirm: true` |
-
-The preview fixes an invitation without a note, followed by one message after
-verified acceptance. It includes the exact message, recipient, connection,
-version, digest, policy, action outcomes and blockers. A material change creates
-a new version and invalidates approval. Delivery receipts and uncertain outcomes
-remain inspectable; the API does not send or retry an invitation or message.
-The backend owns atomic reservations: 5 invitations/day, 25 invitations in a
-rolling 7 days, 5 messages/day, weekdays 09:00–17:00 in the founder timezone,
-and 15–45 minute spacing. There are no extra steps or editable schedules.
-
 ### Workspace retirement
 
 Customers cannot delete a workspace, and the customer catalog has no delete

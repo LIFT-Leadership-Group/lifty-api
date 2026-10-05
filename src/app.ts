@@ -1,4 +1,4 @@
-import { historicalEmailResult, historicalLinkedinResult, historicalOperation, HistoricalEmailResultSchema, HistoricalLinkedinResultSchema } from "./historical-outreach.js";
+import { historicalEmailResult, historicalOperation, HistoricalEmailResultSchema } from "./historical-outreach.js";
 import { executeOutreachOperation, type OutreachInput } from "./outreach-operations.js";
 import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult, type AcquisitionRecoveryInput, type AcquisitionRecoveryOutput } from "./acquisition-recovery.js";
 import { RepairIssueSchema } from "./business-contracts.js";
@@ -45,7 +45,6 @@ import {
 } from "./slack-connect.js";
 import { isSealedSlackState } from "./slack-state.js";
 
-import { HistoricalLinkedinCampaignRequest, LinkedinCampaignRequest, LinkedinCampaignResult, linkedinCampaignResultFor, type LinkedinCampaignInput, type LinkedinCampaignOutput } from "./linkedin-campaign-contracts.js";
 import { HistoricalEmailCampaignRequest, EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 import { EmailWorkspace } from "./email-contracts.js";
 import { connectorUnavailable, executeIdentityOperation, type IdentityInput, type IdentityResult } from "./identity-operations.js";
@@ -91,7 +90,6 @@ export interface AppDependencies {
   retireWorkspace(session: AuthSession, input: RetireWorkspaceInput): Promise<RetireWorkspaceOutput>;
   deleteOwnLogin(session: AuthSession, input: DeleteLoginInput): Promise<DeleteLoginOutput>;
   emailCampaign(session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput>;
-  linkedinCampaign(session: AuthSession, input: LinkedinCampaignInput): Promise<LinkedinCampaignOutput>;
   getEmailWarmup(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStatusValue>;
   startEmailWarmup(session: AuthSession, workspace: string, connectionRef?: string): Promise<WarmupStart>;
   changeEmailWarmup(session: AuthSession, workspace: string, operation: "pause" | "resume" | "remove", connectionRef?: string): Promise<WarmupStatusValue>;
@@ -295,9 +293,6 @@ function registerOpenApi(app: OpenAPIHono<AppEnvironment>): void {
   app.openAPIRegistry.registerPath({method:"post",path:"/v1/me/delete",operationId:"deleteOwnLogin",security:[{bearerAuth:[]}],
     request:{body:{required:true,content:{"application/json":{schema:DeleteLoginRequest}}}},
     responses:{200:JsonResponse(DeleteLoginResult),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),404:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
-  app.openAPIRegistry.registerPath({ method: "post", path: "/v1/linkedin/campaign", operationId: "linkedinCampaign", security: [{ bearerAuth: [] }],
-    request: { body: { required: true, content: { "application/json": { schema: HistoricalLinkedinCampaignRequest } } } },
-    responses: { 200: JsonResponse(HistoricalLinkedinResultSchema), 400: JsonResponse(ErrorResponseSchema), 401: JsonResponse(ErrorResponseSchema), 403: JsonResponse(ErrorResponseSchema), 409: JsonResponse(ErrorResponseSchema), 502: JsonResponse(ErrorResponseSchema), 503: JsonResponse(ErrorResponseSchema) } });
   app.openAPIRegistry.registerPath({method:"get",path:"/v1/email/campaign/placement/preview",operationId:"previewEmailPlacement",security:[{bearerAuth:[]}],
     request:{query:z.object({workspace:EmailWorkspace,campaign_ref:z.uuid(),digest:z.string().regex(/^[a-f0-9]{64}$/)})},
     responses:{200:JsonResponse(EmailPlacementPreview),400:JsonResponse(ErrorResponseSchema),401:JsonResponse(ErrorResponseSchema),403:JsonResponse(ErrorResponseSchema),409:JsonResponse(ErrorResponseSchema),502:JsonResponse(ErrorResponseSchema)}});
@@ -652,7 +647,6 @@ const defaultDependencies: AppDependencies = {
   acquisitionRecovery: async () => { throw new PublicError({status:503,code:"ACQUISITION_RECOVERY_UNAVAILABLE",message:"Research recovery is not configured."}); },
   retireWorkspace: async () => { throw new PublicError({status:503,code:"WORKSPACE_RETIREMENT_UNAVAILABLE",message:"Workspace retirement is not configured yet."}); },
   deleteOwnLogin: async () => { throw new PublicError({status:503,code:"LOGIN_DELETION_UNAVAILABLE",message:"Login deletion is not configured yet."}); },
-  linkedinCampaign: async () => { throw new PublicError({ status: 503, code: "LINKEDIN_NOT_CONFIGURED", message: "LinkedIn campaigns are not configured yet." }); },
   emailCampaign: async () => { throw new PublicError({status:503,code:"EMAIL_NOT_CONFIGURED",message:"Email campaigns are not configured yet."}); },
   authenticate: async () => ({ ok: false, reason: "invalid_session" }),
   businessOperation: executeBusinessOperation,
@@ -1321,17 +1315,6 @@ export function createApp(
     return context.json(EmailPlacementResult.parse(await dependencies.emailCampaign(context.get("authSession"), parsed.data)));
   });
 
-  app.post("/v1/linkedin/campaign", async (context) => {
-    context.header("cache-control", "no-store");
-    const raw = await readRequestTextWithinLimit(context.req.raw, 32 * 1024);
-    if (!raw.ok) return errorJson(context, 413, "INVALID_REQUEST", "LinkedIn campaign request is too large.");
-    let body: unknown;
-    try { body = JSON.parse(raw.text); } catch { return errorJson(context, 400, "INVALID_REQUEST", "Provide one campaign request as JSON."); }
-    const parsed = HistoricalLinkedinCampaignRequest.safeParse(body);
-    if (!parsed.success) return errorJson(context, 400, "INVALID_REQUEST", "Check the LinkedIn campaign operation, workspace and required fields.");
-    const result = await historicalOperation(() => dependencies.linkedinCampaign(context.get("authSession"), parsed.data));
-    return context.json(historicalLinkedinResult(linkedinCampaignResultFor(parsed.data, result)));
-  });
   app.post("/v1/email/campaign", async (context) => {
     context.header("cache-control", "no-store");
     const raw = await readRequestTextWithinLimit(context.req.raw, 128 * 1024);

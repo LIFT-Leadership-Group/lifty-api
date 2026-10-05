@@ -87,7 +87,7 @@ describe("campaign authenticated narrow capability", () => {
       expect(h.rpc).toHaveBeenCalledTimes(1);
     }
   });
-  it("rejects invalid channel/provider and unsafe steps", async () => {
+  it("rejects the retired provider selector and unsafe steps", async () => {
     const h = harness();
     expect((await h.app.request("/v1/email/campaign",post({operation:"provider",payload:{workspace:"senja",channel:"email",provider:"heyreach"}}))).status).toBe(400);
     const payload = { workspace:"senja",lead_ref:reference,connection_ref:reference,name:"Test",start_at:"2026-09-14T21:00:00Z",steps:preview.content.steps };

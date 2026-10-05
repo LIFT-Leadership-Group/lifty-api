@@ -65,9 +65,6 @@ export function createEmailCampaignOperations(serverKey: string) {
   if (serverKey.length < 32) throw new Error("Invalid email server key.");
   return async (session: AuthSession, input: EmailCampaignInput): Promise<EmailCampaignOutput> => {
     const parsed = EmailCampaignRequest.parse(input);
-    if (parsed.operation === "provider" && !["unipile", parsed.payload.channel === "email" ? "smartlead" : "heyreach"].includes(parsed.payload.provider)) {
-      throw new PublicError({ status: 400, code: "INVALID_REQUEST", message: "Choose an available provider for this channel." });
-    }
     // The authenticated caller's client preserves their JWT; the dedicated
     // server key grants this RPC capability, never unrestricted table access.
     const client = session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
