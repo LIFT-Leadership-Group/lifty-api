@@ -185,6 +185,11 @@ optional `UNIPILE_DSN` + `UNIPILE_ACCESS_TOKEN` pair is used only to remove acce
 for accounts still bound through the earlier provider API. The Functions
 migration providing these RPCs must be released before this API.
 
+`LIFTY_LINKEDIN_SERVER_KEY` is the dedicated capability for LinkedIn account
+connections: a random key of at least 32 characters, different from the email
+key. Store its SHA-256 digest and the stable Unipile namespace in
+`private.lifty_linkedin_server_config`.
+
 ## Mailivery warmup (LIF-989)
 
 The hosted email form now asks how the founder uses the mailbox. `personal`
@@ -394,7 +399,7 @@ Validation: browser-script tests execute the delivered inline JavaScript against
 
 Primary contracts: [password recovery guide](https://supabase.com/docs/guides/auth/passwords), [Auth REST schema](https://github.com/supabase/auth/blob/master/openapi.yaml), [official Auth client recovery/transport](https://github.com/supabase/auth-js/blob/master/src/GoTrueClient.ts), [redirect allowlist](https://supabase.com/docs/guides/auth/redirect-urls). No mandatory email-verification or leaked-password setting is introduced.
 
-### Workspace retirement
+## Workspace retirement
 
 Customers cannot delete a workspace, and the customer catalog has no delete
 operation. Only a LIFT admin (`profiles.is_admin`) calls
@@ -408,35 +413,7 @@ revocations; retained LinkedIn account/history guards still apply. Consumed
 sending budgets are preserved. Retirement is separate from Business and does
 not depend on the email service key. Account deletion remains a separate action.
 
-### Deployment and acceptance
-
-1. Apply the LIF-844 SQL migration, retaining the existing account/action ledger,
-   canonical `lead_events` and cross-channel reply/suppression guards.
-2. Provision a random `LIFTY_LINKEDIN_SERVER_KEY` of at least 32 characters and
-   its SHA-256 digest plus the stable Unipile namespace in
-   `private.lifty_linkedin_server_config`. Use a key different from email.
-3. Configure that key, `UNIPILE_DSN` and `UNIPILE_ACCESS_TOKEN` in the API. Either
-   channel can be enabled independently. The API rejects service-role Supabase
-   credentials. Member operations keep the caller JWT and the dedicated RPC
-   capability; browser operations recheck the durable intent issuer in SQL.
-4. Deploy the matching SQL, Jobs/Edge runtime and API commits and publish the
-   CLI through the existing release process. Inspect `/openapi.json` for the
-   strict public contracts. A local commit does not enable sending.
-5. Run the explicitly authorized account/recipient acceptance journey and
-   record invite, acceptance, message and reply receipts and canonical events.
-   Confirm paused recovery, cross-tenant isolation, no duplicate events/sends,
-   cross-channel stop and zero accidental pending work before founders.
-
-`npm run verify` covers mocked HTTP/provider shapes, purpose separation,
-callbacks, caller-scoped RPCs, public schemas and the existing email regression
-suite. These tests do not claim live Hosted Auth or recipient delivery acceptance.
-
-Provider contracts checked: [account readback](https://developer.unipile.com/reference/accountscontroller_getaccountbyid),
-[own-profile readback](https://developer.unipile.com/reference/userscontroller_getaccountownerprofile),
-[Hosted Auth](https://developer.unipile.com/docs/hosted-auth).
-
-
-### Company mapping for the local agent
+## Company mapping for the local agent
 
 `GET /v1/integrations/hubspot/company-mapping/context?workspace_ref=<uuid>` returns current portal properties, mappings, task instructions and the candidate schema. The optional workspace selector requires current membership and a supported active Lifty workspace; omission retains the single-workspace default. `POST /v1/integrations/hubspot/company-mapping` executes the deterministic workflow in **lifty-api**. The local agent calls the CLI, the CLI calls this API, and the API uses HubSpot plus one narrowly authorized storage RPC. It no longer invokes the company Edge Function.
 
@@ -448,7 +425,7 @@ Storage requires **both** the caller's verified user JWT/current workspace membe
 
 Rollout: apply `20260916115048_lif858_company_api_capability.sql`, provision a cryptographically random dedicated key in API secret configuration and only its SHA-256 in `private.lifty_crm_server_config`, then deploy the API. `/readyz/crm` must return `{status:"ready",capability:"lifty-crm-company.v1"}`; `scripts/digitalocean.sh smoke` enforces that independently of general health. It validates the installed RPC/version/key without reading tenant data or contacting HubSpot. A missing/mismatched key fails this probe and company requests return 503. Release the matching CLI after verifying an authenticated workspace context/apply/readback canary. Keep the old Edge deployment only for rollback during this rollout; disable/remove it after API cutover is verified. Never copy production tokens into canary output.
 
-#### Company cutover rollback
+### Company cutover rollback
 
 1. Set `CONSUMER_READ_ONLY_MODE=true` in the API deployment to stop new company apply operations. Context remains available; already accepted HubSpot changes require a fresh readback.
 2. Keep the additive CRM migration and the previously deployed Edge Function. Do not roll back the entire API once new receipt/config Jobs are live: older API schemas cannot read their contracts.
@@ -460,7 +437,7 @@ Company setup guidance is served through the current v6 CRM stage context.
 Earlier client profiles are retired; the response envelope remains
 `lifty-context.v1`. The company mapping backend must be available before use.
 
-### General CRM mapping and verified record links (LIF-897)
+## General CRM mapping and verified record links (LIF-897)
 
 Current v6 clients discover the full mapper through `context crm`. Its
 `mapping_catalog`, `mapping_sources`, `mapping_preview`, `mapping_apply`,
