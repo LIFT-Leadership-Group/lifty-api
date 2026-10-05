@@ -14,7 +14,7 @@ function app() {
     runCrmMapping: createCrmMapping(settings),
   });
 }
-const send = () => app().request("/v1/workspace/crm/mapping/sync", { method: "POST", headers: { "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v8" }, body: JSON.stringify(request) });
+const send = () => app().request("/v1/workspace/crm/mapping/sync", { method: "POST", headers: { "content-type": "application/json", "x-lifty-client-contract": "lifty-cli-context.v10" }, body: JSON.stringify(request) });
 beforeEach(() => { vi.mocked(runCrmMapping).mockReset(); });
 
 describe("public CRM operation boundary", () => {

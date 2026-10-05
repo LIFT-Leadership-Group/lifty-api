@@ -181,7 +181,7 @@ function smartleadWarmup(mailbox: SourceMailbox, now: Date): WarmupSource | null
   const registry = mailbox.smartlead;
   const check = freshness(w.observed_at, SMARTLEAD_WARMUP_FRESH_HOURS * HOUR, now);
   const reasons: Reason[] = [];
-  if (check.freshness === "stale") reasons.push(reason("warmup_check_stale", `The latest Smartlead warmup check is older than ${SMARTLEAD_WARMUP_FRESH_HOURS} hours.`));
+  if (check.freshness === "stale") reasons.push(reason("warmup_check_stale", `The latest warmup check is older than ${SMARTLEAD_WARMUP_FRESH_HOURS} hours.`));
   const detail = w.detail ? ` ${w.detail}` : "";
   const activeDays = w.active_since ? Math.max(0, Math.floor((ms(w.observed_at) - ms(w.active_since)) / DAY)) : null;
   const eligibleAt = ms(registry?.cold_eligible_at);
@@ -193,14 +193,14 @@ function smartleadWarmup(mailbox: SourceMailbox, now: Date): WarmupSource | null
     reasons.push(reason("period_counted_from_registry", `For this approved inbox the required period counts from the registry warmup start, ${day(registry.warmup_started_at)}. The current run of continuous warmup activity began ${day(w.active_since)}.`));
   }
   let state: WarmupSource["state"];
-  if (w.status === "active" && w.health === "pass") state = make("active", "Warming", "ok", "Smartlead warmup is running and its latest check passed.", reasons);
+  if (w.status === "active" && w.health === "pass") state = make("active", "Warming", "ok", "Warmup is running and its latest check passed.", reasons);
   else if (w.status === "active" && w.health === "pending") state = make("active", "Warming · low activity", "watch",
-    "Smartlead warmup is running, but recent warmup activity is below the minimum for a passing check.", [...reasons, reason("warmup_activity_low", `Warmup activity is below the minimum.${detail}`)]);
+    "Warmup is running, but recent warmup activity is below the minimum for a passing check.", [...reasons, reason("warmup_activity_low", `Warmup activity is below the minimum.${detail}`)]);
   else if (w.status === "active" && w.health === "fail") state = make("problem", "Warmup failing", "bad",
-    "Smartlead warmup is running, but its latest check failed.", [...reasons, reason("warmup_health_failed", `The latest warmup check failed.${detail}`)]);
-  else if (w.status === "inactive") state = make("not_running", "Warmup off", "warn", "Smartlead reports that warmup is not running for this inbox.", reasons);
-  else if (w.status === "blocked") state = make("problem", "Warmup blocked", "bad", "Smartlead reports that warmup is blocked for this inbox.", [...reasons, reason("warmup_blocked", `Smartlead blocked warmup.${detail}`)]);
-  else state = make("unknown", "Warmup state unknown", "warn", "The latest Smartlead check could not determine the warmup state.", reasons);
+    "Warmup is running, but its latest check failed.", [...reasons, reason("warmup_health_failed", `The latest warmup check failed.${detail}`)]);
+  else if (w.status === "inactive") state = make("not_running", "Warmup off", "warn", "Warmup is not running for this inbox.", reasons);
+  else if (w.status === "blocked") state = make("problem", "Warmup blocked", "bad", "Warmup is blocked for this inbox.", [...reasons, reason("warmup_blocked", `Warmup is blocked.${detail}`)]);
+  else state = make("unknown", "Warmup state unknown", "warn", "The latest check could not determine the warmup state.", reasons);
   return {
     provider: "smartlead", connection_ref: null, state,
     started_at: w.active_since ? iso(ms(w.active_since)) : null, started_at_basis: w.active_since ? "observed_activity" : null,
@@ -231,15 +231,15 @@ function mailiveryWarmup(item: SourceMailivery, connection: SourceConnection | u
   if (check.freshness === "stale") reasons.push(reason("warmup_check_stale", `The latest warmup check is older than ${MAILIVERY_EVIDENCE_FRESH_HOURS} hours.`));
   let state: WarmupSource["state"];
   switch (binding?.state) {
-    case "warming": state = make("active", "Warming", blocking || evidence?.healthy === false ? "warn" : "ok", "Mailivery is warming this inbox.", reasons); break;
-    case "link_issued": state = make("pending", "Waiting for mailbox connection", "watch", "Warmup starts after the mailbox is connected in Mailivery.", reasons); break;
+    case "warming": state = make("active", "Warming", blocking || evidence?.healthy === false ? "warn" : "ok", "Lifty is warming this inbox.", reasons); break;
+    case "link_issued": state = make("pending", "Waiting for mailbox connection", "watch", "Warmup starts after the mailbox is authorized for warmup.", reasons); break;
     case "pending_consent": state = dnsHoldRecords(blocking)
       ? make("pending", "Waiting for valid DNS records", "warn", "Warmup starts on its own once the mailbox domain has valid SPF, DMARC and MX records.", reasons)
-      : make("pending", "Waiting for Microsoft consent", "watch", "Warmup starts after Microsoft consent is finished in Mailivery.", reasons); break;
-    case "paused": state = make("paused", "Paused", "warn", "Mailivery warmup is paused. Paused days don't count toward the warmup period.", reasons); break;
-    case "problem": state = make("problem", "Needs attention", "bad", "Mailivery warmup has a problem. Days with a problem don't count.", reasons); break;
-    case "removed": state = make("not_running", "Removed", "muted", "Mailivery warmup was removed for this inbox.", reasons); break;
-    default: state = make("unknown", "Warmup state unknown", "warn", "Warmup evidence exists, but no current Mailivery setup is recorded.", reasons);
+      : make("pending", "Waiting for Microsoft consent", "watch", "Warmup starts after Microsoft consent is finished for warmup.", reasons); break;
+    case "paused": state = make("paused", "Paused", "warn", "Warmup is paused. Paused days don't count toward the warmup period.", reasons); break;
+    case "problem": state = make("problem", "Needs attention", "bad", "Warmup has a problem. Days with a problem don't count.", reasons); break;
+    case "removed": state = make("not_running", "Removed", "muted", "Warmup was removed for this inbox.", reasons); break;
+    default: state = make("unknown", "Warmup state unknown", "warn", "Warmup evidence exists, but no current warmup setup is recorded.", reasons);
   }
   const personal = connection?.mailbox_use === "personal";
   const required = personal ? null : REQUIRED_WARMUP_ACTIVE_DAYS;
@@ -283,7 +283,7 @@ function presentWarmup(mailbox: SourceMailbox, now: Date): DeliverabilityMailbox
   if (worst.state.code === "active" && progress) {
     label = progress.period_complete ? `${worst.state.label} · initial period complete` : `${worst.state.label} · day ${progress.active_days} of ${progress.required_days}`;
   }
-  const names = sources.map(source => source.provider === "smartlead" ? "Smartlead" : "Mailivery").join(" and ");
+  const names = sources.map(source => source.provider === "smartlead" ? "campaign platform warmup" : "Lifty warmup").join(" and ");
   const period = progress?.period_complete ? " The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns." : "";
   return {
     status: make(worst.state.code, label, worst.state.tone, `${worst.state.description}${sources.length > 1 ? ` Evidence comes from ${names}.` : ""}${period}`,
@@ -367,7 +367,7 @@ function connectionGate(mailbox: SourceMailbox, connection: SourceConnection): C
     for (const hold of connection.holds) reasons.push(reason("hold", `A safety hold is active (${hold.reason}).`));
     if (!connection.mailbox_use) reasons.push(reason("mailbox_use_required", "Say whether this is a mailbox you already use or a new outreach account before sending. Reconnect the email account to answer."));
     const unlocked = mailbox.warmup.mailivery.find(item => item.connection_ref === connection.connection_ref)?.outreach_unlocked === true;
-    if (connection.mailbox_use === "outreach" && !unlocked) reasons.push(reason("warmup_required", `A new outreach account needs ${REQUIRED_WARMUP_ACTIVE_DAYS} active warmup days and a healthy check from the last 24 hours before it can send.`));
+    if (connection.mailbox_use === "outreach" && !unlocked) reasons.push(reason("warmup_required", `Warmup holds this dedicated account: it needs a healthy check after ${REQUIRED_WARMUP_ACTIVE_DAYS} active warmup days, or its warmup emails are landing in spam. Check warmup status for which.`));
     return reasons.length > 0
       ? { gate: "lifty_campaign_checks", ...make("blocked", "Blocked", "bad", "Lifty's send checks block this connection.", reasons) }
       : { gate: "lifty_campaign_checks", ...make("no_known_blocker", "No known blocker", "watch",

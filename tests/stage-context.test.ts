@@ -64,7 +64,7 @@ describe("runtime context discovery and connection handoff", () => {
     }
     expect(getAgentContext("senders")!.instructions).toContain("they are never identifiers");
     expect(context.instructions).toContain(
-      "Warmup resume never resumes campaigns",
+      "Warmup never pauses or resumes campaigns",
     );
     expect(context.instructions).toContain(
       "Warmup setup uses Google OAuth only",

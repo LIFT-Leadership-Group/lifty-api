@@ -48,8 +48,7 @@ export function createProductionApp(config: ServiceConfig) {
   // server-key-protected intent RPC, never a Supabase administrative key.
   const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
   const placement = createEmailConnectionPlacementOperations();
-  const warmup = createEmailWarmupOperations({ mailivery: config.mailivery ?? null,
-    ...(warmupSetup ? {issueSetupLink:warmupSetup.issue} : {}) });
+  const warmup = createEmailWarmupOperations({ ...(warmupSetup ? {issueSetupLink:warmupSetup.issue} : {}) });
   // Reads use the caller's session; only report reads for authorized tests use the server-side key.
   const deliverability = createEmailDeliverabilityOperations({
     readPlacementDetails: createPlacementReportReader({ smartleadApiKey: config.smartleadApiKey ?? null }) });

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 
-const current = "lifty-cli-context.v8";
-const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7"];
+const current = "lifty-cli-context.v10";
+const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7", "lifty-cli-context.v8"];
 const tasks = ["setup", "account", "journeys", "stages", "business", "targeting", "research-criteria",
   "sample-review", "commercial-voice", "crm", "senders", "sending-accounts", "campaigns", "notifications"];
 

@@ -5,7 +5,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { newSetupSecret, type WarmupSetup } from "./warmup-setup.js";
-import { renderWarmupReceipt, renderWarmupSetupPage, WARMUP_SETUP_SCRIPT_HASH } from "./warmup-setup-page.js";
+import { renderWarmupReceipt, renderWarmupSetupPage } from "./warmup-setup-page.js";
 import { PublicError } from "./errors.js";
 import { PENDING_SUBMIT_SCRIPT_HASH } from "./lifty-brand.js";
 
@@ -16,7 +16,7 @@ export function createWarmupSetupRouter(setup:WarmupSetup, log?:(event:Confirmat
   const error = (c:Context, status:ContentfulStatusCode, message:string) => c.html(renderWarmupReceipt("Setup needs attention", message), status);
   app.use("*", async(c,next)=>{
     c.header("cache-control","no-store, no-transform"); c.header("referrer-policy","no-referrer"); c.header("x-content-type-options","nosniff");
-    c.header("content-security-policy",`default-src 'none'; style-src 'unsafe-inline'; script-src '${WARMUP_SETUP_SCRIPT_HASH}' '${PENDING_SUBMIT_SCRIPT_HASH}'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'`);
+    c.header("content-security-policy",`default-src 'none'; style-src 'unsafe-inline'; script-src '${PENDING_SUBMIT_SCRIPT_HASH}'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'`);
     await next();
   });
   // Never log exceptions, queries, bodies or OAuth responses. The shared
@@ -50,9 +50,9 @@ export function createWarmupSetupRouter(setup:WarmupSetup, log?:(event:Confirmat
     const cookie = getCookie(c,cookieName) ?? "", csrf = form.get("csrf") ?? "";
     if (!/^[A-Za-z0-9_-]{43}$/.test(cookie) || !/^[A-Za-z0-9_-]{43}$/.test(csrf)
       || !timingSafeEqual(Buffer.from(cookie),Buffer.from(csrf))) return error(c,403,"Reopen the Lifty setup link in this browser.");
-    const keys=["intent","csrf","first_name","last_name","timezone"];
+    const keys=["intent","csrf"];
     if(keys.some(key=>form.getAll(key).length!==1)||[...form.keys()].some(key=>!keys.includes(key))) return error(c,400,"Submit each setup field once.");
-    const target = await setup.choose(form.get("intent")!,cookie,{first_name:form.get("first_name"),last_name:form.get("last_name"),timezone:form.get("timezone")});
+    const target = await setup.choose(form.get("intent")!,cookie);
     return c.redirect(target,303);
   });
   app.route("/",createConfirmationRouter("warmup",{
