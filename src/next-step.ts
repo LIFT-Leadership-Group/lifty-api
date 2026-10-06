@@ -76,7 +76,7 @@ export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
   // sample; a yes to LinkedIn connects the founder's sender (LIF-1302).
   sample_ready_for_founder_review: { step: "sample-review", state: "review", section: "leads",
     when: ["The first research run succeeded", "No campaign is saved", "No LinkedIn account is connected"],
-    guide: { task: "step-review" }, context: "sample-review", related: ["targeting", "research-criteria", "crm", "senders", "sending-accounts"] },
+    guide: { task: "step-review" }, context: "sample-review", related: ["targeting", "research-criteria", "crm", "customer-exclusions", "senders", "sending-accounts"] },
   // Part 2: alerts once, then voice before the first draft, then templates.
   linkedin_connected: { step: "campaign", state: "action_required", section: "outreach",
     when: ["The first research run succeeded", "A LinkedIn account is connected", "No campaign is saved"],
@@ -123,7 +123,6 @@ export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
 export const ON_REQUEST_CONTEXTS: Record<string, string> = {
   summary: "Holds next_step and summary_context themselves; agents read the workspace summary to resume or report status.",
   account: "Deleting the signed-in login, only when the founder asks.",
-  "customer-exclusions": "Protecting existing customers when the founder asks or shares a customer file.",
 };
 // A marked test workspace's drafts replace the published files they name (LIF-1298).
 export function nextStepGuide(reason: string, drafts: readonly ContextDraft[] = []) {
@@ -557,7 +556,7 @@ export async function getNextStep(
   if (crm.status === "available") {
     if (crm.value.status !== "connected")
       crmAction =
-        "Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio). Connect only after a separate explicit request, with crm_post for the CRM they use; a leads-only workspace can remain here.";
+        `Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio), and explain that connecting it also lets Lifty read their deals and closed customers so it never looks for leads at those companies. Connect only after a separate explicit request, with crm_post for the CRM they use. If they do not connect a CRM, offer to save the companies that are already their customers from a file so Lifty never contacts them: read ${tool("customer-exclusions", "status")} first and skip the offer when a list is saved, then ${tool("customer-exclusions", "import")} (summary_context task customer-exclusions). They can skip it now and add the file any time. A leads-only workspace can remain here.`;
     else if (crm.value.reconnect_required)
       crmAction =
         "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
