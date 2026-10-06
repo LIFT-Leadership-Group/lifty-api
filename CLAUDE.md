@@ -78,9 +78,11 @@ research schedule's plan; admins may read that status only after the Functions
 migration `20261006220000_lif1260_admin_email_status.sql`, so deploy it first.
 `NEXT_STEP_CATALOG` in `src/next-step.ts` is the step list the ops view shows,
 and next_step builds each response's state, step, section, `context_task` and
-`related_contexts` from it. Every stage context is linked by some step or
-declared in `ON_REQUEST_CONTEXTS`; `tests/next-step-size.test.ts` enforces that
-and that a step recommends only tools of the stages it links (LIF-1301).
+`related_contexts` from it. Every stage context has exactly one role: linked by
+some step, the base of every step (`BASE_CONTEXTS`: summary) or read on request
+(`ON_REQUEST_CONTEXTS`); the admin read returns both maps for the ops page.
+`tests/next-step-size.test.ts` enforces that and that a step recommends only
+tools of the stages it links (LIF-1301, LIF-1304).
 
 ## Context drafts
 
