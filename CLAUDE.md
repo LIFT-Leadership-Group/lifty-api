@@ -65,3 +65,12 @@ LIF-1139 requires the Functions migration
 `20260929203000_lif1139_connection_browser_receipts.sql` before this API revision.
 HubSpot/Slack fail closed before exchanging a code if its claim RPC is unavailable.
 Mailivery retains ephemeral tokens and its existing single-dispatch fence.
+
+## Customer exclusion imports
+
+LIF-1082's authenticated customer-exclusions status/import stage requires the
+Functions migration `20261006180000_lif1082_founder_customer_exclusions.sql`
+before this API revision. Deploy the database through its production-database
+job first. The API reads and replaces founder-upload membership through member
+RPCs; unavailable reads stay unknown. CRM and manual protections are preserved,
+and a file containing only rejected customer rows cannot clear the saved list.

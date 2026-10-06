@@ -2,6 +2,7 @@ import { historicalEmailResult, historicalOperation, HistoricalEmailResultSchema
 import { executeOutreachOperation, type OutreachInput } from "./outreach-operations.js";
 import { executeLinkedinOperation, type LinkedinInput } from "./linkedin-operations.js";
 import { executeCrmPreferencesOperation } from "./crm-preferences.js";
+import { executeCustomerExclusionsOperation } from "./customer-exclusions.js";
 import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult, type AcquisitionRecoveryInput, type AcquisitionRecoveryOutput } from "./acquisition-recovery.js";
 import { RepairIssueSchema } from "./business-contracts.js";
 import { executeBusinessOperation } from "./business-operations.js";
@@ -64,6 +65,7 @@ const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
 // One shared per-user budget for expensive provisioning, run and provider operations.
 const rateLimitedPaths = new Set([
   "/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/sample-review", "/v1/integrations/hubspot/company-mapping", "/v1/email/warmup/start",
+  "/v1/workspace/customer-exclusions/import",
   "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/senders", "/v1/workspace/sending-accounts/connect",
   "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync", "/v1/integrations/attio/sync", "/v1/workspace/crm/sync",
 ]);
@@ -106,6 +108,8 @@ export interface AppDependencies {
   linkedinOperation(session: AuthSession, key: string, input: LinkedinInput): Promise<unknown>;
   /** CRM research-note and conversation preferences (LIF-1239). */
   crmPreferencesOperation(session: AuthSession, key: string, input: IdentityInput): Promise<unknown>;
+  /** Founder CSV customer protections (LIF-1082), with no provider effects. */
+  customerExclusionsOperation(session: AuthSession, key: string, input: IdentityInput): Promise<unknown>;
   /** Browser connect page and confirmation shell for sending accounts. */
   accounts?: { connection: AccountConnection; origin: string; hostedOrigins: string[] };
   authenticate(request: Request): Promise<AuthenticationResult>;
@@ -664,6 +668,7 @@ const defaultDependencies: AppDependencies = {
   identityOperation: (session, key, input, signal) => executeIdentityOperation(session, key, input, connectorUnavailable, signal),
   linkedinOperation: executeLinkedinOperation,
   crmPreferencesOperation: executeCrmPreferencesOperation,
+  customerExclusionsOperation: executeCustomerExclusionsOperation,
   researchOperation: (session, key, input) => executeResearchOperation(session, key, input, DEFAULT_DASHBOARD_ORIGIN),
   getWorkspace: async () => {
     throw new Error("getWorkspace is not configured");

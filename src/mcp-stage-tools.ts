@@ -22,7 +22,7 @@ const openWorld = new Set(["sample-review.post", "research-schedule.activate", "
 const nonDestructive = new Set(["business.post", "senders.post", "journeys.post", "campaigns.post"]);
 // Writes that commit synchronously, with no authorization link or receipt.
 const synchronousStages = new Set(["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule", "journeys", "campaigns"]);
-const synchronousOperations = new Set(["crm.preferences_patch"]);
+const synchronousOperations = new Set(["crm.preferences_patch", "customer-exclusions.import"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.

@@ -4,6 +4,7 @@ import { researchEntries, validateResearchInput } from "./research-operations.js
 import { identityEntries, validateIdentityInput } from "./identity-operations.js";
 import { linkedinEntries } from "./linkedin-operations.js";
 import { crmPreferencesEntries } from "./crm-preferences.js";
+import { customerExclusionsEntries, validateCustomerExclusionsInput } from "./customer-exclusions.js";
 import { getWorkspaceSummary } from "./workspace-summary.js";
 import { getNextStep } from "./next-step.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
@@ -36,9 +37,9 @@ const MAX_STAGE_BYTES = 132 * 1024;
 const invalid = () => new PublicError({ status: 400, code: "INVALID_REQUEST", message: "Use the current stage request schema and supported fields." });
 const forbidden = () => new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "This operation belongs to the current Lifty workspace." });
 
-async function readBody(context: Context<AppEnvironment>, invalidCode?: string): Promise<unknown> {
+async function readBody(context: Context<AppEnvironment>, invalidCode?: string, maxBytes = MAX_STAGE_BYTES): Promise<unknown> {
   const length = Number(context.req.header("content-length"));
-  if (Number.isFinite(length) && length > MAX_STAGE_BYTES) throw new PublicError({ status: 413, code: "PAYLOAD_TOO_LARGE", message: "The request exceeds 132 KiB." });
+  if (Number.isFinite(length) && length > maxBytes) throw new PublicError({ status: 413, code: "PAYLOAD_TOO_LARGE", message: `The request exceeds ${maxBytes / 1024} KiB.` });
   const reader = context.req.raw.body?.getReader();
   if (!reader) return {};
   const chunks: Uint8Array[] = [];
@@ -48,9 +49,9 @@ async function readBody(context: Context<AppEnvironment>, invalidCode?: string):
       const { done, value } = await reader.read();
       if (done) break;
       bytes += value.byteLength;
-      if (bytes > MAX_STAGE_BYTES) {
+      if (bytes > maxBytes) {
         await reader.cancel();
-        throw new PublicError({ status: 413, code: "PAYLOAD_TOO_LARGE", message: "The stage request exceeds 132 KiB." });
+        throw new PublicError({ status: 413, code: "PAYLOAD_TOO_LARGE", message: `The stage request exceeds ${maxBytes / 1024} KiB.` });
       }
       chunks.push(value);
     }
@@ -164,6 +165,23 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       return context.json(definition.response.parse(await dependencies.crmPreferencesOperation(context.get("authSession"), key, { path: {}, query, body })));
     });
     app.openAPIRegistry.registerPath({ method: definition.method.toLowerCase() as "get" | "patch", path: definition.route, security: [{ bearerAuth: [] }],
+      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), query: definition.query as z.ZodObject,
+        ...(definition.request ? { body: { required: true, content: { "application/json": { schema: definition.request } } } } : {}) },
+      responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } },
+        ...Object.fromEntries([400, 401, 403, 409, 413, 422, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) } });
+  }
+  for (const { key, definition } of customerExclusionsEntries()) {
+    app.on(definition.method, definition.route, async (context: Context<AppEnvironment>) => {
+      context.header("cache-control", "no-store");
+      const query = validateCustomerExclusionsInput(definition.query, readQuery(context, definition.query), false) as Record<string, unknown>;
+      // JSON escaping can expand one decoded CSV byte to six wire bytes.
+      // The importer still bounds the decoded UTF-8 file to 128 KiB.
+      const body = definition.request
+        ? validateCustomerExclusionsInput(definition.request, await readBody(context, definition.invalid.code, 769 * 1024), true)
+        : undefined;
+      return context.json(definition.response.parse(await dependencies.customerExclusionsOperation(context.get("authSession"), key, { path: {}, query, body })));
+    });
+    app.openAPIRegistry.registerPath({ method: definition.method.toLowerCase() as "get" | "post", path: definition.route, security: [{ bearerAuth: [] }],
       request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), query: definition.query as z.ZodObject,
         ...(definition.request ? { body: { required: true, content: { "application/json": { schema: definition.request } } } } : {}) },
       responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } },

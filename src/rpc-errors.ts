@@ -74,6 +74,9 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   // CRM preferences (LIF-1239).
   CRM_NOT_SELECTED: "This workspace has no CRM connected. Connect one before choosing what Lifty writes to it.",
   CRM_PREFERENCES_INVALID: "Repair the CRM preferences using the current operation schema.",
+  CUSTOMER_EXCLUSIONS_INVALID: "Repair the customer CSV using the current import schema.",
+  CUSTOMER_EXCLUSIONS_TOO_LARGE: "The customer list exceeds the import limit. Use the current CSV size and row limits.",
+  CUSTOMER_EXCLUSIONS_REVISION_CONFLICT: "This import revision already records different customer data. Read status and import the intended file again.",
   // Calibration sample runs.
   RUN_NOT_CONFIGURED:
     "Save targeting and research criteria before starting the sample.",
@@ -103,6 +106,7 @@ const DATABASE_TOKENS: Record<string, string> = {
   UNAUTHENTICATED: "UNAUTHORIZED",
   LIFTY_WORKSPACE_AMBIGUOUS: "WORKSPACE_SELECTION_REQUIRED",
   LIFTY_WORKSPACE_FORBIDDEN: "WORKSPACE_FORBIDDEN",
+  LIFTY_WORKSPACE_MISSING: "WORKSPACE_NOT_READY",
 };
 
 const STATUS = new Set([400, 401, 403, 404, 409, 413, 422, 429, 503]);
