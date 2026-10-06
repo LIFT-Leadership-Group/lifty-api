@@ -150,6 +150,7 @@ export function createHubspotConnectOperations(
   async function getConnection(session: AuthSession): Promise<HubspotConnectionStatus> {
     const { data, error } = await getRpcClient(session).rpc<unknown>(
       "get_lifty_hubspot_connection",
+      ...(session.workspaceRef ? [{ p_workspace_id: session.workspaceRef }] : []),
     );
     if (error) throw mapConnectRpcError(error);
 

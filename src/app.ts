@@ -37,6 +37,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type AttioConnectStart, type AttioConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
 import { type EnqueueCrmSync, type EnqueueFirstRun, type EnqueueIntegrationRevocation, type EnqueueNotificationDelivery } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
+import { listAdminWorkspaces, type AdminWorkspace } from "./admin-onboarding.js";
 import {
   HubspotCallbackError,
   type HubspotCallbackSuccess,
@@ -77,6 +78,9 @@ const DestinationRefSchema = z.uuid();
 export interface AuthSession {
   userId: string;
   client: unknown;
+  /** An explicit workspace for LIFT admin reads (LIF-1297). Founder sessions
+   * leave it unset and select through x-lifty-workspace. */
+  workspaceRef?: string;
 }
 
 export type AuthenticationResult =
@@ -116,6 +120,8 @@ export interface AppDependencies {
   businessOperation(session: AuthSession, key: string, payload?: unknown): Promise<unknown>;
   getWorkspace(session: AuthSession): Promise<WorkspaceStatus>;
   listMemberWorkspaces(session: AuthSession): Promise<MemberWorkspacesOutput>;
+  /** Every workspace for a LIFT admin; the database enforces is_admin (LIF-1297). */
+  listAdminWorkspaces(session: AuthSession): Promise<AdminWorkspace[]>;
   // Research schedule, weekly status and lead list (LIF-1174). Like every
   // stage RPC, the workspace is the one the database selects for the session.
   researchOperation(session: AuthSession, key: string, input: { query: Record<string, unknown>; body: unknown }): Promise<unknown>;
@@ -674,6 +680,7 @@ const defaultDependencies: AppDependencies = {
     throw new Error("getWorkspace is not configured");
   },
   listMemberWorkspaces: async () => { throw new PublicError({status:503,code:"WORKSPACES_UNAVAILABLE",message:"Workspace listing is not configured yet."}); },
+  listAdminWorkspaces,
   startRun: async () => {
     throw new Error("startRun is not configured");
   },

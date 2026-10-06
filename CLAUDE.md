@@ -62,6 +62,18 @@ changing it forces every founder to update the skill (LIF-1293). Keep
 `tests/installed-client.test.ts` passing; a failure means the change breaks
 installed clients. Change the contract only with a deliberate client release.
 
+## Admin onboarding read
+
+`GET /v1/admin/onboarding` (LIF-1297) lists every workspace through the
+admin-only `admin_list_workspaces()` and computes each one's next_step with
+the caller's own session, naming that workspace (`AuthSession.workspaceRef` →
+`p_workspace_id`). Founder sessions never set it, so their reads are
+unchanged. Its HubSpot, Attio and CRM sync reads need the Functions migration
+`20261006200000_lif1297_admin_workspace_crm_reads.sql` first; deploy the
+database through its production-database job before this API revision.
+`NEXT_STEP_CATALOG` in `src/next-step.ts` is the step list the ops view shows;
+`tests/next-step-size.test.ts` keeps it equal to what next_step returns.
+
 ## Connection confirmation
 
 Browser integration callbacks use `src/connection-confirmation.ts` and its typed

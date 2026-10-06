@@ -105,7 +105,7 @@ export async function executeOutreachOperation(session: AuthSession, key: string
   const { definition } = entry;
   let result: { data: unknown; error: unknown };
   try { result = await (session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> })
-    .rpc(definition.rpc, { p_workspace_id: null, ...definition.args(input) }); }
+    .rpc(definition.rpc, { p_workspace_id: session.workspaceRef ?? null, ...definition.args(input) }); }
   catch (cause) { throw rpcFailure(cause, { operation: definition.rpc, ...unavailable }); }
   if (result.error) throw rpcFailure(result.error, { operation: definition.rpc, ...unavailable });
   const parsed = definition.response.safeParse(result.data);

@@ -7,6 +7,7 @@ import { crmPreferencesEntries } from "./crm-preferences.js";
 import { customerExclusionsEntries, validateCustomerExclusionsInput } from "./customer-exclusions.js";
 import { getWorkspaceSummary } from "./workspace-summary.js";
 import { getNextStep } from "./next-step.js";
+import { readAdminOnboarding } from "./admin-onboarding.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
 import { CrmRecordsQuerySchema, CrmRecordsSchema } from "./crm-records.js";
@@ -82,6 +83,15 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     parse(Empty, context.req.query());
     context.header("cache-control", "no-store");
     return context.json(await getNextStep(dependencies, context.get("authSession")));
+  });
+  // LIF-1297: where every workspace sits in next_step, for LIFT admins only.
+  app.openAPIRegistry.registerPath({ method: "get", path: "/v1/admin/onboarding", security: [{ bearerAuth: [] }],
+    responses: { 200: { description: "The next_step catalog and each workspace's current reason, computed with the admin's session" },
+      403: { description: "Caller is not a LIFT admin" } } });
+  app.get("/v1/admin/onboarding", async context => {
+    parse(Empty, context.req.query());
+    context.header("cache-control", "no-store");
+    return context.json(await readAdminOnboarding(dependencies, context.get("authSession")));
   });
   // The operation catalog is also the route inventory: request/response and RPC
   // owners are identical across HTTP, MCP and API-owned guidance.

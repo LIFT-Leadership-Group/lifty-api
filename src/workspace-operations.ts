@@ -256,7 +256,7 @@ export async function startRun(session: AuthSession): Promise<StartRunResult> {
 export async function getRunStatus(session: AuthSession, dashboardOrigin = DEFAULT_DASHBOARD_ORIGIN): Promise<RunStatus> {
   const { data, error } = await getRpcClient(session).rpc<RunStatus>(
     "get_lifty_run_status",
-    { p_workspace_id: null },
+    { p_workspace_id: session.workspaceRef ?? null },
   );
   if (error) throw rpcFailure(error, runUnavailable("get_lifty_run_status"));
 
@@ -293,8 +293,10 @@ export async function startCrmSyncRun(
 export async function getCrmSyncStatus(
   session: AuthSession,
 ): Promise<CrmSyncStatus> {
+  // Founder calls keep the argument-less form; only admin reads name a workspace.
   const { data, error } = await getRpcClient(session).rpc<CrmSyncStatus>(
     "get_lifty_crm_sync_status",
+    ...(session.workspaceRef ? [{ p_workspace_id: session.workspaceRef }] : []),
   );
 
   if (error) {

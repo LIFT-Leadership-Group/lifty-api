@@ -27,18 +27,59 @@ const tool = (resource: string, operation: string) => {
   if (!stageOperations[resource]?.[operation]) throw new Error(`Unknown catalog operation ${resource}.${operation}`);
   return operationToolNames(resource, operation)[0]!;
 };
-// The stage guide each reason inlines and the only references it needs; the
-// sample steps use their own short playbooks.
-const stepGuides: Record<string, { task: string; references: string[] }> = {
-  workspace_missing: { task: "business", references: ["common", "interview"] },
-  workspace_suspended: { task: "business", references: ["common"] },
-  business_confirmation_needed: { task: "business", references: ["common", "interview"] },
-  setup_resource_unavailable: { task: "setup", references: ["common"] },
-  confirmed_interview_needed: { task: "setup", references: ["common", "interview"] },
-  configuration_needed: { task: "setup", references: ["common", "configuration"] },
-  configuration_saved: { task: "setup", references: ["common"] },
-  campaigns_saved: { task: "campaigns", references: ["common", "writing", "anti_slop"] },
+// Every next_step reason: where it sits, when it is returned (in the order the
+// function below checks), and the guide it inlines with only the references it
+// needs. A guide without references is a short playbook sent as is. The ops
+// onboarding view reads this catalog, so it follows the code (LIF-1297).
+export interface NextStepEntry {
+  step: NextStep["step"]; state: NextStep["state"]; section: NextStep["section"];
+  when: string[]; guide: { task: string; references?: string[] };
+}
+export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
+  workspace_missing: { step: "business", state: "action_required", section: "leads",
+    when: ["The caller has no workspace or no commercial profile"],
+    guide: { task: "business", references: ["common", "interview"] } },
+  workspace_suspended: { step: "business", state: "blocked", section: "leads",
+    when: ["The workspace is suspended"],
+    guide: { task: "business", references: ["common"] } },
+  business_confirmation_needed: { step: "business", state: "action_required", section: "leads",
+    when: ["The commercial profile still has unconfirmed values"],
+    guide: { task: "business", references: ["common", "interview"] } },
+  setup_resource_unavailable: { step: "import", state: "blocked", section: "leads",
+    when: ["Targeting or research criteria are missing", "Setup is already imported, so a resource is unreadable"],
+    guide: { task: "setup", references: ["common"] } },
+  confirmed_interview_needed: { step: "interview", state: "action_required", section: "leads",
+    when: ["Targeting or research criteria are missing", "The setup draft is missing, or its gates are missing or have issues"],
+    guide: { task: "setup", references: ["common", "interview"] } },
+  configuration_needed: { step: "configuration", state: "action_required", section: "leads",
+    when: ["Targeting or research criteria are missing", "Draft gates are complete", "No generated Scout criteria are saved"],
+    guide: { task: "setup", references: ["common", "configuration"] } },
+  configuration_saved: { step: "submission", state: "action_required", section: "leads",
+    when: ["Targeting or research criteria are missing", "Generated criteria are saved", "Setup has not been submitted"],
+    guide: { task: "setup", references: ["common"] } },
+  sample_not_started: { step: "sample-review", state: "action_required", section: "leads",
+    when: ["Targeting and research criteria exist", "No first research run yet"],
+    guide: { task: "step-sample" } },
+  sample_pending: { step: "sample-review", state: "pending", section: "leads",
+    when: ["The first research run is queued or running"],
+    guide: { task: "step-sample" } },
+  sample_failed: { step: "sample-review", state: "blocked", section: "leads",
+    when: ["The first research run failed; its error_code picks the action"],
+    guide: { task: "step-sample" } },
+  sample_ready_for_founder_review: { step: "sample-review", state: "review", section: "leads",
+    when: ["The first research run succeeded", "No campaign is saved"],
+    guide: { task: "step-review" } },
+  campaigns_saved: { step: "campaign", state: "action_required", section: "outreach",
+    when: ["The first research run succeeded", "At least one campaign is saved"],
+    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] } },
 };
+export function nextStepGuide(reason: string) {
+  const entry = NEXT_STEP_CATALOG[reason];
+  if (!entry) return null;
+  return entry.guide.references
+    ? getStepGuide(entry.guide.task, entry.guide.references)
+    : getAgentContext(entry.guide.task);
+}
 // Customer reasons for a failed sample and the one next move for each.
 const sampleFailures: Record<z.infer<typeof RunErrorCodeSchema>, { action: string; tools: string[] }> = {
   research_limit_reached: {
@@ -92,12 +133,7 @@ export async function getNextStep(
     gates: z.infer<typeof SetupGatesSchema> | null = null,
     section: NextStep["section"] = "leads",
   ) => {
-    const playbook = stepGuides[reason];
-    const guide = playbook
-      ? getStepGuide(playbook.task, playbook.references)
-      : context === "sample-review"
-        ? getAgentContext(state === "review" ? "step-review" : "step-sample")
-        : null;
+    const guide = nextStepGuide(reason);
     if (!guide) throw new Error("Missing next-step guide");
     return NextStepSchema.parse({
       state,
