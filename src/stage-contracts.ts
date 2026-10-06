@@ -4,6 +4,7 @@ import { researchOperationDefinitions } from "./research-operations.js";
 import { identityOperationDefinitions, type IdentityDefinition } from "./identity-operations.js";
 import { linkedinOperationDefinitions } from "./linkedin-operations.js";
 import { crmPreferencesOperationDefinitions } from "./crm-preferences.js";
+import { customerExclusionsOperationDefinitions } from "./customer-exclusions.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
@@ -101,6 +102,7 @@ const definitionCatalog = (definitions: Record<string, Record<string, IdentityDe
 const identityCatalog = definitionCatalog(identityOperationDefinitions);
 const linkedinCatalog = definitionCatalog(linkedinOperationDefinitions);
 const crmPreferencesCatalog = definitionCatalog(crmPreferencesOperationDefinitions);
+const customerExclusionsCatalog = definitionCatalog(customerExclusionsOperationDefinitions);
 const outreachCatalog = Object.fromEntries(Object.entries(outreachOperationDefinitions).map(([resource, entries]) => [resource,
   Object.fromEntries(Object.entries(entries).map(([key, definition]) => {
     const base = operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query, definition.path);
@@ -127,6 +129,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   business: { ...businessCatalog.business!, delete: unsupported("business", "DELETE", "Profile revisions and pinned history are retained. Customers cannot delete a workspace; contact LIFT support.") },
   targeting: { ...businessCatalog.targeting!, post: unsupported("targeting", "POST", "Setup creates targeting together with criteria."), delete: unsupported("targeting", "DELETE", "Search activation belongs to the research schedule; targeting history is retained.") },
   "research-criteria": { ...businessCatalog["research-criteria"]!, post: unsupported("research-criteria", "POST", "Setup creates criteria together with targeting."), delete: unsupported("research-criteria", "DELETE", "Use PATCH to clear criteria; pinned history is retained.") },
+  "customer-exclusions": customerExclusionsCatalog["customer-exclusions"]!,
   setup: businessCatalog.setup!,
   account: { delete: operation("POST", "/v1/me/delete", "Delete your own login only after all memberships and retained-history restrictions are resolved.", DeleteLoginResult, DeleteLoginRequest) },
   "sample-review": {

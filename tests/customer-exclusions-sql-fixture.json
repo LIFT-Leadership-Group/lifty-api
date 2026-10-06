@@ -1,0 +1,46 @@
+{
+  "replace": {
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "email_count": 1,
+    "imported_at": "2026-10-06T11:52:57.361936+00:00",
+    "added_emails": 1,
+    "domain_count": 3,
+    "accepted_rows": 5,
+    "added_domains": 3,
+    "rejected_rows": [
+      {
+        "row": 7,
+        "reason": "invalid_domain"
+      }
+    ],
+    "workspace_ref": "f4117425-bcb6-4391-bc75-2eeb91e96bb3",
+    "rejected_count": 1,
+    "removed_emails": 0,
+    "removed_domains": 0,
+    "candidates_excluded": 0,
+    "uploaded_email_count": 1,
+    "uploaded_domain_count": 3
+  },
+  "get": {
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "email_count": 1,
+    "imported_at": "2026-10-06T11:52:57.361936+00:00",
+    "added_emails": 1,
+    "domain_count": 3,
+    "accepted_rows": 5,
+    "added_domains": 3,
+    "rejected_rows": [
+      {
+        "row": 7,
+        "reason": "invalid_domain"
+      }
+    ],
+    "workspace_ref": "f4117425-bcb6-4391-bc75-2eeb91e96bb3",
+    "rejected_count": 1,
+    "removed_emails": 0,
+    "removed_domains": 0,
+    "candidates_excluded": 0,
+    "uploaded_email_count": 1,
+    "uploaded_domain_count": 3
+  }
+}
