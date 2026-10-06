@@ -1,5 +1,5 @@
 import type { AppDependencies, AuthSession } from "./app.js";
-import { getAgentContext } from "./agent-context.js";
+import { getAgentContext, getStepGuide } from "./agent-context.js";
 import {
   BusinessGetSchema,
   TargetingGetSchema,
@@ -26,6 +26,18 @@ import type { RunErrorCodeSchema } from "./contracts.js";
 const tool = (resource: string, operation: string) => {
   if (!stageOperations[resource]?.[operation]) throw new Error(`Unknown catalog operation ${resource}.${operation}`);
   return operationToolNames(resource, operation)[0]!;
+};
+// The stage guide each reason inlines and the only references it needs; the
+// sample steps use their own short playbooks.
+const stepGuides: Record<string, { task: string; references: string[] }> = {
+  workspace_missing: { task: "business", references: ["common", "interview"] },
+  workspace_suspended: { task: "business", references: ["common"] },
+  business_confirmation_needed: { task: "business", references: ["common", "interview"] },
+  setup_resource_unavailable: { task: "setup", references: ["common"] },
+  confirmed_interview_needed: { task: "setup", references: ["common", "interview"] },
+  configuration_needed: { task: "setup", references: ["common", "configuration"] },
+  configuration_saved: { task: "setup", references: ["common"] },
+  campaigns_saved: { task: "campaigns", references: ["common", "writing", "anti_slop"] },
 };
 // Customer reasons for a failed sample and the one next move for each.
 const sampleFailures: Record<z.infer<typeof RunErrorCodeSchema>, { action: string; tools: string[] }> = {
@@ -80,13 +92,12 @@ export async function getNextStep(
     gates: z.infer<typeof SetupGatesSchema> | null = null,
     section: NextStep["section"] = "leads",
   ) => {
-    const guide = getAgentContext(
-      context === "sample-review"
-        ? state === "review"
-          ? "step-review"
-          : "step-sample"
-        : context,
-    );
+    const playbook = stepGuides[reason];
+    const guide = playbook
+      ? getStepGuide(playbook.task, playbook.references)
+      : context === "sample-review"
+        ? getAgentContext(state === "review" ? "step-review" : "step-sample")
+        : null;
     if (!guide) throw new Error("Missing next-step guide");
     return NextStepSchema.parse({
       state,

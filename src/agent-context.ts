@@ -117,8 +117,10 @@ const stageDocuments = Object.fromEntries(
         ...(["targeting", "research-criteria", "sample-review"].includes(stage)
           ? { calibration }
           : {}),
+        // The campaigns stage already carries campaigns.md as its instructions.
+        ...(stage === "journeys" ? { campaign: readGuide("campaigns") } : {}),
         ...(["campaigns", "journeys"].includes(stage)
-          ? { campaign: readGuide("campaigns"), writing, anti_slop: antiSlop }
+          ? { writing, anti_slop: antiSlop }
           : {}),
         ...(stage === "crm" ? { company_mapping: companyMapping } : {}),
       },
@@ -203,6 +205,27 @@ export function getAgentContext(task: string) {
           operations: compactOperations(stageDocument.operations),
         }
       : {}),
+  };
+  const revision = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
+  return AgentContextSchema.parse({ ...content, revision });
+}
+
+// What next_step inlines for one step: the stage's instructions and only the
+// references that step needs. Operation schemas stay in the full stage guide,
+// one summary_context call away, so every response stays small enough for
+// chat connectors (LIF-1149, LIF-1295).
+export function getStepGuide(task: string, references: readonly string[]) {
+  const stage = getAgentContext(task);
+  if (!stage) return null;
+  const content = {
+    format: stage.format,
+    task: stage.task,
+    instructions: stage.instructions,
+    schemas: {},
+    references: Object.fromEntries(references.map((name) => {
+      if (!Object.hasOwn(stage.references, name)) throw new Error(`Unknown ${task} reference ${name}`);
+      return [name, stage.references[name]!];
+    })),
   };
   const revision = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
   return AgentContextSchema.parse({ ...content, revision });
