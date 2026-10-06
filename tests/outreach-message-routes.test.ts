@@ -41,6 +41,18 @@ describe("actual unapproved campaign message corrections", () => {
     expect((await request({ steps: [{ position: 6, text: "A" }, { position: 6, text: "B" }] })).status).toBe(422);
     expect(rpc).toHaveBeenCalledOnce();
   });
+  it("reads and corrects an email whose later steps reply in the thread without a subject", async () => {
+    const thread = <T extends { message: { steps: { position: number; subject: string }[] } }>(receipt: T) => ({ ...receipt, message: { ...receipt.message,
+      steps: receipt.message.steps.map(step => step.position === 1 ? step : { ...step, subject: null }) } });
+    const email = fixtures.email_original.message;
+    const get = harness(thread(fixtures.email_original), email.message_ref);
+    const read = await get.request("GET");
+    expect(read.status).toBe(200);
+    expect((await read.json()).message.steps.map((step: { subject: string | null }) => step.subject).slice(1)).toEqual([null, null, null, null, null]);
+    const post = harness(thread(fixtures.email_revision), email.message_ref);
+    expect((await post.request("POST", "/revisions", { request_ref: email.message_ref, source_digest: email.source_digest,
+      expected_review_status: "pending", changes: { steps: [{ position: 2, text: "Corrected follow-up" }] } })).status).toBe(201);
+  });
   it("parses actual SQL LinkedIn and email source/replacement receipts", () => {
     for (const receipt of Object.values(fixtures)) expect(CampaignMessageResultSchema.safeParse(receipt)).toMatchObject({ success: true });
     expect(CampaignReviewsSchema.safeParse(reviewFixtures.queue)).toMatchObject({ success: true });

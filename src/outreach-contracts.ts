@@ -250,7 +250,8 @@ export const CampaignMessageReviseSchema = z.object({ request_ref: Ref, source_d
 }).strict();
 export const CampaignMessageSchema = z.object({ message_ref: Ref, lead_ref: Ref, channel: z.enum(["email", "linkedin"]),
   status: z.string().nullable(), review_status: z.string().nullable(), is_draft: z.boolean().nullable(), content: z.string(),
-  steps: z.array(z.object({ position: z.number().int().positive(), subject: z.string(), text: z.string() }).strict()).nullable(),
+  // A null subject is a later email that replies in the first email's thread.
+  steps: z.array(z.object({ position: z.number().int().positive(), subject: z.string().nullable(), text: z.string() }).strict()).nullable(),
   source_message_ref: Ref.nullable(), sender_id: Ref.nullable(), sender_version: Version.nullable(), source_digest: Digest, created_at: Timestamp,
   account_id: Ref.nullable(), sender_name: z.string().nullable(), lead_name: z.string().nullable(), lead_email: z.string().nullable(),
   lead_linkedin_url: z.string().nullable(), review_reason: z.string().nullable(), action_ref: Ref.nullable(), run_ref: Ref.nullable(),
