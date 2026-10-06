@@ -50,8 +50,11 @@ close the section in at most six lines: who Lifty targets and why, the five
 leads and their grade mix, what reached their CRM, and that Lifty can keep
 finding leads like these. Then ask one question: set up LinkedIn outreach for
 these leads now? LinkedIn goes first; email comes later, once a mailbox is
-ready. If yes, read `summary_context` task `campaigns`. If "not now", accept
-it and do not ask again this session.
+ready. If yes, connect their LinkedIn as the close action in `actions` says:
+find the founder's sender in `senders_get` (create it only when absent), then
+show the connection link from `sending_accounts_connect` for that sender. The
+templates come after the account connects; `next_step` leads there.
+If "not now", accept it and do not ask again this session.
 
 Section 1 never sends messages or activates outreach, and sample acceptance is
 not saved anywhere: do not claim it was.

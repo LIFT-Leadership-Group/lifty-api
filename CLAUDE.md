@@ -71,6 +71,8 @@ the caller's own session, naming that workspace (`AuthSession.workspaceRef` →
 unchanged. Its HubSpot, Attio and CRM sync reads need the Functions migration
 `20261006200000_lif1297_admin_workspace_crm_reads.sql` first; deploy the
 database through its production-database job before this API revision.
+Identity reads forward the named workspace too; `get_lifty_senders` already
+accepts it, so the Part 2 roster read (LIF-1302) needs no migration.
 `NEXT_STEP_CATALOG` in `src/next-step.ts` is the step list the ops view shows,
 and next_step builds each response's state, step, section, `context_task` and
 `related_contexts` from it. Every stage context is linked by some step or

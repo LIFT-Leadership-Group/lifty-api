@@ -1019,13 +1019,49 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       );
     },
   );
-  it.each(["paused", "active"])("resumes canonical campaign %s without activating or inferring readiness", async state => {
+  it.each([
+    ["paused", { step: "campaign", state: "action_required", reason: "campaigns_saved" }, "activate separately"],
+    ["active", { step: "linkedin", state: "complete", reason: "linkedin_outreach_active" }, "only when the founder asks"],
+  ] as const)("resumes canonical campaign %s without activating or inferring readiness", async (state, position, guidance) => {
     const campaign = vi.fn(async () => ({ ...emptyOutreach("campaigns.get"), campaigns: [{ ...canonicalCampaign, state }] }));
     const h = harness(undefined, null, { getRunStatus: async () => runFixture, outreachOperation: campaign });
     const result = await (await h.request("/v1/workspace/next-step")).json();
-    expect(result).toMatchObject({ step: "campaign", state: "action_required", reason: "campaigns_saved", section: "outreach" });
+    expect(result).toMatchObject({ ...position, section: "outreach" });
     expect(campaign).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: "founder" }), "campaigns.get", { path: {}, query: {}, body: undefined });
-    expect(result.actions[0]).toContain("activate separately");
+    expect(result.actions.join(" ")).toContain(guidance);
+  });
+  // Part 2 resumes from the saved LinkedIn account and campaigns (LIF-1302).
+  const linkedinRoster = (status: "connected" | "needs_reconnect" | "disconnected") => ({ ...sendersFixture,
+    senders: [{ ...sendersFixture.senders[0]!, accounts: [{ ...sendersFixture.senders[0]!.accounts[0]!, channel: "linkedin" as const,
+      identity: "https://www.linkedin.com/in/ana", declaration: null, status }] }] });
+  it.each([
+    ["connected", [], "linkedin_connected"],
+    ["connected", ["inactive"], "campaigns_saved"],
+    ["connected", ["active"], "linkedin_outreach_active"],
+    // A lost LinkedIn account stops its outreach, so it comes first even with an active campaign.
+    ["needs_reconnect", ["active"], "linkedin_reconnect_needed"],
+    // A removed account is history, not a connection.
+    ["disconnected", [], "sample_ready_for_founder_review"],
+  ] as const)("resumes Part 2 from a %s LinkedIn account and campaigns %j at %s", async (status, states, reason) => {
+    const h = harness(undefined, null, { getRunStatus: async () => runFixture,
+      outreachOperation: async (_session, key) => ({ ...emptyOutreach(key), campaigns: states.map(state => ({ ...canonicalCampaign, state })) }),
+      identityOperation: async () => ({ status: 200, body: linkedinRoster(status) }) });
+    const result = await (await h.request("/v1/workspace/next-step")).json();
+    expect(result.reason).toBe(reason);
+    // The agent acts on the exact account: templates permit its sender, a reconnect needs its id.
+    if (reason === "linkedin_connected" || reason === "linkedin_reconnect_needed") {
+      const account = sendersFixture.senders[0]!.accounts[0]!;
+      expect(result.receipt).toEqual({ account: { id: account.id, sender_id: account.sender_id, sender: "Ana Pérez", status } });
+      expect(result.actions.join(" ")).toContain(reason === "linkedin_connected" ? "permitting Ana Pérez" : `path.id ${account.id}`);
+    }
+  });
+  it("treats an unreadable sender roster as unknown, not as LinkedIn unconnected", async () => {
+    const h = harness(undefined, null, { getRunStatus: async () => runFixture,
+      outreachOperation: async (_session, key) => emptyOutreach(key),
+      identityOperation: async () => { throw new PublicError({ status: 502, code: "IDENTITY_UNAVAILABLE", message: "Unavailable." }); } });
+    const result = await (await h.request("/v1/workspace/next-step")).json();
+    expect(result.reason).toBe("sample_ready_for_founder_review");
+    expect(result.actions.join(" ")).toContain("sender roster could not be read");
   });
   it.each(["campaign", "run"])(
     "fails closed for a foreign %s instead of inferring missing configuration",
@@ -1106,6 +1142,8 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
         getHubspotConnection: async () => connection as never,
         getCrmSyncStatus: async () => sync as never,
         startCrmSyncRun: write,
+        // An email account only: LinkedIn is still offered.
+        identityOperation: async () => ({ status: 200, body: sendersFixture }),
       });
       const result = await (await h.request("/v1/workspace/next-step")).json();
       expect(result).toMatchObject({
@@ -1117,7 +1155,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       expect(result.actions[3]).toContain(
         "Close Section 1 in at most six lines",
       );
-      expect(result.actions[3]).toContain("set up LinkedIn outreach now");
+      expect(result.actions[3]).toContain("set up LinkedIn outreach for these leads now");
       expect(result.guide).toMatchObject({ task: "step-review" });
       expect(result.guide.instructions).toContain('If "not now", accept');
       expect(write).not.toHaveBeenCalled();

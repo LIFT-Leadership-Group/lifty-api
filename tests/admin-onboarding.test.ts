@@ -35,6 +35,7 @@ function rpcFor(ref: string, name: string): unknown {
     case "get_lifty_campaigns": return { workspace: identity(ref), campaigns: [], next_cursor: null };
     case "get_lifty_hubspot_connection": return { provider: "hubspot", status: "not_connected" };
     case "get_lifty_attio_connection": return { provider: "attio", status: "not_connected" };
+    case "get_lifty_senders": return { workspace: identity(ref), senders: [] };
     default: throw new Error(`Unexpected RPC ${name}`);
   }
 }
@@ -86,7 +87,7 @@ describe("admin onboarding read", () => {
     const reads = h.calls.filter(([name]) => name !== "admin_list_workspaces");
     expect(new Set(reads.map(([name]) => name))).toEqual(new Set(["get_lifty_business_profile", "get_lifty_targeting",
       "get_lifty_research_criteria", "get_lifty_setup_status", "get_lifty_run_status", "get_lifty_campaigns",
-      "get_lifty_hubspot_connection", "get_lifty_attio_connection"]));
+      "get_lifty_hubspot_connection", "get_lifty_attio_connection", "get_lifty_senders"]));
     expect(reads.every(([, args]) => typeof (args as { p_workspace_id?: unknown })?.p_workspace_id === "string")).toBe(true);
     expect(body.steps.map((step: { reason: string }) => step.reason)).toEqual(Object.keys(NEXT_STEP_CATALOG));
     expect(body.on_request).toEqual(ON_REQUEST_CONTEXTS);
