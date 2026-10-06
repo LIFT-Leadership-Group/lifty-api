@@ -3,6 +3,7 @@ import { businessOperationDefinitions } from "./business-operations.js";
 import { researchOperationDefinitions } from "./research-operations.js";
 import { identityOperationDefinitions, type IdentityDefinition } from "./identity-operations.js";
 import { linkedinOperationDefinitions } from "./linkedin-operations.js";
+import { crmPreferencesOperationDefinitions } from "./crm-preferences.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
 import { NextStepSchema } from "./next-step-contracts.js";
 import { WorkspaceSummarySchema, readResult } from "./workspace-summary.js";
@@ -99,6 +100,7 @@ const definitionCatalog = (definitions: Record<string, Record<string, IdentityDe
 }))]));
 const identityCatalog = definitionCatalog(identityOperationDefinitions);
 const linkedinCatalog = definitionCatalog(linkedinOperationDefinitions);
+const crmPreferencesCatalog = definitionCatalog(crmPreferencesOperationDefinitions);
 const outreachCatalog = Object.fromEntries(Object.entries(outreachOperationDefinitions).map(([resource, entries]) => [resource,
   Object.fromEntries(Object.entries(entries).map(([key, definition]) => {
     const base = operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query, definition.path);
@@ -154,6 +156,7 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
     property_create: operation("POST", "/v1/workspace/crm/mapping/property_create", "Explicitly create a missing HubSpot property or Attio attribute only when workspace provisioning policy permits. Requires evidence that no compatible property already exists; cannot bypass mapping conflicts.", CrmMappingPropertyCreateSchema, CrmMappingPropertyCreateRequestSchema),
     mapping_sync: operation("POST", "/v1/workspace/crm/mapping/sync", "Replay the saved mapping only for the explicit bounded lead cohort using the current preview digest and a stable request_ref. Returns an asynchronous receipt identified by its exact run_ref, not verified success. Does not discover leads or send outreach.", CrmMappingSyncSchema, CrmMappingSyncRequestSchema),
     mapping_status: operation("GET", "/v1/workspace/crm/mapping/status", "Read the exact mapping replay receipt, including per-field live readback and skipped or stale values. Partial or failed runs are not full success.", CrmMappingStatusSchema, null, CrmMappingStatusQuerySchema),
+    ...crmPreferencesCatalog.crm!,
     records: operation("GET", "/v1/workspace/crm/records", "Read verified HubSpot or Attio contact and company links for the existing sync cohort. Supply the known run_ref or omit for the latest CRM sync. This never starts a sync.", CrmRecordsSchema, null, CrmRecordsQuerySchema),
     get: operation("GET", stageRoute("crm"), "Without attempt_ref read the connected CRM (HubSpot or Attio; provider null when none). With it verify only that exact authorization attempt, including reconnection.", z.union([CrmConnectionStatusSchema, ConnectionAttemptStatusSchema]), null, ConnectionAttemptQuerySchema),
     post: operation("POST", stageRoute("crm"), "Start a new connection/reconnection of the CRM the founder uses and return the real consent link immediately. Send provider hubspot or attio; omitted means HubSpot. One CRM at a time: disconnect the other first.", AuthorizationRequiredSchema, CrmConnectRequestSchema),

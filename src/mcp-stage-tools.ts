@@ -20,6 +20,9 @@ const openWorld = new Set(["sample-review.post", "research-schedule.activate", "
   "sending-accounts.disconnect", "senders.delete"]);
 // Creating a resource changes nothing that exists.
 const nonDestructive = new Set(["business.post", "senders.post", "journeys.post", "campaigns.post"]);
+// Writes that commit synchronously, with no authorization link or receipt.
+const synchronousStages = new Set(["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule", "journeys", "campaigns"]);
+const synchronousOperations = new Set(["crm.preferences_patch"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.
@@ -48,7 +51,7 @@ function entries(): Entry[] {
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${read ? "" : ["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule", "journeys", "campaigns"].includes(stage) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
+      const description = `${operation.description}${read ? "" : synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
       return [{ stage, action, operation,
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },

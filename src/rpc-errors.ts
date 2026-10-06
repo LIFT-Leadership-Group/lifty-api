@@ -71,6 +71,9 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   OUTREACH_SAMPLE_SENDER_CONFLICT: "The saved sample person is not permitted by this revision. Preserve that person and repair the permitted senders.",
   OUTREACH_COPY_INVALID: "Repair the saved message content using the campaign schema.",
   OUTREACH_SENDER_CONFLICT: "The lead's assigned person is not permitted for this campaign. Preserve its assignment and resolve the conflict.",
+  // CRM preferences (LIF-1239).
+  CRM_NOT_SELECTED: "This workspace has no CRM connected. Connect one before choosing what Lifty writes to it.",
+  CRM_PREFERENCES_INVALID: "Repair the CRM preferences using the current operation schema.",
   // Calibration sample runs.
   RUN_NOT_CONFIGURED:
     "Save targeting and research criteria before starting the sample.",

@@ -300,8 +300,8 @@ export async function getNextStep(
         else if (sync.value.state === "none")
           crmAction =
             crm.value.provider === "attio"
-              ? "Attio is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_sync_start, then crm_sync_status."
-              : "HubSpot is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_sync_start, then crm_sync_status.";
+              ? "Attio is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status."
+              : "HubSpot is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status.";
         else if (["queued", "running"].includes(sync.value.state))
           crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
         else if (sync.value.state === "succeeded")
