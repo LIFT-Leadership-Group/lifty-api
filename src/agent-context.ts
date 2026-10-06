@@ -9,6 +9,11 @@ import {
   type StageOperation,
 } from "./stage-contracts.js";
 
+// The transport an installed client implements: authentication, the request
+// envelope, the context document and the operation catalog format. It is not
+// a version of the API or its guidance: releases ship their context here and
+// keep this value, so founders never update the skill for them (LIF-1293).
+// tests/installed-client.test.ts holds what a v10 client depends on.
 export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v10";
 export const CLIENT_UPGRADE_MESSAGE = `Update the installed LIFTY CLI and skill to ${STAGE_CLIENT_CONTRACT}. Earlier client contracts are retired. Reload the updated client; setup resumes from the server draft.`;
 export const AgentContextSchema = z.object({
