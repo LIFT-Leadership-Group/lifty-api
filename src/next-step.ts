@@ -405,13 +405,19 @@ export async function getNextStep(
       .filter(account => account.channel === "linkedin" && account.status !== "disconnected")
       .map(account => ({ id: account.id, sender_id: sender.id, sender: sender.name, status: account.status })))
     : [];
-  const reconnect = linkedin.find(account => account.status === "needs_reconnect");
+  // With one sender the agent assumes it; with several it reads the roster and
+  // asks which person a connection or campaign belongs to (Juan, 2026-10-06).
+  const names = (accounts: Array<{ sender: string }>) => accounts.map(account => account.sender).join(", ");
+  const reconnects = linkedin.filter(account => account.status === "needs_reconnect");
+  const reconnect = reconnects[0];
   if (reconnect)
     return response(
       "linkedin_reconnect_needed",
       [
-        `${reconnect.sender}'s LinkedIn account needs reconnecting, so its LinkedIn work waits. Explain this plainly and reconnect only after the founder agrees.`,
-        `${tool("sending-accounts", "reconnect")} with path.id ${reconnect.id}, then show the returned connection_url right away as a clickable link. The same LinkedIn profile must sign in.`,
+        reconnects.length === 1
+          ? `${reconnect.sender}'s LinkedIn account needs reconnecting, so its LinkedIn work waits. Explain this plainly and reconnect only after the founder agrees.`
+          : `LinkedIn accounts of several senders need reconnecting (${names(reconnects)}), so their LinkedIn work waits. Explain this plainly, ask which to reconnect now, and reconnect each one the founder agrees to, one at a time.`,
+        `${tool("sending-accounts", "reconnect")} with path.id ${reconnects.map(account => reconnects.length === 1 ? account.id : `${account.id} (${account.sender})`).join(", ")}, then show the returned connection_url right away as a clickable link. The same LinkedIn profile must sign in.`,
         `${tool("sending-accounts", "attempt")} with the returned attempt id, with bounded backoff, until it is connected. A failed read is unknown, not a failure.`,
         "Reconnecting never resumes or activates a campaign. When it is connected, call next_step.",
       ],
@@ -429,19 +435,20 @@ export async function getNextStep(
     [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")],
     outreach,
   );
-  const connected = linkedin.find(account => account.status === "connected");
+  const connectedAll = linkedin.filter(account => account.status === "connected");
+  const connected = connectedAll[0];
   // Part 2 comes first while a connected LinkedIn account has no active campaign.
   if (connected && !linkedinActive) {
     if (campaigns.campaigns.length) return campaignsSaved();
     return response(
       "linkedin_connected",
       [
-        `${connected.sender}'s LinkedIn is connected. Read ${tool("notifications", "get")}; unless Slack is already connected, ask once where alerts should go: Slack or email. Email needs no setup. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`,
+        `${connectedAll.length === 1 ? `${connected.sender}'s LinkedIn is connected` : `LinkedIn is connected for ${names(connectedAll)}`}. Read ${tool("notifications", "get")}; unless Slack is already connected, ask once where alerts should go: Slack or email. Email needs no setup. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`,
         `Read ${tool("commercial-voice", "get")}. If tone and rules are empty, ask how the founder writes before the first draft and save it with ${tool("commercial-voice", "patch")}; voice is shared by every channel and campaign.`,
-        `Build the LinkedIn templates: read ${tool("journeys", "get")}, create the Journey for qualified (Tier A and B) leads with ${tool("journeys", "post")} and its LinkedIn Campaign with ${tool("campaigns", "post")}, permitting ${connected.sender}. Preview real leads with ${tool("campaigns", "tests_post")} before asking for approval.`,
+        `Build the LinkedIn templates: read ${tool("journeys", "get")}, create the Journey for qualified (Tier A and B) leads with ${tool("journeys", "post")} and its LinkedIn Campaign with ${tool("campaigns", "post")}, permitting ${connectedAll.length === 1 ? connected.sender : `the senders the founder chooses: read ${tool("senders", "get")} for each sender's accounts and ask which of them this campaign sends from`}. Preview real leads with ${tool("campaigns", "tests_post")} before asking for approval.`,
         "Saving, publishing or a connected account never activates outreach. When a campaign is saved, call next_step.",
       ],
-      [tool("notifications", "get"), tool("notifications", "post"), tool("commercial-voice", "get"), tool("commercial-voice", "patch"),
+      [tool("notifications", "get"), tool("notifications", "post"), tool("commercial-voice", "get"), tool("commercial-voice", "patch"), tool("senders", "get"),
         tool("journeys", "get"), tool("journeys", "post"), tool("campaigns", "post"), tool("campaigns", "tests_post"), tool("summary", "context")],
       { account: connected },
     );
@@ -492,11 +499,11 @@ export async function getNextStep(
         [
           `${name} is ready to send: warmup is ready and its placement test passed. Tell the founder.`,
           ...(email.plan === null ? [`The plan could not be read; read ${tool("research-schedule", "get")} before discussing plans.`] : []),
-          `Finish the email campaign: read ${tool("campaigns", "get")} and ${tool("journeys", "get")}, add or update the Journey's Email Campaign with ${tool("campaigns", "post")} or ${tool("campaigns", "draft_patch")}, permitting ${mailbox.sender}, and preview real leads with ${tool("campaigns", "tests_post")}. Voice and the sender's signature come first (summary_context task commercial-voice, then senders).`,
+          `Finish the email campaign: read ${tool("campaigns", "get")} and ${tool("journeys", "get")}, add or update the Journey's Email Campaign with ${tool("campaigns", "post")} or ${tool("campaigns", "draft_patch")}, permitting ${new Set(mailboxes.map(item => item.sender_id)).size === 1 ? mailbox.sender : `the senders the founder chooses: read ${tool("senders", "get")} for each sender's mailboxes and ask which of them this campaign sends from`}, and preview real leads with ${tool("campaigns", "tests_post")}. Voice and the sender's signature come first (summary_context task commercial-voice, then senders).`,
           "Publish only the exact revision the founder approves, and activate it only on their explicit yes. A ready mailbox never activates outreach.",
         ],
         [tool("campaigns", "get"), tool("journeys", "get"), tool("campaigns", "post"), tool("campaigns", "draft_patch"),
-          tool("campaigns", "tests_post"), tool("research-schedule", "get"), tool("summary", "context")],
+          tool("campaigns", "tests_post"), tool("senders", "get"), tool("research-schedule", "get"), tool("summary", "context")],
         email.receipt,
       );
     const alerts = linkedin.length ? [] : [`Ask once where alerts should go, unless Slack is already connected (${tool("notifications", "get")}) or the founder already answered in this conversation: Slack or email. Email needs no setup. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`];
@@ -537,7 +544,7 @@ export async function getNextStep(
       "linkedin_outreach_active",
       [
         `Report LinkedIn activity from ${tool("linkedin", "get")}: today, the last 7 days and any account's waiting_reason. A first message to someone already connected waits for the founder's review in ${tool("campaigns", "reviews_get")}.`,
-        `Close Part 2 in a few lines: who Lifty contacts on LinkedIn and what happens next. Then ask whether to set up email so Lifty can test their domain and inboxes. Yes: connect a mailbox for the same sender with ${tool("sending-accounts", "connect")} and channel email (summary_context task sending-accounts). If not now, accept it and do not ask again this session.`,
+        `Close Part 2 in a few lines: who Lifty contacts on LinkedIn and what happens next. Then ask whether to set up email so Lifty can test their domain and inboxes. Yes: read ${tool("senders", "get")} for who the senders are and which accounts each has; with one sender, connect the mailbox to it, with several ask whose mailbox it is. Then ${tool("sending-accounts", "connect")} with that sender_id and channel email (summary_context task sending-accounts). If not now, accept it and do not ask again this session.`,
         "Pause, edit or activate another campaign only when the founder asks.",
       ],
       [tool("linkedin", "get"), tool("campaigns", "reviews_get"), tool("campaigns", "get"), tool("senders", "get"), tool("sending-accounts", "connect"), tool("summary", "context")],
@@ -591,7 +598,7 @@ export async function getNextStep(
       "Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample.",
       crmAction,
       ...(roster.status === "unavailable" ? ["The sender roster could not be read: read senders_get before offering LinkedIn, because an account may already be connected."] : []),
-      `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach for these leads now. Yes: read ${tool("senders", "get")} and use the founder's own sender (senders_post only when absent; ask whose account it is when unclear), then ${tool("sending-accounts", "connect")} with that sender_id and channel linkedin. Show the returned connection_url right away and confirm it with sending_accounts_attempt; the templates follow once it connects. A founder who would rather start with email connects a mailbox for that sender the same way, with channel email. A leads-only founder can stop here. If not now, accept it and do not ask again this session.`,
+      `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach for these leads now. Yes: read ${tool("senders", "get")} for who the senders are and which accounts each has connected. With one sender, use it; with several, ask whose LinkedIn to connect (senders_post only when that person is absent). Then ${tool("sending-accounts", "connect")} with that sender_id and channel linkedin. Show the returned connection_url right away and confirm it with sending_accounts_attempt; the templates follow once it connects. A founder who would rather start with email connects a mailbox the same way, with channel email: with one sender use it, with several ask whose mailbox it is. A leads-only founder can stop here. If not now, accept it and do not ask again this session.`,
     ],
     [
       tool("sample-review", "get"),
