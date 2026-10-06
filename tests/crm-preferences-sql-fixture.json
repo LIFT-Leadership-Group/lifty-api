@@ -1,0 +1,8 @@
+{
+  "version": 6,
+  "provider": "hubspot",
+  "research": { "mode": "on_complete" },
+  "conversation": { "mode": "all", "channels": ["email"] },
+  "updated_at": "2026-10-06T01:17:56Z",
+  "updated_by": "49062d30-ae7f-4bf8-9408-cf4328a5cf2b"
+}

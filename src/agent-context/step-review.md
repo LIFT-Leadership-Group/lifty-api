@@ -35,6 +35,10 @@ here; for another CRM say it is not supported yet and continue.
 - Company setup before the first sync: `crm_mapping_context`; if it is not
   ready, prepare the bounded plan per `references.company_mapping` and apply
   it with `crm_patch`.
+- Notes and conversations before the first sync: `crm_preferences_get`, show
+  the saved choices and ask whether they want research notes and
+  conversations (all, or only once a lead replies; email, LinkedIn or both) in
+  their CRM. Save only what they change with `crm_preferences_patch`.
 - Sync: `crm_sync_start`, then `crm_sync_status` for that `run_ref` until it
   finishes. Report contacts, research notes and companies delivered
   separately; partial delivery is not full success.

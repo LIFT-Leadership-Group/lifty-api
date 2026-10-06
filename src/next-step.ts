@@ -302,7 +302,7 @@ export async function getNextStep(
             "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
         else if (sync.value.state === "none")
           crmAction =
-            "The CRM connection is saved and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_sync_start, then crm_sync_status.";
+            "The CRM connection is saved and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status.";
         else if (["queued", "running"].includes(sync.value.state))
           crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
         else if (sync.value.state === "succeeded")

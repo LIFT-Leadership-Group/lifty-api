@@ -45,6 +45,31 @@ For initial required company setup, follow `references.company_mapping` using
 `mapping_context` and PATCH. That bounded compatibility flow remains available.
 It does not define the limits of the general mapping operations below.
 
+## Notes and conversations
+
+Besides mapped fields, Lifty writes research notes and conversations to the
+connected CRM. During CRM setup, after the connection is verified and before
+the first sync, read `preferences_get`, show the founder the saved choices and
+ask what they want in their CRM:
+
+- Research notes: a note with each lead's research when it completes
+  (`on_complete`), or none (`none`).
+- Conversations: every sent message and reply (`all`), only once the lead
+  replies (`on_reply`), or none (`none`).
+- Conversation channels: `email`, `linkedin` or both.
+
+Save their answer with `preferences_patch`: the read's `version` as
+`expected_version` and only the choices they changed. Omitted choices keep
+their saved value; `channels` replaces the list. Turning conversations on from
+`none` needs `channels`. Do not change a choice the founder did not make. They
+can change these later the same way.
+
+A change applies to future CRM writes only. Notes and conversations already in
+the CRM stay, and turning a choice on does not copy earlier history. Saving
+does not start a CRM sync, research or outreach. On `VERSION_CONFLICT`, read
+the preferences again, tell the founder what changed and reapply their choice
+to the new version. `CRM_NOT_SELECTED` means no CRM is connected yet.
+
 ## Later edits
 
 For reconnection, use a fresh POST and verify that exact attempt. A previously

@@ -3,6 +3,7 @@ import { businessEntries, validateBusinessRequest } from "./business-operations.
 import { researchEntries, validateResearchInput } from "./research-operations.js";
 import { identityEntries, validateIdentityInput } from "./identity-operations.js";
 import { linkedinEntries } from "./linkedin-operations.js";
+import { crmPreferencesEntries } from "./crm-preferences.js";
 import { getWorkspaceSummary } from "./workspace-summary.js";
 import { getNextStep } from "./next-step.js";
 import { RunProgressQuerySchema, RunProgressSchema } from "./run-progress.js";
@@ -149,6 +150,23 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), query: definition.query as z.ZodObject },
       responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } },
         ...Object.fromEntries([400, 401, 403, 404, 409, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) } });
+  }
+  // CRM preferences (LIF-1239): the database resolves the workspace and its
+  // selected CRM, like Identity.
+  for (const { key, definition } of crmPreferencesEntries()) {
+    app.on(definition.method, definition.route, async (context: Context<AppEnvironment>) => {
+      context.header("cache-control", "no-store");
+      const query = validateIdentityInput(definition.query, readQuery(context, definition.query), { status: 400, code: "INVALID_REQUEST" }) as Record<string, unknown>;
+      const body = definition.request
+        ? validateIdentityInput(definition.request, await readBody(context, definition.invalid.code), definition.invalid)
+        : undefined;
+      return context.json(definition.response.parse(await dependencies.crmPreferencesOperation(context.get("authSession"), key, { path: {}, query, body })));
+    });
+    app.openAPIRegistry.registerPath({ method: definition.method.toLowerCase() as "get" | "patch", path: definition.route, security: [{ bearerAuth: [] }],
+      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), query: definition.query as z.ZodObject,
+        ...(definition.request ? { body: { required: true, content: { "application/json": { schema: definition.request } } } } : {}) },
+      responses: { 200: { description: definition.description, content: { "application/json": { schema: definition.response } } },
+        ...Object.fromEntries([400, 401, 403, 409, 413, 422, 429, 502].map(code => [code, { description: "Typed resource error", content: { "application/json": { schema: StageErrorSchema } } }])) } });
   }
   for (const { key, definition } of outreachEntries()) {
     app.on(definition.method, definition.route.replace(/\{([^}]+)\}/g, ":$1"), async context => {

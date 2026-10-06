@@ -86,6 +86,7 @@ through one table in `src/rpc-errors.ts`; an unknown code is a 502
 - `GET /v1/workspace/leads` — researched leads, newest first, with grade/week filters and an opaque cursor
 - `GET /v1/workspace/senders`, `POST …/senders`, `PATCH …/senders/{id}`, `POST …/senders/{id}/delete` — senders (people) with versioned name, signature and booking link; soft delete
 - `GET /v1/workspace/sending-accounts`, `POST …/sending-accounts/connect`, `GET …/sending-accounts/attempts/{id}`, `POST …/sending-accounts/{id}/reconnect|pause|resume|disconnect` — accounts each sender owns
+- `GET /v1/workspace/crm/preferences`, `PATCH …/crm/preferences` — the selected CRM's research-note, conversation and channel choices with expected_version; reads `public.get_lifty_crm_preferences` and writes through `public.patch_lifty_crm_preferences`
 - `GET /v1/workspace/linkedin` — read-only LinkedIn activity (confirmed invitations, acceptances, messages and replies today and over the last 7 days) and each LinkedIn account's waiting reason; reads `public.get_lifty_linkedin`
 - `GET /connect/{email|linkedin}`, `POST …` — Lifty's connect page (declaration, then sign-in); `/connect/{channel}/return` is the shared confirmation shell
 - `GET /v1/workspaces/{workspace_ref}/research/recovery/{first_run_ref}`, `POST …` — operator-only acquisition recovery for a failed first run; not in the customer catalog, MCP tools or CLI. The database allows only LIFT admins
@@ -471,6 +472,23 @@ or HubSpot; it does not prove that the replay worker is deployed. Verify the
 Jobs task version separately and use a disposable nonproduction exact-cohort
 preview/replay/readback canary under the existing canary policy. Generic v6
 clients consume these API-owned operations without a new CLI business registry.
+
+## CRM notes and conversations (LIF-1239)
+
+`get crm preferences` and `patch crm preferences` expose the three founder
+choices of the strict v1 `crm_artifact_policy`: research notes
+(`none`/`on_complete`), conversations (`none`/`on_reply`/`all`) and their
+channels (`email`, `linkedin`). The member RPCs resolve the workspace and its
+selected CRM, merge omitted choices, preserve every other metadata key
+(including Attio campaign-send history) and reject a stale `expected_version`.
+A database trigger records every policy change on a CRM integration, including
+operator dashboard writes, so all writers share one version. Jobs reads the
+policy on every run; a change applies to future CRM writes only.
+
+Release order: apply Functions migration
+`20261006150000_lif1239_crm_preferences.sql` through its owning CI before this
+API. Without it both operations return the 502 unavailable error and change
+nothing.
 
 ## Staged Unipile V2 connections (LIF-916)
 
