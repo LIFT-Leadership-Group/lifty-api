@@ -1193,6 +1193,22 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       { state: "none" },
       "Ask once whether",
     ],
+    // Without a CRM the founder can save existing customers from a file, or skip it.
+    [
+      { status: "not_connected", provider: "hubspot" },
+      { state: "none" },
+      "customer_exclusions_status first and skip the offer when a list is saved",
+    ],
+    [
+      { status: "not_connected", provider: "hubspot" },
+      { state: "none" },
+      "They can skip it now and add the file any time",
+    ],
+    [
+      { status: "not_connected", provider: "hubspot" },
+      { state: "none" },
+      "read their deals and closed customers so it never looks for leads at those companies",
+    ],
     [
       { ...crmConnected, reconnect_required: true },
       { state: "none" },

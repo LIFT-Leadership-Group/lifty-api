@@ -24,10 +24,19 @@ filter can express (industry, company size, location), propose that Targeting
 filter: research costs time and budget, and the filter keeps it on people who
 can fit. `references.calibration` covers diagnosis.
 
-## 3. CRM (optional)
+## 3. CRM and existing customers (optional)
 
 Follow the CRM action in `actions`; ask about it once. HubSpot and Attio
 connect here; for another CRM say it is not supported yet and continue.
+When you offer it, explain that a connected CRM also lets Lifty read the
+founder's deals and closed customers so it never looks for leads at those
+companies.
+
+- Without a CRM: offer to save the companies that are already their customers
+  from a file so Lifty never contacts them. Read `customer_exclusions_status`
+  first and skip the offer when a list is saved; import with
+  `customer_exclusions_import` (summary_context task customer-exclusions).
+  They can skip it now and add the file any time.
 
 - Connect: `crm_post` with the founder's `provider` (`hubspot` or `attio`), show the returned link right away as a Markdown link,
   and after the founder finishes, `crm_get` with that `attempt_ref`. Only

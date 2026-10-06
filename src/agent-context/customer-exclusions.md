@@ -2,7 +2,10 @@
 
 Use this stage when the founder asks to protect existing customers or provides
 a customer file. Read `references.common` in full. This works with or without
-a connected CRM. Onboarding owns when to ask for the file.
+a connected CRM. next_step offers it at the sample review, with the CRM
+question, when no CRM is connected (a connected HubSpot or Attio already
+excludes the companies in its deals and closed customers). The founder can
+skip it then and add or replace the file any time.
 
 Read `status` before an import. It separates total saved domain/email counts
 from the founder-uploaded counts. It also shows the latest founder import
