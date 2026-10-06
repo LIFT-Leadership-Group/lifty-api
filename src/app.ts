@@ -31,7 +31,7 @@ import { DeleteLoginRequest, DeleteLoginResult, type DeleteLoginInput, type Dele
 import { MemberWorkspacesResult, type MemberWorkspacesOutput } from "./member-workspaces.js";
 
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
+import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, SUPPORTED_CLIENT_CONTRACTS, AgentContextSchema, getAgentContext, isSupportedClientContract } from "./agent-context.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type AttioConnectStart, type AttioConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
@@ -1005,7 +1005,7 @@ export function createApp(
         operation.parameters = (operation.parameters ?? []).filter(parameter =>
           !("name" in parameter && parameter.in === "header" && parameter.name === "x-lifty-client-contract"));
         operation.parameters.push({ in: "header", name: "x-lifty-client-contract", required: true,
-          schema: { type: "string", const: STAGE_CLIENT_CONTRACT } });
+          schema: { type: "string", enum: [...SUPPORTED_CLIENT_CONTRACTS] } });
         operation.responses ??= {};
         operation.responses["409"] ??= { description: "Unsupported client contract; update the installed CLI and skill." };
       }
@@ -1056,7 +1056,7 @@ export function createApp(
     // Unversioned public links show current documentation; authenticated calls
     // still require the explicit current contract below.
     const clientContract = context.req.query("client_contract") ?? STAGE_CLIENT_CONTRACT;
-    if (clientContract !== STAGE_CLIENT_CONTRACT) {
+    if (!isSupportedClientContract(clientContract)) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", CLIENT_UPGRADE_MESSAGE);
     }
     const document = getAgentContext(context.req.param("task"));
@@ -1094,7 +1094,7 @@ export function createApp(
       );
     }
     context.set("authSession", authentication.session);
-    if (context.req.header("x-lifty-client-contract") !== STAGE_CLIENT_CONTRACT) {
+    if (!isSupportedClientContract(context.req.header("x-lifty-client-contract"))) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", CLIENT_UPGRADE_MESSAGE);
     }
     await next();

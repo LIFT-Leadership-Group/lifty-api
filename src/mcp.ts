@@ -3,7 +3,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { AuthSession, AuthenticationResult } from "./app.js";
 import type { MemberWorkspacesOutput } from "./member-workspaces.js";
-import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT } from "./agent-context.js";
+import { CLIENT_UPGRADE_MESSAGE, isSupportedClientContract } from "./agent-context.js";
 
 export interface McpSettings {
   /** Canonical public /mcp URL, never derived from request Host. */
@@ -103,7 +103,7 @@ export async function handleMcpRequest(request: Request, dependencies: McpDepend
     return reply(401, "UNAUTHORIZED", "A valid Lifty OAuth session is required.");
   }
   const contract = request.headers.get("x-lifty-client-contract");
-  if (contract !== null && contract !== STAGE_CLIENT_CONTRACT) return reply(409, "CONTEXT_CLIENT_UNSUPPORTED", CLIENT_UPGRADE_MESSAGE);
+  if (contract !== null && !isSupportedClientContract(contract)) return reply(409, "CONTEXT_CLIENT_UNSUPPORTED", CLIENT_UPGRADE_MESSAGE);
   if (request.method !== "POST") {
     headers.set("allow", "POST");
     return reply(405, "METHOD_NOT_ALLOWED", "Use POST for the stateless MCP endpoint.");

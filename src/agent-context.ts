@@ -13,8 +13,13 @@ import {
 // envelope, the context document and the operation catalog format. It is not
 // a version of the API or its guidance: releases ship their context here and
 // keep this value, so founders never update the skill for them (LIF-1293).
-// tests/installed-client.test.ts holds what a v10 client depends on.
-export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v10";
+// tests/installed-client.test.ts holds what installed clients depend on.
+export const STAGE_CLIENT_CONTRACT = "lifty-cli-context.v11";
+// v10 (CLI 0.1.0-next.34) stays supported until the v11 client release ships;
+// removing it is the one planned forced update (LIF-1296).
+export const SUPPORTED_CLIENT_CONTRACTS: readonly string[] = ["lifty-cli-context.v10", STAGE_CLIENT_CONTRACT];
+export const isSupportedClientContract = (value: string | null | undefined) =>
+  typeof value === "string" && SUPPORTED_CLIENT_CONTRACTS.includes(value);
 export const CLIENT_UPGRADE_MESSAGE = `Update the installed LIFTY CLI and skill to ${STAGE_CLIENT_CONTRACT}. Earlier client contracts are retired. Reload the updated client; setup resumes from the server draft.`;
 export const AgentContextSchema = z.object({
   format: z.literal("lifty-context.v1"),
