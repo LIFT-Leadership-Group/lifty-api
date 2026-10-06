@@ -20,7 +20,6 @@ export interface AttioTokenIdentity {
   workspaceId: string;
   workspaceSlug: string;
   workspaceName: string;
-  clientId: string;
   scopes: string[];
 }
 
@@ -90,7 +89,6 @@ export async function identifyAttioToken(options: {
     workspaceId: text("workspace_id"),
     workspaceSlug: text("workspace_slug"),
     workspaceName: text("workspace_name"),
-    clientId: text("client_id"),
     scopes: text("scope").split(/\s+/).filter(Boolean).sort(),
   };
   if (payload.active !== true || !UUID.test(identity.workspaceId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(identity.workspaceSlug)

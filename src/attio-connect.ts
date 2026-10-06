@@ -121,8 +121,8 @@ export function createAttioConnectOperations(settings: AttioConnectSettings): At
     let identity;
     try { identity = await identifyAttioToken({ accessToken, fetchImpl }); }
     catch { throw new AttioCallbackError("account_lookup_failed", 502); }
-    // A token minted for another client is never accepted as LIFT's grant.
-    if (identity.clientId !== settings.clientId) throw new AttioCallbackError("client_mismatch", 409);
+    // The code was exchanged with LIFT's own client secret, so the token is
+    // LIFT's grant; /v2/self names the app by an app ID, not the OAuth client ID.
     if (missingAttioScopes(identity.scopes).length) throw new AttioCallbackError("scope_mismatch", 403);
 
     const response = await fetchImpl(`${settings.supabaseUrl}/rest/v1/rpc/complete_lifty_attio_connection`, {

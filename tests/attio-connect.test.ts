@@ -73,7 +73,6 @@ describe("Attio connection operations", () => {
   });
 
   it.each([
-    [{ client_id: "another-app" }, "client_mismatch"],
     [{ scope: "record_permission:read-write" }, "scope_mismatch"],
   ])("ends the attempt when Attio identifies %j", async (self, reason) => {
     const { calls, operations } = provider({ self });
