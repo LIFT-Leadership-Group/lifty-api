@@ -191,10 +191,12 @@ export const CompanyTargetingSchema = z
     keywords: text(1000).nullable(),
   })
   .strict();
+export const PersonaEmailRequirementSchema = z.enum(["verified", "optional"]);
 const PersonaValues = {
   name: text(120),
   titles: unique(text(200), 100, (value) => value).min(1),
   persona_type: text(100).nullable(),
+  email_requirement: PersonaEmailRequirementSchema.default("verified"),
 };
 const LaneFilters = {
   seniorities: unique(SenioritySchema, 11, (value) => value).nullable(),
@@ -203,11 +205,7 @@ const LaneFilters = {
 };
 // Persona ids are opaque server ids. Migrated personas carry md5-derived ids
 // without RFC 4122 version/variant bits, so accept any GUID shape.
-// Read bridge for the database expansion. Writes still reject the new field
-// until the separate consumer cutover is deployed after the migration.
-export const PersonaSchema = z.object({ id: z.guid(), ...PersonaValues,
-  email_requirement: z.enum(["verified", "optional"]).default("verified"),
-}).strict();
+export const PersonaSchema = z.object({ id: z.guid(), ...PersonaValues }).strict();
 export const TargetingLaneSchema = z
   .object({ id: z.uuid(), personas: unique(PersonaSchema, 30, (value) => value.id).min(1), ...LaneFilters })
   .strict();
@@ -264,7 +262,10 @@ export const CriteriaPatchSchema = changed({
 
 // Lane changes: {id, ...} patches a lane (omitted fields stay), {id, remove:
 // true} removes it, and a lane without id is added. Personas without id are new.
-const PersonaInputSchema = z.object({ id: z.guid().optional(), ...PersonaValues }).strict();
+// PATCH omission must reach the database unchanged so a rename preserves policy.
+const PersonaInputSchema = z.object({ id: z.guid().optional(), ...PersonaValues,
+  email_requirement: PersonaEmailRequirementSchema.optional(),
+}).strict();
 const LanePersonas = unique(PersonaInputSchema, 30, (value) => value.id ?? `name:${value.name}`).min(1);
 export const TargetingLaneChangeSchema = z.union([
   z.object({ id: z.uuid(), remove: z.literal(true) }).strict(),
@@ -299,7 +300,7 @@ export const TargetingPatchSchema = z
 // Setup draft: Targeting without ids (the server assigns them on submit), the
 // inputs the criteria are written from, and the evidence behind them.
 const DraftLaneSchema = z
-  .object({ personas: unique(z.object(PersonaValues).strict(), 30, (value) => value.name).min(1), ...LaneFilters })
+  .object({ personas: unique(z.object({ ...PersonaValues, email_requirement: PersonaEmailRequirementSchema.optional() }).strict(), 30, (value) => value.name).min(1), ...LaneFilters })
   .strict();
 export const CriteriaInputsSchema = z
   .object({

@@ -54,7 +54,7 @@ Read the affected resource and its current version. Profile and voice edits
 regenerate nothing. A filter-only targeting PATCH changes only the lanes and
 fields it supplies and affects the next discovery.
 
-A persona change (added, removed, renamed, titles or type changed) sends
+A persona change (added, removed, renamed, titles, type or email requirement changed) sends
 regenerated_criteria in the same targeting PATCH, because the criteria describe
 the personas: both change together or neither does. regenerated_criteria
 carries the criteria expected_version and the regenerated text, plus
@@ -83,7 +83,7 @@ Preserve all existing lanes, persona identities, industry codes and domains.
   is added (personas required); `{id, remove: true}` removes a lane and carries
   no other keys. Unlisted lanes stay unchanged and at least one lane remains.
 - personas, when given, replaces that lane's list. Keep an existing persona's
-  id to preserve its identity; a persona without id is new. Persona names are
+  id and email_requirement to preserve its identity and email policy; a persona without id is new. Persona names are
   labels; titles drive buyer search.
 - company.industries holds classification labels. A broad label such as real
   estate does not by itself establish software fit or exclude brokerages.
@@ -253,7 +253,7 @@ disqualifier. The saved draft:
     "lanes": [
       {
         "personas": [
-          { "name": "Founder buyer", "titles": ["Founder", "Co-Founder"], "persona_type": null }
+          { "name": "Founder buyer", "titles": ["Founder", "Co-Founder"], "persona_type": null, "email_requirement": "verified" }
         ],
         "seniorities": null,
         "person_locations": null,
