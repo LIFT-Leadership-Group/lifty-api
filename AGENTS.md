@@ -52,6 +52,16 @@ an explicitly authorized internal workspace and seed data, and must stop before
 live sending. Confirm the actual target and issue scope first. Public health
 and fail-closed authentication smoke checks are safe.
 
+## Installed clients and context
+
+Every task context the agent reads comes from this API (`src/agent-context`),
+so an API change ships its context change in the same PR and reaches every
+founder on deploy. Do not change `STAGE_CLIENT_CONTRACT` for an API or
+context release: it names the transport installed clients implement, and
+changing it forces every founder to update the skill (LIF-1293). Keep
+`tests/installed-client.test.ts` passing; a failure means the change breaks
+installed clients. Change the contract only with a deliberate client release.
+
 ## Connection confirmation
 
 Browser integration callbacks use `src/connection-confirmation.ts` and its typed
