@@ -1117,6 +1117,32 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
     expect(result.actions.join(" ")).toContain("never activates outreach");
     expect(result.recommended_tools).not.toContain("campaigns_activate");
   });
+  // Several senders: the agent asks whose account or campaign it is instead of
+  // acting on the first one; one sender is assumed.
+  it.each(["connected", "needs_reconnect", "email_ready"] as const)("names every sender for a %s step and asks which one", async position => {
+    const ana = { ...sendersFixture.senders[0]!, accounts: [position === "email_ready" ? mailbox
+      : { ...linkedinAccount, status: position === "needs_reconnect" ? "needs_reconnect" as const : "connected" as const }] };
+    const luisId = "44444444-4444-4444-8444-444444444444";
+    const luis = { ...ana, id: luisId, name: "Luis Gómez",
+      accounts: [{ ...ana.accounts[0]!, id: "33333333-3333-4333-8333-333333333333", sender_id: luisId }] };
+    const h = harness(undefined, null, { getRunStatus: async () => runFixture,
+      outreachOperation: async (_session, key) => emptyOutreach(key),
+      identityOperation: async () => ({ status: 200, body: { ...sendersFixture, senders: [ana, luis] } }),
+      getEmailWarmup: async () => warmupRead("warming", { warmup_ready: true }) as never,
+      getEmailPlacement: async () => passing as never,
+      researchOperation: async () => scheduleRead("paid") });
+    const result = await (await h.request("/v1/workspace/next-step")).json();
+    const actions = result.actions.join(" ");
+    expect(result.reason).toBe(position === "connected" ? "linkedin_connected" : position === "needs_reconnect" ? "linkedin_reconnect_needed" : "email_ready");
+    if (position === "needs_reconnect") {
+      expect(actions).toContain("ask which to reconnect now");
+      expect(actions).toContain(`${ana.accounts[0]!.id} (Ana Pérez), ${luis.accounts[0]!.id} (Luis Gómez)`);
+    } else {
+      if (position === "connected") expect(actions).toContain("LinkedIn is connected for Ana Pérez, Luis Gómez");
+      expect(actions).toContain("ask which of them this campaign sends from");
+      expect(actions).not.toContain("permitting Ana Pérez");
+    }
+  });
   it("treats an unreadable sender roster as unknown, not as LinkedIn unconnected", async () => {
     const h = harness(undefined, null, { getRunStatus: async () => runFixture,
       outreachOperation: async (_session, key) => emptyOutreach(key),
