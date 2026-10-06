@@ -21,13 +21,23 @@ const limits: Record<string, number> = {
   sample_pending: 12_000,
   sample_failed: 12_000,
   sample_ready_for_founder_review: 40_000,
+  linkedin_connected: 80_000,
   campaigns_saved: 80_000,
+  linkedin_outreach_active: 25_000,
+  linkedin_reconnect_needed: 25_000,
 };
 
 const identity = { workspace_ref: workspaceRef, name: "Example", state: "ready_for_connections" };
 const at = profileFixture.updated_at;
 const run = { state: "succeeded", run_ref: "run-1", requested_leads: 5, leads_discovered: 5, leads_researched: 5,
   error_code: null, started_at: at, completed_at: at, workspace: { workspace_ref: workspaceRef, name: "Example" }, leads: [] };
+const senderId = "22222222-2222-4222-8222-222222222222";
+const linkedinAccount = (status: string) => ({ id: "11111111-1111-4111-8111-111111111111", sender_id: senderId, channel: "linkedin",
+  identity: "https://www.linkedin.com/in/ada", status, state: "active", checked_at: at, observation: { state: "verified" },
+  connected_at: at, disconnected_at: null, access_revoked_at: null, declaration: null, sends: { today: 0, last_7_days: 0 } });
+const founder = (status: string) => ({ id: senderId, version: 1, name: "Ada Founder", signature: null, booking_url: null,
+  accounts: [linkedinAccount(status)] });
+const activeLinkedin = { ...campaignSummary, state: "active" };
 const unset = { targeting: { workspace_ref: workspaceRef, targeting: null }, criteria: { workspace_ref: workspaceRef, criteria: null } };
 const base = {
   business: { workspace: identity, profile: profileFixture } as unknown,
@@ -37,6 +47,7 @@ const base = {
   draft: draftGetFixture as unknown,
   run: { state: "none" } as unknown,
   campaigns: [] as unknown[],
+  senders: [] as unknown[] | "unavailable",
 };
 const generated = { text: criteriaFixture.text, research_fields: criteriaFixture.research_fields,
   source_versions: { profile_version: 1, draft_version: 1, base_version: "base-v1" } };
@@ -54,6 +65,9 @@ const states: Partial<typeof base>[] = [
   { run: { ...run, state: "failed", error_code: "search_exhausted" } },
   { run },
   { run, campaigns: [campaignSummary] },
+  { run, senders: [founder("connected")] },
+  { run, campaigns: [activeLinkedin] },
+  { run, senders: [founder("needs_reconnect")] },
 ];
 
 async function nextStep(state: Partial<typeof base>) {
@@ -67,6 +81,10 @@ async function nextStep(state: Partial<typeof base>) {
     getHubspotConnection: async () => ({ provider: "hubspot", status: "not_connected" }),
     getAttioConnection: async () => ({ provider: "attio", status: "not_connected" }),
     getCrmSyncStatus: async () => ({ state: "none" }),
+    identityOperation: async () => {
+      if (current.senders === "unavailable") throw new Error("roster unavailable");
+      return { status: 200, body: { workspace: identity, senders: current.senders } };
+    },
   } as Parameters<typeof getNextStep>[0], { userId: "founder", client: {} } as Parameters<typeof getNextStep>[1]);
 }
 

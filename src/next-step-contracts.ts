@@ -18,6 +18,7 @@ export const NextStepSchema = z
       "import",
       "sample-review",
       "campaign",
+      "linkedin",
     ]),
     reason: z.string().min(1),
     section: z

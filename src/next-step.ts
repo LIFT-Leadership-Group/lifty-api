@@ -16,6 +16,7 @@ import {
 import { readComponent } from "./workspace-summary.js";
 import { readCrmConnection } from "./crm-connection.js";
 import { CampaignsSchema } from "./outreach-contracts.js";
+import { SendersGetSchema } from "./identity-contracts.js";
 import { PublicError } from "./errors.js";
 import { z } from "zod";
 import { stageOperations } from "./stage-contracts.js";
@@ -27,8 +28,8 @@ const tool = (resource: string, operation: string) => {
   if (!stageOperations[resource]?.[operation]) throw new Error(`Unknown catalog operation ${resource}.${operation}`);
   return operationToolNames(resource, operation)[0]!;
 };
-// Every next_step reason: where it sits, when it is returned (in the order the
-// function below checks), and the guide it inlines with only the references it
+// Every next_step reason in journey order: where it sits, when it is returned,
+// and the guide it inlines with only the references it
 // needs. A guide without references is a short playbook sent as is. `context`
 // is the stage whose full guide summary_context serves for the step, and
 // `related` the stages its actions lead to, so the agent knows where to look
@@ -70,13 +71,25 @@ export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
   sample_failed: { step: "sample-review", state: "blocked", section: "leads",
     when: ["The first research run failed; its error_code picks the action"],
     guide: { task: "step-sample" }, context: "sample-review", related: ["research-schedule", "targeting"] },
-  // Calibration is a targeting or research-criteria change followed by a new sample.
+  // Calibration is a targeting or research-criteria change followed by a new
+  // sample; a yes to LinkedIn connects the founder's sender (LIF-1302).
   sample_ready_for_founder_review: { step: "sample-review", state: "review", section: "leads",
-    when: ["The first research run succeeded", "No campaign is saved"],
-    guide: { task: "step-review" }, context: "sample-review", related: ["targeting", "research-criteria", "crm", "campaigns"] },
+    when: ["The first research run succeeded", "No campaign is saved", "No LinkedIn account is connected"],
+    guide: { task: "step-review" }, context: "sample-review", related: ["targeting", "research-criteria", "crm", "senders", "sending-accounts"] },
+  // Part 2: alerts once, then voice before the first draft, then templates.
+  linkedin_connected: { step: "campaign", state: "action_required", section: "outreach",
+    when: ["The first research run succeeded", "A LinkedIn account is connected", "No campaign is saved"],
+    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns",
+    related: ["notifications", "commercial-voice", "journeys", "senders"] },
   campaigns_saved: { step: "campaign", state: "action_required", section: "outreach",
-    when: ["The first research run succeeded", "At least one campaign is saved"],
-    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns", related: ["journeys"] },
+    when: ["The first research run succeeded", "At least one campaign is saved", "No LinkedIn campaign is active"],
+    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns", related: ["journeys", "commercial-voice", "linkedin"] },
+  linkedin_outreach_active: { step: "linkedin", state: "complete", section: "outreach",
+    when: ["The first research run succeeded", "A LinkedIn campaign is active"],
+    guide: { task: "linkedin", references: ["common"] }, context: "linkedin", related: ["campaigns", "leads", "senders", "sending-accounts"] },
+  linkedin_reconnect_needed: { step: "linkedin", state: "blocked", section: "outreach",
+    when: ["The first research run succeeded", "A LinkedIn account needs reconnecting"],
+    guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts", related: ["senders", "linkedin"] },
 };
 // Stage contexts no next_step reason links, and how the agent reaches each one
 // instead. A context is linked by a step or declared here, never both.
@@ -84,12 +97,6 @@ export const ON_REQUEST_CONTEXTS: Record<string, string> = {
   summary: "Holds next_step and summary_context themselves; agents read the workspace summary to resume or report status.",
   account: "Deleting the signed-in login, only when the founder asks.",
   "customer-exclusions": "Protecting existing customers when the founder asks or shares a customer file.",
-  leads: "Researched leads beyond the sample, when the founder asks for them.",
-  "commercial-voice": "Outreach templating; the Part 2 steps link it (LIF-1302).",
-  senders: "Outreach accounts; the Part 2 steps link it (LIF-1302).",
-  "sending-accounts": "Outreach accounts; the Part 2 steps link it (LIF-1302).",
-  linkedin: "LinkedIn activity; the Part 2 steps link it (LIF-1302).",
-  notifications: "The alert channel; the Part 2 steps link it (LIF-1302).",
 };
 export function nextStepGuide(reason: string) {
   const entry = NEXT_STEP_CATALOG[reason];
@@ -129,6 +136,7 @@ type Reads = Pick<
   | "getHubspotConnection"
   | "getAttioConnection"
   | "getCrmSyncStatus"
+  | "identityOperation"
 >;
 // The session forwards the caller's workspace selection; every read below
 // resolves the same workspace through the shared database rule.
@@ -304,75 +312,134 @@ export async function getNextStep(
       run,
     );
   }
-  const campaigns = CampaignsSchema.parse(await deps.outreachOperation(session, "campaigns.get", { path: {}, query: {}, body: undefined }));
+  // Part 2 reads campaigns and the sender roster together. An unreadable
+  // roster is unknown, never "LinkedIn not connected" (LIF-1302).
+  const [campaigns, roster] = await Promise.all([
+    deps.outreachOperation(session, "campaigns.get", { path: {}, query: {}, body: undefined }).then(value => CampaignsSchema.parse(value)),
+    readComponent(async () => {
+      const value = SendersGetSchema.parse((await deps.identityOperation(session, "senders.get", { path: {}, query: {}, body: undefined })).body);
+      if (value.workspace.workspace_ref !== ref)
+        throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Identity state changed workspace." });
+      return value.senders;
+    }),
+  ]);
   if (campaigns.workspace.workspace_ref !== ref)
     throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Outreach state changed workspace." });
-  if (!campaigns.campaigns.length) {
-    const crm = await readComponent(() => readCrmConnection(deps, session));
-    let crmAction =
-      "Read crm_get before offering CRM sync; its saved connection is currently unavailable. A leads-only workspace can remain here.";
-    if (crm.status === "available") {
-      if (crm.value.status !== "connected")
-        crmAction =
-          "Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio). Connect only after a separate explicit request, with crm_post for the CRM they use; a leads-only workspace can remain here.";
-      else if (crm.value.reconnect_required)
-        crmAction =
-          "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
-      else {
-        const sync = await readComponent(async () => {
-          const value = CrmSyncStatusSchema.parse(
-            await deps.getCrmSyncStatus(session),
-          );
-          if (value.state !== "none" && value.workspace.workspace_ref !== ref)
-            throw new PublicError({
-              status: 403,
-              code: "WORKSPACE_FORBIDDEN",
-              message:
-                "The CRM sync does not belong to the selected workspace.",
-            });
-          return value;
-        });
-        if (sync.status === "unavailable")
-          crmAction =
-            "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
-        else if (sync.value.state === "none")
-          crmAction =
-            crm.value.provider === "attio"
-              ? "Attio is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status."
-              : "HubSpot is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status.";
-        else if (["queued", "running"].includes(sync.value.state))
-          crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
-        else if (sync.value.state === "succeeded")
-          crmAction = `The CRM sync finished (${sync.value.leads_synced ?? 0} leads). Do not repeat it just to check status.`;
-        else
-          crmAction = `The CRM sync failed (${sync.value.error_code ?? "unknown"}). Read crm_sync_status and resolve its blocker before offering a retry.`;
-      }
-    }
+  const linkedin = roster.status === "available"
+    ? roster.value.flatMap(sender => sender.accounts
+      .filter(account => account.channel === "linkedin" && account.status !== "disconnected")
+      .map(account => ({ id: account.id, sender_id: sender.id, sender: sender.name, status: account.status })))
+    : [];
+  const reconnect = linkedin.find(account => account.status === "needs_reconnect");
+  if (reconnect)
     return response(
-      "sample_ready_for_founder_review",
+      "linkedin_reconnect_needed",
       [
-        "Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps. Include lower-fit profiles and explain their mismatch.",
-        "Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample.",
-        crmAction,
-        "Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach now; yes: summary_context task campaigns. A leads-only founder can stop here. If not now, accept it and do not ask again this session.",
+        `${reconnect.sender}'s LinkedIn account needs reconnecting, so its LinkedIn work waits. Explain this plainly and reconnect only after the founder agrees.`,
+        `${tool("sending-accounts", "reconnect")} with path.id ${reconnect.id}, then show the returned connection_url right away as a clickable link. The same LinkedIn profile must sign in.`,
+        `${tool("sending-accounts", "attempt")} with the returned attempt id, with bounded backoff, until it is connected. A failed read is unknown, not a failure.`,
+        "Reconnecting never resumes or activates a campaign. When it is connected, call next_step.",
       ],
-      [
-        tool("sample-review", "get"),
-        tool("crm", "get"),
-        tool("crm", "post"),
-        tool("crm", "mapping_context"),
-        tool("crm", "patch"),
-        tool("crm", "sync_start"),
-        tool("crm", "sync_status"),
-        tool("summary", "context"),
-      ],
-      run,
+      [tool("sending-accounts", "get"), tool("sending-accounts", "reconnect"), tool("sending-accounts", "attempt"), tool("linkedin", "get")],
+      { account: reconnect },
     );
+  const outreach = { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) };
+  if (campaigns.campaigns.some(value => value.channel === "linkedin" && value.state === "active"))
+    return response(
+      "linkedin_outreach_active",
+      [
+        `Report LinkedIn activity from ${tool("linkedin", "get")}: today, the last 7 days and any account's waiting_reason. A first message to someone already connected waits for the founder's review in ${tool("campaigns", "reviews_get")}.`,
+        `Close Part 2 in a few lines: who Lifty contacts on LinkedIn and what happens next. Then ask whether to set up email so Lifty can test their domain and inboxes. Yes: connect a mailbox for the same sender with ${tool("sending-accounts", "connect")} and channel email (summary_context task sending-accounts). If not now, accept it and do not ask again this session.`,
+        "Pause, edit or activate another campaign only when the founder asks.",
+      ],
+      [tool("linkedin", "get"), tool("campaigns", "reviews_get"), tool("campaigns", "get"), tool("senders", "get"), tool("sending-accounts", "connect"), tool("summary", "context")],
+      outreach,
+    );
+  if (campaigns.campaigns.length)
+    return response(
+      "campaigns_saved",
+      [
+        "Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent.",
+        "When a LinkedIn campaign is active, call next_step.",
+      ],
+      [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")],
+      outreach,
+    );
+  const connected = linkedin.find(account => account.status === "connected");
+  if (connected)
+    return response(
+      "linkedin_connected",
+      [
+        `${connected.sender}'s LinkedIn is connected. Read ${tool("notifications", "get")}; unless Slack is already connected, ask once where alerts should go: Slack or email. Email needs no setup. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`,
+        `Read ${tool("commercial-voice", "get")}. If tone and rules are empty, ask how the founder writes before the first draft and save it with ${tool("commercial-voice", "patch")}; voice is shared by every channel and campaign.`,
+        `Build the LinkedIn templates: read ${tool("journeys", "get")}, create the Journey for qualified (Tier A and B) leads with ${tool("journeys", "post")} and its LinkedIn Campaign with ${tool("campaigns", "post")}, permitting ${connected.sender}. Preview real leads with ${tool("campaigns", "tests_post")} before asking for approval.`,
+        "Saving, publishing or a connected account never activates outreach. When a campaign is saved, call next_step.",
+      ],
+      [tool("notifications", "get"), tool("notifications", "post"), tool("commercial-voice", "get"), tool("commercial-voice", "patch"),
+        tool("journeys", "get"), tool("journeys", "post"), tool("campaigns", "post"), tool("campaigns", "tests_post"), tool("summary", "context")],
+      { account: connected },
+    );
+  const crm = await readComponent(() => readCrmConnection(deps, session));
+  let crmAction =
+    "Read crm_get before offering CRM sync; its saved connection is currently unavailable. A leads-only workspace can remain here.";
+  if (crm.status === "available") {
+    if (crm.value.status !== "connected")
+      crmAction =
+        "Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio). Connect only after a separate explicit request, with crm_post for the CRM they use; a leads-only workspace can remain here.";
+    else if (crm.value.reconnect_required)
+      crmAction =
+        "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
+    else {
+      const sync = await readComponent(async () => {
+        const value = CrmSyncStatusSchema.parse(
+          await deps.getCrmSyncStatus(session),
+        );
+        if (value.state !== "none" && value.workspace.workspace_ref !== ref)
+          throw new PublicError({
+            status: 403,
+            code: "WORKSPACE_FORBIDDEN",
+            message:
+              "The CRM sync does not belong to the selected workspace.",
+          });
+        return value;
+      });
+      if (sync.status === "unavailable")
+        crmAction =
+          "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
+      else if (sync.value.state === "none")
+        crmAction =
+          crm.value.provider === "attio"
+            ? "Attio is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status."
+            : "HubSpot is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status.";
+      else if (["queued", "running"].includes(sync.value.state))
+        crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
+      else if (sync.value.state === "succeeded")
+        crmAction = `The CRM sync finished (${sync.value.leads_synced ?? 0} leads). Do not repeat it just to check status.`;
+      else
+        crmAction = `The CRM sync failed (${sync.value.error_code ?? "unknown"}). Read crm_sync_status and resolve its blocker before offering a retry.`;
+    }
   }
   return response(
-    "campaigns_saved",
-    ["Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent."],
-    [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")],
-    { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) },
+    "sample_ready_for_founder_review",
+    [
+      "Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps. Include lower-fit profiles and explain their mismatch.",
+      "Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample.",
+      crmAction,
+      ...(roster.status === "unavailable" ? ["The sender roster could not be read: read senders_get before offering LinkedIn, because an account may already be connected."] : []),
+      `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach for these leads now. Yes: read ${tool("senders", "get")} and use the founder's own sender (senders_post only when absent; ask whose account it is when unclear), then ${tool("sending-accounts", "connect")} with that sender_id and channel linkedin. Show the returned connection_url right away and confirm it with sending_accounts_attempt; the templates follow once it connects. A leads-only founder can stop here. If not now, accept it and do not ask again this session.`,
+    ],
+    [
+      tool("sample-review", "get"),
+      tool("crm", "get"),
+      tool("crm", "post"),
+      tool("crm", "mapping_context"),
+      tool("crm", "patch"),
+      tool("crm", "sync_start"),
+      tool("crm", "sync_status"),
+      tool("senders", "get"),
+      tool("sending-accounts", "connect"),
+      tool("summary", "context"),
+    ],
+    run,
   );
 }

@@ -7,7 +7,8 @@ import * as contracts from "./identity-contracts.js";
 // LIF-1182 Identity: senders and their sending accounts. Every definition is a
 // catalog operation (HTTP route, MCP tool, CLI noun, public context). Member
 // RPCs resolve the workspace from the session's x-lifty-workspace header with
-// the shared database rule (p_workspace_id null). Provider work (links,
+// the shared database rule (p_workspace_id null); the admin onboarding read
+// names the workspace instead (AuthSession.workspaceRef, LIF-1302). Provider work (links,
 // verifying an authorization, revoking access) is delegated to the account
 // connector; reads never call it except the attempt read, which may finish a
 // binding the person already authorized.
@@ -161,7 +162,7 @@ export async function executeIdentityOperation(session: AuthSession, key: string
   const { definition } = entry;
   const call = async (rpc: string, args: Record<string, unknown>) => {
     let result: { data: unknown; error: unknown };
-    try { result = await (session.client as RpcClient).rpc(rpc, { p_workspace_id: null, ...args }); }
+    try { result = await (session.client as RpcClient).rpc(rpc, { p_workspace_id: session.workspaceRef ?? null, ...args }); }
     catch (cause) { throw rpcFailure(cause, { operation: rpc, ...unavailable }); }
     if (result.error) throw rpcFailure(result.error, { operation: rpc, ...unavailable });
     return result.data;
