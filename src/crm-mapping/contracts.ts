@@ -8,11 +8,16 @@ export {
 const Json = z.record(z.string(), z.unknown());
 const Ref = z.uuid();
 const Digest = z.string().regex(/^[a-f0-9]{64}$/);
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+/** HubSpot portal/record ids are numeric; Attio workspace/record ids are UUIDs. */
+export const CrmIdSchema = z.string().regex(new RegExp(`^([0-9]{1,30}|${UUID})$`));
+export const CrmProviderSchema = z.enum(["hubspot", "attio"]);
+export type CrmProviderName = z.infer<typeof CrmProviderSchema>;
 export const ObjectSchema = z.enum(["contact", "company"]);
 export const MappingValuesSchema = z
   .object({
     workspace_id: Ref,
-    provider: z.literal("hubspot"),
+    provider: CrmProviderSchema,
     source_stage: z.enum(["discovery", "research", "outreach", "verification"]),
     source_entity: z.enum(["lead", "company"]),
     source_field: z.string().min(1).max(200),
@@ -72,10 +77,12 @@ export const MappingEditSchema = MappingValuesSchema.extend({
 export const ScopeSchema = z.object({
   workspace_ref: Ref,
   integration_ref: Ref,
-  portal_id: z.string().regex(/^\d{1,30}$/),
+  portal_id: CrmIdSchema,
   mapping_version: Digest,
 });
 export const StateSchema = ScopeSchema.extend({
+  // Databases before LIF-1238 return HubSpot-only state without a provider.
+  provider: CrmProviderSchema.default("hubspot"),
   workspace_name: z.string(),
   allow_provisioning: z.boolean(),
   mappings: z.array(MappingSchema),
@@ -158,7 +165,7 @@ export const EvaluationSchema = z.object({
 export const ReplayRecordSchema = z.object({
   lead_refs: z.array(Ref),
   object: ObjectSchema,
-  record_id: z.string().regex(/^\d{1,30}$/),
+  record_id: CrmIdSchema,
   expected: z.record(z.string(), z.string().nullable()),
   proposed: z.record(z.string(), z.string()),
   evaluations: z.array(EvaluationSchema),
@@ -190,10 +197,20 @@ export const CrmMappingApplyRequestSchema = ScopeSchema.extend({
 export const CrmMappingApplySchema = StateSchema.extend({
   state: z.literal("applied"),
 });
+/** Attio attribute definition: api_slug, title and one of the types the sync writes. */
+export const AttioAttributeCreateSchema = z
+  .object({
+    name: z.string().regex(/^[a-z][a-z0-9_]{0,99}$/),
+    label: z.string().min(1).max(200),
+    description: z.string().max(1000).optional(),
+    type: z.enum(["text", "number", "checkbox", "select", "date", "timestamp"]),
+    options: z.array(z.object({ label: z.string().min(1).max(200) }).strict()).max(500).optional(),
+  })
+  .strict();
 export const CrmMappingPropertyCreateRequestSchema = ScopeSchema.extend({
   schema_version: Digest,
   object: ObjectSchema,
-  property: z
+  property: z.union([z
     .object({
       name: z.string().regex(/^[a-z][a-z0-9_]{0,99}$/),
       label: z.string().min(1).max(200),
@@ -229,7 +246,7 @@ export const CrmMappingPropertyCreateRequestSchema = ScopeSchema.extend({
         .max(500)
         .optional(),
     })
-    .strict(),
+    .strict(), AttioAttributeCreateSchema]),
 }).strict();
 export const CrmMappingPropertyCreateSchema = ScopeSchema.extend({
   state: z.enum(["created", "already_exists"]),

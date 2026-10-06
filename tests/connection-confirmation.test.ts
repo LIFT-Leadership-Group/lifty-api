@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app.js';
 import { sealHubspotConnectIntent } from '../src/hubspot-state.js';
 import { sealSlackConnectIntent } from '../src/slack-state.js';
+import { sealAttioConnectIntent } from '../src/attio-state.js';
 
 describe('connection document boundary', () => {
-  it.each(['hubspot', 'slack'] as const)('renders %s confirmation before exchanging the authorization', async provider => {
+  it.each(['hubspot', 'slack', 'attio'] as const)('renders %s confirmation before exchanging the authorization', async provider => {
     const complete = vi.fn(async () => ({ portalId:'123', hubDomain:null, teamId:'T1', teamName:'Test' }));
-    const state = (provider === 'hubspot' ? sealHubspotConnectIntent : sealSlackConnectIntent)('a'.repeat(64), 'secret');
+    const state = { hubspot: sealHubspotConnectIntent, slack: sealSlackConnectIntent, attio: sealAttioConnectIntent }[provider]('a'.repeat(64), 'secret');
     const app = createApp({completeHubspotCallback:complete, completeSlackCallback:complete});
     const response = await app.request(`https://api.lifty.test/${provider}/callback?state=${state}&code=PRIVATE_CODE`);
     expect(response.status).toBe(200);
@@ -79,7 +80,7 @@ it('registers every browser callback/return in the shared inventory, excluding p
   const app=createApp({warmupSetup:setup,accounts:{connection:accounts,origin:'https://api.lifty.test',hostedOrigins:['https://connect.lifty.test']}});
   const browserRoutes=app.routes.filter(r=>r.method==='GET'&&/\/(callback|return)$/.test(r.path)).map(r=>r.path).sort();
   expect(browserRoutes).toEqual(Object.values(CONNECTION_FLOWS).map(x=>x.path).sort());
-  const entries=app.routes.filter(r=>r.method==='GET'&&/^\/(hubspot|slack|connect|warmup)\//.test(r.path)&&!browserRoutes.includes(r.path)).map(r=>r.path).sort();
+  const entries=app.routes.filter(r=>r.method==='GET'&&/^\/(hubspot|slack|attio|connect|warmup)\//.test(r.path)&&!browserRoutes.includes(r.path)).map(r=>r.path).sort();
   expect(entries).toEqual(Object.values(CONNECTION_FLOWS).flatMap(x=>[...x.entries]).sort());
   for(const path of browserRoutes)for(const stage of ['status','process'])expect(app.routes.some(r=>r.method==='POST'&&r.path===path+'/'+stage)).toBe(true);
 });
@@ -126,7 +127,7 @@ it('a failed status transport never navigates away or spins forever',async()=>{
   expect(page.location.href).toBe('https://api.lifty.test/connect/email/return?intent=capability');
   expect(vi.mocked(fetchImpl).mock.calls.length).toBeLessThan(20);
 });
-it.each(['hubspot','slack'] as const)('%s never repeats an exchanged code and reads durable success after a lost response',async provider=>{
+it.each(['hubspot','slack','attio'] as const)('%s never repeats an exchanged code and reads durable success after a lost response',async provider=>{
   let claimed=false,connected=false;const complete=vi.fn(async()=>{connected=true;throw new Error('lost store response');});
   const fetchImpl=vi.fn(async(_url:unknown,init?:RequestInit)=>{
     const args=JSON.parse(String(init!.body));expect(args.p_intent_token).toBe('a'.repeat(64));

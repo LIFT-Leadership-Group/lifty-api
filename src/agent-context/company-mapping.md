@@ -1,5 +1,7 @@
 ## Company CRM setup: required before HubSpot sync
 
+HubSpot only. Attio needs no separate company setup.
+
 For onboarding, insert this step immediately after the requested HubSpot
 connection and before `sync`. Completion also requires company configuration
 readiness. For an existing workspace, use it when the founder asks to configure

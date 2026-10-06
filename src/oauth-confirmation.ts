@@ -2,7 +2,7 @@ import { ConfirmationResult, connectionFetch, invalidConfirmation, pendingConfir
 import { z } from 'zod';
 
 /** An existing opaque intent capability authorizes only its own receipt/claim. */
-export function createOAuthConfirmation(options:{provider:'hubspot'|'slack';origin:string;supabaseUrl:string;publishableKey:string;
+export function createOAuthConfirmation(options:{provider:'hubspot'|'slack'|'attio';origin:string;supabaseUrl:string;publishableKey:string;
   open:(state:string)=>string;complete:(input:{state:string;code:string})=>Promise<unknown>;fetchImpl?:typeof fetch}):ConfirmationAdapter {
   const fetchImpl=connectionFetch(options.fetchImpl??fetch);
   const Receipt= z.object({result:ConfirmationResult,claimed:z.boolean()});

@@ -38,6 +38,7 @@ const state: State = {
   workspace_name: "Lift",
   integration_ref: "89700000-0000-4000-a000-000000000004",
   portal_id: "52044090",
+  provider: "hubspot",
   mapping_version: "a".repeat(64),
   allow_provisioning: false,
   mappings: [mapping],
@@ -69,9 +70,11 @@ const property: Property = {
   fieldType: "select",
   options: [{ label: "Computer Software", value: "COMPUTER_SOFTWARE" }],
 };
+// HubSpot remote records carry their single identity value and no record URL.
+const hs = (values: Record<string, string | null>) => ({ values, identities: [values.email ?? values.domain].filter((v): v is string => !!v), url: null });
 const records = {
-  contact: new Map([["11", { email: "founder@example.com" }]]),
-  company: new Map([["22", { domain: "example.com", industry: null }]]),
+  contact: new Map([["11", hs({ email: "founder@example.com" })]]),
+  company: new Map([["22", hs({ domain: "example.com", industry: null })]]),
 };
 const build = (
   s = state,
@@ -96,7 +99,7 @@ describe("CRM mapping preview", () => {
     const result = await build(state, property, {
       ...records,
       company: new Map([
-        ["22", { domain: "example.com", industry: "CONSULTING" }],
+        ["22", hs({ domain: "example.com", industry: "CONSULTING" })],
       ]),
     });
     expect(result.plan.records).toEqual([]);
@@ -121,7 +124,7 @@ describe("CRM mapping preview", () => {
       (
         await build(state, property, {
           ...records,
-          company: new Map([["22", { domain: "foreign.com", industry: null }]]),
+          company: new Map([["22", hs({ domain: "foreign.com", industry: null })]]),
         })
       ).issues,
     ).toEqual(

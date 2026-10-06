@@ -8,6 +8,7 @@ import {
   type CrmMappingOptions,
 } from "./contracts.js";
 const PROVIDER_REQUEST_TIMEOUT_MS = 15_000;
+const ATTIO_API = "https://api.attio.com/v2";
 export interface CrmMappingSettings {
   serverKey: string;
   readOnly?: boolean;
@@ -59,6 +60,8 @@ function storageError(error: unknown): MappingError {
     lifty_company_mapping_unsupported: "WORKSPACE_UNSUPPORTED",
     lifty_hubspot_reconnect_required: "HUBSPOT_RECONNECT_REQUIRED",
     lifty_hubspot_connection_unavailable: "HUBSPOT_NOT_CONNECTED",
+    lifty_attio_reconnect_required: "ATTIO_RECONNECT_REQUIRED",
+    lifty_attio_connection_unavailable: "ATTIO_NOT_CONNECTED",
     lifty_company_mapping_forbidden: "FORBIDDEN_WORKSPACE",
     lifty_company_mapping_stale: "STALE_CONTEXT",
     lifty_crm_credential_stale: "STALE_CONTEXT",
@@ -169,7 +172,7 @@ export async function withMappingSession<T>(
     const cached = tokens.get(cacheKey);
     if (cached) return cached;
     const parsed = Credential.safeParse(await rpc("credential", scoped(state)));
-    if (!parsed.success) throw new MappingError("HUBSPOT_NOT_CONNECTED", 409);
+    if (!parsed.success) throw new MappingError(state.provider === "attio" ? "ATTIO_NOT_CONNECTED" : "HUBSPOT_NOT_CONNECTED", 409);
     const credential = parsed.data;
     if (
       credential.workspace_ref !== state.workspace_ref ||
@@ -177,6 +180,23 @@ export async function withMappingSession<T>(
       credential.portal_id !== state.portal_id
     )
       throw new MappingError("WORKSPACE_OR_PORTAL_CHANGED", 409);
+    if (state.provider === "attio") {
+      // Attio tokens never expire; an inactive or revoked one needs a reconnect.
+      const response = await providerFetch(`${ATTIO_API}/self`, {
+        headers: { authorization: `Bearer ${credential.secret}` },
+      });
+      const self = z
+        .object({ active: z.boolean(), workspace_id: z.string().optional() })
+        .safeParse(await response.json().catch(() => null));
+      if (response.status === 401 || (response.ok && self.success && !self.data.active)) {
+        await rpc("reconnect", { ...scoped(state), credential_version: credential.credential_version });
+        throw new MappingError("ATTIO_RECONNECT_REQUIRED", 409);
+      }
+      if (!response.ok || !self.success || self.data.workspace_id !== state.portal_id)
+        throw new MappingError("WORKSPACE_OR_PORTAL_CHANGED", 409);
+      tokens.set(cacheKey, credential.secret);
+      return credential.secret;
+    }
     const resolved = await resolveHubSpotGrant(
       {
         workspaceId: state.workspace_ref,
@@ -230,7 +250,8 @@ export async function withMappingSession<T>(
     body?: unknown,
   ) {
     const token = await tokenFor(state);
-    const response = await providerFetch(`https://api.hubapi.com${path}`, {
+    const attio = state.provider === "attio";
+    const response = await providerFetch(`${attio ? ATTIO_API : "https://api.hubapi.com"}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${token}`,
@@ -238,17 +259,18 @@ export async function withMappingSession<T>(
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
+    const prefix = attio ? "ATTIO" : "HUBSPOT";
     if (response.status === 401)
-      throw new MappingError("HUBSPOT_RECONNECT_REQUIRED", 409);
+      throw new MappingError(`${prefix}_RECONNECT_REQUIRED`, 409);
     if (response.status === 403)
-      throw new MappingError("HUBSPOT_PERMISSION_REQUIRED", 409);
+      throw new MappingError(`${prefix}_PERMISSION_REQUIRED`, 409);
     if (response.status === 429)
-      throw new MappingError("HUBSPOT_RATE_LIMITED", 429);
+      throw new MappingError(`${prefix}_RATE_LIMITED`, 429);
     if (!response.ok)
       throw new MappingError(
         response.status === 409
-          ? "HUBSPOT_PROPERTY_CONFLICT"
-          : "HUBSPOT_REQUEST_FAILED",
+          ? `${prefix}_PROPERTY_CONFLICT`
+          : `${prefix}_REQUEST_FAILED`,
         response.status === 409 ? 409 : 502,
       );
     return response.json().catch(() => null);

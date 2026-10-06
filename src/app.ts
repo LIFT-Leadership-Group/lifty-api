@@ -32,7 +32,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, AgentContextSchema, getAgentContext } from "./agent-context.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
+import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type AttioConnectStart, type AttioConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
 import { type EnqueueCrmSync, type EnqueueFirstRun, type EnqueueIntegrationRevocation, type EnqueueNotificationDelivery } from "./trigger-client.js";
 import { PublicError } from "./errors.js";
 import {
@@ -45,6 +45,7 @@ import {
   type SlackCallbackSuccess,
 } from "./slack-connect.js";
 import { isSealedSlackState } from "./slack-state.js";
+import { isSealedAttioState } from "./attio-state.js";
 
 import { HistoricalEmailCampaignRequest, EmailCampaignRequest, EmailCampaignResult, EmailPlacementResult, EmailPlacementPreview, campaignResultFor, type EmailCampaignInput, type EmailCampaignOutput } from "./email-campaign-contracts.js";
 import { EmailWorkspace } from "./email-contracts.js";
@@ -63,7 +64,7 @@ const MAX_CREATE_WORKSPACE_BYTES = 16 * 1024;
 const rateLimitedPaths = new Set([
   "/v1/workspace/business", "/v1/workspace/setup", "/v1/workspace/sample-review", "/v1/integrations/hubspot/company-mapping", "/v1/email/warmup/start",
   "/v1/workspace/crm", "/v1/workspace/notifications", "/v1/workspace/senders", "/v1/workspace/sending-accounts/connect",
-  "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync",
+  "/v1/workspace/crm/mapping/apply", "/v1/workspace/crm/mapping/property_create", "/v1/workspace/crm/mapping/sync", "/v1/integrations/hubspot/sync", "/v1/integrations/attio/sync", "/v1/workspace/crm/sync",
 ]);
 const rateLimitedPatterns = [/^\/v1\/workspace\/sending-accounts\/[^/]+\/(?:reconnect|disconnect)$/, /^\/v1\/workspace\/senders\/[^/]+\/delete$/];
 const RequestIdSchema = z.uuid();
@@ -144,6 +145,9 @@ export interface AppDependencies {
   ): Promise<HubspotCallbackSuccess>;
   denyHubspotCallback(state: string): Promise<void>;
   buildHubspotAuthorizeUrl(state: string): string | null;
+  startAttioConnect(session: AuthSession): Promise<AttioConnectStart>;
+  getAttioConnection(session: AuthSession): Promise<AttioConnectionStatus>;
+  buildAttioAuthorizeUrl(state: string): string | null;
   startSlackConnect(session: AuthSession): Promise<SlackConnectStart>;
   createSlackConnectLink(session: AuthSession, workspaceId: string): Promise<SlackConnectLink>;
   getSlackConnection(session: AuthSession): Promise<SlackConnectionStatus>;
@@ -621,7 +625,7 @@ function resolveProvider(
         context,
         400,
         "PROVIDER_INVALID",
-        "Unknown provider. Supported providers: hubspot, slack.",
+        "Unknown provider. Supported providers: hubspot, attio, slack.",
       ),
     };
   }
@@ -722,6 +726,11 @@ const defaultDependencies: AppDependencies = {
     );
   },
   buildHubspotAuthorizeUrl: () => null,
+  startAttioConnect: async () => {
+    throw new PublicError({ status: 503, code: "INTEGRATION_NOT_CONFIGURED", message: "The Attio connection service is not configured." });
+  },
+  getAttioConnection: async () => ({ provider: "attio", status: "not_connected" }),
+  buildAttioAuthorizeUrl: () => null,
   createSlackConnectLink: async () => { throw new Error("createSlackConnectLink is not configured"); },
   startSlackConnect: async () => {
     throw new Error("startSlackConnect is not configured");
@@ -946,9 +955,23 @@ export function createApp(
     context.header("referrer-policy", "no-referrer");
     return context.redirect(authorizeUrl, 302);
   });
-  for(const flow of ["hubspot","slack"] as const) {
+  app.get("/attio/start", (context) => {
+    const intent = context.req.query("intent") ?? "";
+    if (!isSealedAttioState(intent)) {
+      return hubspotHtmlResponse(context, 400, "Invalid connection link", "Ask LIFTY for a fresh Attio connection link.");
+    }
+    const authorizeUrl = dependencies.buildAttioAuthorizeUrl(intent);
+    if (!authorizeUrl) {
+      return hubspotHtmlResponse(context, 503, "Connection unavailable", "The Attio connection service is temporarily unavailable.");
+    }
+    context.header("cache-control", "no-store");
+    context.header("referrer-policy", "no-referrer");
+    return context.redirect(authorizeUrl, 302);
+  });
+  const sealedState = { hubspot: isSealedHubspotState, slack: isSealedSlackState, attio: isSealedAttioState } as const;
+  for(const flow of ["hubspot","slack","attio"] as const) {
     const adapter:ConfirmationAdapter=dependencies.connectionCallbacks?.[flow] ?? {
-      validate(input:{state:string}) { if(!(flow==="hubspot"?isSealedHubspotState:isSealedSlackState)(input.state))throw new SyntaxError("invalid_state"); },
+      validate(input:{state:string}) { if(!sealedState[flow](input.state))throw new SyntaxError("invalid_state"); },
       status:async()=>invalidConfirmation(),
     };
     app.route("/",createConfirmationRouter(flow,adapter,{...(adapter.origin ? {origin:adapter.origin} : {}),log:logConfirmation}));
@@ -1397,9 +1420,10 @@ export function createApp(
   app.post("/v1/integrations/:provider/connect", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    const result = provider.provider === "hubspot"
-      ? await dependencies.startHubspotConnect(context.get("authSession"))
-      : await dependencies.startSlackConnect(context.get("authSession"));
+    const session = context.get("authSession");
+    const result = provider.provider === "hubspot" ? await dependencies.startHubspotConnect(session)
+      : provider.provider === "attio" ? await dependencies.startAttioConnect(session)
+      : await dependencies.startSlackConnect(session);
     const validated = ProviderConnectStartSchema.parse(result);
     return context.json(LegacyProviderConnectStartSchema.parse({ provider: validated.provider,
       connect_url: validated.connect_url, expires_in_seconds: validated.expires_in_seconds }));
@@ -1408,9 +1432,10 @@ export function createApp(
   app.get("/v1/integrations/:provider", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    const result = provider.provider === "hubspot"
-      ? await dependencies.getHubspotConnection(context.get("authSession"))
-      : await dependencies.getSlackConnection(context.get("authSession"));
+    const session = context.get("authSession");
+    const result = provider.provider === "hubspot" ? await dependencies.getHubspotConnection(session)
+      : provider.provider === "attio" ? await dependencies.getAttioConnection(session)
+      : await dependencies.getSlackConnection(session);
     return context.json(IntegrationConnectionStatusSchema.parse(result));
   });
 
@@ -1455,12 +1480,25 @@ export function createApp(
     );
   });
 
+  // The sync run follows the workspace's selected CRM; a provider-named route
+  // never starts a sync into a different CRM than the one it names.
+  async function requireConnectedCrm(context: Context<AppEnvironment>, provider: "hubspot" | "attio") {
+    const attio = (await dependencies.getAttioConnection(context.get("authSession"))).status === "connected";
+    if (provider === "attio" && !attio) {
+      throw new PublicError({ status: 409, code: "ATTIO_NOT_CONNECTED", message: "Connect Attio before syncing leads to it." });
+    }
+    if (provider === "hubspot" && attio) {
+      throw new PublicError({ status: 409, code: "CRM_PROVIDER_MISMATCH",
+        message: "This workspace's CRM is Attio. Update Lifty and sync through the CRM stage." });
+    }
+  }
   app.post("/v1/integrations/:provider/sync", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    if (provider.provider !== "hubspot") {
+    if (provider.provider === "slack") {
       return providerUnavailable(context, provider.provider);
     }
+    await requireConnectedCrm(context, provider.provider);
     const result = await dependencies.startCrmSyncRun(
       context.get("authSession"),
     );
@@ -1473,7 +1511,7 @@ export function createApp(
   app.get("/v1/integrations/:provider/sync", async (context) => {
     const provider = resolveProvider(context);
     if (!provider.ok) return provider.response;
-    if (provider.provider !== "hubspot") {
+    if (provider.provider === "slack") {
       return providerUnavailable(context, provider.provider);
     }
     const result = await dependencies.getCrmSyncStatus(

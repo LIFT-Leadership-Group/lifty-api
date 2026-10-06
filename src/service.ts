@@ -2,6 +2,9 @@ import { createAcquisitionRecoveryOperations } from "./acquisition-recovery.js";
 import { createOAuthConfirmation } from "./oauth-confirmation.js";
 import { openHubspotConnectIntent } from "./hubspot-state.js";
 import { openSlackConnectIntent } from "./slack-state.js";
+import { openAttioConnectIntent } from "./attio-state.js";
+import { createAttioConnectOperations, getAttioConnection } from "./attio-connect.js";
+import { buildAttioAuthorizationUrl } from "./attio-oauth.js";
 import { createRunProgressReader } from "./run-progress.js";
 import { createCompanyReadinessCheck } from "./company-mapping/readiness.js";
 import { createCrmMappingReadinessCheck } from "./crm-mapping/readiness.js";
@@ -53,6 +56,8 @@ export function createProductionApp(config: ServiceConfig) {
   const deliverability = createEmailDeliverabilityOperations({
     readPlacementDetails: createPlacementReportReader({ smartleadApiKey: config.smartleadApiKey ?? null }) });
   const hubspot = createHubspotConnectOperations(config.hubspot);
+  const attioSettings = config.attio ?? null;
+  const attio = attioSettings ? createAttioConnectOperations(attioSettings) : null;
   const slackSettings = config.slack;
   const slack = slackSettings
     ? createSlackConnectOperations(slackSettings)
@@ -68,6 +73,8 @@ export function createProductionApp(config: ServiceConfig) {
     connectionCallbacks:{
       hubspot:createOAuthConfirmation({provider:"hubspot",origin:new URL(config.hubspot.publicBaseUrl).origin,...config.supabase,
         open:state=>openHubspotConnectIntent(state,config.hubspot.clientSecret),complete:hubspot.completeCallback}),
+      ...(attio && attioSettings ? {attio:createOAuthConfirmation({provider:"attio",origin:new URL(attioSettings.publicBaseUrl).origin,...config.supabase,
+        open:state=>openAttioConnectIntent(state,attioSettings.clientSecret),complete:attio.completeCallback})} : {}),
       ...(slack && slackSettings ? {slack:createOAuthConfirmation({provider:"slack",origin:new URL(slackSettings.publicBaseUrl).origin,...config.supabase,
         open:state=>openSlackConnectIntent(state,slackSettings.clientSecret),complete:slack.completeCallback})} : {}),
     },
@@ -127,6 +134,12 @@ export function createProductionApp(config: ServiceConfig) {
       redirectUri: `${config.hubspot.publicBaseUrl}/hubspot/callback`,
       state,
     }),
+    getAttioConnection,
+    ...(attio && attioSettings ? {
+      startAttioConnect: attio.startConnect,
+      buildAttioAuthorizeUrl: (state: string) => buildAttioAuthorizationUrl({
+        clientId: attioSettings.clientId, redirectUri: `${attioSettings.publicBaseUrl}/attio/callback`, state }),
+    } : {}),
     createSlackConnectLink: slack?.createConnectLink ?? (async () => slackUnavailable()),
     startSlackConnect: slack?.startConnect ?? (async () => slackUnavailable()),
     getSlackConnection: slack?.getConnection ?? (async () => slackUnavailable()),

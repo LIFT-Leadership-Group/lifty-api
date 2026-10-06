@@ -4,6 +4,7 @@ import { parseHostedAuthOrigin } from "./hosted-auth-branding.js";
 import type { SupabaseAuthenticationConfig } from "./supabase-auth.js";
 import type { HubspotConnectSettings } from "./hubspot-connect.js";
 import type { SlackConnectSettings } from "./slack-connect.js";
+import type { AttioConnectSettings } from "./attio-connect.js";
 
 import type { AccountConnectionSettings } from "./account-connection.js";
 import type { MailiverySettings } from "./email-warmup.js";
@@ -25,6 +26,8 @@ export interface ServiceConfig {
   supabase: SupabaseAuthenticationConfig;
   hubspot: Omit<HubspotConnectSettings, "fetchImpl">;
   slack: Omit<SlackConnectSettings, "fetchImpl"> | null;
+  /** LIFT's Attio OAuth app; Attio connection is unavailable without it. */
+  attio?: Omit<AttioConnectSettings, "fetchImpl"> | null;
   /** Email server capability for the historical campaign and warmup RPCs; connections use `accounts`. */
   serverKeys?: { email: string | null };
   /** Sending-account connections (LIF-1182). Null keeps connect links closed; reads still work. */
@@ -157,6 +160,9 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   }
   const slackClientId = environment.SLACK_CLIENT_ID?.trim();
   const slackClientSecret = environment.SLACK_CLIENT_SECRET?.trim();
+  const attioClientId = environment.ATTIO_CLIENT_ID?.trim();
+  const attioClientSecret = environment.ATTIO_CLIENT_SECRET?.trim();
+  if (Boolean(attioClientId) !== Boolean(attioClientSecret)) throw new Error("Attio connection requires both ATTIO_CLIENT_ID and ATTIO_CLIENT_SECRET.");
 
   // The earlier provider API is used only to remove access to accounts still bound through it.
   const v1Values = [environment.UNIPILE_DSN?.trim(), environment.UNIPILE_ACCESS_TOKEN?.trim()];
@@ -197,7 +203,7 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   if (setupEnabled && (warmupBaseUrl.username || warmupBaseUrl.password || warmupBaseUrl.port || warmupBaseUrl.search || warmupBaseUrl.hash || warmupBaseUrl.pathname !== "/")) {
     throw new Error("Google warmup setup public base URL must be an HTTPS origin without credentials, port, path, query or fragment.");
   }
-  if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
+  if (crmKey && [emailKey, linkedinKey, publishableKey, environment.HUBSPOT_CLIENT_SECRET, attioClientSecret, environment.TRIGGER_SECRET_KEY].includes(crmKey)) throw new Error("CRM requires a distinct dedicated server key.");
   return {
     mcp,
     ...(openAiAppsChallenge === undefined ? {} : { openAiAppsChallenge }),
@@ -230,6 +236,15 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
       supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
       publishableKey,
     },
+    attio: attioClientId && attioClientSecret
+      ? {
+          clientId: attioClientId,
+          clientSecret: attioClientSecret,
+          publicBaseUrl: publicBaseUrl.toString().replace(/\/$/, ""),
+          supabaseUrl: supabaseUrl.toString().replace(/\/$/, ""),
+          publishableKey,
+        }
+      : null,
     slack: slackClientId && slackClientSecret
       ? {
           clientId: slackClientId,

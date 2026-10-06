@@ -1,6 +1,6 @@
 # Browser authorization and the exact attempt
 
-This contract covers the HubSpot (`crm`) and Slack (`notifications`) stage
+This contract covers the HubSpot and Attio (`crm`) and Slack (`notifications`) stage
 GET/POST operations. Sending accounts have their own attempt read
 (`sending-accounts` guide).
 
