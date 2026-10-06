@@ -7,8 +7,10 @@ const TOKEN_ENDPOINT = "https://app.attio.com/oauth/token";
 const SELF_ENDPOINT = "https://api.attio.com/v2/self";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** People/Companies records, attribute schema and research notes. */
+/** People/Companies records, attribute schema, research notes and the
+ * meeting reads that detect booked meetings (sync-attio-meetings). */
 export const ATTIO_REQUIRED_SCOPES: readonly string[] = Object.freeze([
+  "meeting:read",
   "note:read-write",
   "object_configuration:read-write",
   "record_permission:read-write",
