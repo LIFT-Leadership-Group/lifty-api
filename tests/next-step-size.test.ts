@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { getAgentContext } from "../src/agent-context.js";
-import { NEXT_STEP_CATALOG, getNextStep } from "../src/next-step.js";
+import { NEXT_STEP_CATALOG, ON_REQUEST_CONTEXTS, getNextStep } from "../src/next-step.js";
+import { operationToolNames } from "../src/operation-names.js";
+import { stageOperations } from "../src/stage-contracts.js";
 import { campaignSummary } from "./outreach-fixtures.js";
 import { criteriaFixture, draftGetFixture, laneFixture, profileFixture, workspaceRef } from "./business-fixtures.js";
 
@@ -77,10 +79,34 @@ describe("next_step response size", () => {
       const size = JSON.stringify(result).length;
       expect(size, `${result.reason} is ${size} characters`).toBeLessThan(limits[result.reason]!);
       expect(getAgentContext(result.context_task!), result.reason).not.toBeNull();
-      // The catalog the ops view reads describes what next_step actually returns.
-      expect(NEXT_STEP_CATALOG[result.reason], result.reason).toMatchObject({ step: result.step, state: result.state, section: result.section });
     }
     expect([...seen].sort()).toEqual(Object.keys(limits).sort());
     expect(Object.keys(NEXT_STEP_CATALOG).sort()).toEqual(Object.keys(limits).sort());
+  });
+});
+
+// The stage that owns each callable tool name.
+const toolStage = new Map(Object.entries(stageOperations).flatMap(([stage, operations]) =>
+  Object.keys(operations).flatMap(operation => operationToolNames(stage, operation).map(name => [name, stage] as const))));
+
+// Each step tells the agent where to look; a context outside onboarding is
+// declared with how the agent reaches it instead (LIF-1301).
+describe("next_step context links", () => {
+  it("links every stage context to a step or declares it on request", () => {
+    const linked = new Set(Object.values(NEXT_STEP_CATALOG).flatMap(entry => [entry.context, ...entry.related]));
+    for (const stage of linked) expect(Object.hasOwn(stageOperations, stage), `${stage} is not a stage`).toBe(true);
+    for (const stage of Object.keys(ON_REQUEST_CONTEXTS)) expect(linked.has(stage), `${stage} is linked and declared on request`).toBe(false);
+    expect([...linked, ...Object.keys(ON_REQUEST_CONTEXTS)].sort()).toEqual(Object.keys(stageOperations).sort());
+  });
+
+  it("recommends only tools of the stages the step links", async () => {
+    for (const state of [...states, { run: { ...run, state: "failed", error_code: "research_limit_reached" } }]) {
+      const result = await nextStep(state);
+      expect(result.related_contexts, result.reason).toEqual(NEXT_STEP_CATALOG[result.reason]!.related);
+      // summary_context is how every step reads its links.
+      const stages = new Set(["summary", result.context_task, ...result.related_contexts]);
+      for (const name of result.recommended_tools)
+        expect(stages.has(toolStage.get(name) ?? ""), `${result.reason} recommends ${name}`).toBe(true);
+    }
   });
 });

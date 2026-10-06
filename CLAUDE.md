@@ -71,8 +71,11 @@ the caller's own session, naming that workspace (`AuthSession.workspaceRef` →
 unchanged. Its HubSpot, Attio and CRM sync reads need the Functions migration
 `20261006200000_lif1297_admin_workspace_crm_reads.sql` first; deploy the
 database through its production-database job before this API revision.
-`NEXT_STEP_CATALOG` in `src/next-step.ts` is the step list the ops view shows;
-`tests/next-step-size.test.ts` keeps it equal to what next_step returns.
+`NEXT_STEP_CATALOG` in `src/next-step.ts` is the step list the ops view shows,
+and next_step builds each response's state, step, section, `context_task` and
+`related_contexts` from it. Every stage context is linked by some step or
+declared in `ON_REQUEST_CONTEXTS`; `tests/next-step-size.test.ts` enforces that
+and that a step recommends only tools of the stages it links (LIF-1301).
 
 ## Connection confirmation
 

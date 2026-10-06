@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { AppDependencies, AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
-import { NEXT_STEP_CATALOG, getNextStep, nextStepGuide } from "./next-step.js";
+import { NEXT_STEP_CATALOG, ON_REQUEST_CONTEXTS, getNextStep, nextStepGuide } from "./next-step.js";
 
 // LIF-1297: the ops onboarding view. A LIFT admin's own session lists every
 // workspace and computes each one's next_step with the same code founders use,
@@ -57,5 +57,6 @@ export async function readAdminOnboarding(dependencies: Reads, session: AuthSess
     const guide = nextStepGuide(reason)!;
     return { reason, ...entry, guide: { ...entry.guide, revision: guide.revision, size: JSON.stringify(guide).length } };
   });
-  return { generated_at: new Date().toISOString(), steps, workspaces: positions };
+  // Contexts no step links, each with how the agent reaches it (LIF-1301).
+  return { generated_at: new Date().toISOString(), steps, on_request: ON_REQUEST_CONTEXTS, workspaces: positions };
 }
