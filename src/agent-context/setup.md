@@ -4,7 +4,7 @@ The workspace server draft is the only source. Create and confirm the commercial
 
 The draft has three parts:
 
-- targeting: `{lanes}`, the Targeting lane shape without ids. Each lane has personas `{name, titles, persona_type}`, seniorities, person_locations and company filters; company.employees is a list of `{min, max}` ranges. Persona names are unique across the draft; setup assigns lane and persona ids.
+- targeting: `{lanes}`, the Targeting lane shape without ids. Each lane has personas `{name, titles, persona_type, email_requirement}`, seniorities, person_locations and company filters; company.employees is a list of `{min, max}` ranges. Persona names are unique across the draft; setup assigns lane and persona ids.
 - criteria_inputs: primary_motion `{name}`, disqualifiers (exclusions that need evidence), size `{floor, unit}` for a size metric other than employees (for example ARR), broad_search_confirmed, operating_state, parked_motions and personas `[{name, role, tell}]` whose names match draft personas.
 - evidence: website, public_research or founder_statement entries with an optional source_url.
 
@@ -25,3 +25,5 @@ Read setup_generation_context for the actual current Scout base, confirmed profi
 Submit setup_post `{expected_draft_version}` once. The transaction creates Targeting and criteria together at version 1, assigns lane and persona ids and returns an imported receipt with setup_ref and exact versions. Same version replays that receipt. Lost response: read status; a failed read means unknown. SETUP_STALE names stale_sources; read fresh context and regenerate. Another setup version cannot overwrite an existing setup.
 
 Discard the draft with DELETE only before submission; after submission it is immutable history. Later edits use each resource's PATCH. Saving/submitting does not activate recurring research, CRM sync or outreach. Use next_step to resume the existing checkpoint ids.
+
+For a new persona, omit `email_requirement` or use `verified`. Use `optional` only when the founder confirms email-unavailable discovery for that persona; it is effective only while LinkedIn is active. Follow references.targeting when preserving an existing persona policy.
