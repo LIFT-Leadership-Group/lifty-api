@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getAgentContext } from "../src/agent-context.js";
-import { getNextStep } from "../src/next-step.js";
+import { NEXT_STEP_CATALOG, getNextStep } from "../src/next-step.js";
 import { campaignSummary } from "./outreach-fixtures.js";
 import { criteriaFixture, draftGetFixture, laneFixture, profileFixture, workspaceRef } from "./business-fixtures.js";
 
@@ -77,7 +77,10 @@ describe("next_step response size", () => {
       const size = JSON.stringify(result).length;
       expect(size, `${result.reason} is ${size} characters`).toBeLessThan(limits[result.reason]!);
       expect(getAgentContext(result.context_task!), result.reason).not.toBeNull();
+      // The catalog the ops view reads describes what next_step actually returns.
+      expect(NEXT_STEP_CATALOG[result.reason], result.reason).toMatchObject({ step: result.step, state: result.state, section: result.section });
     }
     expect([...seen].sort()).toEqual(Object.keys(limits).sort());
+    expect(Object.keys(NEXT_STEP_CATALOG).sort()).toEqual(Object.keys(limits).sort());
   });
 });

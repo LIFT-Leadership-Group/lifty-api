@@ -73,7 +73,8 @@ const COMPLETION_FAILURES: ReadonlyArray<[string, string, number]> = [
 
 /** Secret-free status; readable even when LIFT's Attio app is not configured. */
 export async function getAttioConnection(session: AuthSession): Promise<AttioConnectionStatus> {
-  const { data, error } = await (session.client as RpcClient).rpc<unknown>("get_lifty_attio_connection");
+  const { data, error } = await (session.client as RpcClient).rpc<unknown>("get_lifty_attio_connection",
+    ...(session.workspaceRef ? [{ p_workspace_id: session.workspaceRef }] : []));
   if (error) throw mapConnectRpcError(error);
   const parsed = AttioConnectionStatusSchema.safeParse(data);
   if (!parsed.success) {

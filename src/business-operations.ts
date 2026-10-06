@@ -220,8 +220,8 @@ export async function executeBusinessOperation(
     key === "business.post"
       ? { p_payload: payload }
       : key === "setup.post"
-        ? { p_workspace_id: null, p_expected_draft_version: (payload as { expected_draft_version: number }).expected_draft_version }
-        : { p_workspace_id: null, ...(entry.definition.method === "PATCH" ? { p_payload: payload } : {}) };
+        ? { p_workspace_id: session.workspaceRef ?? null, p_expected_draft_version: (payload as { expected_draft_version: number }).expected_draft_version }
+        : { p_workspace_id: session.workspaceRef ?? null, ...(entry.definition.method === "PATCH" ? { p_payload: payload } : {}) };
   const unavailable = {
     operation: entry.definition.rpc,
     code: "BUSINESS_UNAVAILABLE",
