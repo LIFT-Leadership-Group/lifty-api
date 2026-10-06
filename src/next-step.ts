@@ -118,10 +118,14 @@ export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
     guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns",
     related: ["journeys", "commercial-voice", "senders", "sending-accounts", "research-schedule"] },
 };
-// Stage contexts no next_step reason links, and how the agent reaches each one
-// instead. A context is linked by a step or declared here, never both.
+// Stage contexts no next_step reason links, each with how the agent reaches it.
+// A stage is linked by a step, the base of every step, or read on request:
+// exactly one of the three (LIF-1301, LIF-1304).
+// The base: every step reads its links and the workspace summary through it.
+export const BASE_CONTEXTS: Record<string, string> = {
+  summary: "Holds next_step and summary_context; every step reads its linked contexts through it, and agents read the workspace summary to resume or report status.",
+};
 export const ON_REQUEST_CONTEXTS: Record<string, string> = {
-  summary: "Holds next_step and summary_context themselves; agents read the workspace summary to resume or report status.",
   account: "Deleting the signed-in login, only when the founder asks.",
 };
 // A marked test workspace's drafts replace the published files they name (LIF-1298).

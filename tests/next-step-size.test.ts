@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getAgentContext } from "../src/agent-context.js";
-import { NEXT_STEP_CATALOG, ON_REQUEST_CONTEXTS, getNextStep } from "../src/next-step.js";
+import { BASE_CONTEXTS, NEXT_STEP_CATALOG, ON_REQUEST_CONTEXTS, getNextStep } from "../src/next-step.js";
 import { operationToolNames } from "../src/operation-names.js";
 import { stageOperations } from "../src/stage-contracts.js";
 import { campaignSummary } from "./outreach-fixtures.js";
@@ -132,13 +132,14 @@ const toolStage = new Map(Object.entries(stageOperations).flatMap(([stage, opera
   Object.keys(operations).flatMap(operation => operationToolNames(stage, operation).map(name => [name, stage] as const))));
 
 // Each step tells the agent where to look; a context outside onboarding is
-// declared with how the agent reaches it instead (LIF-1301).
+// declared with how the agent reaches it instead (LIF-1301, LIF-1304).
 describe("next_step context links", () => {
-  it("links every stage context to a step or declares it on request", () => {
-    const linked = new Set(Object.values(NEXT_STEP_CATALOG).flatMap(entry => [entry.context, ...entry.related]));
+  it("gives every stage context exactly one role: linked by a step, the base or on request", () => {
+    const linked = [...new Set(Object.values(NEXT_STEP_CATALOG).flatMap(entry => [entry.context, ...entry.related]))];
     for (const stage of linked) expect(Object.hasOwn(stageOperations, stage), `${stage} is not a stage`).toBe(true);
-    for (const stage of Object.keys(ON_REQUEST_CONTEXTS)) expect(linked.has(stage), `${stage} is linked and declared on request`).toBe(false);
-    expect([...linked, ...Object.keys(ON_REQUEST_CONTEXTS)].sort()).toEqual(Object.keys(stageOperations).sort());
+    const roles = [...linked, ...Object.keys(BASE_CONTEXTS), ...Object.keys(ON_REQUEST_CONTEXTS)];
+    expect(roles.filter((stage, index) => roles.indexOf(stage) !== index), "stages with two roles").toEqual([]);
+    expect(roles.sort()).toEqual(Object.keys(stageOperations).sort());
   });
 
   it("recommends only tools of the stages the step links", async () => {
