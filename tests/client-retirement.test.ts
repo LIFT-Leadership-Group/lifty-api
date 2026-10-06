@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
+import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
 
-const current = "lifty-cli-context.v10";
-const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7", "lifty-cli-context.v8"];
+const current = STAGE_CLIENT_CONTRACT;
+const supported = ["lifty-cli-context.v10", "lifty-cli-context.v11"];
+const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7", "lifty-cli-context.v8", "lifty-cli-context.v9"];
 const tasks = ["setup", "account", "journeys", "stages", "business", "targeting", "research-criteria",
   "sample-review", "commercial-voice", "crm", "senders", "sending-accounts", "campaigns", "notifications"];
 
@@ -44,17 +46,19 @@ describe("retired client contracts", () => {
     expect(business).not.toHaveBeenCalled();
   });
 
-  it("keeps current context and authenticated stage reads usable", async () => {
+  it("keeps context and authenticated stage reads usable for every supported client", async () => {
     const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: {} } }),
       listMemberWorkspaces: async () => ({workspaces:[]}), businessOperation: async () => ({workspace:null,profile:null}) });
-    for (const task of tasks) {
-      const response = await app.request(`/v1/context/${task}?client_contract=${current}`);
+    for (const contract of supported) {
+      for (const task of tasks) {
+        const response = await app.request(`/v1/context/${task}?client_contract=${contract}`);
+        expect(response.status).toBe(200);
+        expect((await response.json()).instructions.length).toBeGreaterThan(0);
+      }
+      const response = await app.request("/v1/workspace/business", { headers: { "x-lifty-client-contract": contract } });
       expect(response.status).toBe(200);
-      expect((await response.json()).instructions.length).toBeGreaterThan(0);
+      expect(await response.json()).toMatchObject({ workspace:null, profile:null });
     }
-    const response = await app.request("/v1/workspace/business", { headers: { "x-lifty-client-contract": current } });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ workspace:null, profile:null });
   });
 
   it("documents the required current client header on every authenticated operation", async () => {
@@ -63,7 +67,7 @@ describe("retired client contracts", () => {
       for (const operation of Object.values(methods)) {
         if (!operation.security?.some((entry: Record<string, unknown>) => "bearerAuth" in entry)) continue;
         expect(operation.parameters).toContainEqual(expect.objectContaining({
-          in: "header", name: "x-lifty-client-contract", required: true, schema: { type: "string", const: current },
+          in: "header", name: "x-lifty-client-contract", required: true, schema: { type: "string", enum: supported },
         }));
         expect(operation.responses[409]).toBeDefined();
       }
