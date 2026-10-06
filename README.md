@@ -21,9 +21,10 @@ configured Hono app for programmatic use.
 from the same catalog used by HTTP and MCP. Public context works before login
 and contains no tenant values or Scout base.
 
-The supported client contract is `lifty-cli-context.v10`. The CLI requests it
-through the public `client_contract` query and sends
-`x-lifty-client-contract: lifty-cli-context.v10` on authenticated requests.
+The supported client contract is `lifty-cli-context.v11` (CLI 0.1.0-next.35).
+It names the transport, not the API: API and context releases keep it
+(LIF-1293). The CLI requests it through the public `client_contract` query and
+sends `x-lifty-client-contract: lifty-cli-context.v11` on authenticated requests.
 Missing, retired or unknown contracts return 409 `CONTEXT_CLIENT_UNSUPPORTED`
 after authentication. Invalid sessions return 401. Public unversioned links
 show current documentation. Health, login and provider browser callbacks keep
@@ -280,8 +281,8 @@ resume a user-paused warmup or activate campaigns.
 
 Deploy the independent-pause migration first, then Jobs (which requires
 `lif1228.warmup.v3`), then this API together with a CLI release supporting
-`lifty-cli-context.v10`. The frozen next.33 package uses v9 and is not a v10
-release artifact. Older clients receive an explicit upgrade response.
+`lifty-cli-context.v10` (next.34). v10 was later retired by the v11 client
+release (LIF-1296). Older clients receive an explicit upgrade response.
 
 ## Shared deliverability read (LIF-1042)
 

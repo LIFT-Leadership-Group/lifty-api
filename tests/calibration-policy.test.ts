@@ -3,7 +3,7 @@ import { createApp } from "../src/app.js";
 import { StartRunResultSchema } from "../src/contracts.js";
 
 const authenticate = async () => ({ ok: true as const, session: { userId: "founder", client: {} } });
-const headers = { "x-lifty-client-contract": "lifty-cli-context.v10" };
+const headers = { "x-lifty-client-contract": "lifty-cli-context.v11" };
 const checkpoint = {
   state: "failed", run_ref: "22222222-2222-4222-8222-222222222222",
   requested_leads: 5, workspace: { workspace_ref: "33333333-3333-4333-8333-333333333333", name: "Example" },

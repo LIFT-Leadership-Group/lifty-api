@@ -3,8 +3,8 @@ import { createApp } from "../src/app.js";
 import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
 
 const current = STAGE_CLIENT_CONTRACT;
-const supported = ["lifty-cli-context.v10", "lifty-cli-context.v11"];
-const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7", "lifty-cli-context.v8", "lifty-cli-context.v9"];
+const supported = ["lifty-cli-context.v11"];
+const retired = ["lifty-cli-context.v1", "lifty-cli-context.v2", "lifty-cli-context.v3", "lifty-cli-context.v4", "lifty-cli-context.v5", "lifty-cli-context.v6", "lifty-cli-context.v7", "lifty-cli-context.v8", "lifty-cli-context.v9", "lifty-cli-context.v10"];
 const tasks = ["setup", "account", "journeys", "stages", "business", "targeting", "research-criteria",
   "sample-review", "commercial-voice", "crm", "senders", "sending-accounts", "campaigns", "notifications"];
 

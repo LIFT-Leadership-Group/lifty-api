@@ -4,43 +4,15 @@ import { SUPPORTED_CLIENT_CONTRACTS } from "../src/agent-context.js";
 import { stageOperations } from "../src/stage-contracts.js";
 
 // What installed clients already depend on. @liftleadershipgroup/lifty
-// 0.1.0-next.34 implements lifty-cli-context.v10 and 0.1.0-next.35 implements
-// v11; founders are not asked to update for API releases (LIF-1293). A failure
-// here means the change breaks installed clients: keep the old shape, or make
-// it a deliberate transport change with a new contract and client release.
+// 0.1.0-next.35 implements lifty-cli-context.v11; founders are not asked to
+// update for API releases (LIF-1293). A failure here means the change breaks
+// installed clients: keep the old shape, or make it a deliberate transport
+// change with a new contract and client release.
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 // Routes each client calls without the operation catalog (its dist/cli.js).
-const v10DirectRoutes: readonly (readonly [string, string])[] = [
-  ["GET", "/v1/me/workspaces"],
-  ["GET", "/v1/workspace/summary"],
-  ...["hubspot", "slack"].flatMap(provider => [
-    ["GET", `/v1/integrations/${provider}`],
-    ["DELETE", `/v1/integrations/${provider}`],
-    ["POST", `/v1/integrations/${provider}/connect`],
-  ] as const),
-  ["GET", "/v1/integrations/hubspot/sync"],
-  ["POST", "/v1/integrations/hubspot/sync"],
-  ["GET", "/v1/integrations/hubspot/company-mapping/context"],
-  ["POST", "/v1/integrations/hubspot/company-mapping"],
-  ["GET", "/v1/notifications"],
-  ["GET", "/v1/notifications/slack/channels"],
-  ["PUT", "/v1/notifications/destinations/slack"],
-  ["PUT", "/v1/notifications/routes"],
-  ["POST", "/v1/notifications/destinations/00000000-0000-4000-8000-000000000000/test"],
-  ["GET", "/v1/email/warmup"],
-  ...["start", "pause", "resume", "remove"].map(operation => ["POST", `/v1/email/warmup/${operation}`] as const),
-  ["GET", "/v1/email/deliverability"],
-  ["POST", "/v1/email/campaign"],
-  ["GET", "/v1/email/campaign/placement"],
-  ["GET", "/v1/email/campaign/placement/preview"],
-];
-// Already retired: POST /v1/linkedin/campaign left with LIF-1190 after next.34
-// shipped, so its historical LinkedIn `lifty campaign` command returns 404;
-// next.35 no longer has the command.
 const directRoutes: Record<string, readonly (readonly [string, string])[]> = {
-  "lifty-cli-context.v10": v10DirectRoutes,
   "lifty-cli-context.v11": [["GET", "/v1/me/workspaces"], ["GET", "/v1/workspace/summary"]],
 };
 
