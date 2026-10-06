@@ -30,7 +30,7 @@ function rpcFor(ref: string, name: string): unknown {
     case "get_lifty_setup_status": return { workspace_ref: ref, state: "none" };
     case "get_lifty_setup_draft": return { ...draftGetFixture, workspace_ref: ref };
     case "get_lifty_run_status": return ref === reviewing ? { state: "succeeded", run_ref: "run-1", requested_leads: 5,
-      leads_discovered: 5, leads_researched: 5, error_code: null, started_at: at, completed_at: at,
+      leads_discovered: 5, leads_researched: 5, error_code: null, started_at: at, completed_at: at, reviewed_at: null,
       workspace: { workspace_ref: ref, name: "Workspace" }, leads: [] } : { state: "none" };
     case "get_lifty_campaigns": return { workspace: identity(ref), campaigns: [], next_cursor: null };
     case "get_lifty_hubspot_connection": return { provider: "hubspot", status: "not_connected" };

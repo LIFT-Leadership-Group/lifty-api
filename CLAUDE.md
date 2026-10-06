@@ -117,6 +117,17 @@ LIF-1139 requires the Functions migration
 HubSpot/Slack fail closed before exchanging a code if its claim RPC is unavailable.
 Mailivery retains ephemeral tokens and its existing single-dispatch fence.
 
+## Sample review confirmation
+
+LIF-1303 records the founder's confirmation of the calibration sample
+(`sample-review confirm` → `confirm_lifty_run_review`, `reviewed_at` on the run
+status). next_step returns the sample review until the latest sample is
+confirmed, so an account connected or a campaign saved while the sample ran no
+longer skips it. This API revision requires the Functions migration
+`20261006233000_lif1303_sample_review_mark.sql`; deploy it through its
+production-database job first. The migration marks samples of workspaces already
+past the review as confirmed, so no workspace moves back.
+
 ## Customer exclusion imports
 
 LIF-1082's authenticated customer-exclusions status/import stage requires the

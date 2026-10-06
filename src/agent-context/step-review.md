@@ -24,6 +24,11 @@ filter can express (industry, company size, location), propose that Targeting
 filter: research costs time and budget, and the filter keeps it on people who
 can fit. `references.calibration` covers diagnosis.
 
+When the founder confirms the sample, or moves on without asking for changes,
+record it once with `sample_review_confirm` and the sample's `run_ref`.
+`next_step` returns this review until you do. A new sample after a targeting
+change needs its own confirmation.
+
 ## 3. CRM and existing customers (optional)
 
 Follow the CRM action in `actions`; ask about it once. HubSpot and Attio
@@ -57,7 +62,10 @@ companies.
 Once the founder is happy with the leads (and the CRM question is answered),
 close the section in at most six lines: who Lifty targets and why, the five
 leads and their grade mix, what reached their CRM, and that Lifty can keep
-finding leads like these. Then ask one question: set up LinkedIn outreach for
+finding leads like these. If the founder already connected LinkedIn or a
+mailbox, or saved a campaign, while the sample ran, `actions` says so: do not
+offer it again, and call `next_step` after the confirmation to continue there.
+Otherwise ask one question: set up LinkedIn outreach for
 these leads now? LinkedIn goes first; email comes later, once a mailbox is
 ready. If yes, connect their LinkedIn as the close action in `actions` says:
 find the founder's sender in `senders_get` (create it only when absent), then
@@ -67,5 +75,6 @@ founder who would rather start with email connects a mailbox the same way,
 with channel `email`; `next_step` then guides its preparation.
 If "not now", accept it and do not ask again this session.
 
-Section 1 never sends messages or activates outreach, and sample acceptance is
-not saved anywhere: do not claim it was.
+Section 1 never sends messages or activates outreach. The confirmation records
+only that the founder accepted this sample; it does not approve a campaign or
+authorize sending.

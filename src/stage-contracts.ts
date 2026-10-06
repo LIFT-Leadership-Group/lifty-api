@@ -16,7 +16,7 @@ import {
   CrmMappingSyncRequestSchema, CrmMappingSyncSchema, CrmMappingStatusQuerySchema, CrmMappingStatusSchema,
 } from "./crm-mapping/contracts.js";
 import { z } from "zod";
-import { CrmConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, RunStatusSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, StartRunResultSchema, UpsertNotificationDestinationRequestSchema, WorkspaceStatusSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema } from "./contracts.js";
+import { ConfirmRunReviewRequestSchema, CrmConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, RunStatusSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, StartRunResultSchema, UpsertNotificationDestinationRequestSchema, WorkspaceStatusSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, DisconnectResponseSchema, NotificationTestResultSchema } from "./contracts.js";
 import { DeleteLoginRequest, DeleteLoginResult } from "./login-deletion.js";
 import { CompanyMappingContextSchema, CompanyMappingReceiptSchema } from "./company-mapping.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
@@ -134,7 +134,8 @@ export const stageOperations: Record<string, Record<string, StageOperation>> = {
   account: { delete: operation("POST", "/v1/me/delete", "Delete your own login only after all memberships and retained-history restrictions are resolved.", DeleteLoginResult, DeleteLoginRequest) },
   "sample-review": {
     progress: operation("GET", "/v1/workspace/runs/progress", "Wait up to 25 seconds for a change to this exact run. Pass the last cursor to resume. Returns the complete current bounded cohort, live research count and terminal state; not a persisted event history. A failed run's error_code is a customer reason. Read-only and reauthorized on each poll.", RunProgressSchema, null, RunProgressQuerySchema),
-    get: operation("GET", stageRoute("sample-review"), "Read the current sample: its five people, grades, run state and, when failed, the customer reason in error_code. No persisted approval ledger.", RunStatusSchema),
+    get: operation("GET", stageRoute("sample-review"), "Read the current sample: its five people, grades, run state, reviewed_at once the founder confirmed it and, when failed, the customer reason in error_code.", RunStatusSchema),
+    confirm: operation("POST", "/v1/workspace/sample-review/confirm", "Record that the founder confirmed the latest finished sample, by its run_ref, when they accept it or move on without changes. Repeating it keeps the first confirmation. next_step returns the sample review until the latest sample is confirmed. Does not change targeting, start research or authorize outreach.", RunStatusSchema, ConfirmRunReviewRequestSchema),
     post: operation("POST", stageRoute("sample-review"), "Start or re-attach the five-person sample for the current targeting. It uses five people of this week's research volume; with fewer than five left it returns RESEARCH_LIMIT_REACHED and resets_at and starts nothing. A retry reuses saved people. Never activates weekly research, CRM sync or outreach.", StartRunResultSchema, Empty),
   },
   "research-schedule": {

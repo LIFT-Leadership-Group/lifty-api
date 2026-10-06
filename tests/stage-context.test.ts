@@ -242,8 +242,8 @@ describe("customer surfaces name no provider or retired volume knob", () => {
     expect(publicCodes).toEqual(expect.arrayContaining(["RESEARCH_STATUS_UNAVAILABLE", "LEADS_UNAVAILABLE", "STAGE_OPERATION_UNSUPPORTED"]));
     for (const [name, text] of Object.entries(surfaces)) expect(text.match(retired)?.[0], name).toBeUndefined();
   });
-  it("keeps the sample's operations to get, post and progress", () => {
-    expect(Object.keys(stageOperations["sample-review"]!).sort()).toEqual(["get", "post", "progress"]);
+  it("keeps the sample's operations to get, post, progress and the founder's confirmation", () => {
+    expect(Object.keys(stageOperations["sample-review"]!).sort()).toEqual(["confirm", "get", "post", "progress"]);
     expect(getStageMcpTools().map(tool => tool.name).filter(name => /recovery|capacity|allowance|apollo/.test(name))).toEqual([]);
   });
 });

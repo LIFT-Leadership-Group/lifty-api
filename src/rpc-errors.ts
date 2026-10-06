@@ -87,6 +87,7 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   RUN_IN_PROGRESS:
     "Another research run is in progress for this workspace. Start the sample after it finishes.",
   RUN_NOT_FOUND: "This research run is unavailable in the selected workspace.",
+  RUN_NOT_REVIEWABLE: "Only a finished sample can be confirmed. Wait for it to finish, then confirm it.",
   RUN_PROGRESS_UNAVAILABLE:
     "Research progress is unavailable for the selected workspace or sample.",
   // Operator acquisition recovery (admin HTTP route, not in the catalog).

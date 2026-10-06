@@ -5,9 +5,21 @@ Read `references.common` and `references.calibration` in full.
 
 ## Read current state
 
-GET returns the existing run, actual grades, evidence/links and its calibration
-policy. It does not invent a review result or return a persisted approval state.
-Preserve historical policy and grades; old cohorts are not new research.
+GET returns the existing run, actual grades, evidence/links, its calibration
+policy and `reviewed_at`, set once the founder confirmed this sample. It does not
+invent a review result. Preserve historical policy and grades; old cohorts are
+not new research.
+
+## Founder confirmation
+
+When the founder accepts the sample, or moves on without changes, POST
+`sample-review confirm` with the sample's `run_ref`. Only the latest finished
+sample can be confirmed: an older run returns `RUN_NOT_FOUND`, and a running or
+failed one `RUN_NOT_REVIEWABLE`. Repeating it keeps the first confirmation.
+`next_step` returns the sample review until the latest sample is confirmed, even
+when an account was connected or a campaign saved while it ran. A targeting
+change starts a new sample, which needs its own confirmation. The confirmation
+does not authorize outreach.
 
 ## First setup and required inputs
 
@@ -55,14 +67,13 @@ A failed sample's `error_code` is one of these customer reasons:
 
 ## Later edits
 
-Grades, evidence and sample approval are not editable. A targeting/rubric
-change goes through its own stage.
+Grades and evidence are not editable, and a confirmation is not withdrawn. A
+targeting/rubric change goes through its own stage and starts a new sample.
 When several people were disqualified for the same reason a search filter can
 express (industry, company size, location), propose that Targeting filter so
 research is not spent on people who cannot fit; evidence-only reasons stay in
 the research criteria.
-Founder acceptance stays a conversation decision; never claim it was saved as
-a new product feature. A saved shortfall requires diagnosis before more work.
+A saved shortfall requires diagnosis before more work.
 
 ## User-facing behavior and errors
 
@@ -83,14 +94,16 @@ with chosen saved leads; exact sending approval remains separate.
 
 ## After sample acceptance
 
-"Looks good" after the lead table accepts the sample only. When the founder
+"Looks good" after the lead table accepts the sample only; record it with
+`sample-review confirm`. When the founder
 continues toward outreach, fetch `context campaigns`. If channel intent is
 missing, offer LinkedIn, email, both, or not right now and wait. Do not recommend
 email simply because a mailbox is connected. Follow the campaign context to
 explain the chosen sequence before configuring outreach. Reuse explicit choices;
 never turn sample acceptance into campaign activation consent.
 
-In a later session `next_step` returns this stage while no campaign is saved.
-The saved cohort is ready to use: do not present it as new work or ask for a
-second review unless the founder wants one. A "not right now" answer about
+In a later session `next_step` returns this stage until the sample is
+confirmed, and afterwards while nothing is connected or saved. Once
+`reviewed_at` is set, the saved cohort is ready to use: do not present it as new
+work or ask for a second review unless the founder wants one. A "not right now" answer about
 outreach is not saved, so ask about it at most once per session and accept it.

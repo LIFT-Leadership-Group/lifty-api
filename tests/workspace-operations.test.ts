@@ -247,7 +247,7 @@ describe("first run operations", () => {
   it("builds research links only for verified lead IDs with available workspace research", async () => {
     const lead = {name:"Test",title:null,company:null,linkedin_url:"https://www.linkedin.com/in/test",tier:null,fit_rationale:null,stage:null};
     const id="33333333-3333-4333-8333-333333333333";
-    const data={state:"succeeded",run_ref:"run",requested_leads:3,leads_discovered:3,leads_researched:1,error_code:null,started_at:"2026-09-14T00:00:00Z",completed_at:null,workspace:{workspace_ref:"ws",name:"Test"},leads:[{...lead,lead_ref:id,research_available:true},{...lead,lead_ref:id,research_available:false,research_url:"https://wrong.example"},{...lead}]};
+    const data={state:"succeeded",run_ref:"run",requested_leads:3,leads_discovered:3,leads_researched:1,error_code:null,started_at:"2026-09-14T00:00:00Z",completed_at:null,reviewed_at:null,workspace:{workspace_ref:"ws",name:"Test"},leads:[{...lead,lead_ref:id,research_available:true},{...lead,lead_ref:id,research_available:false,research_url:"https://wrong.example"},{...lead}]};
     const calls:string[]=[];
     const result=await getRunStatus({userId:"founder",client:{rpc:async(name:string)=>{calls.push(name);return {data,error:null};}}},"https://dashboard.example.com");
     expect(result.state).toBe("succeeded");
@@ -265,6 +265,7 @@ describe("first run operations", () => {
       error_code: null,
       started_at: "2026-09-01T21:00:00Z",
       completed_at: null,
+      reviewed_at: null,
       workspace: { workspace_ref: "ws_opaque", name: "Example" },
       leads: null,
     };

@@ -8,7 +8,7 @@ import {
 } from "../src/agent-context.js";
 import { getStageMcpTools, callStageMcpTool } from "../src/mcp-stage-tools.js";
 import { stageOperations } from "../src/stage-contracts.js";
-import { getRunStatus, startRun } from "../src/workspace-operations.js";
+import { confirmRunReview, getRunStatus, startRun } from "../src/workspace-operations.js";
 import { createRunProgressReader } from "../src/run-progress.js";
 import { DEFAULT_DASHBOARD_ORIGIN } from "../src/config.js";
 import {
@@ -90,6 +90,9 @@ const rpcNames: Record<string, unknown> = {
   list_lifty_leads: leadsFixture,
   get_lifty_run_status: { state: "none" },
   start_lifty_run: { state: "queued", run_ref: sampleRun, requested_leads: 5, workspace: sampleWorkspace, created: true, attempt: 0 },
+  confirm_lifty_run_review: { state: "succeeded", run_ref: sampleRun, requested_leads: 5, leads_discovered: 5, leads_researched: 5,
+    error_code: null, started_at: "2026-10-06T12:00:00Z", completed_at: "2026-10-06T12:05:00Z", reviewed_at: "2026-10-06T12:10:00Z",
+    workspace: sampleWorkspace, leads: [] },
   get_lifty_run_progress: { run_ref: sampleRun, attempt: 0, workspace_ref: workspaceRef, state: "queued", requested_leads: 5,
     leads_discovered: 0, leads_researched: 0, error_code: null, leads: [] },
   get_lifty_business_profile: get,
@@ -749,6 +752,7 @@ function resourceReads(rpc: { mock: { calls: unknown[][] } }) {
 // they send are observable.
 const runAdapters: Partial<AppDependencies> = {
   getRunStatus: (session) => getRunStatus(session),
+  confirmRunReview: (session, runRef) => confirmRunReview(session, runRef),
   startRun,
   getRunProgress: createRunProgressReader(),
   enqueueFirstRun: async () => ({ id: "job" }),
@@ -762,6 +766,7 @@ const resolvedOperations = [
   ["GET", "/v1/workspace/leads?grade=A&grade=B&limit=10", undefined, "list_lifty_leads"],
   ["GET", "/v1/workspace/sample-review", undefined, "get_lifty_run_status"],
   ["POST", "/v1/workspace/sample-review", {}, "start_lifty_run"],
+  ["POST", "/v1/workspace/sample-review/confirm", { run_ref: sampleRun }, "confirm_lifty_run_review"],
   ["GET", `/v1/workspace/runs/progress?run_ref=${sampleRun}&wait_seconds=0`, undefined, "get_lifty_run_progress"],
 ] as const;
 describe("research schedule, leads and sample share one workspace rule", () => {
@@ -918,6 +923,8 @@ const runFixture = {
   error_code: null,
   started_at: profileFixture.updated_at,
   completed_at: profileFixture.updated_at,
+  // Confirmed, so Parts 2-4 follow the saved accounts and campaigns (LIF-1303).
+  reviewed_at: profileFixture.updated_at,
   workspace: { workspace_ref: workspaceRef, name: "Example" },
   leads: [],
 };
@@ -976,6 +983,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
           ...runFixture,
           state,
           completed_at: state === "failed" ? profileFixture.updated_at : null,
+          reviewed_at: null,
           error_code: state === "failed" ? "research_failed" : null,
         }),
         outreachOperation: campaign,
@@ -1072,8 +1080,8 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
   const scheduleRead = (source: string) => ({ version: 1, state: "paused", weekly_target: 25,
     limit: { weekly_research_limit: 25, source, effective_from: profileFixture.updated_at }, effective_target: 25,
     updated_at: profileFixture.updated_at, updated_by: null });
-  const emailHarness = (state: { accounts?: unknown[]; warmup?: unknown; placement?: unknown; plan?: string; campaigns?: string[] }) => harness(undefined, null, {
-    getRunStatus: async () => runFixture,
+  const emailHarness = (state: { accounts?: unknown[]; warmup?: unknown; placement?: unknown; plan?: string; campaigns?: string[]; run?: unknown }) => harness(undefined, null, {
+    getRunStatus: async () => (state.run ?? runFixture) as never,
     outreachOperation: async (_session, key) => ({ ...emptyOutreach(key), campaigns: (state.campaigns ?? []).map(value => ({ ...canonicalCampaign, state: value })) }),
     identityOperation: async () => ({ status: 200, body: roster(state.accounts ?? [mailbox]) }),
     getEmailWarmup: async () => {
@@ -1142,6 +1150,41 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       expect(actions).toContain("ask which of them this campaign sends from");
       expect(actions).not.toContain("permitting Ana Pérez");
     }
+  });
+  // Accounts or campaigns set up while the sample ran never skip its review:
+  // Parts 2-4 wait for the founder's confirmation (LIF-1303).
+  it.each([
+    ["mailbox", { accounts: [mailbox] }, "email_connected"],
+    ["LinkedIn account", { accounts: [linkedinAccount] }, "linkedin_connected"],
+    ["saved campaign", { accounts: [], campaigns: ["inactive"] }, "campaigns_saved"],
+  ] as const)("keeps the sample review ahead of a %s set up while the sample ran until the founder confirms it", async (_label, state, after) => {
+    const review = await (await emailHarness({ ...state, run: { ...runFixture, reviewed_at: null } } as never).request("/v1/workspace/next-step")).json();
+    expect(review).toMatchObject({ reason: "sample_ready_for_founder_review", section: "leads" });
+    expect(review.recommended_tools).toContain("sample_review_confirm");
+    expect(review.actions.join(" ")).toContain("sample_review_confirm and run_ref run-1");
+    // What the founder already set up is not offered again.
+    expect(review.actions.join(" ")).toContain("do not offer it again");
+    expect(review.actions.join(" ")).not.toContain("set up LinkedIn outreach");
+    const confirmed = await (await emailHarness(state as never).request("/v1/workspace/next-step")).json();
+    expect(confirmed.reason).toBe(after);
+  });
+  it("does not ask a confirmed leads-only founder to review the sample again", async () => {
+    const result = await (await emailHarness({ accounts: [] }).request("/v1/workspace/next-step")).json();
+    expect(result.reason).toBe("sample_ready_for_founder_review");
+    expect(result.recommended_tools).not.toContain("sample_review_confirm");
+    expect(result.actions.join(" ")).toContain("already confirmed this sample");
+    expect(result.actions.join(" ")).toContain("set up LinkedIn outreach");
+  });
+  it("confirms the exact run and reports a sample that cannot be confirmed yet", async () => {
+    const h = harness(undefined, null, runAdapters);
+    const response = await h.request("/v1/workspace/sample-review/confirm", "POST", { run_ref: sampleRun });
+    expect(await response.json()).toMatchObject({ run_ref: sampleRun, reviewed_at: "2026-10-06T12:10:00Z" });
+    expect(h.rpc).toHaveBeenCalledExactlyOnceWith("confirm_lifty_run_review", { p_run_ref: sampleRun, p_workspace_id: null });
+    expect((await h.request("/v1/workspace/sample-review/confirm", "POST", {})).status).toBe(400);
+    const running = await harness(null, { code: "PT409", message: "RUN_NOT_REVIEWABLE" }, runAdapters)
+      .request("/v1/workspace/sample-review/confirm", "POST", { run_ref: sampleRun });
+    expect(running.status).toBe(409);
+    expect((await running.json()).error.code).toBe("RUN_NOT_REVIEWABLE");
   });
   it("treats an unreadable sender roster as unknown, not as LinkedIn unconnected", async () => {
     const h = harness(undefined, null, { getRunStatus: async () => runFixture,

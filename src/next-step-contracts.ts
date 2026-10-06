@@ -37,7 +37,7 @@ export const NextStepSchema = z
       "Interview decisions still missing, during the interview only.",
     ),
     workspace_ref: z.string().nullable(),
-    recommended_tools: z.array(z.string()).max(10),
+    recommended_tools: z.array(z.string()).max(12),
     guide: z
       .record(z.string(), z.unknown())
       .describe("The current API-owned guide for this step."),
