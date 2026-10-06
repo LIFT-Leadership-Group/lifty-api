@@ -1,5 +1,5 @@
 import type { AppDependencies, AuthSession } from "./app.js";
-import { getAgentContext, getStepGuide } from "./agent-context.js";
+import { getAgentContext, getStepGuide, type ContextDraft } from "./agent-context.js";
 import {
   BusinessGetSchema,
   TargetingGetSchema,
@@ -98,12 +98,13 @@ export const ON_REQUEST_CONTEXTS: Record<string, string> = {
   account: "Deleting the signed-in login, only when the founder asks.",
   "customer-exclusions": "Protecting existing customers when the founder asks or shares a customer file.",
 };
-export function nextStepGuide(reason: string) {
+// A marked test workspace's drafts replace the published files they name (LIF-1298).
+export function nextStepGuide(reason: string, drafts: readonly ContextDraft[] = []) {
   const entry = NEXT_STEP_CATALOG[reason];
   if (!entry) return null;
   return entry.guide.references
-    ? getStepGuide(entry.guide.task, entry.guide.references)
-    : getAgentContext(entry.guide.task);
+    ? getStepGuide(entry.guide.task, entry.guide.references, drafts)
+    : getAgentContext(entry.guide.task, drafts);
 }
 // Customer reasons for a failed sample and the one next move for each.
 const sampleFailures: Record<z.infer<typeof RunErrorCodeSchema>, { action: string; tools: string[] }> = {
@@ -137,6 +138,7 @@ type Reads = Pick<
   | "getAttioConnection"
   | "getCrmSyncStatus"
   | "identityOperation"
+  | "readContextDrafts"
 >;
 // The session forwards the caller's workspace selection; every read below
 // resolves the same workspace through the shared database rule.
@@ -147,10 +149,12 @@ export async function getNextStep(
   const read = (key: string) => deps.businessOperation(session, key);
   const business = BusinessGetSchema.parse(await read("business.get"));
   const ref = business.workspace?.workspace_ref ?? null;
+  // Read alongside the remaining resources; only a marked test workspace has any.
+  const drafts = ref ? deps.readContextDrafts(session, ref).catch(() => []) : Promise.resolve([]);
   let saved: Record<string, unknown> | null = null;
   // State, step, section and context links come from the catalog, so the ops
   // view and the response cannot disagree.
-  const response = (
+  const response = async (
     reason: string,
     actions: string[],
     tools: string[],
@@ -158,7 +162,7 @@ export async function getNextStep(
     gates: z.infer<typeof SetupGatesSchema> | null = null,
   ) => {
     const entry = NEXT_STEP_CATALOG[reason];
-    const guide = nextStepGuide(reason);
+    const guide = nextStepGuide(reason, await drafts);
     if (!entry || !guide) throw new Error("Missing next-step guide");
     return NextStepSchema.parse({
       state: entry.state,

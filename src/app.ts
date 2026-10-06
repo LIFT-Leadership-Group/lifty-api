@@ -31,7 +31,8 @@ import { DeleteLoginRequest, DeleteLoginResult, type DeleteLoginInput, type Dele
 import { MemberWorkspacesResult, type MemberWorkspacesOutput } from "./member-workspaces.js";
 
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, SUPPORTED_CLIENT_CONTRACTS, AgentContextSchema, getAgentContext, isSupportedClientContract } from "./agent-context.js";
+import { CLIENT_UPGRADE_MESSAGE, STAGE_CLIENT_CONTRACT, SUPPORTED_CLIENT_CONTRACTS, AgentContextSchema, getAgentContext, isSupportedClientContract, type ContextDraft } from "./agent-context.js";
+import { readContextDrafts } from "./context-drafts.js";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { DisconnectResponseSchema, IntegrationConnectionStatusSchema, NotificationConfigSchema, NotificationDestinationSchema, NotificationRouteSchema, NotificationTestResultSchema, SetNotificationRouteRequestSchema, SlackNotificationChannelsSchema, UpsertNotificationDestinationRequestSchema, ProviderConnectStartSchema, LegacyProviderConnectStartSchema, SlackConnectLinkSchema, type SlackConnectLink, ProviderSchema, StartCrmSyncResultSchema, CrmSyncStatusSchema, type DisconnectResult, type HubspotConnectStart, type HubspotConnectionStatus, type AttioConnectStart, type AttioConnectionStatus, type NotificationConfig, type NotificationDestination, type NotificationRoute, type NotificationTestResult, type SetNotificationRouteRequest, type SlackNotificationChannels, type UpsertNotificationDestinationRequest, type Provider, type SlackConnectStart, type SlackConnectionStatus, type RunStatus, type StartRunResult, type StartCrmSyncResult, type CrmSyncStatus, WorkspaceStatusSchema, type WorkspaceStatus } from "./contracts.js";
@@ -122,6 +123,9 @@ export interface AppDependencies {
   listMemberWorkspaces(session: AuthSession): Promise<MemberWorkspacesOutput>;
   /** Every workspace for a LIFT admin; the database enforces is_admin (LIF-1297). */
   listAdminWorkspaces(session: AuthSession): Promise<AdminWorkspace[]>;
+  /** A marked test workspace's context drafts (LIF-1298); never rejects, and
+   * any failed read is an empty list, so published context is served. */
+  readContextDrafts(session: AuthSession, workspaceRef: string | null): Promise<ContextDraft[]>;
   // Research schedule, weekly status and lead list (LIF-1174). Like every
   // stage RPC, the workspace is the one the database selects for the session.
   researchOperation(session: AuthSession, key: string, input: { query: Record<string, unknown>; body: unknown }): Promise<unknown>;
@@ -681,6 +685,7 @@ const defaultDependencies: AppDependencies = {
   },
   listMemberWorkspaces: async () => { throw new PublicError({status:503,code:"WORKSPACES_UNAVAILABLE",message:"Workspace listing is not configured yet."}); },
   listAdminWorkspaces,
+  readContextDrafts,
   startRun: async () => {
     throw new Error("startRun is not configured");
   },
@@ -1058,7 +1063,7 @@ export function createApp(
 
   // Task documentation is public so an agent can interview before sign-in.
   // Register only this GET before authentication; every business route stays scoped.
-  app.get("/v1/context/:task", (context) => {
+  app.get("/v1/context/:task", async (context) => {
     context.header("cache-control", "no-store");
     // Unversioned public links show current documentation; authenticated calls
     // still require the explicit current contract below.
@@ -1066,9 +1071,18 @@ export function createApp(
     if (!isSupportedClientContract(clientContract)) {
       return errorJson(context, 409, "CONTEXT_CLIENT_UNSUPPORTED", CLIENT_UPGRADE_MESSAGE);
     }
-    const document = getAgentContext(context.req.param("task"));
+    const task = context.req.param("task");
+    const document = getAgentContext(task);
     if (!document) return errorJson(context, 404, "CONTEXT_NOT_FOUND", "No instructions are available for this task.");
-    return context.json(document);
+    // A caller with a session (the MCP adapter forwards it) may be a marked
+    // test workspace whose drafts replace published files (LIF-1298). The
+    // installed CLI reads anonymously, and an invalid session is anonymous here.
+    const session = trustedMcpRequests.get(context.req.raw)
+      ?? (context.req.header("authorization")
+        ? await dependencies.authenticate(context.req.raw).then(result => result.ok ? result.session : null, () => null)
+        : null);
+    const drafts = session ? await dependencies.readContextDrafts(session, session.workspaceRef ?? null).catch(() => []) : [];
+    return context.json(drafts.length ? getAgentContext(task, drafts) : document);
   });
   app.openAPIRegistry.registerPath({
     method: "get", path: "/v1/context/{task}", operationId: "getAgentTaskContext", security: [],

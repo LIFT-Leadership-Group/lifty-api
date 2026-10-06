@@ -85,6 +85,7 @@ async function nextStep(state: Partial<typeof base>) {
       if (current.senders === "unavailable") throw new Error("roster unavailable");
       return { status: 200, body: { workspace: identity, senders: current.senders } };
     },
+    readContextDrafts: async () => [],
   } as Parameters<typeof getNextStep>[0], { userId: "founder", client: {} } as Parameters<typeof getNextStep>[1]);
 }
 

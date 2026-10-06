@@ -697,7 +697,7 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
       "only after the founder asks",
     );
     expect(resumed.guide.task).toBe("step-sample");
-    expect(h.rpc.mock.calls.map(([name]) => name).slice(0, 4)).toEqual([
+    expect(resourceReads(h.rpc).slice(0, 4)).toEqual([
       "get_lifty_business_profile",
       "get_lifty_targeting",
       "get_lifty_research_criteria",
@@ -727,7 +727,7 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
       step: "business",
       reason: "business_confirmation_needed",
     });
-    expect(h.rpc).toHaveBeenCalledOnce();
+    expect(resourceReads(h.rpc)).toEqual(["get_lifty_business_profile"]);
     const retired = harness({
       ...get,
       workspace: { ...identity, state: "suspended" },
@@ -735,9 +735,15 @@ describe("Business catalog, lifecycle and next-step conformance", () => {
     expect(
       await (await retired.request("/v1/workspace/next-step")).json(),
     ).toMatchObject({ state: "blocked", reason: "workspace_suspended" });
-    expect(retired.rpc).toHaveBeenCalledOnce();
+    expect(resourceReads(retired.rpc)).toEqual(["get_lifty_business_profile"]);
   });
 });
+
+// The resources next_step read, in order. Its context drafts read (LIF-1298)
+// runs alongside them for every workspace; tests/context-drafts.test.ts owns it.
+function resourceReads(rpc: { mock: { calls: unknown[][] } }) {
+  return rpc.mock.calls.map(([name]) => name).filter(name => name !== "get_lifty_context_drafts");
+}
 
 // The run reads go through their production RPC adapters so the arguments
 // they send are observable.
