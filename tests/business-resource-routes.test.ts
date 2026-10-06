@@ -399,6 +399,19 @@ describe("typed Business direct HTTP boundary", () => {
     expect((await h.request("/v1/workspace/targeting", "PATCH", body)).status).toBe(200);
     expect(h.rpc).toHaveBeenLastCalledWith("patch_lifty_targeting", { p_workspace_id: null, p_payload: body });
   });
+  it("accepts expanded persona reads while keeping email-policy writes closed before the migration", async () => {
+    const persona = { ...laneFixture.personas[0], email_requirement: "optional" };
+    const lane = { ...laneFixture, personas: [persona] };
+    const h = harness({ workspace_ref: workspaceRef, targeting: { version: 1, updated_at: profileFixture.updated_at, lanes: [lane] } });
+    const read = await h.request("/v1/workspace/targeting");
+    expect(read.status).toBe(200);
+    expect((await read.json()).targeting.lanes[0].personas[0].email_requirement).toBe("optional");
+    h.rpc.mockClear();
+    expect((await h.request("/v1/workspace/targeting", "PATCH", { expected_version: 1, lanes: [{ id: lane.id, personas: [persona] }] })).status).toBe(422);
+    expect(h.rpc).not.toHaveBeenCalled();
+    const legacy = harness(rpcNames.get_lifty_targeting);
+    expect((await (await legacy.request("/v1/workspace/targeting")).json()).targeting.lanes[0].personas[0].email_requirement).toBe("verified");
+  });
   it("saves voice version0 directly and rejects unrelated business facts", async () => {
     const h = harness({
       workspace_ref: workspaceRef,
