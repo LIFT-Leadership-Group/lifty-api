@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createCurrentClient as createApp } from "./current-client.js";
 
@@ -88,32 +88,76 @@ describe("LIFTY API workspace management (P6)", () => {
     expect(enqueued).toBe(false);
   });
 
-  it("still reports the disconnect when the revocation enqueue fails, and logs it", async () => {
-    const events: unknown[] = [];
-    const app = createApp({
-      authenticate,
-      disconnectIntegration: async () => ({ ...disconnectedFixture, revocation_ref: REVOCATION_REF }),
-      enqueueIntegrationRevocation: async () => {
-        throw new Error("trigger down");
-      },
-      log: (event) => events.push(event),
-    });
+  it("still reports the disconnect when every bounded enqueue attempt fails, and logs it once (LIF-1119)", async () => {
+    vi.useFakeTimers();
+    try {
+      const events: unknown[] = [];
+      let calls = 0;
+      const app = createApp({
+        authenticate,
+        disconnectIntegration: async () => ({ ...disconnectedFixture, revocation_ref: REVOCATION_REF }),
+        enqueueIntegrationRevocation: async () => {
+          calls += 1;
+          throw new Error("trigger down");
+        },
+        log: (event) => events.push(event),
+      });
 
-    const response = await app.request("/v1/integrations/hubspot", {
-      method: "DELETE",
-      headers: authorized,
-    });
+      const pending = app.request("/v1/integrations/hubspot", {
+        method: "DELETE",
+        headers: authorized,
+      });
+      await vi.runAllTimersAsync();
+      const response = await pending;
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(disconnectedFixture);
-    expect(events).toEqual([
-      expect.objectContaining({
-        level: "error",
-        event: "revocation_enqueue_failed",
-        path: "/v1/integrations/hubspot",
-      }),
-    ]);
-    expect(JSON.stringify(events)).not.toContain(REVOCATION_REF);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(disconnectedFixture);
+      expect(calls).toBe(3);
+      expect(events).toEqual([
+        expect.objectContaining({
+          level: "error",
+          event: "revocation_enqueue_failed",
+          path: "/v1/integrations/hubspot",
+          attempts: 3,
+        }),
+      ]);
+      expect(JSON.stringify(events)).not.toContain(REVOCATION_REF);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries a lost or hung enqueue with the same revocation and stays quiet once it lands (LIF-1119)", async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: string[] = [];
+      const events: unknown[] = [];
+      const app = createApp({
+        authenticate,
+        disconnectIntegration: async () => ({ ...disconnectedFixture, revocation_ref: REVOCATION_REF }),
+        enqueueIntegrationRevocation: (revocationId) => {
+          calls.push(revocationId);
+          if (calls.length === 1) return new Promise<never>(() => {});
+          if (calls.length === 2) return Promise.reject(new Error("trigger down"));
+          return Promise.resolve({ id: "run_revoke" });
+        },
+        log: (event) => events.push(event),
+      });
+
+      const pending = app.request("/v1/integrations/hubspot", {
+        method: "DELETE",
+        headers: authorized,
+      });
+      await vi.runAllTimersAsync();
+      const response = await pending;
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(disconnectedFixture);
+      expect(calls).toEqual([REVOCATION_REF, REVOCATION_REF, REVOCATION_REF]);
+      expect(events).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([
