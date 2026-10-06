@@ -203,7 +203,11 @@ const LaneFilters = {
 };
 // Persona ids are opaque server ids. Migrated personas carry md5-derived ids
 // without RFC 4122 version/variant bits, so accept any GUID shape.
-export const PersonaSchema = z.object({ id: z.guid(), ...PersonaValues }).strict();
+// Read bridge for the database expansion. Writes still reject the new field
+// until the separate consumer cutover is deployed after the migration.
+export const PersonaSchema = z.object({ id: z.guid(), ...PersonaValues,
+  email_requirement: z.enum(["verified", "optional"]).default("verified"),
+}).strict();
 export const TargetingLaneSchema = z
   .object({ id: z.uuid(), personas: unique(PersonaSchema, 30, (value) => value.id).min(1), ...LaneFilters })
   .strict();
