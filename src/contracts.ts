@@ -88,6 +88,9 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
       error_code: RunErrorCodeSchema.nullable(),
       started_at: z.string().min(1),
       completed_at: z.string().nullable(),
+      // When the founder confirmed this sample (LIF-1303). Optional until the
+      // database returns it for every run; the API deploys before the migration.
+      reviewed_at: z.string().nullable().optional(),
       workspace: WorkspaceReferenceSchema,
       leads: z.array(RunLeadSchema).nullable(),
     })
