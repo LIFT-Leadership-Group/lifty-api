@@ -79,6 +79,25 @@ and next_step builds each response's state, step, section, `context_task` and
 declared in `ON_REQUEST_CONTEXTS`; `tests/next-step-size.test.ts` enforces that
 and that a step recommends only tools of the stages it links (LIF-1301).
 
+## Context drafts
+
+A LIFT admin can mark a workspace as a context test workspace in the ops
+dashboard and save a draft of one `src/agent-context/<file>.md` for it
+(LIF-1298). Drafts live in Supabase, written only by the admin RPCs of the
+Functions migration `20261006210000_lif1298_context_drafts.sql`. lifty-api
+reads them with the caller's own session (`get_lifty_context_drafts`) and
+substitutes the published file only in authenticated responses: next_step
+guides (CLI and MCP) and `/v1/context/<task>` when the request carries a
+session, which the MCP adapter forwards. The installed CLI reads context
+anonymously and always gets the git version. A served document lists its
+`drafts` and gets its own revision. A failed read serves published context.
+`GET /v1/admin/context` gives the ops editor every published file with its
+SHA-256 and uses, plus the drafts and test workspaces. Promotion opens a
+pull request here; `.github/workflows/verify.yml` runs `npm run verify` on it.
+Each document's files are declared in `src/agent-context.ts`; key order is
+part of the revision, so keep published documents byte-identical when
+restructuring them.
+
 ## Connection confirmation
 
 Browser integration callbacks use `src/connection-confirmation.ts` and its typed

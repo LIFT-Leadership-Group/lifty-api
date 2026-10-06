@@ -1,6 +1,6 @@
 import { operationToolNames } from "./operation-names.js";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import {
   StageErrorSchema,
@@ -22,6 +22,12 @@ export const SUPPORTED_CLIENT_CONTRACTS: readonly string[] = [STAGE_CLIENT_CONTR
 export const isSupportedClientContract = (value: string | null | undefined) =>
   typeof value === "string" && SUPPORTED_CLIENT_CONTRACTS.includes(value);
 export const CLIENT_UPGRADE_MESSAGE = `Update the installed LIFTY CLI and skill to ${STAGE_CLIENT_CONTRACT}. Earlier client contracts are retired. Reload the updated client; setup resumes from the server draft.`;
+// A served draft (LIF-1298): which context file it replaced and its revision.
+const ServedDraftSchema = z.object({
+  draft_ref: z.uuid(),
+  file: z.string(),
+  revision: z.number().int().positive(),
+});
 export const AgentContextSchema = z.object({
   format: z.literal("lifty-context.v1"),
   task: z.string().min(1),
@@ -30,52 +36,104 @@ export const AgentContextSchema = z.object({
   schemas: z.record(z.string(), z.record(z.string(), z.unknown())),
   references: z.record(z.string(), z.string()),
   operations: z.record(z.string(), StageOperationSchema).optional(),
+  // Present only when a test workspace's draft replaced a published file.
+  drafts: z.array(ServedDraftSchema).optional(),
 });
 
 // Only checked-in public guidance goes here. Tenant data and the Scout base
-// remain behind the authenticated setup generation-context boundary.
-const interview = readFileSync(
-  new URL("./agent-context/interview.md", import.meta.url),
-  "utf8",
+// remain behind the authenticated setup generation-context boundary. Every
+// document names the files it is built from, so a draft replaces one file
+// wherever it is used (LIF-1298).
+const contextDirectory = new URL("./agent-context/", import.meta.url);
+export const CONTEXT_FILES: Readonly<Record<string, string>> = Object.fromEntries(
+  readdirSync(contextDirectory)
+    .filter((name) => name.endsWith(".md"))
+    .sort()
+    .map((name) => [name.slice(0, -3), readFileSync(new URL(name, contextDirectory), "utf8")]),
 );
-const companyMapping = readFileSync(
-  new URL("./agent-context/company-mapping.md", import.meta.url),
-  "utf8",
-);
-const calibration = readFileSync(
-  new URL("./agent-context/calibration.md", import.meta.url),
-  "utf8",
-);
-const writing = readFileSync(
-  new URL("./agent-context/writing.md", import.meta.url),
-  "utf8",
-);
-const antiSlop = readFileSync(
-  new URL("./agent-context/anti-slop.md", import.meta.url),
-  "utf8",
-);
-const documents = {
-  "step-sample": {
-    instructions: readFileSync(
-      new URL("./agent-context/step-sample.md", import.meta.url),
-      "utf8",
-    ),
-    schemas: {},
-    references: {},
-  },
-  "step-review": {
-    instructions: readFileSync(
-      new URL("./agent-context/step-review.md", import.meta.url),
-      "utf8",
-    ),
-    schemas: {},
-    references: { calibration, company_mapping: companyMapping },
-  },
 
+/** A draft of one context file for the caller's test workspace. */
+export interface ContextDraft {
+  draft_ref: string;
+  file: string;
+  revision: number;
+  content: string;
+}
+
+interface DocumentSource {
+  instructions: string;
+  references: Record<string, string>;
+  operations?: Record<string, StageOperation>;
+}
+const documentSources: Record<string, DocumentSource> = {
+  "step-sample": { instructions: "step-sample", references: {} },
+  "step-review": {
+    instructions: "step-review",
+    references: { calibration: "calibration", company_mapping: "company-mapping" },
+  },
 };
-const readGuide = (name: string) =>
-  readFileSync(new URL(`./agent-context/${name}.md`, import.meta.url), "utf8");
-const configuration = readGuide("configuration");
+const stageSources: Record<string, DocumentSource> = Object.fromEntries(
+  Object.entries(stageOperations).map(([stage, operations]) => [
+    stage,
+    {
+      instructions: stage,
+      operations,
+      references: {
+        common: "stage-common",
+        ...(["crm", "notifications"].includes(stage)
+          ? { connections: "stage-connections" }
+          : {}),
+        // The interview carries the founder voice and first-reply rules;
+        // configuration carries the criteria authoring rules a persona edit
+        // needs to regenerate criteria in the same targeting PATCH.
+        ...(stage === "business" ? { interview: "interview" } : {}),
+        ...(["setup", "targeting", "research-criteria"].includes(stage)
+          ? { interview: "interview", configuration: "configuration" }
+          : {}),
+        ...(["targeting", "research-criteria", "sample-review"].includes(stage)
+          ? { calibration: "calibration" }
+          : {}),
+        // The campaigns stage already carries campaigns.md as its instructions.
+        ...(stage === "journeys" ? { campaign: "campaigns" } : {}),
+        ...(["campaigns", "journeys"].includes(stage)
+          ? { writing: "writing", anti_slop: "anti-slop" }
+          : {}),
+        ...(stage === "crm" ? { company_mapping: "company-mapping" } : {}),
+      },
+    },
+  ]),
+);
+const indexSource: DocumentSource = {
+  instructions: "stages",
+  references: { common: "stage-common" },
+  operations: {},
+};
+const sourceFor = (task: string) =>
+  task === "stages"
+    ? indexSource
+    : Object.hasOwn(stageSources, task)
+      ? stageSources[task]
+      : Object.hasOwn(documentSources, task)
+        ? documentSources[task]
+        : undefined;
+
+/** Every published file and where documents use it, for the ops editor. */
+export function contextFileUsage() {
+  const usage: Record<string, Array<{ task: string; as: string }>> = {};
+  const sources: Array<[string, DocumentSource]> = [
+    ["stages", indexSource],
+    ...Object.entries(documentSources),
+    ...Object.entries(stageSources),
+  ];
+  for (const [task, source] of sources) {
+    (usage[source.instructions] ??= []).push({ task, as: "instructions" });
+    for (const [name, file] of Object.entries(source.references)) {
+      (usage[file] ??= []).push({ task, as: `references.${name}` });
+    }
+  }
+  return usage;
+}
+
 // The CLI noun after "lifty <verb> <resource>"; a noun equal to the verb is implicit.
 function cliNoun(key: string, op: StageOperation) {
   const noun = op.cli?.operation ?? key;
@@ -98,47 +156,6 @@ function operationGuide(
       .join("\n")
   );
 }
-const stageReferences: Record<string, string> = {
-  common: readGuide("stage-common"),
-};
-const stageDocuments = Object.fromEntries(
-  Object.entries(stageOperations).map(([stage, operations]) => [
-    stage,
-    {
-      instructions: readGuide(stage),
-      schemas: {},
-      operations,
-      references: {
-        ...stageReferences,
-        ...(["crm", "notifications"].includes(stage)
-          ? { connections: readGuide("stage-connections") }
-          : {}),
-        // The interview carries the founder voice and first-reply rules;
-        // configuration carries the criteria authoring rules a persona edit
-        // needs to regenerate criteria in the same targeting PATCH.
-        ...(stage === "business" ? { interview } : {}),
-        ...(["setup", "targeting", "research-criteria"].includes(stage)
-          ? { interview, configuration }
-          : {}),
-        ...(["targeting", "research-criteria", "sample-review"].includes(stage)
-          ? { calibration }
-          : {}),
-        // The campaigns stage already carries campaigns.md as its instructions.
-        ...(stage === "journeys" ? { campaign: readGuide("campaigns") } : {}),
-        ...(["campaigns", "journeys"].includes(stage)
-          ? { writing, anti_slop: antiSlop }
-          : {}),
-        ...(stage === "crm" ? { company_mapping: companyMapping } : {}),
-      },
-    },
-  ]),
-);
-const indexDocument = {
-  instructions: readGuide("stages"),
-  schemas: {},
-  references: stageReferences,
-  operations: {},
-};
 
 // Every error response shares one envelope. Publishing it once per document
 // instead of once per status code halves the operation payload; clients
@@ -176,53 +193,86 @@ function compactOperations(operations: Record<string, StageOperation>) {
   );
 }
 
-export function getAgentContext(task: string) {
-  const stageDocument =
-    task === "stages"
-      ? indexDocument
-      : Object.hasOwn(stageDocuments, task)
-        ? stageDocuments[task]
-        : undefined;
-  if (!Object.hasOwn(documents, task) && !stageDocument) return null;
-  const document = stageDocument ?? documents[task as keyof typeof documents];
+// Reads a document's files, the caller's draft winning over the published
+// file. Drafts for files this document does not use are ignored.
+function fileReader(drafts: readonly ContextDraft[]) {
+  const served = new Map<string, ContextDraft>();
+  const read = (file: string) => {
+    const draft = drafts.find((item) => item.file === file);
+    if (draft) {
+      served.set(file, draft);
+      return draft.content;
+    }
+    const published = CONTEXT_FILES[file];
+    if (published === undefined) throw new Error(`Missing context file ${file}`);
+    return published;
+  };
+  const marker = () =>
+    served.size
+      ? {
+          drafts: [...served.values()]
+            .sort((a, b) => a.file.localeCompare(b.file))
+            .map(({ draft_ref, file, revision }) => ({ draft_ref, file, revision })),
+        }
+      : {};
+  return { read, marker };
+}
+
+const withRevision = <T extends object>(content: T) =>
+  AgentContextSchema.parse({
+    ...content,
+    revision: `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`,
+  });
+
+export function getAgentContext(task: string, drafts: readonly ContextDraft[] = []) {
+  const source = sourceFor(task);
+  if (!source) return null;
+  const { read, marker } = fileReader(drafts);
+  const instructions = read(source.instructions);
+  const references = Object.fromEntries(
+    Object.entries(source.references).map(([name, file]) => [name, read(file)]),
+  );
   const content = {
     format: "lifty-context.v1" as const,
     task,
-    ...document,
-    ...(stageDocument
-      ? {
-          instructions:
-            task === "stages"
-              ? `${document.instructions}\n${Object.keys(stageOperations)
-                  .map((stage) => `- [${stage}](/v1/context/${stage})`)
-                  .join("\n")}\n${Object.entries(stageOperations)
-                  .map(([stage, operations]) =>
-                    operationGuide(stage, operations),
-                  )
-                  .join("\n")}`
-              : `${document.instructions}\n${operationGuide(task, stageDocument.operations)}`,
-        }
-      : {}),
+    instructions:
+      task === "stages"
+        ? `${instructions}\n${Object.keys(stageOperations)
+            .map((stage) => `- [${stage}](/v1/context/${stage})`)
+            .join("\n")}\n${Object.entries(stageOperations)
+            .map(([stage, operations]) => operationGuide(stage, operations))
+            .join("\n")}`
+        : source.operations
+          ? `${instructions}\n${operationGuide(task, source.operations)}`
+          : instructions,
     // Compact per call: operation definitions stay live objects (routes can
-    // change at runtime in tests and the revision must follow them).
-    ...(stageDocument && task !== "stages"
-      ? {
-          schemas: { ...stageDocument.schemas, error: errorSchema },
-          operations: compactOperations(stageDocument.operations),
-        }
+    // change at runtime in tests and the revision must follow them). Key
+    // order is part of the revision: stage documents put operations before
+    // references, the index after.
+    schemas: source.operations && task !== "stages" ? { error: errorSchema } : {},
+    ...(source.operations && task !== "stages"
+      ? { operations: compactOperations(source.operations) }
       : {}),
+    references,
+    ...(task === "stages" ? { operations: {} } : {}),
+    ...marker(),
   };
-  const revision = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
-  return AgentContextSchema.parse({ ...content, revision });
+  return withRevision(content);
 }
 
 // What next_step inlines for one step: the stage's instructions and only the
 // references that step needs. Operation schemas stay in the full stage guide,
 // one summary_context call away, so every response stays small enough for
 // chat connectors (LIF-1149, LIF-1295).
-export function getStepGuide(task: string, references: readonly string[]) {
-  const stage = getAgentContext(task);
-  if (!stage) return null;
+export function getStepGuide(task: string, references: readonly string[], drafts: readonly ContextDraft[] = []) {
+  const source = sourceFor(task);
+  if (!source) return null;
+  const used = drafts.filter(
+    (draft) =>
+      draft.file === source.instructions ||
+      references.some((name) => source.references[name] === draft.file),
+  );
+  const stage = getAgentContext(task, used)!;
   const content = {
     format: stage.format,
     task: stage.task,
@@ -232,7 +282,7 @@ export function getStepGuide(task: string, references: readonly string[]) {
       if (!Object.hasOwn(stage.references, name)) throw new Error(`Unknown ${task} reference ${name}`);
       return [name, stage.references[name]!];
     })),
+    ...(stage.drafts ? { drafts: stage.drafts } : {}),
   };
-  const revision = `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`;
-  return AgentContextSchema.parse({ ...content, revision });
+  return withRevision(content);
 }

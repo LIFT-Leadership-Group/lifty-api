@@ -45,8 +45,11 @@ export async function readAdminOnboarding(dependencies: Reads, session: AuthSess
       const workspace = workspaces[index]!;
       try {
         const step = await getNextStep(dependencies, { ...session, workspaceRef: workspace.workspace_ref });
+        // guide shows which revision this workspace's agent gets, and the
+        // drafts it carries when the workspace is a marked test workspace (LIF-1298).
         positions[index] = { ...workspace, next_step: { reason: step.reason, step: step.step, state: step.state,
-          section: step.section, gates: step.gates, response_size: JSON.stringify(step).length }, error: null };
+          section: step.section, gates: step.gates, response_size: JSON.stringify(step).length,
+          guide: { revision: step.guide.revision, drafts: step.guide.drafts ?? [] } }, error: null };
       } catch (error) {
         // One unreadable workspace never hides the others.
         positions[index] = { ...workspace, next_step: null, error: error instanceof PublicError ? error.code : "NEXT_STEP_UNAVAILABLE" };
