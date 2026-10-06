@@ -4,6 +4,7 @@ import { PublicError } from "./errors.js";
 import { rpcFailure } from "./rpc-errors.js";
 import { validateIdentityInput, type IdentityDefinition, type IdentityInput } from "./identity-operations.js";
 import * as c from "./outreach-contracts.js";
+import { memberReviewOperationDefinitions, memberReviewReceiptMatches } from "./member-review-operations.js";
 
 const Empty = z.object({}).strict();
 export type OutreachInput = IdentityInput;
@@ -64,7 +65,7 @@ function reviewDefinition(read: boolean): Definition {
     invalid, success: 200, cli: { operation: read ? "reviews_get" : "message_review_post" },
     args: input => read ? { p_query: input.query } : { p_message_id: input.path.message_ref, p_payload: input.body },
     description: read ? "Read the selected workspace's saved Campaign review queue, including the exact person, account and action. Paginated, read-only; failed reads stay unavailable. Members and operators use the same workflow."
-      : "Review one exact saved LinkedIn message using source_digest and expected_review_status. Approve queues only the reviewed bytes; it never activates a Campaign. Skip closes the LinkedIn branch and allows its active Email Campaign to start, without global suppression. Retry returns a failed review to pending only after confirming that no begun, unknown or confirmed send could be replayed.",
+      : "Review one exact saved LinkedIn or email message using source_digest and expected_review_status. Approve schedules only the reviewed bytes; it never activates a Campaign. Skip closes only this channel's branch, without global suppression. Retry re-checks the account and sender and atomically approves the same bytes only after confirming that no begun, unknown or confirmed send could be replayed.",
   };
 }
 export const outreachOperationDefinitions = {
@@ -77,6 +78,7 @@ export const outreachOperationDefinitions = {
     activate: definition("journeys", "activate", "POST", c.ActivateSchema, c.JourneyResultSchema, "Use one exact approved Journey revision for new Journey starts. The executable version is derived automatically from it and each activated Campaign's selected revision; started Journeys keep theirs. Campaign intent is unchanged."),
   },
   campaigns: {
+    ...memberReviewOperationDefinitions,
     reviews_get: reviewDefinition(true),
     message_review_post: reviewDefinition(false),
     runtime: { ...definition("campaigns", "runtime", "GET", null, c.CampaignRuntimeSchema,
@@ -110,6 +112,11 @@ export async function executeOutreachOperation(session: AuthSession, key: string
   if (result.error) throw rpcFailure(result.error, { operation: definition.rpc, ...unavailable });
   const parsed = definition.response.safeParse(result.data);
   if (!parsed.success) throw new PublicError({ status: 502, ...unavailable });
+  const reviewMatch = memberReviewReceiptMatches(entry.action, input, parsed.data);
+  if (reviewMatch !== undefined) {
+    if (!reviewMatch) throw new PublicError({ status: 502, ...unavailable });
+    return parsed.data;
+  }
   // A response for another resource cannot confirm this operation's outcome.
   const value = parsed.data as { journey?: { journey_ref: string }; campaign?: { campaign_ref: string } };
   if (entry.action === "runtime") {
@@ -144,10 +151,9 @@ export async function executeOutreachOperation(session: AuthSession, key: string
   if (entry.action === "message_review_post") {
     const receipt = c.CampaignMessageResultSchema.parse(parsed.data);
     const request = input.body as z.infer<typeof c.CampaignMessageReviewSchema>;
-    const expected = { approve: "approved", skip: "suppressed", retry: "pending" }[request.action];
+    const expected = { approve: "approved", skip: "suppressed", retry: "approved" }[request.action];
     if (receipt.message.message_ref !== input.path.message_ref || receipt.message.review_status !== expected
-      || receipt.message.channel !== "linkedin"
-      || (request.action === "approve" && (!receipt.message.account_id || !receipt.message.sender_id || !receipt.message.sender_name)))
+      || (request.action !== "skip" && (!receipt.message.account_id || !receipt.message.sender_id || !receipt.message.sender_name)))
       throw new PublicError({ status: 502, ...unavailable });
     return receipt;
   }

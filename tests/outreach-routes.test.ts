@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { STAGE_CLIENT_CONTRACT, getAgentContext } from "../src/agent-context.js";
 import { executeOutreachOperation, outreachEntries } from "../src/outreach-operations.js";
+import { memberReviewOperationDefinitions } from "../src/member-review-operations.js";
 import { getStageMcpTools, callStageMcpTool } from "../src/mcp-stage-tools.js";
 
 import { journeyRef, campaignRef, revisionRef, senderId, workspace, digest, policy, journeyPolicy, revision, executableVersion, journey, campaign, journeySummary, campaignSummary } from "./outreach-fixtures.js";
@@ -24,7 +25,7 @@ describe("canonical Outreach member transport", () => {
           : name.includes("journey") ? { workspace, journey: name === "publish_lifty_journey" ? { ...journey, draft_revision: revision(journeyPolicy, true), revisions: [revision(journeyPolicy, true)] } : journey }
             : name === "activate_lifty_campaign" ? { workspace, campaign: { ...campaign, state: "active", active_revision: revision(policy, true) }, journey: { ...journey, executable_version: executableVersion } }
               : { workspace, campaign: name === "publish_lifty_campaign" ? { ...campaign, draft_revision: revision(policy, true), revisions: [revision(policy, true)] } : campaign });
-    for (const { action, resource, definition } of outreachEntries().filter(entry => entry.action !== "runtime" && entry.action !== "reviews_get" && !entry.action.startsWith("tests_") && !entry.action.startsWith("message_") && entry.action !== "test_detail")) {
+    for (const { action, resource, definition } of outreachEntries().filter(entry => !(entry.action in memberReviewOperationDefinitions) && entry.action !== "runtime" && entry.action !== "reviews_get" && !entry.action.startsWith("tests_") && !entry.action.startsWith("message_") && entry.action !== "test_detail")) {
       const ref = resource === "journeys" ? journeyRef : campaignRef;
       const body = action === "post" ? resource === "journeys" ? { name: "Journey", policy: journeyPolicy } : { name: "LinkedIn", journey_ref: journeyRef, channel: "linkedin", policy }
         : action === "draft_patch" ? { expected_version: 1, revision_ref: revisionRef, changes: resource === "journeys" ? { audience: { kind: "qualified" } } : { instructions: "New instructions" } }

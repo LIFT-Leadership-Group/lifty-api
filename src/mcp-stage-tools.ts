@@ -15,6 +15,7 @@ interface Entry { stage: string; action: string; operation: StageOperation; tool
 export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Response>;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
 const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate",
+  "campaigns.message_review_post", "campaigns.reply_review_post", "campaigns.lead_stop_post",
   "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
   // Removing Lifty's access at the account provider.
   "sending-accounts.disconnect", "senders.delete"]);
@@ -23,6 +24,7 @@ const nonDestructive = new Set(["business.post", "senders.post", "journeys.post"
 // Writes that commit synchronously, with no authorization link or receipt.
 const synchronousStages = new Set(["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule", "journeys", "campaigns"]);
 const synchronousOperations = new Set(["crm.preferences_patch", "customer-exclusions.import"]);
+const pendingOperations = new Set(["campaigns.reply_review_post", "campaigns.message_rewrite_post", "campaigns.lead_stop_post"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.
@@ -51,7 +53,7 @@ function entries(): Entry[] {
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${read ? "" : synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
+      const description = `${operation.description}${read ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
       return [{ stage, action, operation,
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },
