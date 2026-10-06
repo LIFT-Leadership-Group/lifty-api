@@ -1061,6 +1061,62 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       expect(result.actions.join(" ")).toContain(reason === "linkedin_connected" ? "permitting Ana Pérez" : `path.id ${account.id}`);
     }
   });
+  // Parts 3 and 4 resume from the founder's mailbox, warmup, placement and plan (LIF-1260).
+  const mailbox = { ...sendersFixture.senders[0]!.accounts[0]! };
+  const linkedinAccount = { ...mailbox, id: laneFixture.personas[0]!.id.replace(/.$/, "f"), channel: "linkedin" as const,
+    identity: "https://www.linkedin.com/in/ana", declaration: null };
+  const roster = (accounts: unknown[]) => ({ ...sendersFixture, senders: [{ ...sendersFixture.senders[0]!, accounts }] });
+  const warmupRead = (state: string, extra: Record<string, unknown> = {}) => ({ state, warmup_ready: false, spam: null,
+    recommended_go_live: { kind: "projected", date: "2026-10-27", remaining_active_days: 21, message: "About three weeks of warmup." }, ...extra });
+  const passing = { passing_until: "2099-01-01T00:00:00Z", test: { state: "passed" } };
+  const scheduleRead = (source: string) => ({ version: 1, state: "paused", weekly_target: 25,
+    limit: { weekly_research_limit: 25, source, effective_from: profileFixture.updated_at }, effective_target: 25,
+    updated_at: profileFixture.updated_at, updated_by: null });
+  const emailHarness = (state: { accounts?: unknown[]; warmup?: unknown; placement?: unknown; plan?: string; campaigns?: string[] }) => harness(undefined, null, {
+    getRunStatus: async () => runFixture,
+    outreachOperation: async (_session, key) => ({ ...emptyOutreach(key), campaigns: (state.campaigns ?? []).map(value => ({ ...canonicalCampaign, state: value })) }),
+    identityOperation: async () => ({ status: 200, body: roster(state.accounts ?? [mailbox]) }),
+    getEmailWarmup: async () => {
+      if (state.warmup === "unavailable") throw new PublicError({ status: 502, code: "EMAIL_WARMUP_UNAVAILABLE", message: "Unavailable." });
+      return (state.warmup ?? warmupRead("not_started")) as never;
+    },
+    getEmailPlacement: async () => (state.placement ?? { passing_until: null, test: null }) as never,
+    researchOperation: async () => scheduleRead(state.plan ?? "free"),
+  });
+  it.each([
+    [{}, "email_connected", "email"],
+    [{ warmup: warmupRead("warming") }, "email_preparing", "email"],
+    [{ placement: { passing_until: null, test: { state: "running" } } }, "email_preparing", "email"],
+    [{ warmup: warmupRead("warming", { spam: { holds_sending: true } }) }, "email_held", "email"],
+    [{ warmup: warmupRead("warming"), placement: { passing_until: null, test: { state: "failed" } } }, "email_held", "email"],
+    [{ accounts: [{ ...mailbox, status: "needs_reconnect" }] }, "email_held", "email"],
+    [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing }, "paid_plan_needed", "kickoff"],
+    [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing, plan: "paid" }, "email_ready", "kickoff"],
+    // Ready needs a passing placement test, not warmup alone.
+    [{ warmup: warmupRead("warming", { warmup_ready: true }) }, "email_preparing", "email"],
+    // Part 2 comes first while a connected LinkedIn account has no active campaign.
+    [{ accounts: [linkedinAccount, mailbox], warmup: warmupRead("warming", { warmup_ready: true }), placement: passing }, "linkedin_connected", "outreach"],
+    [{ accounts: [linkedinAccount, mailbox], campaigns: ["active"] }, "email_connected", "email"],
+    // An unreadable status is unknown: never ready or held.
+    [{ warmup: "unavailable", placement: passing }, "email_connected", "email"],
+  ] as const)("resumes Parts 3 and 4 from %j at %s", async (state, reason, section) => {
+    const result = await (await emailHarness(state as never).request("/v1/workspace/next-step")).json();
+    expect(result).toMatchObject({ reason, section });
+  });
+  it("asks for the alert channel in Part 3 only when the founder skipped LinkedIn", async () => {
+    const alone = await (await emailHarness({}).request("/v1/workspace/next-step")).json();
+    expect(alone.actions.join(" ")).toContain("where alerts should go");
+    const both = await (await emailHarness({ accounts: [linkedinAccount, mailbox], campaigns: ["active"] }).request("/v1/workspace/next-step")).json();
+    expect(both.reason).toBe("email_connected");
+    expect(both.actions.join(" ")).not.toContain("where alerts should go");
+  });
+  it("hands a free workspace with a ready mailbox to David without activating anything", async () => {
+    const result = await (await emailHarness({ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing }).request("/v1/workspace/next-step")).json();
+    expect(result).toMatchObject({ reason: "paid_plan_needed", step: "plan", receipt: { plan: "free", mailbox: { id: mailbox.id } } });
+    expect(result.actions.join(" ")).toContain("David from LIFT");
+    expect(result.actions.join(" ")).toContain("never activates outreach");
+    expect(result.recommended_tools).not.toContain("campaigns_activate");
+  });
   it("treats an unreadable sender roster as unknown, not as LinkedIn unconnected", async () => {
     const h = harness(undefined, null, { getRunStatus: async () => runFixture,
       outreachOperation: async (_session, key) => emptyOutreach(key),
@@ -1148,8 +1204,8 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
         getHubspotConnection: async () => connection as never,
         getCrmSyncStatus: async () => sync as never,
         startCrmSyncRun: write,
-        // An email account only: LinkedIn is still offered.
-        identityOperation: async () => ({ status: 200, body: sendersFixture }),
+        // No outreach account yet: the founder is still closing Part 1.
+        identityOperation: async () => ({ status: 200, body: { ...sendersFixture, senders: [] } }),
       });
       const result = await (await h.request("/v1/workspace/next-step")).json();
       expect(result).toMatchObject({

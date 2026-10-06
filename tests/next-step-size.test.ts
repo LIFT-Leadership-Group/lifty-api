@@ -25,6 +25,11 @@ const limits: Record<string, number> = {
   campaigns_saved: 80_000,
   linkedin_outreach_active: 25_000,
   linkedin_reconnect_needed: 25_000,
+  email_connected: 25_000,
+  email_preparing: 25_000,
+  email_held: 25_000,
+  paid_plan_needed: 80_000,
+  email_ready: 80_000,
 };
 
 const identity = { workspace_ref: workspaceRef, name: "Example", state: "ready_for_connections" };
@@ -38,6 +43,13 @@ const linkedinAccount = (status: string) => ({ id: "11111111-1111-4111-8111-1111
 const founder = (status: string) => ({ id: senderId, version: 1, name: "Ada Founder", signature: null, booking_url: null,
   accounts: [linkedinAccount(status)] });
 const activeLinkedin = { ...campaignSummary, state: "active" };
+const mailboxOwner = (status: string) => ({ ...founder(status), accounts: [{ ...linkedinAccount(status),
+  id: "33333333-3333-4333-8333-333333333333", channel: "email", identity: "ada@example.com" }] });
+const warmup = (state: string, extra: Record<string, unknown> = {}) => ({ state, warmup_ready: false, spam: null,
+  recommended_go_live: { kind: "projected", date: "2026-10-27", remaining_active_days: 21, message: "About three weeks of warmup." }, ...extra });
+const passed = { passing_until: "2099-01-01T00:00:00Z", test: { state: "passed" } };
+const schedule = (source: string) => ({ version: 1, state: "paused", weekly_target: 25,
+  limit: { weekly_research_limit: 25, source, effective_from: at }, effective_target: 25, updated_at: at, updated_by: null });
 const unset = { targeting: { workspace_ref: workspaceRef, targeting: null }, criteria: { workspace_ref: workspaceRef, criteria: null } };
 const base = {
   business: { workspace: identity, profile: profileFixture } as unknown,
@@ -48,6 +60,9 @@ const base = {
   run: { state: "none" } as unknown,
   campaigns: [] as unknown[],
   senders: [] as unknown[] | "unavailable",
+  warmup: warmup("not_started") as unknown,
+  placement: { passing_until: null, test: null } as unknown,
+  plan: "free",
 };
 const generated = { text: criteriaFixture.text, research_fields: criteriaFixture.research_fields,
   source_versions: { profile_version: 1, draft_version: 1, base_version: "base-v1" } };
@@ -68,6 +83,11 @@ const states: Partial<typeof base>[] = [
   { run, senders: [founder("connected")] },
   { run, campaigns: [activeLinkedin] },
   { run, senders: [founder("needs_reconnect")] },
+  { run, senders: [mailboxOwner("connected")] },
+  { run, senders: [mailboxOwner("connected")], warmup: warmup("warming") },
+  { run, senders: [mailboxOwner("connected")], warmup: warmup("warming", { spam: { holds_sending: true } }) },
+  { run, senders: [mailboxOwner("connected")], warmup: warmup("warming", { warmup_ready: true }), placement: passed },
+  { run, senders: [mailboxOwner("connected")], warmup: warmup("warming", { warmup_ready: true }), placement: passed, plan: "paid" },
 ];
 
 async function nextStep(state: Partial<typeof base>) {
@@ -81,6 +101,9 @@ async function nextStep(state: Partial<typeof base>) {
     getHubspotConnection: async () => ({ provider: "hubspot", status: "not_connected" }),
     getAttioConnection: async () => ({ provider: "attio", status: "not_connected" }),
     getCrmSyncStatus: async () => ({ state: "none" }),
+    getEmailWarmup: async () => current.warmup,
+    getEmailPlacement: async () => current.placement,
+    researchOperation: async () => schedule(current.plan),
     identityOperation: async () => {
       if (current.senders === "unavailable") throw new Error("roster unavailable");
       return { status: 200, body: { workspace: identity, senders: current.senders } };
