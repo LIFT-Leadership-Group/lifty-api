@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
-import { NEXT_STEP_CATALOG } from "../src/next-step.js";
+import { NEXT_STEP_CATALOG, ON_REQUEST_CONTEXTS } from "../src/next-step.js";
 import { getCrmSyncStatus, getRunStatus } from "../src/workspace-operations.js";
 import { getAttioConnection } from "../src/attio-connect.js";
 import { createHubspotConnectOperations } from "../src/hubspot-connect.js";
@@ -89,10 +89,13 @@ describe("admin onboarding read", () => {
       "get_lifty_hubspot_connection", "get_lifty_attio_connection"]));
     expect(reads.every(([, args]) => typeof (args as { p_workspace_id?: unknown })?.p_workspace_id === "string")).toBe(true);
     expect(body.steps.map((step: { reason: string }) => step.reason)).toEqual(Object.keys(NEXT_STEP_CATALOG));
+    expect(body.on_request).toEqual(ON_REQUEST_CONTEXTS);
     for (const step of body.steps) {
       expect(step.when.length, step.reason).toBeGreaterThan(0);
       expect(step.guide.revision, step.reason).toMatch(/^sha256:[a-f0-9]{64}$/);
       expect(step.guide.size, step.reason).toBeGreaterThan(0);
+      // The ops page shows where each step sends the agent (LIF-1301).
+      expect(step, step.reason).toMatchObject({ context: NEXT_STEP_CATALOG[step.reason]!.context, related: NEXT_STEP_CATALOG[step.reason]!.related });
     }
   });
 

@@ -41,7 +41,13 @@ export const NextStepSchema = z
     context_task: z
       .string()
       .nullable()
-      .describe("Stage that owns the returned guide and operation catalog."),
+      .describe("Stage whose full guide, references and operations summary_context returns for this step."),
+    related_contexts: z
+      .array(z.string())
+      .max(10)
+      .describe(
+        "Other stages this step's actions lead to, such as targeting or research-criteria for calibration during the sample review. Read one with summary_context when the founder asks for it.",
+      ),
     saved: z.record(z.string(), z.unknown()).nullable(),
     receipt: z.record(z.string(), z.unknown()).nullable(),
   })

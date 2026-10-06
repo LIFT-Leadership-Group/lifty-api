@@ -29,49 +29,67 @@ const tool = (resource: string, operation: string) => {
 };
 // Every next_step reason: where it sits, when it is returned (in the order the
 // function below checks), and the guide it inlines with only the references it
-// needs. A guide without references is a short playbook sent as is. The ops
-// onboarding view reads this catalog, so it follows the code (LIF-1297).
+// needs. A guide without references is a short playbook sent as is. `context`
+// is the stage whose full guide summary_context serves for the step, and
+// `related` the stages its actions lead to, so the agent knows where to look
+// when the founder asks for something else there. The ops onboarding view
+// reads this catalog, and next_step builds its responses from it (LIF-1297, LIF-1301).
 export interface NextStepEntry {
   step: NextStep["step"]; state: NextStep["state"]; section: NextStep["section"];
   when: string[]; guide: { task: string; references?: string[] };
+  context: string; related: string[];
 }
 export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
   workspace_missing: { step: "business", state: "action_required", section: "leads",
     when: ["The caller has no workspace or no commercial profile"],
-    guide: { task: "business", references: ["common", "interview"] } },
+    guide: { task: "business", references: ["common", "interview"] }, context: "business", related: [] },
   workspace_suspended: { step: "business", state: "blocked", section: "leads",
     when: ["The workspace is suspended"],
-    guide: { task: "business", references: ["common"] } },
+    guide: { task: "business", references: ["common"] }, context: "business", related: [] },
   business_confirmation_needed: { step: "business", state: "action_required", section: "leads",
     when: ["The commercial profile still has unconfirmed values"],
-    guide: { task: "business", references: ["common", "interview"] } },
+    guide: { task: "business", references: ["common", "interview"] }, context: "business", related: [] },
   setup_resource_unavailable: { step: "import", state: "blocked", section: "leads",
     when: ["Targeting or research criteria are missing", "Setup is already imported, so a resource is unreadable"],
-    guide: { task: "setup", references: ["common"] } },
+    guide: { task: "setup", references: ["common"] }, context: "setup", related: ["targeting", "research-criteria"] },
   confirmed_interview_needed: { step: "interview", state: "action_required", section: "leads",
     when: ["Targeting or research criteria are missing", "The setup draft is missing, or its gates are missing or have issues"],
-    guide: { task: "setup", references: ["common", "interview"] } },
+    guide: { task: "setup", references: ["common", "interview"] }, context: "setup", related: [] },
   configuration_needed: { step: "configuration", state: "action_required", section: "leads",
     when: ["Targeting or research criteria are missing", "Draft gates are complete", "No generated Scout criteria are saved"],
-    guide: { task: "setup", references: ["common", "configuration"] } },
+    guide: { task: "setup", references: ["common", "configuration"] }, context: "setup", related: [] },
   configuration_saved: { step: "submission", state: "action_required", section: "leads",
     when: ["Targeting or research criteria are missing", "Generated criteria are saved", "Setup has not been submitted"],
-    guide: { task: "setup", references: ["common"] } },
+    guide: { task: "setup", references: ["common"] }, context: "setup", related: [] },
   sample_not_started: { step: "sample-review", state: "action_required", section: "leads",
     when: ["Targeting and research criteria exist", "No first research run yet"],
-    guide: { task: "step-sample" } },
+    guide: { task: "step-sample" }, context: "sample-review", related: [] },
   sample_pending: { step: "sample-review", state: "pending", section: "leads",
     when: ["The first research run is queued or running"],
-    guide: { task: "step-sample" } },
+    guide: { task: "step-sample" }, context: "sample-review", related: [] },
   sample_failed: { step: "sample-review", state: "blocked", section: "leads",
     when: ["The first research run failed; its error_code picks the action"],
-    guide: { task: "step-sample" } },
+    guide: { task: "step-sample" }, context: "sample-review", related: ["research-schedule", "targeting"] },
+  // Calibration is a targeting or research-criteria change followed by a new sample.
   sample_ready_for_founder_review: { step: "sample-review", state: "review", section: "leads",
     when: ["The first research run succeeded", "No campaign is saved"],
-    guide: { task: "step-review" } },
+    guide: { task: "step-review" }, context: "sample-review", related: ["targeting", "research-criteria", "crm", "campaigns"] },
   campaigns_saved: { step: "campaign", state: "action_required", section: "outreach",
     when: ["The first research run succeeded", "At least one campaign is saved"],
-    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] } },
+    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns", related: ["journeys"] },
+};
+// Stage contexts no next_step reason links, and how the agent reaches each one
+// instead. A context is linked by a step or declared here, never both.
+export const ON_REQUEST_CONTEXTS: Record<string, string> = {
+  summary: "Holds next_step and summary_context themselves; agents read the workspace summary to resume or report status.",
+  account: "Deleting the signed-in login, only when the founder asks.",
+  "customer-exclusions": "Protecting existing customers when the founder asks or shares a customer file.",
+  leads: "Researched leads beyond the sample, when the founder asks for them.",
+  "commercial-voice": "Outreach templating; the Part 2 steps link it (LIF-1302).",
+  senders: "Outreach accounts; the Part 2 steps link it (LIF-1302).",
+  "sending-accounts": "Outreach accounts; the Part 2 steps link it (LIF-1302).",
+  linkedin: "LinkedIn activity; the Part 2 steps link it (LIF-1302).",
+  notifications: "The alert channel; the Part 2 steps link it (LIF-1302).",
 };
 export function nextStepGuide(reason: string) {
   const entry = NEXT_STEP_CATALOG[reason];
@@ -122,38 +140,36 @@ export async function getNextStep(
   const business = BusinessGetSchema.parse(await read("business.get"));
   const ref = business.workspace?.workspace_ref ?? null;
   let saved: Record<string, unknown> | null = null;
+  // State, step, section and context links come from the catalog, so the ops
+  // view and the response cannot disagree.
   const response = (
-    state: NextStep["state"],
-    step: NextStep["step"],
     reason: string,
     actions: string[],
     tools: string[],
-    context = "business",
     receipt: Record<string, unknown> | null = null,
     gates: z.infer<typeof SetupGatesSchema> | null = null,
-    section: NextStep["section"] = "leads",
   ) => {
+    const entry = NEXT_STEP_CATALOG[reason];
     const guide = nextStepGuide(reason);
-    if (!guide) throw new Error("Missing next-step guide");
+    if (!entry || !guide) throw new Error("Missing next-step guide");
     return NextStepSchema.parse({
-      state,
-      step,
+      state: entry.state,
+      step: entry.step,
       reason,
-      section,
+      section: entry.section,
       actions,
       gates,
       workspace_ref: ref,
       recommended_tools: tools,
       guide,
-      context_task: context,
+      context_task: entry.context,
+      related_contexts: entry.related,
       saved,
       receipt,
     });
   };
   if (!business.workspace || !business.profile)
     return response(
-      "action_required",
-      "business",
       "workspace_missing",
       [
         "Research the supplied website once and present one concise business hypothesis. Ask the founder to confirm or correct it, then create the workspace with business_post. Login alone creates nothing.",
@@ -168,16 +184,12 @@ export async function getNextStep(
     });
   if (business.workspace.state === "suspended")
     return response(
-      "blocked",
-      "business",
       "workspace_suspended",
       ["Explain that the workspace is suspended and stop changes."],
       [tool("business", "get")],
     );
   if (!business.profile.confirmation.complete)
     return response(
-      "action_required",
-      "business",
       "business_confirmation_needed",
       [
         `Confirm or correct the missing commercial profile values: ${business.profile.confirmation.missing.join(", ")}. Save confirmed values with business_patch and its expected_version. Do not ask again for already confirmed values.`,
@@ -201,8 +213,6 @@ export async function getNextStep(
   if (!targeting.targeting || !criteria.criteria || !criteria.criteria.text) {
     if (status.state === "imported")
       return response(
-        "blocked",
-        "import",
         "setup_resource_unavailable",
         [
           "The saved setup receipt exists but a required resource is unavailable. Retry setup_status and resource reads; do not submit another setup.",
@@ -212,7 +222,6 @@ export async function getNextStep(
           tool("targeting", "get"),
           tool("research-criteria", "get"),
         ],
-        "setup",
         status,
       );
     const draft = SetupDraftGetSchema.parse(await read("setup.get_draft"));
@@ -225,38 +234,29 @@ export async function getNextStep(
     saved = draft;
     if (!draft.draft || draft.gates.missing.length || draft.gates.issues.length)
       return response(
-        "action_required",
-        "interview",
         "confirmed_interview_needed",
         [
           "Resume the workspace server draft. Ask only its next missing gate, leading with a hypothesis; save every confirmed block with setup_patch_draft and the returned expected_version. Exclusions need at least one evidence-based disqualifier or an excluded industry code filter; an empty parked-motions list is a valid decision.",
           "When gates are complete, call next_step.",
         ],
         [tool("setup", "get_draft"), tool("setup", "patch_draft")],
-        "setup",
         null,
         draft.gates,
       );
     if (!draft.generated_criteria)
       return response(
-        "action_required",
-        "configuration",
         "configuration_needed",
         [
           "Read setup_generation_context, generate only Scout criteria from the saved draft and current base, then save them with setup_patch_draft. Bind source_versions to the profile, resulting draft version and base version.",
         ],
         [tool("setup", "generation_context"), tool("setup", "patch_draft")],
-        "setup",
       );
     return response(
-      "action_required",
-      "submission",
       "configuration_saved",
       [
         `Submit once with setup_post {expected_draft_version:${draft.version}}. After a lost response use setup_status; a saved receipt proves both resources were created. This does not activate research or outreach.`,
       ],
       [tool("setup", "post"), tool("setup", "status")],
-      "setup",
     );
   }
   // Resource heads are authoritative even when configured outside setup.
@@ -271,8 +271,6 @@ export async function getNextStep(
     });
   if (run.state === "none")
     return response(
-      "action_required",
-      "sample-review",
       "sample_not_started",
       [
         `${tool("sample-review", "post")} with body {} and keep its run_ref. The sample uses five people of this week's research volume; with fewer than five left it returns RESEARCH_LIMIT_REACHED and resets_at: give the founder that reset time.`,
@@ -281,12 +279,9 @@ export async function getNextStep(
         "When terminal, call next_step. This bounded initial sample does not activate weekly research or outreach.",
       ],
       [tool("sample-review", "post"), tool("sample-review", "progress")],
-      "sample-review",
     );
   if (["queued", "running"].includes(run.state))
     return response(
-      "pending",
-      "sample-review",
       "sample_pending",
       [
         `${tool("sample-review", "progress")} with run_ref ${run.run_ref}, then the returned cursor and wait_seconds 25 until terminal. Narrate each newly researched lead in one line.`,
@@ -294,14 +289,11 @@ export async function getNextStep(
         "When terminal, call next_step.",
       ],
       [tool("sample-review", "progress")],
-      "sample-review",
       run,
     );
   if (run.state === "failed") {
     const failure = sampleFailures[run.error_code ?? "research_failed"];
     return response(
-      "blocked",
-      "sample-review",
       "sample_failed",
       [
         `The sample stopped with reason ${run.error_code ?? "research_failed"}. Read ${tool("sample-review", "get")} for the saved people and explain the reason plainly.`,
@@ -309,7 +301,6 @@ export async function getNextStep(
         "Saved leads stay usable; outreach setup does not have to wait for the sample.",
       ],
       [tool("sample-review", "get"), ...failure.tools],
-      "sample-review",
       run,
     );
   }
@@ -358,8 +349,6 @@ export async function getNextStep(
       }
     }
     return response(
-      "review",
-      "sample-review",
       "sample_ready_for_founder_review",
       [
         "Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps. Include lower-fit profiles and explain their mismatch.",
@@ -377,14 +366,13 @@ export async function getNextStep(
         tool("crm", "sync_status"),
         tool("summary", "context"),
       ],
-      "sample-review",
       run,
     );
   }
   return response(
-    "action_required", "campaign", "campaigns_saved",
+    "campaigns_saved",
     ["Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent."],
-    [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")], "campaigns",
-    { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) }, null, "outreach",
+    [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")],
+    { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) },
   );
 }
