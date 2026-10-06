@@ -17,6 +17,7 @@ import { readComponent } from "./workspace-summary.js";
 import { readCrmConnection } from "./crm-connection.js";
 import { CampaignsSchema } from "./outreach-contracts.js";
 import { SendersGetSchema } from "./identity-contracts.js";
+import { ResearchScheduleSchema } from "./research-operations.js";
 import { PublicError } from "./errors.js";
 import { z } from "zod";
 import { stageOperations } from "./stage-contracts.js";
@@ -90,6 +91,32 @@ export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
   linkedin_reconnect_needed: { step: "linkedin", state: "blocked", section: "outreach",
     when: ["The first research run succeeded", "A LinkedIn account needs reconnecting"],
     guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts", related: ["senders", "linkedin"] },
+  // Part 3: prepare the founder's mailbox; "ready" is warmup ready plus a
+  // passing placement test until LIF-1223 replaces that check (LIF-1260).
+  email_connected: { step: "email", state: "action_required", section: "email",
+    when: ["The first research run succeeded", "No connected LinkedIn account is waiting for its first active campaign",
+      "An email account is connected", "Its warmup and placement test have not started"],
+    guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts",
+    related: ["notifications", "research-schedule", "senders", "campaigns"] },
+  email_preparing: { step: "email", state: "pending", section: "email",
+    when: ["The first research run succeeded", "No connected LinkedIn account is waiting for its first active campaign",
+      "A mailbox's warmup or placement test is running"],
+    guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts",
+    related: ["notifications", "research-schedule", "campaigns"] },
+  email_held: { step: "email", state: "blocked", section: "email",
+    when: ["The first research run succeeded", "No connected LinkedIn account is waiting for its first active campaign",
+      "A mailbox needs reconnecting, its warmup has a problem or lands in spam, or its placement test failed"],
+    guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts", related: ["senders"] },
+  // Part 4: a ready mailbox; a free workspace is handed to David for a paid
+  // plan until checkout exists (LIF-1262). The plan never gates activation here.
+  paid_plan_needed: { step: "plan", state: "action_required", section: "kickoff",
+    when: ["The first research run succeeded", "A mailbox's warmup is ready and its placement test passed", "The workspace is on the free plan"],
+    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns",
+    related: ["research-schedule", "sending-accounts", "journeys"] },
+  email_ready: { step: "email", state: "action_required", section: "kickoff",
+    when: ["The first research run succeeded", "A mailbox's warmup is ready and its placement test passed", "The workspace is on a paid or managed plan"],
+    guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns",
+    related: ["journeys", "commercial-voice", "senders", "sending-accounts", "research-schedule"] },
 };
 // Stage contexts no next_step reason links, and how the agent reaches each one
 // instead. A context is linked by a step or declared here, never both.
@@ -129,6 +156,47 @@ const sampleFailures: Record<z.infer<typeof RunErrorCodeSchema>, { action: strin
     tools: [tool("sample-review", "post")],
   },
 };
+// Parts 3 and 4 classify the founder's mailboxes from today's reads (LIF-1260):
+// "ready" is warmup ready and a passing placement test until LIF-1223 replaces
+// that check. An unreadable status is unknown, never ready or held.
+type Mailbox = { id: string; sender_id: string; sender: string; email: string | null; status: "connected" | "needs_reconnect" | "disconnected" };
+type EmailKind = "held" | "ready" | "preparing" | "connected";
+async function emailPosition(deps: Reads, session: AuthSession, workspace: string, mailboxes: Mailbox[]) {
+  const now = Date.now();
+  const [checked, schedule] = await Promise.all([
+    Promise.all(mailboxes.slice(0, 5).map(async mailbox => {
+      if (mailbox.status !== "connected") return { mailbox, warmup: null, placement: null };
+      const [warmup, placement] = await Promise.all([
+        readComponent(() => deps.getEmailWarmup(session, workspace, mailbox.id)),
+        readComponent(() => deps.getEmailPlacement(session, { workspace, connection_ref: mailbox.id })),
+      ]);
+      return { mailbox, warmup: warmup.status === "available" ? warmup.value : null,
+        placement: placement.status === "available" ? placement.value : null };
+    })),
+    readComponent(async () => ResearchScheduleSchema.parse(
+      await deps.researchOperation(session, "research-schedule.get", { query: {}, body: undefined }))),
+  ]);
+  const positions = checked.map(({ mailbox, warmup, placement }) => {
+    const passing = !!placement?.passing_until && Date.parse(placement.passing_until) > now;
+    const test = placement?.test?.state ?? null;
+    let kind: EmailKind = "connected";
+    let cause: "reconnect" | "spam" | "problem" | "placement" | null = null;
+    if (mailbox.status === "needs_reconnect") [kind, cause] = ["held", "reconnect"];
+    else if (warmup?.spam?.holds_sending) [kind, cause] = ["held", "spam"];
+    else if (warmup?.state === "problem") [kind, cause] = ["held", "problem"];
+    else if (test === "failed" && !passing) [kind, cause] = ["held", "placement"];
+    else if (warmup?.warmup_ready && passing) kind = "ready";
+    else if ((warmup && !["not_started", "removed"].includes(warmup.state)) || ["pending", "running", "uncertain"].includes(test ?? "")) kind = "preparing";
+    return { mailbox, kind, cause, unknown: mailbox.status === "connected" && (!warmup || !placement),
+      receipt: { mailbox, warmup: warmup ? { state: warmup.state, go_live: warmup.recommended_go_live } : null,
+        placement: placement ? { test, passing_until: placement.passing_until } : null } };
+  });
+  // An actionable problem first, then the furthest-along mailbox.
+  const chosen = (["held", "ready", "preparing", "connected"] as const)
+    .map(kind => positions.find(item => item.kind === kind)).find(item => item !== undefined)!;
+  const plan = schedule.status === "available" ? schedule.value.limit.source : null;
+  return { ...chosen, plan, receipt: { ...chosen.receipt, plan } };
+}
 type Reads = Pick<
   AppDependencies,
   | "businessOperation"
@@ -139,6 +207,9 @@ type Reads = Pick<
   | "getCrmSyncStatus"
   | "identityOperation"
   | "readContextDrafts"
+  | "getEmailWarmup"
+  | "getEmailPlacement"
+  | "researchOperation"
 >;
 // The session forwards the caller's workspace selection; every read below
 // resolves the same workspace through the shared database rule.
@@ -348,29 +419,20 @@ export async function getNextStep(
       { account: reconnect },
     );
   const outreach = { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) };
-  if (campaigns.campaigns.some(value => value.channel === "linkedin" && value.state === "active"))
-    return response(
-      "linkedin_outreach_active",
-      [
-        `Report LinkedIn activity from ${tool("linkedin", "get")}: today, the last 7 days and any account's waiting_reason. A first message to someone already connected waits for the founder's review in ${tool("campaigns", "reviews_get")}.`,
-        `Close Part 2 in a few lines: who Lifty contacts on LinkedIn and what happens next. Then ask whether to set up email so Lifty can test their domain and inboxes. Yes: connect a mailbox for the same sender with ${tool("sending-accounts", "connect")} and channel email (summary_context task sending-accounts). If not now, accept it and do not ask again this session.`,
-        "Pause, edit or activate another campaign only when the founder asks.",
-      ],
-      [tool("linkedin", "get"), tool("campaigns", "reviews_get"), tool("campaigns", "get"), tool("senders", "get"), tool("sending-accounts", "connect"), tool("summary", "context")],
-      outreach,
-    );
-  if (campaigns.campaigns.length)
-    return response(
-      "campaigns_saved",
-      [
-        "Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent.",
-        "When a LinkedIn campaign is active, call next_step.",
-      ],
-      [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")],
-      outreach,
-    );
+  const linkedinActive = campaigns.campaigns.some(value => value.channel === "linkedin" && value.state === "active");
+  const campaignsSaved = () => response(
+    "campaigns_saved",
+    [
+      "Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent.",
+      "When a LinkedIn campaign is active, call next_step.",
+    ],
+    [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")],
+    outreach,
+  );
   const connected = linkedin.find(account => account.status === "connected");
-  if (connected)
+  // Part 2 comes first while a connected LinkedIn account has no active campaign.
+  if (connected && !linkedinActive) {
+    if (campaigns.campaigns.length) return campaignsSaved();
     return response(
       "linkedin_connected",
       [
@@ -383,6 +445,105 @@ export async function getNextStep(
         tool("journeys", "get"), tool("journeys", "post"), tool("campaigns", "post"), tool("campaigns", "tests_post"), tool("summary", "context")],
       { account: connected },
     );
+  }
+  // Parts 3 and 4 follow the founder's mailbox (LIF-1260).
+  const mailboxes = roster.status === "available"
+    ? roster.value.flatMap(sender => sender.accounts
+      .filter(account => account.channel === "email" && account.status !== "disconnected")
+      .map(account => ({ id: account.id, sender_id: sender.id, sender: sender.name, email: account.identity, status: account.status })))
+    : [];
+  if (mailboxes.length) {
+    const email = await emailPosition(deps, session, ref!, mailboxes);
+    const { mailbox } = email;
+    const name = mailbox.email ?? `${mailbox.sender}'s mailbox`;
+    if (email.kind === "held")
+      return response(
+        "email_held",
+        [
+          email.cause === "reconnect"
+            ? `${name} needs reconnecting, so it cannot warm up or send. Reconnect only after the founder agrees: ${tool("sending-accounts", "reconnect")} with path.id ${mailbox.id}, show the returned connection_url right away, then ${tool("sending-accounts", "attempt")} until it is connected. The same mailbox must sign in.`
+            : email.cause === "spam"
+              ? `Warmup emails from ${name} are landing in spam, so the mailbox is held. Read ${tool("sending-accounts", "warmup_status")} and say how many landed in spam; only a later measurement below the limit clears the hold. Do not request a placement test or start email outreach from it meanwhile.`
+              : email.cause === "placement"
+                ? `The latest placement test for ${name} failed, so it does not send. Read ${tool("sending-accounts", "placement_status")} and explain the result; request a new test only when it says can_request and the founder agrees.`
+                : `Warmup for ${name} has a problem. Read ${tool("sending-accounts", "warmup_status")} and follow its blocking_reason; if it lasts, contact LIFT support. Never connect a different mailbox to work around it.`,
+          "Email preparation never starts outreach. When it is resolved, call next_step.",
+        ],
+        [tool("sending-accounts", "get"), tool("sending-accounts", "warmup_status"), tool("sending-accounts", "placement_status"),
+          tool("sending-accounts", "placement_start"), tool("sending-accounts", "reconnect"), tool("sending-accounts", "attempt"), tool("summary", "context")],
+        email.receipt,
+      );
+    if (email.kind === "ready" && email.plan === "free")
+      return response(
+        "paid_plan_needed",
+        [
+          `${name} is ready to send: warmup is ready and its placement test passed. Tell the founder; ${tool("sending-accounts", "warmup_status")} has the detail if they ask.`,
+          `Show the email campaign before the plan question: read ${tool("campaigns", "get")} and ${tool("journeys", "get")}, and preview real leads with ${tool("campaigns", "tests_post")}. Draft the Email Campaign first if none exists (summary_context task campaigns).`,
+          "Then ask the founder to choose a paid plan: it starts email campaigns and recurring weekly leads (100 researched people a week instead of 25). Paid plans are set up with David from LIFT for now: tell the founder David will contact them to choose one. Do not quote prices or promise a checkout link.",
+          "A paid plan, a ready mailbox or an approved campaign never activates outreach; activation stays the founder's explicit yes.",
+        ],
+        [tool("sending-accounts", "warmup_status"), tool("campaigns", "get"), tool("journeys", "get"), tool("campaigns", "tests_post"),
+          tool("research-schedule", "get"), tool("summary", "context")],
+        email.receipt,
+      );
+    if (email.kind === "ready")
+      return response(
+        "email_ready",
+        [
+          `${name} is ready to send: warmup is ready and its placement test passed. Tell the founder.`,
+          ...(email.plan === null ? [`The plan could not be read; read ${tool("research-schedule", "get")} before discussing plans.`] : []),
+          `Finish the email campaign: read ${tool("campaigns", "get")} and ${tool("journeys", "get")}, add or update the Journey's Email Campaign with ${tool("campaigns", "post")} or ${tool("campaigns", "draft_patch")}, permitting ${mailbox.sender}, and preview real leads with ${tool("campaigns", "tests_post")}. Voice and the sender's signature come first (summary_context task commercial-voice, then senders).`,
+          "Publish only the exact revision the founder approves, and activate it only on their explicit yes. A ready mailbox never activates outreach.",
+        ],
+        [tool("campaigns", "get"), tool("journeys", "get"), tool("campaigns", "post"), tool("campaigns", "draft_patch"),
+          tool("campaigns", "tests_post"), tool("research-schedule", "get"), tool("summary", "context")],
+        email.receipt,
+      );
+    const alerts = linkedin.length ? [] : [`Ask once where alerts should go, unless Slack is already connected (${tool("notifications", "get")}) or the founder already answered in this conversation: Slack or email. Email needs no setup. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`];
+    const weekly = `Ask roughly how many leads they want to reach each week, unless already answered, and save it as the weekly target with ${tool("research-schedule", "patch")} (up to the plan's limit; ${tool("research-schedule", "get")} shows it).`;
+    const close = "Close Part 3: tell the founder when Lifty will follow up, using recommended_go_live from warmup_status. Never compute dates yourself. Connecting or warming a mailbox never starts email outreach.";
+    if (email.kind === "preparing")
+      return response(
+        "email_preparing",
+        [
+          `${name} is being prepared. Report where it stands from ${tool("sending-accounts", "warmup_status")} (state, active days and recommended_go_live) and ${tool("sending-accounts", "placement_status")} for a test in progress.`,
+          ...alerts,
+          weekly,
+          "Meanwhile, offer to prepare the email campaign copy (summary_context task campaigns); it stays unapproved and inactive.",
+          close,
+        ],
+        [tool("sending-accounts", "warmup_status"), tool("sending-accounts", "placement_status"), tool("notifications", "get"), tool("notifications", "post"),
+          tool("research-schedule", "get"), tool("research-schedule", "patch"), tool("summary", "context")],
+        email.receipt,
+      );
+    return response(
+      "email_connected",
+      [
+        ...(email.unknown ? [`${name}'s warmup or placement status could not be read: read both before offering anything, because preparation may already be running.`] : []),
+        `${name} is connected. Read ${tool("sending-accounts", "warmup_status")} with connection_ref ${mailbox.id} and explain the path from mailbox_use and recommended_go_live: a dedicated sending mailbox warms up first; for a mailbox they already use, warmup is optional and the placement test verifies it. If its checks show an SPF, DMARC or MX record not_valid, say which one to publish first. Start warmup only after the founder agrees, then show the setup link it returns.`,
+        `Request a placement test only when ${tool("sending-accounts", "placement_status")} says can_request, with the founder's explicit consent, using the first email of the real sequence.`,
+        ...alerts,
+        weekly,
+        close,
+      ],
+      [tool("sending-accounts", "warmup_status"), tool("sending-accounts", "warmup_start"), tool("sending-accounts", "placement_status"),
+        tool("sending-accounts", "placement_start"), tool("notifications", "get"), tool("notifications", "post"),
+        tool("research-schedule", "get"), tool("research-schedule", "patch"), tool("summary", "context")],
+      email.receipt,
+    );
+  }
+  if (linkedinActive)
+    return response(
+      "linkedin_outreach_active",
+      [
+        `Report LinkedIn activity from ${tool("linkedin", "get")}: today, the last 7 days and any account's waiting_reason. A first message to someone already connected waits for the founder's review in ${tool("campaigns", "reviews_get")}.`,
+        `Close Part 2 in a few lines: who Lifty contacts on LinkedIn and what happens next. Then ask whether to set up email so Lifty can test their domain and inboxes. Yes: connect a mailbox for the same sender with ${tool("sending-accounts", "connect")} and channel email (summary_context task sending-accounts). If not now, accept it and do not ask again this session.`,
+        "Pause, edit or activate another campaign only when the founder asks.",
+      ],
+      [tool("linkedin", "get"), tool("campaigns", "reviews_get"), tool("campaigns", "get"), tool("senders", "get"), tool("sending-accounts", "connect"), tool("summary", "context")],
+      outreach,
+    );
+  if (campaigns.campaigns.length) return campaignsSaved();
   const crm = await readComponent(() => readCrmConnection(deps, session));
   let crmAction =
     "Read crm_get before offering CRM sync; its saved connection is currently unavailable. A leads-only workspace can remain here.";
@@ -430,7 +591,7 @@ export async function getNextStep(
       "Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample.",
       crmAction,
       ...(roster.status === "unavailable" ? ["The sender roster could not be read: read senders_get before offering LinkedIn, because an account may already be connected."] : []),
-      `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach for these leads now. Yes: read ${tool("senders", "get")} and use the founder's own sender (senders_post only when absent; ask whose account it is when unclear), then ${tool("sending-accounts", "connect")} with that sender_id and channel linkedin. Show the returned connection_url right away and confirm it with sending_accounts_attempt; the templates follow once it connects. A leads-only founder can stop here. If not now, accept it and do not ask again this session.`,
+      `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach for these leads now. Yes: read ${tool("senders", "get")} and use the founder's own sender (senders_post only when absent; ask whose account it is when unclear), then ${tool("sending-accounts", "connect")} with that sender_id and channel linkedin. Show the returned connection_url right away and confirm it with sending_accounts_attempt; the templates follow once it connects. A founder who would rather start with email connects a mailbox for that sender the same way, with channel email. A leads-only founder can stop here. If not now, accept it and do not ask again this session.`,
     ],
     [
       tool("sample-review", "get"),

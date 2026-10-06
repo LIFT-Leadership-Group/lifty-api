@@ -6,7 +6,8 @@ import { rpcFailure } from "./rpc-errors.js";
 // LIF-1174 weekly research volume and researched leads. Every definition is
 // a catalog operation: HTTP routes, MCP tools, CLI nouns and public context
 // derive from it. The database selects the workspace from the session's
-// x-lifty-workspace header with the shared rule (p_workspace_id is null).
+// x-lifty-workspace header with the shared rule (p_workspace_id is null); the
+// admin onboarding read names the workspace instead (LIF-1260).
 const Empty = z.object({}).strict();
 const Timestamp = z.iso.datetime({ offset: true });
 const Count = z.number().int().nonnegative();
@@ -280,7 +281,7 @@ export async function executeResearchOperation(
       session.client as {
         rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }>;
       }
-    ).rpc(definition.rpc, { p_workspace_id: null, ...definition.args(input) });
+    ).rpc(definition.rpc, { p_workspace_id: session.workspaceRef ?? null, ...definition.args(input) });
   } catch (cause) {
     throw rpcFailure(cause, unavailable);
   }
