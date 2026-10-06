@@ -73,48 +73,49 @@ export const NEXT_STEP_CATALOG: Record<string, NextStepEntry> = {
     when: ["The first research run failed; its error_code picks the action"],
     guide: { task: "step-sample" }, context: "sample-review", related: ["research-schedule", "targeting"] },
   // Calibration is a targeting or research-criteria change followed by a new
-  // sample; a yes to LinkedIn connects the founder's sender (LIF-1302).
+  // sample; a yes to LinkedIn connects the founder's sender (LIF-1302). The
+  // founder's confirmation of the sample opens Parts 2-4 (LIF-1303).
   sample_ready_for_founder_review: { step: "sample-review", state: "review", section: "leads",
-    when: ["The first research run succeeded", "No campaign is saved", "No LinkedIn account is connected"],
+    when: ["The first research run succeeded", "The founder has not confirmed the sample, or no campaign, LinkedIn account or mailbox exists yet"],
     guide: { task: "step-review" }, context: "sample-review", related: ["targeting", "research-criteria", "crm", "customer-exclusions", "senders", "sending-accounts"] },
   // Part 2: alerts once, then voice before the first draft, then templates.
   linkedin_connected: { step: "campaign", state: "action_required", section: "outreach",
-    when: ["The first research run succeeded", "A LinkedIn account is connected", "No campaign is saved"],
+    when: ["The founder confirmed the first sample", "A LinkedIn account is connected", "No campaign is saved"],
     guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns",
     related: ["notifications", "commercial-voice", "journeys", "senders"] },
   campaigns_saved: { step: "campaign", state: "action_required", section: "outreach",
-    when: ["The first research run succeeded", "At least one campaign is saved", "No LinkedIn campaign is active"],
+    when: ["The founder confirmed the first sample", "At least one campaign is saved", "No LinkedIn campaign is active"],
     guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns", related: ["journeys", "commercial-voice", "linkedin"] },
   linkedin_outreach_active: { step: "linkedin", state: "complete", section: "outreach",
-    when: ["The first research run succeeded", "A LinkedIn campaign is active"],
+    when: ["The founder confirmed the first sample", "A LinkedIn campaign is active"],
     guide: { task: "linkedin", references: ["common"] }, context: "linkedin", related: ["campaigns", "leads", "senders", "sending-accounts"] },
   linkedin_reconnect_needed: { step: "linkedin", state: "blocked", section: "outreach",
-    when: ["The first research run succeeded", "A LinkedIn account needs reconnecting"],
+    when: ["The founder confirmed the first sample", "A LinkedIn account needs reconnecting"],
     guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts", related: ["senders", "linkedin"] },
   // Part 3: prepare the founder's mailbox; "ready" is warmup ready plus a
   // passing placement test until LIF-1223 replaces that check (LIF-1260).
   email_connected: { step: "email", state: "action_required", section: "email",
-    when: ["The first research run succeeded", "No connected LinkedIn account is waiting for its first active campaign",
+    when: ["The founder confirmed the first sample", "No connected LinkedIn account is waiting for its first active campaign",
       "An email account is connected", "Its warmup and placement test have not started"],
     guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts",
     related: ["notifications", "research-schedule", "senders", "campaigns"] },
   email_preparing: { step: "email", state: "pending", section: "email",
-    when: ["The first research run succeeded", "No connected LinkedIn account is waiting for its first active campaign",
+    when: ["The founder confirmed the first sample", "No connected LinkedIn account is waiting for its first active campaign",
       "A mailbox's warmup or placement test is running"],
     guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts",
     related: ["notifications", "research-schedule", "campaigns"] },
   email_held: { step: "email", state: "blocked", section: "email",
-    when: ["The first research run succeeded", "No connected LinkedIn account is waiting for its first active campaign",
+    when: ["The founder confirmed the first sample", "No connected LinkedIn account is waiting for its first active campaign",
       "A mailbox needs reconnecting, its warmup has a problem or lands in spam, or its placement test failed"],
     guide: { task: "sending-accounts", references: ["common"] }, context: "sending-accounts", related: ["senders"] },
   // Part 4: a ready mailbox; a free workspace is handed to David for a paid
   // plan until checkout exists (LIF-1262). The plan never gates activation here.
   paid_plan_needed: { step: "plan", state: "action_required", section: "kickoff",
-    when: ["The first research run succeeded", "A mailbox's warmup is ready and its placement test passed", "The workspace is on the free plan"],
+    when: ["The founder confirmed the first sample", "A mailbox's warmup is ready and its placement test passed", "The workspace is on the free plan"],
     guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns",
     related: ["research-schedule", "sending-accounts", "journeys"] },
   email_ready: { step: "email", state: "action_required", section: "kickoff",
-    when: ["The first research run succeeded", "A mailbox's warmup is ready and its placement test passed", "The workspace is on a paid or managed plan"],
+    when: ["The founder confirmed the first sample", "A mailbox's warmup is ready and its placement test passed", "The workspace is on a paid or managed plan"],
     guide: { task: "campaigns", references: ["common", "writing", "anti_slop"] }, context: "campaigns",
     related: ["journeys", "commercial-voice", "senders", "sending-accounts", "research-schedule"] },
 };
@@ -407,6 +408,93 @@ export async function getNextStep(
   // With one sender the agent assumes it; with several it reads the roster and
   // asks which person a connection or campaign belongs to (Juan, 2026-10-06).
   const names = (accounts: Array<{ sender: string }>) => accounts.map(account => account.sender).join(", ");
+  // The founder's mailboxes, for Parts 3 and 4 (LIF-1260).
+  const mailboxes = roster.status === "available"
+    ? roster.value.flatMap(sender => sender.accounts
+      .filter(account => account.channel === "email" && account.status !== "disconnected")
+      .map(account => ({ id: account.id, sender_id: sender.id, sender: sender.name, email: account.identity, status: account.status })))
+    : [];
+  // What the founder set up while the sample ran, so the review does not offer it again.
+  const started = [
+    ...(linkedin.length ? [`LinkedIn (${names(linkedin)})`] : []),
+    ...(mailboxes.length ? [`email (${mailboxes.map(mailbox => mailbox.email ?? mailbox.sender).join(", ")})`] : []),
+    ...(campaigns.campaigns.length ? ["a saved campaign"] : []),
+  ];
+  // The sample review: until the founder confirms this sample, and afterwards
+  // while nothing is connected or saved (a leads-only founder rests here).
+  const sampleReview = async () => {
+    const crm = await readComponent(() => readCrmConnection(deps, session));
+    let crmAction =
+      "Read crm_get before offering CRM sync; its saved connection is currently unavailable. A leads-only workspace can remain here.";
+    if (crm.status === "available") {
+      if (crm.value.status !== "connected")
+        crmAction =
+          `Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio), and explain that connecting it also lets Lifty read their deals and closed customers so it never looks for leads at those companies. Connect only after a separate explicit request, with crm_post for the CRM they use. If they do not connect a CRM, offer to save the companies that are already their customers from a file so Lifty never contacts them: read ${tool("customer-exclusions", "status")} first and skip the offer when a list is saved, then ${tool("customer-exclusions", "import")} (summary_context task customer-exclusions). They can skip it now and add the file any time. A leads-only workspace can remain here.`;
+      else if (crm.value.reconnect_required)
+        crmAction =
+          "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
+      else {
+        const sync = await readComponent(async () => {
+          const value = CrmSyncStatusSchema.parse(
+            await deps.getCrmSyncStatus(session),
+          );
+          if (value.state !== "none" && value.workspace.workspace_ref !== ref)
+            throw new PublicError({
+              status: 403,
+              code: "WORKSPACE_FORBIDDEN",
+              message:
+                "The CRM sync does not belong to the selected workspace.",
+            });
+          return value;
+        });
+        if (sync.status === "unavailable")
+          crmAction =
+            "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
+        else if (sync.value.state === "none")
+          crmAction =
+            crm.value.provider === "attio"
+              ? "Attio is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status."
+              : "HubSpot is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status.";
+        else if (["queued", "running"].includes(sync.value.state))
+          crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
+        else if (sync.value.state === "succeeded")
+          crmAction = `The CRM sync finished (${sync.value.leads_synced ?? 0} leads). Do not repeat it just to check status.`;
+        else
+          crmAction = `The CRM sync failed (${sync.value.error_code ?? "unknown"}). Read crm_sync_status and resolve its blocker before offering a retry.`;
+      }
+    }
+    return response(
+      "sample_ready_for_founder_review",
+      [
+        "Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps. Include lower-fit profiles and explain their mismatch.",
+        run.reviewed_at
+          ? "The founder already confirmed this sample: do not ask for the review again. A targeting change still follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample."
+          : `Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample. When the founder confirms the sample or moves on without changes, record it once with ${tool("sample-review", "confirm")} and run_ref ${run.run_ref}; a new sample needs its own confirmation.`,
+        crmAction,
+        ...(roster.status === "unavailable" ? ["The sender roster could not be read: read senders_get before offering LinkedIn, because an account may already be connected."] : []),
+        started.length
+          ? `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. The founder already set up ${started.join(" and ")} while the sample ran: do not offer it again. After the confirmation, call next_step; it continues from there.`
+          : `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach for these leads now. Yes: read ${tool("senders", "get")} for who the senders are and which accounts each has connected. With one sender, use it; with several, ask whose LinkedIn to connect (senders_post only when that person is absent). Then ${tool("sending-accounts", "connect")} with that sender_id and channel linkedin. Show the returned connection_url right away and confirm it with sending_accounts_attempt; the templates follow once it connects. A founder who would rather start with email connects a mailbox the same way, with channel email: with one sender use it, with several ask whose mailbox it is. A leads-only founder can stop here. If not now, accept it and do not ask again this session.`,
+      ],
+      [
+        tool("sample-review", "get"),
+        ...(run.reviewed_at ? [] : [tool("sample-review", "confirm")]),
+        tool("crm", "get"),
+        tool("crm", "post"),
+        tool("crm", "mapping_context"),
+        tool("crm", "patch"),
+        tool("crm", "sync_start"),
+        tool("crm", "sync_status"),
+        tool("senders", "get"),
+        tool("sending-accounts", "connect"),
+        tool("summary", "context"),
+      ],
+      run,
+    );
+  };
+  // An account connected or a campaign saved while the sample ran never skips
+  // the review: Parts 2-4 wait for the founder's confirmation (LIF-1303).
+  if (!run.reviewed_at) return sampleReview();
   const reconnects = linkedin.filter(account => account.status === "needs_reconnect");
   const reconnect = reconnects[0];
   if (reconnect)
@@ -453,11 +541,6 @@ export async function getNextStep(
     );
   }
   // Parts 3 and 4 follow the founder's mailbox (LIF-1260).
-  const mailboxes = roster.status === "available"
-    ? roster.value.flatMap(sender => sender.accounts
-      .filter(account => account.channel === "email" && account.status !== "disconnected")
-      .map(account => ({ id: account.id, sender_id: sender.id, sender: sender.name, email: account.identity, status: account.status })))
-    : [];
   if (mailboxes.length) {
     const email = await emailPosition(deps, session, ref!, mailboxes);
     const { mailbox } = email;
@@ -550,67 +633,5 @@ export async function getNextStep(
       outreach,
     );
   if (campaigns.campaigns.length) return campaignsSaved();
-  const crm = await readComponent(() => readCrmConnection(deps, session));
-  let crmAction =
-    "Read crm_get before offering CRM sync; its saved connection is currently unavailable. A leads-only workspace can remain here.";
-  if (crm.status === "available") {
-    if (crm.value.status !== "connected")
-      crmAction =
-        `Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio), and explain that connecting it also lets Lifty read their deals and closed customers so it never looks for leads at those companies. Connect only after a separate explicit request, with crm_post for the CRM they use. If they do not connect a CRM, offer to save the companies that are already their customers from a file so Lifty never contacts them: read ${tool("customer-exclusions", "status")} first and skip the offer when a list is saved, then ${tool("customer-exclusions", "import")} (summary_context task customer-exclusions). They can skip it now and add the file any time. A leads-only workspace can remain here.`;
-    else if (crm.value.reconnect_required)
-      crmAction =
-        "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
-    else {
-      const sync = await readComponent(async () => {
-        const value = CrmSyncStatusSchema.parse(
-          await deps.getCrmSyncStatus(session),
-        );
-        if (value.state !== "none" && value.workspace.workspace_ref !== ref)
-          throw new PublicError({
-            status: 403,
-            code: "WORKSPACE_FORBIDDEN",
-            message:
-              "The CRM sync does not belong to the selected workspace.",
-          });
-        return value;
-      });
-      if (sync.status === "unavailable")
-        crmAction =
-          "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
-      else if (sync.value.state === "none")
-        crmAction =
-          crm.value.provider === "attio"
-            ? "Attio is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status."
-            : "HubSpot is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_preferences_get and the founder's research-note and conversation choices (crm_preferences_patch only for what they change), crm_sync_start, then crm_sync_status.";
-      else if (["queued", "running"].includes(sync.value.state))
-        crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
-      else if (sync.value.state === "succeeded")
-        crmAction = `The CRM sync finished (${sync.value.leads_synced ?? 0} leads). Do not repeat it just to check status.`;
-      else
-        crmAction = `The CRM sync failed (${sync.value.error_code ?? "unknown"}). Read crm_sync_status and resolve its blocker before offering a retry.`;
-    }
-  }
-  return response(
-    "sample_ready_for_founder_review",
-    [
-      "Show the researched leads from receipt.leads (sample_review_get only if you need more): your read first, then person, company, grade, LinkedIn URL, fit rationale and evidence gaps. Include lower-fit profiles and explain their mismatch.",
-      "Ask one question: does this confirm the targeting, or what should change? A change follows summary_context task targeting or research-criteria, its synchronous PATCH/readback, then a new sample.",
-      crmAction,
-      ...(roster.status === "unavailable" ? ["The sender roster could not be read: read senders_get before offering LinkedIn, because an account may already be connected."] : []),
-      `Close Section 1 in at most six lines: target, leads and grade mix, and CRM result. Then ask whether to set up LinkedIn outreach for these leads now. Yes: read ${tool("senders", "get")} for who the senders are and which accounts each has connected. With one sender, use it; with several, ask whose LinkedIn to connect (senders_post only when that person is absent). Then ${tool("sending-accounts", "connect")} with that sender_id and channel linkedin. Show the returned connection_url right away and confirm it with sending_accounts_attempt; the templates follow once it connects. A founder who would rather start with email connects a mailbox the same way, with channel email: with one sender use it, with several ask whose mailbox it is. A leads-only founder can stop here. If not now, accept it and do not ask again this session.`,
-    ],
-    [
-      tool("sample-review", "get"),
-      tool("crm", "get"),
-      tool("crm", "post"),
-      tool("crm", "mapping_context"),
-      tool("crm", "patch"),
-      tool("crm", "sync_start"),
-      tool("crm", "sync_status"),
-      tool("senders", "get"),
-      tool("sending-accounts", "connect"),
-      tool("summary", "context"),
-    ],
-    run,
-  );
+  return sampleReview();
 }

@@ -131,6 +131,7 @@ export interface AppDependencies {
   researchOperation(session: AuthSession, key: string, input: { query: Record<string, unknown>; body: unknown }): Promise<unknown>;
   startRun(session: AuthSession): Promise<StartRunResult>;
   getRunStatus(session: AuthSession): Promise<RunStatus>;
+  confirmRunReview(session: AuthSession, runRef: string): Promise<RunStatus>;
   getRunProgress(session: AuthSession, query: RunProgressQuery, signal: AbortSignal): Promise<RunProgress>;
   enqueueFirstRun: EnqueueFirstRun;
   startCrmSyncRun(session: AuthSession): Promise<StartCrmSyncResult>;
@@ -693,6 +694,7 @@ const defaultDependencies: AppDependencies = {
   getRunStatus: async () => {
     throw new Error("getRunStatus is not configured");
   },
+  confirmRunReview: async () => { throw new Error("confirmRunReview is not configured"); },
   enqueueFirstRun: async () => {
     throw new Error("enqueueFirstRun is not configured");
   },

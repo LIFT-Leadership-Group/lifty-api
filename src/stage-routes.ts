@@ -26,7 +26,7 @@ import type { AppDependencies, AppEnvironment } from "./app.js";
 import type { ConnectionProvider } from "./connection-attempt.js";
 import { PublicError } from "./errors.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
-import { CrmConnectionStatusSchema, CrmSyncStatusSchema, NotificationConfigSchema, RunStatusSchema, StartCrmSyncResultSchema, StartRunResultSchema, WorkspaceStatusSchema } from "./contracts.js";
+import { ConfirmRunReviewRequestSchema, CrmConnectionStatusSchema, CrmSyncStatusSchema, NotificationConfigSchema, RunStatusSchema, StartCrmSyncResultSchema, StartRunResultSchema, WorkspaceStatusSchema } from "./contracts.js";
 import { readCrmConnection } from "./crm-connection.js";
 import {
   AuthorizationRequiredSchema,
@@ -242,6 +242,13 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     await dependencies.enqueueFirstRun(result.run_ref, result.attempt ?? 0);
     return context.json(result);
   });
+  // The founder's confirmation of the sample they reviewed (LIF-1303).
+  app.post("/v1/workspace/sample-review/confirm", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    const body = parse(ConfirmRunReviewRequestSchema, await readBody(context));
+    return context.json(RunStatusSchema.parse(await dependencies.confirmRunReview(context.get("authSession"), body.run_ref)));
+  });
   app.get("/v1/workspace/runs/progress", async context => {
     context.header("cache-control", "no-store");
     const query = RunProgressQuerySchema.safeParse(context.req.query());
@@ -249,9 +256,10 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     return context.json(RunProgressSchema.parse(await dependencies.getRunProgress(context.get("authSession"), query.data, context.req.raw.signal)));
   });
   for (const [method, route, response] of [["get", "/v1/workspace/sample-review", RunStatusSchema], ["post", "/v1/workspace/sample-review", StartRunResultSchema],
-    ["get", "/v1/workspace/runs/progress", RunProgressSchema]] as const) {
+    ["get", "/v1/workspace/runs/progress", RunProgressSchema], ["post", "/v1/workspace/sample-review/confirm", RunStatusSchema]] as const) {
     app.openAPIRegistry.registerPath({ method, path: route, security: [{ bearerAuth: [] }],
-      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), ...(route.endsWith("progress") ? { query: RunProgressQuerySchema } : {}) },
+      request: { headers: z.object({ "x-lifty-workspace": z.string().max(100).optional() }), ...(route.endsWith("progress") ? { query: RunProgressQuerySchema } : {}),
+        ...(route.endsWith("confirm") ? { body: { required: true, content: { "application/json": { schema: ConfirmRunReviewRequestSchema } } } } : {}) },
       responses: { 200: { description: "Calibration sample", content: { "application/json": { schema: response } } },
         ...Object.fromEntries([400, 401, 403, 404, 409, 429, 502, 504].map(code => [code, { description: "Typed error", content: { "application/json": { schema: StageErrorSchema } } }])) },
     });

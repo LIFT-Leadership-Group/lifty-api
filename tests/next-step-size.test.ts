@@ -35,7 +35,7 @@ const limits: Record<string, number> = {
 const identity = { workspace_ref: workspaceRef, name: "Example", state: "ready_for_connections" };
 const at = profileFixture.updated_at;
 const run = { state: "succeeded", run_ref: "run-1", requested_leads: 5, leads_discovered: 5, leads_researched: 5,
-  error_code: null, started_at: at, completed_at: at, workspace: { workspace_ref: workspaceRef, name: "Example" }, leads: [] };
+  error_code: null, started_at: at, completed_at: at, reviewed_at: at, workspace: { workspace_ref: workspaceRef, name: "Example" }, leads: [] };
 const senderId = "22222222-2222-4222-8222-222222222222";
 const linkedinAccount = (status: string) => ({ id: "11111111-1111-4111-8111-111111111111", sender_id: senderId, channel: "linkedin",
   identity: "https://www.linkedin.com/in/ada", status, state: "active", checked_at: at, observation: { state: "verified" },
@@ -76,7 +76,7 @@ const states: Partial<typeof base>[] = [
   { ...unset, setup: { workspace_ref: workspaceRef, state: "imported", setup_ref: "77777777-7777-4777-8777-777777777777",
     draft_version: 1, profile_version: 1, targeting_version: 1, criteria_version: 1, submitted_at: at } },
   {},
-  { run: { ...run, state: "running", completed_at: null } },
+  { run: { ...run, state: "running", completed_at: null, reviewed_at: null } },
   { run: { ...run, state: "failed", error_code: "search_exhausted" } },
   { run },
   { run, campaigns: [campaignSummary] },

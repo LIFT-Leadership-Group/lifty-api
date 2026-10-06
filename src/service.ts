@@ -42,7 +42,7 @@ import {
   createSupabaseReadinessCheck,
 } from "./supabase-auth.js";
 import { createAcquisitionVerificationTrigger, createCrmSyncTrigger, createCrmMappingTrigger, createFirstRunTrigger, createIntegrationRevocationTrigger, createNotificationDeliveryTrigger } from "./trigger-client.js";
-import { disconnectIntegration, getCrmSyncStatus, getRunStatus, getWorkspaceStatus, getNotificationConfig, listSlackNotificationChannels, upsertNotificationDestination, setNotificationRoute, enqueueNotificationTest, startCrmSyncRun, startRun } from "./workspace-operations.js";
+import { confirmRunReview, disconnectIntegration, getCrmSyncStatus, getRunStatus, getWorkspaceStatus, getNotificationConfig, listSlackNotificationChannels, upsertNotificationDestination, setNotificationRoute, enqueueNotificationTest, startCrmSyncRun, startRun } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
   const emailKey = config.serverKeys?.email ?? null;
@@ -108,6 +108,7 @@ export function createProductionApp(config: ServiceConfig) {
     listMemberWorkspaces,
     startRun,
     getRunStatus: session => getRunStatus(session, config.dashboardOrigin),
+    confirmRunReview: (session, runRef) => confirmRunReview(session, runRef, config.dashboardOrigin),
     researchOperation: (session, key, input) => executeResearchOperation(session, key, input, config.dashboardOrigin ?? DEFAULT_DASHBOARD_ORIGIN),
     getRunProgress: createRunProgressReader(),
     enqueueFirstRun: createFirstRunTrigger(config.trigger),

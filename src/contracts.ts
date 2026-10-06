@@ -88,14 +88,16 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
       error_code: RunErrorCodeSchema.nullable(),
       started_at: z.string().min(1),
       completed_at: z.string().nullable(),
-      // When the founder confirmed this sample (LIF-1303). Optional until the
-      // database returns it for every run; the API deploys before the migration.
-      reviewed_at: z.string().nullable().optional(),
+      // When the founder confirmed this sample; null until then (LIF-1303).
+      reviewed_at: z.string().nullable(),
       workspace: WorkspaceReferenceSchema,
       leads: z.array(RunLeadSchema).nullable(),
     })
     .strict(),
 ]);
+
+// The founder confirms the sample they reviewed, by its run_ref (LIF-1303).
+export const ConfirmRunReviewRequestSchema = z.object({ run_ref: z.uuid() }).strict();
 
 /** Providers the integration routes accept. */
 export const ProviderSchema = z.enum(["hubspot", "slack", "attio"]);

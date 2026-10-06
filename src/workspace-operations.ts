@@ -259,7 +259,21 @@ export async function getRunStatus(session: AuthSession, dashboardOrigin = DEFAU
     { p_workspace_id: session.workspaceRef ?? null },
   );
   if (error) throw rpcFailure(error, runUnavailable("get_lifty_run_status"));
+  return runStatusWithLinks(data, dashboardOrigin);
+}
 
+// Records the founder's confirmation of the latest sample; repeating it keeps
+// the first one (LIF-1303). Returns the sample like getRunStatus.
+export async function confirmRunReview(session: AuthSession, runRef: string, dashboardOrigin = DEFAULT_DASHBOARD_ORIGIN): Promise<RunStatus> {
+  const { data, error } = await getRpcClient(session).rpc<RunStatus>(
+    "confirm_lifty_run_review",
+    { p_run_ref: runRef, p_workspace_id: null },
+  );
+  if (error) throw rpcFailure(error, runUnavailable("confirm_lifty_run_review"));
+  return runStatusWithLinks(data, dashboardOrigin);
+}
+
+function runStatusWithLinks(data: unknown, dashboardOrigin: string): RunStatus {
   const parsed = RunStatusSchema.safeParse(unwrapSingleRow(data));
   if (!parsed.success) {
     throw invalidResponse(parsed.error);

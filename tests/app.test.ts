@@ -276,6 +276,7 @@ describe("LIFTY API", () => {
       error_code: null,
       started_at: "2026-09-01T21:00:00Z",
       completed_at: "2026-09-01T21:20:00Z",
+      reviewed_at: null,
       workspace: { workspace_ref: "ws_opaque", name: "Example" },
       leads: [
         {

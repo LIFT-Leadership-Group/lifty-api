@@ -33,7 +33,7 @@ describe("calibration policy rollout", () => {
     const status = {
       state: "succeeded" as const, run_ref: checkpoint.run_ref, requested_leads: 5,
       calibration_policy: "researched_v1" as const, leads_discovered: 5, leads_researched: 5,
-      error_code: null, started_at: "2026-09-17T00:00:00Z", completed_at: "2026-09-17T00:01:00Z",
+      error_code: null, started_at: "2026-09-17T00:00:00Z", completed_at: "2026-09-17T00:01:00Z", reviewed_at: null,
       workspace: checkpoint.workspace, leads: ["A", "A", "A", "B", "C"].map((tier, i) => ({
         name: `Candidate ${i}`, title: "CEO", company: `Company ${i}`,
         linkedin_url: `https://linkedin.com/in/candidate-${i}`, tier,
@@ -73,7 +73,7 @@ describe("calibration policy rollout", () => {
     const status = {
       state: "succeeded" as const, run_ref: checkpoint.run_ref, requested_leads: 5,
       calibration_policy: "qualified_ab_v1" as const, leads_discovered: 5, leads_researched: 5,
-      error_code: null, started_at: "2026-09-16T00:00:00Z", completed_at: "2026-09-16T00:01:00Z",
+      error_code: null, started_at: "2026-09-16T00:00:00Z", completed_at: "2026-09-16T00:01:00Z", reviewed_at: null,
       workspace: checkpoint.workspace, leads: [{ name: "Founder", title: "CEO", company: "Example",
         linkedin_url: "https://linkedin.com/in/founder", tier: "B", fit_rationale: "Relevant product, weaker buying evidence.", stage: "qualified" }],
     };
