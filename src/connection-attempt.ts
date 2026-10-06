@@ -4,7 +4,7 @@ import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import { ConnectionAttemptStatusSchema } from "./stage-contracts.js";
 
-export type ConnectionProvider = "hubspot" | "slack";
+export type ConnectionProvider = "hubspot" | "slack" | "attio";
 export type ConnectionAttemptStatus = z.infer<typeof ConnectionAttemptStatusSchema>;
 
 /** Read the existing durable provider intent through the caller's DB session. */
@@ -35,7 +35,7 @@ export async function getConnectionAttempt(session: AuthSession, provider: Conne
 
 /** OAuth callbacks prove the intent with its decrypted token, never a public UUID. */
 export async function recordOAuthFailure(input: {
-  provider: "hubspot" | "slack"; intentToken: string; status: "denied" | "failed"; code: string;
+  provider: ConnectionProvider; intentToken: string; status: "denied" | "failed"; code: string;
   supabaseUrl: string; publishableKey: string; fetchImpl: typeof fetch;
 }): Promise<void> {
   const response = await connectionFetch(input.fetchImpl)(`${input.supabaseUrl}/rest/v1/rpc/fail_lifty_connect_attempt`, {

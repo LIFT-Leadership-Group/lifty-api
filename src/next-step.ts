@@ -12,9 +12,9 @@ import { NextStepSchema, type NextStep } from "./next-step-contracts.js";
 import {
   RunStatusSchema,
   CrmSyncStatusSchema,
-  HubspotConnectionStatusSchema,
 } from "./contracts.js";
 import { readComponent } from "./workspace-summary.js";
+import { readCrmConnection } from "./crm-connection.js";
 import { CampaignsSchema } from "./outreach-contracts.js";
 import { PublicError } from "./errors.js";
 import { z } from "zod";
@@ -56,6 +56,7 @@ type Reads = Pick<
   | "getRunStatus"
   | "outreachOperation"
   | "getHubspotConnection"
+  | "getAttioConnection"
   | "getCrmSyncStatus"
 >;
 // The session forwards the caller's workspace selection; every read below
@@ -269,17 +270,13 @@ export async function getNextStep(
   if (campaigns.workspace.workspace_ref !== ref)
     throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Outreach state changed workspace." });
   if (!campaigns.campaigns.length) {
-    const crm = await readComponent(async () =>
-      HubspotConnectionStatusSchema.parse(
-        await deps.getHubspotConnection(session),
-      ),
-    );
+    const crm = await readComponent(() => readCrmConnection(deps, session));
     let crmAction =
       "Read crm_get before offering CRM sync; its saved connection is currently unavailable. A leads-only workspace can remain here.";
     if (crm.status === "available") {
       if (crm.value.status !== "connected")
         crmAction =
-          "Ask once whether the founder wants these leads and their research in their CRM. Connect only after a separate explicit request; a leads-only workspace can remain here.";
+          "Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio). Connect only after a separate explicit request, with crm_post for the CRM they use; a leads-only workspace can remain here.";
       else if (crm.value.reconnect_required)
         crmAction =
           "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
@@ -302,7 +299,9 @@ export async function getNextStep(
             "The CRM connection is saved; read crm_sync_status before offering a sync because its previous receipt is unavailable.";
         else if (sync.value.state === "none")
           crmAction =
-            "The CRM connection is saved and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_sync_start, then crm_sync_status.";
+            crm.value.provider === "attio"
+              ? "Attio is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_sync_start, then crm_sync_status."
+              : "HubSpot is connected and nothing is synced yet. Offer to sync these leads only after a separate explicit request: crm_mapping_context (company setup with crm_patch if not ready), crm_sync_start, then crm_sync_status.";
         else if (["queued", "running"].includes(sync.value.state))
           crmAction = `The CRM sync is in progress (run_ref ${sync.value.run_ref}). Read crm_sync_status; do not start another sync.`;
         else if (sync.value.state === "succeeded")

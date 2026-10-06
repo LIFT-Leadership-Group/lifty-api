@@ -16,6 +16,7 @@ export function fixture() {
     workspace_name: "Fixture",
     integration_ref: "89700000-0000-4000-a000-000000000004",
     portal_id: "52044090",
+    provider: "hubspot",
     mapping_version: "a".repeat(64),
     allow_provisioning: true,
     mappings: [

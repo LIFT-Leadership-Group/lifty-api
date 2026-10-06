@@ -142,12 +142,12 @@ describe("LIFTY API workspace management (P6)", () => {
     expect(await response.json()).toMatchObject({ error: { code: "PROVIDER_INVALID" } });
   });
 
-  it("accepts only HubSpot and Slack integration providers", async () => {
+  it("accepts only HubSpot, Attio and Slack integration providers", async () => {
     const app = createApp({ authenticate });
     for (const [path, method] of [["/v1/integrations/unipile/connect", "POST"], ["/v1/integrations/unipile", "GET"], ["/v1/integrations/unipile/sync", "GET"]] as const) {
       const response = await app.request(path, { method, headers: authorized });
       expect(response.status, path).toBe(400);
-      expect(await response.json()).toMatchObject({ error: { code: "PROVIDER_INVALID", message: "Unknown provider. Supported providers: hubspot, slack." } });
+      expect(await response.json()).toMatchObject({ error: { code: "PROVIDER_INVALID", message: "Unknown provider. Supported providers: hubspot, attio, slack." } });
     }
   });
 

@@ -22,10 +22,11 @@ import type { AppDependencies, AppEnvironment } from "./app.js";
 import type { ConnectionProvider } from "./connection-attempt.js";
 import { PublicError } from "./errors.js";
 import { CompanyPlanSchema } from "./company-mapping/contract.js";
-import { HubspotConnectionStatusSchema, NotificationConfigSchema, RunStatusSchema, StartRunResultSchema, WorkspaceStatusSchema } from "./contracts.js";
+import { CrmConnectionStatusSchema, CrmSyncStatusSchema, NotificationConfigSchema, RunStatusSchema, StartCrmSyncResultSchema, StartRunResultSchema, WorkspaceStatusSchema } from "./contracts.js";
+import { readCrmConnection } from "./crm-connection.js";
 import {
   AuthorizationRequiredSchema,
-  ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema,
+  ConnectionAttemptQuerySchema, ConnectionAttemptStatusSchema, CrmConnectRequestSchema,
   NotificationStagePatchSchema, StageErrorSchema, stageOperations,
 } from "./stage-contracts.js";
 
@@ -224,9 +225,16 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
     if (state.state === "suspended") throw new PublicError({ status: 409, code: "WORKSPACE_SUSPENDED", message: "This workspace is suspended. Contact LIFT support." });
     return state.workspace.workspace_ref;
   }
-  async function attempt(context: Context<AppEnvironment>, provider: ConnectionProvider, ref: string, workspaceRef: string) {
+  async function attempt(context: Context<AppEnvironment>, provider: ConnectionProvider | "crm", ref: string, workspaceRef: string) {
     parse(z.uuid(), ref);
-    const result = await dependencies.getConnectionAttempt(context.get("authSession"), provider, ref, workspaceRef);
+    const session = context.get("authSession");
+    // A CRM attempt UUID belongs to exactly one provider ledger; an unknown one
+    // still reads as not found for both.
+    const result = provider !== "crm" ? await dependencies.getConnectionAttempt(session, provider, ref, workspaceRef)
+      : await dependencies.getConnectionAttempt(session, "hubspot", ref, workspaceRef).catch(error => {
+        if (error instanceof PublicError && error.status === 404) return dependencies.getConnectionAttempt(session, "attio", ref, workspaceRef);
+        throw error;
+      });
     if (result.attempt_ref !== ref) throw new PublicError({ status: 502, code: "CONNECTION_ATTEMPT_UNAVAILABLE", message: "The authorization could not be verified. Retry the same attempt." });
     return context.json(ConnectionAttemptStatusSchema.parse(result));
   }
@@ -281,23 +289,52 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
 
   // Current-workspace mapping context keeps arbitrary member-workspace selection
   // out of the generic stage flow; the legacy admin route remains separate.
+  // The five-property company setup exists for HubSpot's company reconciler.
+  // Attio matches companies on their domains; its fields use the general mapper.
+  async function requireHubspotCompanySetup(context: Context<AppEnvironment>) {
+    const attio = await dependencies.getAttioConnection(context.get("authSession"));
+    if (attio.status === "connected") throw new PublicError({ status: 409, code: "COMPANY_SETUP_NOT_REQUIRED",
+      message: "Attio needs no separate company setup: companies are matched on their domain and the baseline maps the company name. Use mapping_catalog to map other company fields." });
+  }
   app.get("/v1/workspace/crm/mapping-context", async context => {
     parse(Empty, context.req.query());
     const current = await workspace(context);
+    await requireHubspotCompanySetup(context);
     return forward(context, "GET", `/v1/integrations/hubspot/company-mapping/context?workspace_ref=${encodeURIComponent(current)}`);
   });
 
   // Disconnection stays in the existing handlers. These POST adapters exist
   // because stage operations cannot express DELETE, and they pin the current
   // workspace instead of accepting one from the caller.
-  for (const [stage, provider] of [["crm", "hubspot"], ["notifications", "slack"]] as const) {
+  for (const stage of ["crm", "notifications"] as const) {
     app.post(`/v1/workspace/${stage}/disconnect`, async context => {
       parse(Empty, context.req.query());
       parse(Empty, await readBody(context));
       await workspace(context);
+      const provider = stage === "notifications" ? "slack"
+        : (await dependencies.getAttioConnection(context.get("authSession"))).status === "connected" ? "attio" : "hubspot";
       return forward(context, "DELETE", `/v1/integrations/${provider}`);
     });
   }
+
+  // The review sync follows the selected CRM; the database refuses a workspace
+  // without a usable connection and never falls back to another provider.
+  app.post("/v1/workspace/crm/sync", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    parse(Empty, await readBody(context));
+    await workspace(context);
+    const result = StartCrmSyncResultSchema.parse(await dependencies.startCrmSyncRun(context.get("authSession")));
+    // Enqueue every start, including a re-attach: the run-scoped key is idempotent.
+    await dependencies.enqueueCrmSync(result.run_ref);
+    return context.json(result);
+  });
+  app.get("/v1/workspace/crm/sync", async context => {
+    context.header("cache-control", "no-store");
+    parse(Empty, context.req.query());
+    await workspace(context);
+    return context.json(CrmSyncStatusSchema.parse(await dependencies.getCrmSyncStatus(context.get("authSession"))));
+  });
 
   for (const stage of Object.keys(stageOperations).filter(stage => !["business", "targeting", "research-criteria", "commercial-voice", "setup", "account", "sample-review", "research-schedule", "leads", "senders", "sending-accounts", "journeys", "campaigns", "linkedin"].includes(stage))) {
     app.get(`/v1/workspace/${stage}`, async context => {
@@ -310,8 +347,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       const current = await workspace(context);
       if (stage === "crm" || stage === "notifications") {
         const query = parse(ConnectionAttemptQuerySchema, context.req.query());
-        if (query.attempt_ref) return attempt(context, stage === "crm" ? "hubspot" : "slack", query.attempt_ref, current);
-        return stage === "crm" ? context.json(HubspotConnectionStatusSchema.parse(await dependencies.getHubspotConnection(session)))
+        if (query.attempt_ref) return attempt(context, stage === "crm" ? "crm" : "slack", query.attempt_ref, current);
+        return stage === "crm" ? context.json(CrmConnectionStatusSchema.parse(await readCrmConnection(dependencies, session)))
           : context.json(NotificationConfigSchema.parse(await dependencies.getNotificationConfig(session)));
       }
 
@@ -327,8 +364,11 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       const current = await workspace(context);
       const session = context.get("authSession");
 
+      if (stage === "crm") {
+        const { provider } = parse(CrmConnectRequestSchema, body);
+        return context.json(authorization(provider === "attio" ? await dependencies.startAttioConnect(session) : await dependencies.startHubspotConnect(session)));
+      }
       parse(Empty, body);
-      if (stage === "crm") return context.json(authorization(await dependencies.startHubspotConnect(session)));
       if (stage === "notifications") return context.json(authorization(await dependencies.startSlackConnect(session)));
       throw new PublicError({ status: 405, code: "STAGE_OPERATION_UNSUPPORTED", message: "This operation is not available." });
     });
@@ -343,6 +383,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       if (stage === "crm") {
         const plan = parse(CompanyPlanSchema, body);
         if (plan.workspace_ref !== current) throw forbidden();
+        await requireHubspotCompanySetup(context);
         return forward(context, "POST", "/v1/integrations/hubspot/company-mapping", plan);
       }
 

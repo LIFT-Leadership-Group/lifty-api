@@ -9,6 +9,7 @@ import { renderLiftyPage } from './lifty-brand.js';
 export const CONNECTION_FLOWS = {
   hubspot: { path:'/hubspot/callback', label:'HubSpot', entries:['/hubspot/start'] },
   slack: { path:'/slack/callback', label:'Slack', entries:['/slack/start'] },
+  attio: { path:'/attio/callback', label:'Attio', entries:['/attio/start'] },
   warmup: { path:'/warmup/google/callback', label:'email warmup', entries:['/warmup/setup','/warmup/received'] },
   email: { path:'/connect/email/return', label:'email', entries:['/connect/email'] },
   linkedin: { path:'/connect/linkedin/return', label:'LinkedIn', entries:['/connect/linkedin'] },

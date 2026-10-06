@@ -60,6 +60,8 @@ The request-scoped Supabase client aborts each database request after 10 seconds
 | `HUBSPOT_CLIENT_SECRET` | Encrypted app-level secret for the HubSpot LIFTY app |
 | `SLACK_CLIENT_ID` | Client ID for the Slack OAuth app |
 | `SLACK_CLIENT_SECRET` | App-level secret for Slack OAuth |
+| `ATTIO_CLIENT_ID` | Client ID of LIFT's Attio OAuth app (optional; Attio connection is unavailable without it) |
+| `ATTIO_CLIENT_SECRET` | Client secret of LIFT's Attio OAuth app. Register `<PUBLIC_BASE_URL>/attio/callback` and the scopes `record_permission:read-write`, `object_configuration:read-write`, `note:read-write` |
 | `TRIGGER_SECRET_KEY` | Trigger.dev key for initial research, CRM and notification tasks |
 | `TRIGGER_API_URL` | Optional; defaults to `https://api.trigger.dev` |
 | `HOST` | Bind host, default `0.0.0.0` |

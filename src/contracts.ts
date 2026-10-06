@@ -95,7 +95,7 @@ export const RunStatusSchema = z.discriminatedUnion("state", [
 ]);
 
 /** Providers the integration routes accept. */
-export const ProviderSchema = z.enum(["hubspot", "slack"]);
+export const ProviderSchema = z.enum(["hubspot", "slack", "attio"]);
 
 export const HubspotConnectStartSchema = z
   .object({
@@ -127,6 +127,40 @@ export const HubspotConnectionStatusSchema = z.discriminatedUnion("status", [
     .strict(),
 ]);
 
+export const AttioConnectStartSchema = z
+  .object({
+    provider: z.literal("attio"),
+    connect_url: z.string().url(),
+    expires_in_seconds: z.number().int().positive(),
+    attempt_ref: z.uuid().optional(),
+    expires_at: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict();
+
+/** The founder's own Attio workspace; the bearer token never leaves the database. */
+export const AttioConnectionStatusSchema = z.discriminatedUnion("status", [
+  z.object({ provider: z.literal("attio"), status: z.literal("not_connected") }).strict(),
+  z
+    .object({
+      provider: z.literal("attio"),
+      status: z.literal("connected"),
+      attio_workspace_id: z.uuid(),
+      workspace_slug: z.string().min(1).max(100),
+      workspace_name: z.string().min(1).max(255),
+      granted_scopes: z.array(z.string()),
+      connected_at: z.string().nullable(),
+      reconnect_required: z.boolean(),
+    })
+    .strict(),
+]);
+
+/** The selected CRM; nothing connected names no provider. */
+export const CrmConnectionStatusSchema = z.union([
+  z.object({ provider: z.null(), status: z.literal("not_connected") }).strict(),
+  HubspotConnectionStatusSchema,
+  AttioConnectionStatusSchema,
+]);
+
 export const SlackConnectStartSchema = z
   .object({
     provider: z.literal("slack"),
@@ -146,12 +180,14 @@ export type SlackConnectLink = z.infer<typeof SlackConnectLinkSchema>;
 export const ProviderConnectStartSchema = z.union([
   HubspotConnectStartSchema,
   SlackConnectStartSchema,
+  AttioConnectStartSchema,
 ]);
 // Existing installed clients reject additional handoff keys. Keep the public
 // legacy response distinct from internal results consumed by stage adapters.
 export const LegacyProviderConnectStartSchema = z.union([
   HubspotConnectStartSchema.omit({ attempt_ref: true, expires_at: true }),
   SlackConnectStartSchema.omit({ attempt_ref: true, expires_at: true }),
+  AttioConnectStartSchema.omit({ attempt_ref: true, expires_at: true }),
 ]);
 
 export const SlackConnectionStatusSchema = z.discriminatedUnion("status", [
@@ -180,6 +216,7 @@ export const SlackConnectionStatusSchema = z.discriminatedUnion("status", [
 export const IntegrationConnectionStatusSchema = z.union([
   HubspotConnectionStatusSchema,
   SlackConnectionStatusSchema,
+  AttioConnectionStatusSchema,
 ]);
 
 export const NotificationTypeSchema = z.enum([
@@ -324,6 +361,9 @@ export type RunStatus = z.infer<typeof RunStatusSchema>;
 export type Provider = z.infer<typeof ProviderSchema>;
 export type HubspotConnectStart = z.infer<typeof HubspotConnectStartSchema>;
 export type HubspotConnectionStatus = z.infer<typeof HubspotConnectionStatusSchema>;
+export type AttioConnectStart = z.infer<typeof AttioConnectStartSchema>;
+export type AttioConnectionStatus = z.infer<typeof AttioConnectionStatusSchema>;
+export type CrmConnectionStatus = z.infer<typeof CrmConnectionStatusSchema>;
 export type SlackConnectStart = z.infer<typeof SlackConnectStartSchema>;
 export type SlackConnectionStatus = z.infer<typeof SlackConnectionStatusSchema>;
 export type IntegrationConnectionStatus = z.infer<typeof IntegrationConnectionStatusSchema>;

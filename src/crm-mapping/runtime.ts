@@ -21,9 +21,11 @@ import { readProperties, readRecords } from "./provider.js";
 import {
   buildPreview,
   matchesIdentity,
+  RECORD_ID,
   type Properties,
   type Surface,
 } from "./preview.js";
+import { createAttioAttribute } from "./attio.js";
 export type { CrmMappingSettings } from "./transport.js";
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
@@ -356,20 +358,18 @@ async function recordLinks(
     const id = object === "contact" ? lead.crm_contact_id : lead.crm_company_id;
     const row = id ? remote[object].get(id) : undefined;
     const status =
-      !id || !/^\d{1,30}$/.test(id)
+      !id || !RECORD_ID[state.provider].test(id)
         ? "missing_record"
         : !row
           ? "record_unavailable"
           : !matchesIdentity(lead, object, row)
             ? "identity_mismatch"
             : "verified";
-    return {
-      status,
-      url:
-        status === "verified"
-          ? `https://app.hubspot.com/contacts/${state.portal_id}/record/${object === "contact" ? "0-1" : "0-2"}/${id}`
-          : null,
-    };
+    // Attio links are the record's own web_url; HubSpot's are built from the portal.
+    const url = status !== "verified" ? null
+      : state.provider === "attio" ? row?.url ?? null
+      : `https://app.hubspot.com/contacts/${state.portal_id}/record/${object === "contact" ? "0-1" : "0-2"}/${id}`;
+    return { status: status === "verified" && !url ? "record_unavailable" : status, url };
   };
   return CrmRecordsSchema.parse({
     state: "available",
@@ -377,6 +377,7 @@ async function recordLinks(
     run_ref: data.run_ref,
     sync_state: data.sync_state,
     portal_id: state.portal_id,
+    provider: state.provider,
     leads: data.leads.map((lead) => {
       const contact = link(lead, "contact"),
         company = link(lead, "company");
@@ -400,12 +401,17 @@ async function createProperty(
   request: z.infer<typeof C.CrmMappingPropertyCreateRequestSchema>,
 ) {
   checkScope(state, request);
+  const attio = state.provider === "attio";
+  const prefix = attio ? "ATTIO" : "HUBSPOT";
   if (!state.allow_provisioning)
-    throw new C.MappingError("HUBSPOT_PROVISIONING_DISABLED", 403);
+    throw new C.MappingError(`${prefix}_PROVISIONING_DISABLED`, 403);
+  const definition = request.property;
+  // A HubSpot property definition never creates an Attio attribute, or vice versa.
+  if (attio === "fieldType" in definition)
+    throw new C.MappingError("INVALID_PROPERTY_DEFINITION", 422);
   const properties = await readProperties(tools, state);
   if (request.schema_version !== (await C.fingerprint(properties)))
     throw new C.MappingError("STALE_SCHEMA", 409);
-  const definition = request.property;
   const sameName = properties[request.object].find(
     (p) => p.name === definition.name,
   );
@@ -416,9 +422,9 @@ async function createProperty(
   if (sameName) {
     if (
       sameName.type !== definition.type ||
-      sameName.fieldType !== definition.fieldType
+      ("fieldType" in definition && sameName.fieldType !== definition.fieldType)
     )
-      throw new C.MappingError("HUBSPOT_PROPERTY_CONFLICT", 409);
+      throw new C.MappingError(`${prefix}_PROPERTY_CONFLICT`, 409);
     return C.CrmMappingPropertyCreateSchema.parse({
       ...scope(state),
       state: "already_exists",
@@ -426,53 +432,55 @@ async function createProperty(
     });
   }
   if (sameLabel)
-    throw new C.MappingError("HUBSPOT_PROPERTY_ALREADY_EXISTS", 409, [
+    throw new C.MappingError(`${prefix}_PROPERTY_ALREADY_EXISTS`, 409, [
       {
-        code: "HUBSPOT_PROPERTY_ALREADY_EXISTS",
+        code: `${prefix}_PROPERTY_ALREADY_EXISTS`,
         path: "/property",
-        message: `Use existing property ${sameLabel.name}.`,
+        message: `Use existing ${attio ? "attribute" : "property"} ${sameLabel.name}.`,
         suggestion: "Map to the existing field instead of creating another.",
       },
     ]);
-  const pairs: Record<string, string[]> = {
-    string: ["text", "textarea"],
-    number: ["number"],
-    enumeration: ["select", "radio", "checkbox"],
-    bool: ["booleancheckbox"],
-    date: ["date"],
-    datetime: ["date"],
-  };
+  const choice = attio ? "select" : "enumeration";
+  const labels = definition.options?.map((o) => "value" in o ? o.value : o.label) ?? [];
   if (
-    !pairs[definition.type]?.includes(definition.fieldType) ||
-    (definition.type === "enumeration" &&
-      (!definition.options?.length ||
-        new Set(definition.options.map((o) => o.value)).size !==
-          definition.options.length)) ||
-    (definition.type !== "enumeration" && definition.options?.length)
+    (definition.type === choice && (!labels.length || new Set(labels).size !== labels.length)) ||
+    (definition.type !== choice && labels.length)
   )
     throw new C.MappingError("INVALID_PROPERTY_DEFINITION", 422);
+  if ("fieldType" in definition) {
+    const pairs: Record<string, string[]> = {
+      string: ["text", "textarea"],
+      number: ["number"],
+      enumeration: ["select", "radio", "checkbox"],
+      bool: ["booleancheckbox"],
+      date: ["date"],
+      datetime: ["date"],
+    };
+    if (!pairs[definition.type]?.includes(definition.fieldType))
+      throw new C.MappingError("INVALID_PROPERTY_DEFINITION", 422);
+  }
   const fresh = C.StateSchema.parse(await tools.rpc("state"));
   checkScope(fresh, request);
   if (!fresh.allow_provisioning)
-    throw new C.MappingError("HUBSPOT_PROVISIONING_DISABLED", 403);
-  const path = `/crm/v3/properties/${request.object === "contact" ? "contacts" : "companies"}`;
-  await tools.call(state, "POST", path, definition);
-  const verified = C.PropertySchema.parse(
-    await tools.call(
-      state,
-      "GET",
-      `${path}/${encodeURIComponent(definition.name)}`,
-    ),
-  );
+    throw new C.MappingError(`${prefix}_PROVISIONING_DISABLED`, 403);
+  let verified: C.Property;
+  if (!("fieldType" in definition)) {
+    verified = await createAttioAttribute(tools, state, request.object, definition);
+  } else {
+    const path = `/crm/v3/properties/${request.object === "contact" ? "contacts" : "companies"}`;
+    await tools.call(state, "POST", path, definition);
+    verified = C.PropertySchema.parse(
+      await tools.call(state, "GET", `${path}/${encodeURIComponent(definition.name)}`),
+    );
+    if (verified.fieldType !== definition.fieldType)
+      throw new C.MappingError("HUBSPOT_PROPERTY_READBACK_FAILED", 502);
+  }
   if (
     verified.name !== definition.name ||
     verified.type !== definition.type ||
-    verified.fieldType !== definition.fieldType ||
-    definition.options?.some(
-      (o) => !verified.options?.some((v) => v.value === o.value && !v.hidden),
-    )
+    labels.some((value) => !verified.options?.some((v) => v.value === value && !v.hidden))
   )
-    throw new C.MappingError("HUBSPOT_PROPERTY_READBACK_FAILED", 502);
+    throw new C.MappingError(`${prefix}_PROPERTY_READBACK_FAILED`, 502);
   return C.CrmMappingPropertyCreateSchema.parse({
     ...scope(state),
     state: "created",

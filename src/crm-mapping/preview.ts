@@ -5,14 +5,28 @@ import {
   type Property,
   type LeadSource,
   type ReplayPlan,
+  type CrmProviderName,
   CrmMappingPreviewSchema,
 } from "./contracts.js";
+import { ATTIO_IDENTITY, invalidAttioValue } from "./attio.js";
 export type Surface = "contact" | "company";
 export type Properties = Record<Surface, Property[]>;
-export type RemoteRecords = Record<
-  Surface,
-  Map<string, Record<string, string | null>>
->;
+/** Flattened mapped values, every identity value (Attio records can hold
+ * several emails or domains) and the provider's own record URL when it has one. */
+export interface RemoteRecord {
+  values: Record<string, string | null>;
+  identities: string[];
+  url: string | null;
+}
+export type RemoteRecords = Record<Surface, Map<string, RemoteRecord>>;
+export const IDENTITY_FIELD: Record<CrmProviderName, Record<Surface, string>> = {
+  hubspot: { contact: "email", company: "domain" },
+  attio: ATTIO_IDENTITY,
+};
+export const RECORD_ID: Record<CrmProviderName, RegExp> = {
+  hubspot: /^\d{1,30}$/,
+  attio: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+};
 export function normalizeDomain(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
   try {
@@ -28,27 +42,29 @@ export function normalizeDomain(value: unknown): string | null {
 export function matchesIdentity(
   lead: LeadSource,
   object: Surface,
-  remote: Record<string, string | null>,
+  remote: RemoteRecord,
 ): boolean {
   if (object === "company") {
     const expected = normalizeDomain(
       lead.company_discovery?.company_domain ?? lead.discovery.company_domain,
     );
-    return expected !== null && normalizeDomain(remote.domain) === expected;
+    return expected !== null && remote.identities.some(domain => normalizeDomain(domain) === expected);
   }
   const email = lead.discovery.email;
   return (
     typeof email === "string" &&
     email.trim().length > 0 &&
-    email.trim().toLowerCase() === remote.email?.trim().toLowerCase()
+    remote.identities.some(value => email.trim().toLowerCase() === value.trim().toLowerCase())
   );
 }
 export function invalidPropertyValue(
   property: Property | undefined,
   value: string,
+  provider: CrmProviderName = "hubspot",
 ): string | null {
   if (!property || property.archived) return "missing_property";
   if (property.modificationMetadata?.readOnlyValue) return "read_only_property";
+  if (provider === "attio") return invalidAttioValue(property, value);
   if (property.type === "enumeration") {
     const allowed = new Set(
       property.options?.filter((o) => !o.hidden).map((o) => o.value),
@@ -108,7 +124,7 @@ export async function buildPreview(
           reason,
           ...(value === undefined ? {} : { value }),
         });
-      if (!id || !/^\d{1,30}$/.test(id)) {
+      if (!id || !RECORD_ID[state.provider].test(id)) {
         issue("missing_record");
         continue;
       }
@@ -120,13 +136,13 @@ export async function buildPreview(
         issue("identity_mismatch");
         continue;
       }
-      const identity = object === "contact" ? "email" : "domain";
+      const identity = IDENTITY_FIELD[state.provider][object];
       const expected: Record<string, string | null> = {
-        [identity]: current[identity] ?? null,
+        [identity]: current.values[identity] ?? null,
       };
       for (const mapping of mappings)
         expected[mapping.destination_field] =
-          current[mapping.destination_field] ?? null;
+          current.values[mapping.destination_field] ?? null;
       const key = `${object}:${id}`;
       const record = records.get(key) ?? {
         lead_refs: [],
@@ -172,7 +188,7 @@ export async function buildPreview(
           for (const row of rows.filter((row) => !eligible.includes(row)))
             issue("source_context_required", row.destination_field);
           const result = buildCrmPropertyPayload({
-            provider: "hubspot",
+            provider: state.provider,
             mappings: eligible,
             source,
             stage,
@@ -190,6 +206,7 @@ export async function buildPreview(
             const invalid = invalidPropertyValue(
               properties[object].find((p) => p.name === field),
               value,
+              state.provider,
             );
             if (invalid) {
               issue(invalid, field, value);

@@ -18,10 +18,12 @@ const Available = z
     workspace_ref: z.uuid(),
     run_ref: z.uuid(),
     sync_state: z.enum(["queued", "running", "succeeded", "failed"]),
+    /** HubSpot portal or Attio workspace id. */
     portal_id: z
       .string()
-      .regex(/^[0-9]{1,30}$/)
+      .regex(/^([0-9]{1,30}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/)
       .nullable(),
+    provider: z.enum(["hubspot", "attio"]).optional(),
     leads: z.array(Lead).max(2_000),
   })
   .strict();

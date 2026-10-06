@@ -7,10 +7,12 @@ import {
 } from "./contracts.js";
 import type { MappingSession } from "./transport.js";
 import type { Properties, RemoteRecords, Surface } from "./preview.js";
+import { readAttioProperties, readAttioRecords } from "./attio.js";
 export async function readProperties(
   tools: MappingSession,
   state: State,
 ): Promise<Properties> {
+  if (state.provider === "attio") return readAttioProperties(tools, state);
   const read = async (object: Surface) => {
     const result = z
       .object({ results: z.array(PropertySchema) })
@@ -36,6 +38,7 @@ export async function readRecords(
   leads: LeadSource[],
   identityOnly = false,
 ): Promise<RemoteRecords> {
+  if (state.provider === "attio") return readAttioRecords(tools, state, leads, identityOnly);
   const remote: RemoteRecords = { contact: new Map(), company: new Map() };
   for (const object of ["contact", "company"] as const) {
     const ids = [
@@ -79,13 +82,13 @@ export async function readRecords(
         );
       if (!data.success) throw new MappingError("INVALID_HUBSPOT_RECORDS", 502);
       for (const row of data.data.results)
-        if (slice.includes(row.id) && !row.archived)
-          remote[object].set(
-            row.id,
-            Object.fromEntries(
-              properties.map((key) => [key, row.properties[key] ?? null]),
-            ),
+        if (slice.includes(row.id) && !row.archived) {
+          const values = Object.fromEntries(
+            properties.map((key) => [key, row.properties[key] ?? null]),
           );
+          const identity = values[object === "contact" ? "email" : "domain"];
+          remote[object].set(row.id, { values, identities: identity ? [identity] : [], url: null });
+        }
     }
   }
   return remote;

@@ -8,7 +8,8 @@ import {
   VoiceGetSchema,
   SetupStatusSchema,
 } from "./business-contracts.js";
-import { RunErrorCodeSchema, WorkspaceStatusSchema } from "./contracts.js";
+import { RunErrorCodeSchema, WorkspaceStatusSchema, type CrmConnectionStatus } from "./contracts.js";
+import { crmAccountLabel, readCrmConnection } from "./crm-connection.js";
 import { CampaignsSchema, JourneysSchema, ExactRevisionSchema } from "./outreach-contracts.js";
 import { PublicError } from "./errors.js";
 import { SenderSchema, SendersGetSchema } from "./identity-contracts.js";
@@ -91,7 +92,9 @@ const SummaryRunSchema = z.discriminatedUnion("state", [
 const SummaryCrmSchema = z
   .object({
     available: z.literal(true),
+    provider: z.enum(["hubspot", "attio"]).nullable(),
     connected: z.boolean(),
+    account: z.string().nullable(),
     portal_id: z.string().nullable(),
     hub_domain: z.string().nullable(),
     connected_at: z.string().nullable(),
@@ -135,17 +138,19 @@ export const runOverview = (
         started_at: run.started_at,
         completed_at: run.completed_at,
       };
-export const hubspotOverview = (
-  hubspot: Read<"getHubspotConnection">,
+export const crmOverview = (
+  crm: CrmConnectionStatus,
   sync: Read<"getCrmSyncStatus">,
 ): z.infer<typeof SummaryCrmSchema> => ({
   available: true,
-  connected: hubspot.status === "connected",
-  portal_id: hubspot.status === "connected" ? hubspot.portal_id : null,
-  hub_domain: hubspot.status === "connected" ? hubspot.hub_domain : null,
-  connected_at: hubspot.status === "connected" ? hubspot.connected_at : null,
+  provider: crm.status === "connected" ? crm.provider : null,
+  connected: crm.status === "connected",
+  account: crmAccountLabel(crm),
+  portal_id: crm.status === "connected" && crm.provider === "hubspot" ? crm.portal_id : null,
+  hub_domain: crm.status === "connected" && crm.provider === "hubspot" ? crm.hub_domain : null,
+  connected_at: crm.status === "connected" ? crm.connected_at : null,
   reconnect_required:
-    hubspot.status === "connected" ? hubspot.reconnect_required : false,
+    crm.status === "connected" ? crm.reconnect_required : false,
   sync_pending: sync.state === "queued" || sync.state === "running",
   last_sync_at: sync.state === "none" ? null : sync.completed_at,
   last_sync:
@@ -326,12 +331,12 @@ export async function getWorkspaceSummary(
       return { state, weekly_target, effective_target };
     }),
     readComponent(async () => {
-      const [hubspot, sync] = await Promise.all([
-        deps.getHubspotConnection(reads),
+      const [crm, sync] = await Promise.all([
+        readCrmConnection(deps, reads),
         deps.getCrmSyncStatus(reads),
       ]);
       if (sync.state !== "none") scoped(sync.workspace, current);
-      return hubspotOverview(hubspot, sync);
+      return crmOverview(crm, sync);
     }),
   ]);
   // Independently scoped RPCs must still refer to the same current membership.
