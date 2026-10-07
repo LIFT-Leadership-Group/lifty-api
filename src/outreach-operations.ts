@@ -5,6 +5,7 @@ import { rpcFailure } from "./rpc-errors.js";
 import { validateIdentityInput, type IdentityDefinition, type IdentityInput } from "./identity-operations.js";
 import * as c from "./outreach-contracts.js";
 import { memberReviewOperationDefinitions, memberReviewReceiptMatches } from "./member-review-operations.js";
+import { writingRecommendations } from "./writing-rules.js";
 
 const Empty = z.object({}).strict();
 export type OutreachInput = IdentityInput;
@@ -198,5 +199,11 @@ export async function executeOutreachOperation(session: AuthSession, key: string
   // A paused or never-activated Campaign has no operating intent.
   if (key === "campaigns.pause" && c.CampaignResultSchema.parse(parsed.data).campaign.state === "active")
     throw new PublicError({ status: 502, ...unavailable });
+  if (entry.resource === "campaigns" && value.campaign) {
+    // The response schema already validated this Campaign (activation adds its Journey).
+    const { campaign } = parsed.data as { campaign: z.infer<typeof c.CampaignSchema> };
+    const recommendations = writingRecommendations(campaign.draft_revision, campaign.channel);
+    if (recommendations) return { ...(parsed.data as object), writing_recommendations: recommendations };
+  }
   return parsed.data;
 }

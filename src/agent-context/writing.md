@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v20
+Version: lifty-writing.v21
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -70,12 +70,14 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
 - Use one relevant hook per message. The hook is one sentence that ties the
   main focus to the CTA. It is a bridge, not a reason for writing. Do not
   explain why you followed up, why you started with a topic, or why they
-  should hear it from you. Follow-up is assumed. If the hook could sit on
-  any company's email, rewrite it.
+  should hear it from you, and do not comment on the message or on yourself
+  as its sender ("This comes from me", "I'm in this because"). Follow-up is
+  assumed. If the hook could sit on any company's email, rewrite it.
 - Do not list everything researched about the recipient. Explain why the offer
   may help without claiming they have a problem you cannot verify.
-- State company-specific research plainly in the same sentence. Never hedge
-  it ("it looks like", "seems like", "I'm guessing"): see
+- Attribute company-specific research the way a person would, in the same
+  sentence: say where you saw it ("I saw on your careers page that..."). Never
+  hedge it ("it looks like", "seems like", "I'm guessing"): see
   `references.anti_slop`. If an inference carries the message, ask the
   recipient to confirm it. Never promise unsupported ROI or quote guessed
   financial metrics.
@@ -103,11 +105,11 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
   name", "I named them because...", and "If this landed with the wrong person,
   that is useful." Say the fact. Do not narrate why you are allowed to say it.
   If a line would make a founder ask "how is that useful?", rewrite it.
-- Read `references.anti_slop` and do not use those phrases. Empty nudges and
-  guilt closes are banned, including "just checking in", "circling back",
-  "I don't want to keep asking you", and "I'll leave it here". Do not guilt
-  someone into replying. "I'll keep this short" and "Last note from me" are
-  fine as spoken openers. Never write "sit with", "sits with", or "sit
+- Read `references.anti_slop`, the list LIFT checks composed copy against,
+  and avoid those phrases. Empty nudges and guilt closes are banned,
+  including "just checking in", "circling back", "I don't want to keep
+  asking you", and "I'll leave it here". Do not guilt someone into replying.
+  "I'll keep this short" is fine as a spoken opener. Never write "sit with", "sits with", or "sit
   with you".
 - Read the copy aloud. If the founder would not say it, rewrite it.
 - Use the confirmed business URL exactly when it supports the ask. Put that
