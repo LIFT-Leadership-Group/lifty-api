@@ -44,25 +44,27 @@ describe("isolated saved campaign tests", () => {
     const compared = fixtures.comparison.test.samples;
     expect(compared.every(sample => sample.baseline_output !== null)).toBe(true);
     expect(compared.some(sample => sample.changes.includes("research_changed"))).toBe(true);
-    for (const value of [fixtures.test_pending, fixtures.test_completed, fixtures.comparison])
+    for (const value of [fixtures.test_pending, fixtures.test_completed, fixtures.comparison, fixtures.test_failed])
       expect(CampaignTestResultSchema.safeParse(value)).toMatchObject({ success: true });
     expect(CampaignTestsSchema.safeParse(fixtures.tests_list)).toMatchObject({ success: true });
   });
   it("relays a failed sample's coded reason as one founder-facing sentence", async () => {
-    const [first, ...rest] = fixtures.test_completed.test.samples;
-    const failed = { ...first!, status: "failed", output: null,
-      failure: { code: "composition_templates_unavailable", stage: "version", position: 4, cause: "TemplateReadiness.undeclared_slot" } };
-    const legacy = { ...rest[0] ?? first!, status: "failed", output: null };
-    const receipt = { ...fixtures.test_completed, test: { ...fixtures.test_completed.test, status: "failed", samples: [failed, legacy] } };
-    const h = harness(receipt);
-    const response = await h.request("GET", `/v1/workspace/campaigns/${test.campaign_ref}/tests/${fixtures.test_completed.test.test_ref}`);
+    const failed = fixtures.test_failed.test;
+    const path = `/v1/workspace/campaigns/${failed.campaign_ref}/tests/${failed.test_ref}`;
+    const response = await harness(fixtures.test_failed).request("GET", path);
     expect(response.status).toBe(200);
-    const [named, unnamed] = (await response.json()).test.samples;
-    expect(named.failure).toMatchObject({ code: "composition_templates_unavailable", position: 4,
-      message: "A saved template in step 4 uses a {placeholder} Lifty cannot fill. Use {first_name}, {company} or a declared slot, then preview again." });
+    const samples: Array<{ failure: Record<string, unknown> }> = (await response.json()).test.samples;
+    expect(samples.map(sample => sample.failure)).toEqual(expect.arrayContaining([
+      { code: "composition_held", message: "This draft could not be completed, and no reason was recorded for it." },
+      { code: "composition_templates_unavailable", stage: "version", position: 4, cause: "TemplateReadiness.undeclared_slot",
+        message: "A saved template in step 4 uses a {placeholder} Lifty cannot fill. Use {first_name}, {company} or a declared slot, then preview again." },
+    ]));
     // A database without failure reasons still returns the bare status.
-    expect(unnamed.failure).toBeUndefined();
-    const invented = harness({ ...receipt, test: { ...receipt.test, samples: [{ ...failed, failure: { code: "made_up" } }] } });
-    expect((await invented.request("GET", `/v1/workspace/campaigns/${test.campaign_ref}/tests/${fixtures.test_completed.test.test_ref}`)).status).toBe(502);
+    const legacy = { ...fixtures.test_failed, test: { ...failed, samples: failed.samples.map(({ failure: _failure, ...sample }) => sample) } };
+    const bare = await harness(legacy).request("GET", path);
+    expect(bare.status).toBe(200);
+    expect((await bare.json()).test.samples.every((sample: object) => !("failure" in sample))).toBe(true);
+    const invented = { ...fixtures.test_failed, test: { ...failed, samples: failed.samples.map(sample => ({ ...sample, failure: { code: "made_up" } })) } };
+    expect((await harness(invented).request("GET", path)).status).toBe(502);
   });
 });
