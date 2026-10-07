@@ -41,7 +41,7 @@ import {
   createSupabaseAuthenticator,
   createSupabaseReadinessCheck,
 } from "./supabase-auth.js";
-import { createAcquisitionVerificationTrigger, createCrmSyncTrigger, createCrmMappingTrigger, createFirstRunTrigger, createIntegrationRevocationTrigger, createNotificationDeliveryTrigger } from "./trigger-client.js";
+import { createAcquisitionVerificationTrigger, createCrmSyncTrigger, createCrmMappingTrigger, createFirstRunTrigger, createIntegrationRevocationTrigger, createNotificationDeliveryTrigger, createWarmupVerifyTrigger } from "./trigger-client.js";
 import { confirmRunReview, disconnectIntegration, getCrmSyncStatus, getRunStatus, getWorkspaceStatus, getNotificationConfig, listSlackNotificationChannels, upsertNotificationDestination, setNotificationRoute, enqueueNotificationTest, startCrmSyncRun, startRun } from "./workspace-operations.js";
 
 export function createProductionApp(config: ServiceConfig) {
@@ -49,7 +49,8 @@ export function createProductionApp(config: ServiceConfig) {
   const accounts = config.accounts ? createAccountConnection(config.accounts) : null;
   // Workspace member operations use their session. Browser setup uses a narrow,
   // server-key-protected intent RPC, never a Supabase administrative key.
-  const warmupSetup = config.warmupSetup ? createWarmupSetup(config.warmupSetup) : null;
+  const warmupSetup = config.warmupSetup
+    ? createWarmupSetup(config.warmupSetup, { verifyWarmup: createWarmupVerifyTrigger(config.trigger) }) : null;
   const placement = createEmailConnectionPlacementOperations();
   const warmup = createEmailWarmupOperations({ ...(warmupSetup ? {issueSetupLink:warmupSetup.issue} : {}) });
   // Reads use the caller's session; only report reads for authorized tests use the server-side key.

@@ -56,7 +56,8 @@ export async function verifyGoogleWarmupIdentity(idToken:string, clientId:string
 /** Only non-secret intent hashes, policy and a verified email cross the DB boundary.
  * OAuth responses and provider failures are never returned, logged, persisted or retried. */
 export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rpc?:Rpc;fetchImpl?:typeof fetch;
-  verifyIdentity?:(token:string, clientId:string, nonce:string)=>Promise<Identity>}={}) {
+  verifyIdentity?:(token:string, clientId:string, nonce:string)=>Promise<Identity>;
+  verifyWarmup?:(senderRef:string, attempt:string)=>Promise<unknown>}={}) {
   const fetchImpl = connectionFetch(dependencies.fetchImpl ?? fetch);
   const base = settings.publicBaseUrl.replace(/\/$/, "");
   const redirectUri = `${base}/warmup/google/callback`;
@@ -157,6 +158,10 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
         await response.body?.cancel().catch(()=>{});
         if (!response.ok) throw new Error();
       } catch { throw pending(); }
+      // Jobs verifies and starts this binding now, so the page can confirm it
+      // and a habitual mailbox's placement test starts. The handoff already
+      // succeeded: a lost trigger only waits for the next scheduled pass.
+      await dependencies.verifyWarmup?.(record.sender_ref, payload.oauth_hash).catch(()=>{});
     },
   };
 }

@@ -8,7 +8,8 @@ const policy = { version: 1, emails_per_day: 22, ramp: "slow", reply_rate: 30,
 const record = { email: "founder@example.test", workspace_ref: "22222222-2222-4222-8222-222222222222",
   sender_ref: "33333333-3333-4333-8333-333333333333", expires_at: "2026-10-01T00:00:00Z",
   state: "claimed", policy, first_name: "Ada", last_name: "Lovelace" };
-function harness(email = record.email, providerFailure = false, tokenOverrides:Record<string,unknown> = {}, recordOverrides:Partial<WarmupSetupRecord> = {}, cleanupFailure = false) {
+function harness(email = record.email, providerFailure = false, tokenOverrides:Record<string,unknown> = {}, recordOverrides:Partial<WarmupSetupRecord> = {}, cleanupFailure = false,
+  verifyWarmup?: (senderRef:string, attempt:string)=>Promise<unknown>) {
   const writes: {operation: string; payload: Record<string, unknown>}[] = [];
   let claimed = false, dispatched = false;
   const rpc = vi.fn(async (operation: string, payload: Record<string, unknown>) => {
@@ -30,7 +31,7 @@ function harness(email = record.email, providerFailure = false, tokenOverrides:R
   const setup = createWarmupSetup({serverKey: "k".repeat(32), publicBaseUrl: "https://api.lifty.test",
     supabaseUrl: "https://db.test", publishableKey: "publishable", googleClientId: "client-id", googleClientSecret: "client-secret",
     mailivery: {apiKey: "mailivery-secret"}}, {rpc, fetchImpl,
-      verifyIdentity: async () => ({email, email_verified: true})});
+      verifyIdentity: async () => ({email, email_verified: true}), ...(verifyWarmup ? {verifyWarmup} : {})});
   return {setup, requests, writes};
 }
 describe("warmup setup OAuth handoff", () => {
@@ -81,6 +82,18 @@ describe("warmup setup OAuth handoff", () => {
     await expect(h.setup.callback(secret, browser, "google-code")).rejects.toThrow();
     expect(h.requests).toHaveLength(2);
     expect(JSON.stringify(h.writes)).not.toMatch(/PRIVATE|google-code/);
+  });
+  it("asks Jobs to verify the binding right after Mailivery accepts; a lost trigger cannot fail the handoff", async () => {
+    const order: string[] = [];
+    const verify = vi.fn(async () => { order.push("verify"); throw new Error("Trigger.dev unavailable"); });
+    const h = harness(record.email, false, {}, {}, false, verify);
+    await expect(h.setup.callback(secret, browser, "code")).resolves.toBeUndefined();
+    expect(verify).toHaveBeenCalledExactlyOnceWith(record.sender_ref, hashSetupSecret(secret));
+    expect(h.requests.at(-1)?.url).toContain("mailivery");
+    const failed = vi.fn(async () => undefined);
+    await expect(harness(record.email, true, {}, {}, false, failed).setup.callback(secret, browser, "code"))
+      .rejects.toMatchObject({code: "WARMUP_HANDOFF_PENDING"});
+    expect(failed).not.toHaveBeenCalled();
   });
   it("does not retry or expose provider errors after an ambiguous dispatch", async () => {
     const h = harness(record.email, true);

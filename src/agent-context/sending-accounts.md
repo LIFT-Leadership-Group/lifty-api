@@ -145,10 +145,13 @@ another email address. If the returned link or status does not support Google
 setup, report the actual blocker and involve support. Do not create another
 account or invent a link.
 
-After the founder finishes, read `warmup_status` again. The state moves from
-waiting for authorization to warming after Lifty's next check. The setup page
-says warmup is starting and usually starts within 20 minutes; that wait is
-normal, not a stuck setup.
+After the founder finishes, Lifty verifies the mailbox and starts warmup right
+away, usually within a few minutes. The setup page says warmup is starting,
+then confirms it. Read `warmup_status` again before saying warmup runs; if it
+still waits for authorization, read it again a minute later. Do not say Lifty
+waits for a scheduled check. For a habitual mailbox the placement test starts
+in the same step: the result usually comes within 20 minutes, on Slack and by
+email according to the founder's notification settings.
 `warmup_start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
 verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
 another Lifty workspace already warms the same mailbox. It fails with

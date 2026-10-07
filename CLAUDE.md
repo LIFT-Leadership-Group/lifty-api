@@ -178,3 +178,15 @@ the Functions migrations `20261009090000_campaign_cadence_runtime.sql` and
 `20261009100000_campaign_setup_limits.sql` (one batch), then this API
 revision. The database stays the final gate, so an earlier API
 only accepts drafts the validator still refuses.
+
+## Warmup setup verification
+
+Once Mailivery accepts a founder's Google warmup handoff, the callback
+triggers the Jobs task `lifty-email-warmup-verify` (one run per OAuth attempt),
+which starts that binding and its habitual placement test right away instead
+of at the next scheduled passes. A failed trigger never fails the handoff; the
+scheduled reconcile still covers it. The Functions migration
+`20261008220000_warmup_receipt_started_placement.sql` makes the receipt count a
+just-started binding as connected and adds the optional `placement` (`when`,
+`notify`) the page promises. Without it the receipt still waits for the first
+scheduled readback, so ship Jobs and that migration before this revision.
