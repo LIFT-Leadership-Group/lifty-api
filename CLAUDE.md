@@ -207,3 +207,13 @@ scheduled reconcile still covers it. The Functions migration
 just-started binding as connected and adds the optional `placement` (`when`,
 `notify`) the page promises. Without it the receipt still waits for the first
 scheduled readback, so ship Jobs and that migration before this revision.
+
+## Campaign test failure reasons
+
+LIF-1292: a failed campaign test sample carries `failure` (the composer's
+`lifty_preparation_failure_v1` code, optional stage, step `position`, error
+class `cause` and AgentAPI `http_status`), and the API adds a founder-facing
+`message` (`src/campaign-test-failure.ts`). The field is optional, so ship this
+API revision first: the Functions migration that stores and returns failures
+comes next, then the Jobs runner that reports the real code. An older API
+rejects a response that carries the new field.

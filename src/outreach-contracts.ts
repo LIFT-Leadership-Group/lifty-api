@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { WorkspaceIdentitySchema } from "./business-contracts.js";
 import { WritingRecommendationsSchema } from "./writing-rules.js";
+import { TEST_FAILURE_CODES, TEST_FAILURE_STAGES } from "./campaign-test-failure.js";
 
 const Ref = z.uuid();
 const Version = z.number().int().positive();
@@ -283,9 +284,16 @@ const TestOutput = z.object({ output_ref: Ref, digest: Digest, created_at: Times
     sender_id: Ref, sender_version: Version, prompt_digest: Digest }).strict(),
 }).strict();
 export const TestChangeSchema = z.enum(["research_changed", "lead_facts_changed", "sender_changed", "business_changed", "composition_context_changed"]);
+// A failed sample names its coded cause; the API adds the founder-facing message.
+const TestFailure = z.object({ code: z.enum(TEST_FAILURE_CODES), stage: z.enum(TEST_FAILURE_STAGES).optional(),
+  position: z.number().int().min(1).max(5).optional().describe("The Campaign step involved, when known."),
+  cause: z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,63}$/).optional(), http_status: z.number().int().min(100).max(599).optional(),
+  message: z.string().min(1).max(400).optional().describe("Founder-facing reason to relay; the API adds it."),
+}).strict();
 export const CampaignTestSchema = TestSummary.extend({ samples: z.array(z.object({ lead_ref: Ref, lab_run_ref: Ref,
   status: z.enum(["queued", "running", "succeeded", "failed", "canceled"]), lane: z.string().nullable(), opener: z.enum(["cold", "linkedin_bridge"]).nullable(),
   output: TestOutput.nullable(), baseline_output: TestOutput.nullable(), changes: z.array(TestChangeSchema),
+  failure: TestFailure.nullable().optional(),
 }).strict()).min(1).max(20) }).strict();
 export const CampaignTestResultSchema = z.object({ ...Workspace, test: CampaignTestSchema }).strict();
 export const CampaignTestsSchema = z.object({ ...Workspace, tests: z.array(TestSummary).max(100), next_cursor: Ref.nullable() }).strict();
