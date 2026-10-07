@@ -377,25 +377,32 @@ export async function listSlackNotificationChannels(
     { method: "POST" },
   );
   if (error) {
-    // The function reports a missing or stale Slack grant as 409. That is a
-    // setup step for the founder, not a transient failure to retry.
     // Read the response structurally: the client's Response may come from a
     // different fetch implementation, so instanceof is not reliable here.
     const response = (error as { context?: { status?: unknown; json?: () => Promise<unknown> } }).context;
-    if (response?.status === 409) {
-      let reason: unknown;
-      try { reason = typeof response.json === "function" ? ((await response.json()) as { error?: unknown } | null)?.error : undefined; } catch { reason = undefined; }
-      if (reason === "slack_reconnect_required") {
-        throw new PublicError({ status: 409, code: "SLACK_RECONNECT_REQUIRED", message: "Reconnect Slack before choosing a notification channel.", cause: error });
-      }
-      // Every 409 from this function is a Slack setup state, never a transient failure.
+    let reason: unknown;
+    try { reason = typeof response?.json === "function" ? ((await response.json()) as { error?: unknown } | null)?.error : undefined; } catch { reason = undefined; }
+    // Only the reasons the function names are founder setup steps. The
+    // workspace ones are the database's own resolution, mapped like any RPC.
+    if (reason === "slack_not_connected") {
       throw new PublicError({ status: 409, code: "SLACK_NOT_CONNECTED", message: "Slack is not connected to this workspace. Connect Slack first.", cause: error });
     }
+    if (reason === "slack_reconnect_required") {
+      throw new PublicError({ status: 409, code: "SLACK_RECONNECT_REQUIRED", message: "Reconnect Slack before choosing a notification channel.", cause: error });
+    }
+    if (reason === "workspace_selection_required") throw mapRpcError({ code: "PT409", message: "lifty_workspace_ambiguous" });
+    if (reason === "workspace_forbidden") throw mapRpcError({ code: "PT403", message: "lifty_workspace_forbidden" });
+    if (reason === "workspace_missing") throw mapRpcError({ code: "PT409", message: "lifty_workspace_missing" });
+    // Anything else is ours, whatever its status: never a reason to reconnect Slack.
+    const upstreamCode = typeof reason === "string" && /^[a-z0-9_]{1,80}$/.test(reason)
+      ? reason
+      : typeof response?.status === "number" ? `http_${response.status}` : undefined;
     throw new PublicError({
       status: 502,
       code: "SLACK_CHANNELS_UNAVAILABLE",
       message: "LIFTY could not load Slack channels. Try again in a moment.",
       cause: error,
+      diagnostics: { upstream_operation: "lifty-slack-channels", ...(upstreamCode ? { upstream_code: upstreamCode } : {}), upstream_kind: "edge_function" },
     });
   }
   const parsed = SlackNotificationChannelsSchema.safeParse(data);

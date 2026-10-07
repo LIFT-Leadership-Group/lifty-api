@@ -124,9 +124,25 @@ describe("notification configuration operations", () => {
     await expect(read(409, { error: "slack_not_connected" })).rejects.toMatchObject({ status: 409, code: "SLACK_NOT_CONNECTED" });
     await expect(read(409, { error: "slack_reconnect_required" })).rejects.toMatchObject({ status: 409, code: "SLACK_RECONNECT_REQUIRED" });
     await expect(read(500, { error: "channel_list_unavailable" })).rejects.toMatchObject({ status: 502, code: "SLACK_CHANNELS_UNAVAILABLE" });
-    // A Response-like object from another fetch implementation, with an unreadable body.
-    const foreign = { functions: { invoke: async () => ({ data: null, error: Object.assign(new Error("non-2xx"), { context: { status: 409, json: async () => { throw new Error("consumed"); } } }) }) } };
-    await expect(listSlackNotificationChannels({ userId: "founder-123", client: foreign })).rejects.toMatchObject({ status: 409, code: "SLACK_NOT_CONNECTED" });
+    // A Response-like object from another fetch implementation is read structurally.
+    const foreign = (json: () => Promise<unknown>) => ({ functions: { invoke: async () => ({ data: null, error: Object.assign(new Error("non-2xx"), { context: { status: 409, json } }) }) } });
+    await expect(listSlackNotificationChannels({ userId: "founder-123", client: foreign(async () => ({ error: "slack_not_connected" })) })).rejects.toMatchObject({ status: 409, code: "SLACK_NOT_CONNECTED" });
+  });
+
+  it("does not report a workspace or Lifty failure as a disconnected Slack", async () => {
+    const failing = (status: number, body: unknown) => ({ functions: { invoke: async () => ({ data: null,
+      error: Object.assign(new Error("Edge Function returned a non-2xx status code"), { context: new Response(JSON.stringify(body), { status }) }) }) } });
+    const read = (status: number, body: unknown) => listSlackNotificationChannels({ userId: "founder-123", client: failing(status, body) });
+    await expect(read(409, { error: "workspace_selection_required" })).rejects.toMatchObject({ status: 409, code: "WORKSPACE_SELECTION_REQUIRED" });
+    await expect(read(403, { error: "workspace_forbidden" })).rejects.toMatchObject({ status: 403, code: "WORKSPACE_FORBIDDEN" });
+    // The function's earlier reasons for a failed config read or credential lookup.
+    await expect(read(409, { error: "notification_config_unavailable" })).rejects.toMatchObject({ status: 502, code: "SLACK_CHANNELS_UNAVAILABLE",
+      diagnostics: { upstream_operation: "lifty-slack-channels", upstream_code: "notification_config_unavailable" } });
+    await expect(read(502, { error: "slack_credential_unavailable" })).rejects.toMatchObject({ status: 502, code: "SLACK_CHANNELS_UNAVAILABLE",
+      diagnostics: { upstream_code: "slack_credential_unavailable" } });
+    // An unreadable body proves nothing about Slack.
+    const unreadable = { functions: { invoke: async () => ({ data: null, error: Object.assign(new Error("non-2xx"), { context: { status: 409, json: async () => { throw new Error("consumed"); } } }) }) } };
+    await expect(listSlackNotificationChannels({ userId: "founder-123", client: unreadable })).rejects.toMatchObject({ status: 502, code: "SLACK_CHANNELS_UNAVAILABLE" });
   });
 
   it("maps every write to the audited notification RPC contract", async () => {

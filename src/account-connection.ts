@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { connectionFetch, type ConfirmationResult } from "./connection-confirmation.js";
+import { connectionFetch, type ConfirmationAttention, type ConfirmationResult } from "./connection-confirmation.js";
 import { openConnectAttempt, sealConnectAttempt, type ConnectChannel } from "./connect-state.js";
 import { createAccountProvider, IdentityMismatch, ProviderTransport, type AccountProviderSettings, type ExpectedIdentity } from "./account-provider.js";
 import { HostedReturnError } from "./hosted-return-error.js";
@@ -40,6 +40,10 @@ const Snapshot = z.object({
 }).strip();
 type Snapshot = z.infer<typeof Snapshot>;
 const RevocationContext = z.object({ revocable: z.boolean(), transport: ProviderTransport.nullable() }).strip();
+const Conflict = z.discriminatedUnion("conflict", [
+  z.object({ conflict: z.enum(["none", "live_here", "live_elsewhere", "released", "kept"]) }).strip(),
+  z.object({ conflict: z.literal("retained"), account_id: Uuid }).strip(),
+]);
 export type ConnectOutcome =
   | { kind: "declare"; senderName: string }
   | { kind: "redirect"; url: string }
@@ -79,14 +83,14 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     return value;
   };
 
-  async function rpc(channel: ConnectChannel, operation: string, payload: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
+  async function call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
     const timeout = AbortSignal.timeout(15_000);
     let response: Response;
     try {
-      response = await fetchImpl(`${settings.supabaseUrl}/rest/v1/rpc/lifty_sending_account_provider`, {
+      response = await fetchImpl(`${settings.supabaseUrl}/rest/v1/rpc/${name}`, {
         method: "POST", redirect: "error", signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
         headers: { apikey: settings.publishableKey, "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ p_server_key: key(channel), p_operation: operation, p_payload: payload }),
+        body: JSON.stringify(args),
       });
     } catch { throw rpcError(null); }
     let body: unknown;
@@ -94,6 +98,8 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     if (!response.ok) throw rpcError(body);
     return body;
   }
+  const rpc = (channel: ConnectChannel, operation: string, payload: Record<string, unknown>, signal?: AbortSignal) =>
+    call("lifty_sending_account_provider", { p_server_key: key(channel), p_operation: operation, p_payload: payload }, signal);
   const snapshot = async (channel: ConnectChannel, operation: string, payload: Record<string, unknown>) => {
     const parsed = Snapshot.safeParse(await rpc(channel, operation, payload));
     if (!parsed.success || parsed.data.attempt.channel !== channel) throw rpcError(null);
@@ -155,6 +161,38 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     if (!verified) return current;
     return snapshot(channel, "complete", { attempt_id: attempt.id, verified });
   }
+  // Remove Lifty's access to one disconnected account; true only with provider evidence.
+  async function release(account: Pick<Account, "id" | "channel">, signal: AbortSignal): Promise<boolean> {
+    try {
+      const context = RevocationContext.parse(await rpc(account.channel, "revocation_context", { account_id: account.id }, signal));
+      const providerAccountId = context.transport?.account_id;
+      if (!context.revocable || !context.transport || !providerAccountId) return false;
+      const evidence = await provider.revoke({ transport: context.transport, providerAccountId, signal });
+      await rpc(account.channel, "revocation_confirmed", { account_id: account.id, provider_account_id: providerAccountId, evidence }, signal);
+      return true;
+    } catch { return false; }
+  }
+  // Why the provider refused the sign-in. Unipile names the existing account
+  // only for api/already_exists; a retained account Lifty no longer uses is
+  // removed now so the same attempt can be retried. Any failure here only
+  // makes the explanation less specific.
+  async function explain(channel: ConnectChannel, attemptId: string, hint: HostedReturnError, accountRef?: string): Promise<ConfirmationAttention> {
+    if (hint === "authorization_cancelled") return "canceled";
+    if (hint !== "account_exists") return "provider";
+    if (!accountRef) return "exists";
+    let conflict: z.infer<typeof Conflict>;
+    try {
+      conflict = Conflict.parse(await call("lifty_sending_account_conflict",
+        { p_server_key: key(channel), p_attempt_id: attemptId, p_account_id: accountRef }));
+    } catch { return "exists"; }
+    switch (conflict.conflict) {
+      case "live_here": return "already_connected";
+      case "live_elsewhere": return "in_use";
+      case "released": return "released";
+      case "retained": return await release({ id: conflict.account_id, channel }, AbortSignal.timeout(6_000)) ? "released" : "exists";
+      default: return "exists";
+    }
+  }
   function result(current: Snapshot): ConfirmationResult {
     const { attempt } = current;
     if (attempt.internal_state === "completed" || attempt.state === "connected") return { status: "connected", account: null };
@@ -178,7 +216,7 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
       return handoff(channel, intent, await snapshot(channel, "declare", { attempt_id: id, declaration }));
     },
     /** Confirmation shell status: the same evidence as the attempt read. */
-    async confirm(channel: ConnectChannel, intent: string, returnError: HostedReturnError | null): Promise<ConfirmationResult> {
+    async confirm(channel: ConnectChannel, intent: string, returnError: HostedReturnError | null, accountRef?: string): Promise<ConfirmationResult> {
       const id = open(channel, intent);
       let current = await snapshot(channel, "context", { attempt_id: id });
       // A provider-reported error explains a missing authorization; it never
@@ -189,7 +227,8 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
         }
         // Browser hints are not terminal evidence. Keep polling so a delayed
         // authorization can still establish the authoritative outcome.
-        return result(current);
+        const pending = result(current);
+        return pending.status === "pending" ? { status: "pending", attention: await explain(channel, id, returnError, accountRef) } : pending;
       }
       current = await reconcile(channel, current);
       return result(current);
@@ -205,13 +244,7 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     async revoke(accounts: Account[], signal: AbortSignal): Promise<void> {
       for (const account of accounts) {
         if (signal.aborted) return;
-        try {
-          const context = RevocationContext.parse(await rpc(account.channel, "revocation_context", { account_id: account.id }, signal));
-          const providerAccountId = context.transport?.account_id;
-          if (!context.revocable || !context.transport || !providerAccountId) continue;
-          const evidence = await provider.revoke({ transport: context.transport, providerAccountId, signal });
-          await rpc(account.channel, "revocation_confirmed", { account_id: account.id, provider_account_id: providerAccountId, evidence }, signal);
-        } catch { /* unconfirmed; continue with the remaining budget */ }
+        await release(account, signal); // unconfirmed releases continue with the remaining budget
       }
     },
   };

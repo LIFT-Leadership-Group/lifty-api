@@ -117,6 +117,16 @@ LIF-1139 requires the Functions migration
 HubSpot/Slack fail closed before exchanging a code if its claim RPC is unavailable.
 Mailivery retains ephemeral tokens and its existing single-dispatch fence.
 
+A pending result may carry `attention`: why the provider refused a sending
+account sign-in (with "Try again" on the same attempt) or that a warmup
+handoff is starting. When Unipile names the existing account
+(`api/already_exists`), `lifty_sending_account_conflict` says what it is to
+Lifty; a retained account Lifty no longer uses is removed through the
+revocation path before the retry. The Functions migration
+`20261008210000_connect_provider_account_release.sql` adds that read and the
+warmup `starting` receipt. This API works before it ships (the explanation
+stays generic), so the order is free.
+
 ## Sample review confirmation
 
 LIF-1303 records the founder's confirmation of the calibration sample
