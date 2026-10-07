@@ -120,6 +120,24 @@ it('submits a code once, survives a lost response, displays late success, and re
   const reload=browser(page.location.href,fetchImpl);const again=reload.run();await vi.runAllTimersAsync();await again;
   expect(requests.filter(r=>r.stage==='process')).toHaveLength(1);
 });
+it.each([
+  [{when:'now',notify:['email','slack']},'You will get the result on Slack and by email, usually within 20 minutes.'],
+  [{when:'now',notify:[]},'The result is usually ready in Lifty within 20 minutes.'],
+  [{when:'after_warmup',notify:['email']},'When warmup ends, Lifty sends one test email from this mailbox to about 20 to 40 test inboxes and sends you the result by email.'],
+])('warmup confirmation promises the placement test from the receipt (%j)',async(placement,promise)=>{
+  vi.useFakeTimers();
+  const receipt={status:'connected',account:'founder@example.test',placement};
+  // The shared schema keeps the field the page needs.
+  const router=createConfirmationRouter('warmup',{validate:()=>{},status:async()=>receipt as never});
+  const check=await router.request(`https://api.lifty.test${CONNECTION_FLOWS.warmup.path}/status`,{method:'POST',headers,body:JSON.stringify({state:'capability'})});
+  expect(await check.json()).toEqual(receipt);
+  const page=browser('https://api.lifty.test/warmup/google/callback?state=capability',vi.fn(async()=>Response.json(receipt)) as typeof fetch);
+  page.elements.confirmation!.dataset.warmup='true';
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-title']!.textContent).toBe('Warmup is running');
+  expect(page.elements['confirmation-detail']!.textContent).toContain('Lifty verified founder@example.test.');
+  expect(page.elements['confirmation-detail']!.textContent).toContain(promise);
+});
 it('a failed status transport never navigates away or spins forever',async()=>{
   vi.useFakeTimers();
   const fetchImpl=vi.fn(async()=>new Response('Bad gateway',{status:502})) as typeof fetch;
