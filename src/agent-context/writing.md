@@ -39,7 +39,8 @@ it, how the founder's offer relates, and what each message asks the recipient to
 do. Separate observed facts from your interpretation. If the evidence supports
 several angles, recommend one and explain the tradeoff. Use the founder's
 direction when they have already chosen. Show the draft and incorporate their
-feedback before saving it with campaigns `post` or `draft_patch`.
+feedback before saving it with `lifty post campaigns` or
+`lifty patch campaigns draft`.
 
 ## Name the author
 
@@ -341,11 +342,11 @@ placeholders. This review is writing guidance, not a claim that the
 draft is proven to perform. Preserve the founder's chosen wording while
 flagging unsupported claims or contract conflicts.
 
-After discussing the draft, save it with campaigns `post` or `draft_patch`.
-Preview real leads with `tests_post` and read them with `test_detail`,
-including senders, audience, composition, timing and blockers. Ask for
-approval of that exact revision before `publish`, and for authorization
-before `activate`. Saving, connecting an account or liking
+After saving, preview real leads with `lifty post campaigns tests_post` and
+read them with `lifty get campaigns test_detail` (senders, audience, timing,
+blockers). Get approval of that exact revision before
+`lifty post campaigns publish`, and authorization before
+`lifty post campaigns activate`. Saving, connecting an account or liking
 an angle never authorizes sending. Lifty handles scheduling and execution after
 activation; the local agent does not need to stay open. Material edits require
 a new preview and confirmation under the current campaign policy.
