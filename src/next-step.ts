@@ -537,13 +537,16 @@ export async function getNextStep(
     );
   const outreach = { campaigns: campaigns.campaigns.map(value => ({ campaign_ref: value.campaign_ref, journey_ref: value.journey_ref, version: value.version, state: value.state, channel: value.channel })) };
   const linkedinActive = campaigns.campaigns.some(value => value.channel === "linkedin" && value.state === "active");
+  // How a preview is shown before the approval question, wherever it runs.
+  const previewSteps = `While ${tool("campaigns", "tests_post")} runs, tell the founder it takes a few minutes and report progress from ${tool("campaigns", "test_detail")} as "3 of 5 ready", never how you check. Show every step for at least one lead, explain differences from each sample's changes instead of guessing, and flag research that leaves a lead's company or fit unverified. Describe sending as ${tool("campaigns", "review_settings_get")} says: with approve_each, every message waits for the founder's approval. If an operation refuses the founder's choice, say so before saving; never call it changeable later.`;
   const campaignsSaved = () => response(
     "campaigns_saved",
     [
-      "Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Paused intent and account/readiness/incident holds remain independent.",
+      "Read campaigns_get and journeys_get for the exact saved drafts, approvals, selected revisions, executable version and intent. Publish only the chosen exact revision; activate separately with explicit founder authorization. Before asking, say who starts: the Journey's audience (in qualified mode every eligible qualified lead not yet contacted, now and later), never only the tested leads. Paused intent and account/readiness/incident holds remain independent.",
+      previewSteps,
       "When a LinkedIn campaign is active, call next_step.",
     ],
-    [tool("campaigns", "get"), tool("journeys", "get"), tool("summary", "context")],
+    [tool("campaigns", "get"), tool("journeys", "get"), tool("campaigns", "tests_post"), tool("campaigns", "test_detail"), tool("campaigns", "review_settings_get"), tool("summary", "context")],
     outreach,
   );
   const connectedAll = linkedin.filter(account => account.status === "connected");
@@ -557,10 +560,12 @@ export async function getNextStep(
         `${connectedAll.length === 1 ? `${connected.sender}'s LinkedIn is connected` : `LinkedIn is connected for ${names(connectedAll)}`}. Read ${tool("notifications", "get")}; unless Slack is already connected, ask once where alerts should go: Slack or email. Email needs no setup. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`,
         `Read ${tool("commercial-voice", "get")}. If tone and rules are empty, ask how the founder writes before the first draft and save it with ${tool("commercial-voice", "patch")}; voice is shared by every channel and campaign.`,
         `Build the LinkedIn templates: read ${tool("journeys", "get")}, create the Journey for qualified (Tier A and B) leads with ${tool("journeys", "post")} and its LinkedIn Campaign with ${tool("campaigns", "post")}, permitting ${connectedAll.length === 1 ? connected.sender : `the senders the founder chooses: read ${tool("senders", "get")} for each sender's accounts and ask which of them this campaign sends from`}. Preview real leads with ${tool("campaigns", "tests_post")} before asking for approval.`,
+        previewSteps,
         "Saving, publishing or a connected account never activates outreach. When a campaign is saved, call next_step.",
       ],
       [tool("notifications", "get"), tool("notifications", "post"), tool("commercial-voice", "get"), tool("commercial-voice", "patch"), tool("senders", "get"),
-        tool("journeys", "get"), tool("journeys", "post"), tool("campaigns", "post"), tool("campaigns", "tests_post"), tool("summary", "context")],
+        tool("journeys", "get"), tool("journeys", "post"), tool("campaigns", "post"), tool("campaigns", "tests_post"), tool("campaigns", "test_detail"),
+        tool("campaigns", "review_settings_get"), tool("summary", "context")],
       { account: connected },
     );
   }
