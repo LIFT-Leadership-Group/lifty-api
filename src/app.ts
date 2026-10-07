@@ -201,6 +201,7 @@ export interface LogEvent {
   error_code: string;
   status: number;
   stage?: string;
+  attempts?: number;
   elapsed_ms?: number;
   upstream_operation?: string;
   upstream_code?: string;
@@ -648,6 +649,41 @@ function resolveProvider(
     };
   }
   return { ok: true, provider: parsed.data };
+}
+
+// LIF-1119: one lost enqueue used to leave a detached grant pending until an
+// operator noticed. Retry a few times inside the disconnect request, each
+// attempt bounded. The revocation row is the idempotency key, so an attempt
+// Trigger accepted but whose response was lost dedupes on the next one.
+const REVOCATION_ENQUEUE_RETRY_DELAYS_MS = [250, 1_000];
+const REVOCATION_ENQUEUE_ATTEMPT_TIMEOUT_MS = 3_000;
+
+async function enqueueRevocationWithRetry(
+  enqueue: EnqueueIntegrationRevocation,
+  revocationRef: string,
+): Promise<{ ok: true } | { ok: false; error: unknown; attempts: number }> {
+  let lastError: unknown;
+  const attempts = REVOCATION_ENQUEUE_RETRY_DELAYS_MS.length + 1;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, REVOCATION_ENQUEUE_RETRY_DELAYS_MS[attempt - 1]));
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        enqueue(revocationRef),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("revocation enqueue timed out")), REVOCATION_ENQUEUE_ATTEMPT_TIMEOUT_MS);
+        }),
+      ]);
+      return { ok: true };
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return { ok: false, error: lastError, attempts };
 }
 
 function providerUnavailable(context: Context<AppEnvironment>, provider: Provider): Response {
@@ -1484,19 +1520,23 @@ export function createApp(
     // LIF-681: the RPC detached the grant under a revocation row; ask the
     // provider to revoke it too, best effort. LIFT already cannot use the
     // grant, so a lost enqueue degrades to "not revoked at HubSpot", never to
-    // a failed disconnect.
+    // a failed disconnect. LIF-1119: the row stays pending and the overdue
+    // revocation alert reports it if every attempt fails.
     if (result.revocation_ref) {
-      try {
-        await dependencies.enqueueIntegrationRevocation(result.revocation_ref);
-      } catch (error) {
+      const enqueued = await enqueueRevocationWithRetry(
+        dependencies.enqueueIntegrationRevocation,
+        result.revocation_ref,
+      );
+      if (!enqueued.ok) {
         dependencies.log({
           level: "error",
           event: "revocation_enqueue_failed",
           request_id: context.get("requestId"),
           method: context.req.method,
           path: context.req.path,
-          error_code: error instanceof PublicError ? error.code : "REVOCATION_ENQUEUE_FAILED",
-          status: error instanceof PublicError ? error.status : 502,
+          error_code: enqueued.error instanceof PublicError ? enqueued.error.code : "REVOCATION_ENQUEUE_FAILED",
+          status: enqueued.error instanceof PublicError ? enqueued.error.status : 502,
+          attempts: enqueued.attempts,
         });
       }
     }
