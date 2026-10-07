@@ -101,18 +101,20 @@ After the email account is connected, call `warmup_status` and use its
 `mailbox_use` and `recommended_go_live` to explain what happens next. Do not
 compute dates yourself.
 
-- `personal` (a mailbox the person already uses, declared habitual): initial
-  warmup is optional. Placement follows connection without a warmup wait;
-  measured warmup spam can still hold sending. Explain the tradeoff in plain
-  words: a warmup service gets access to the mailbox, and warmup emails and
-  their replies pass through the inbox. In return it builds sending reputation.
-  Start warmup only if the founder says yes.
-- `outreach` (a dedicated sending mailbox): warmup is required. The mailbox
-  needs a healthy check after 21 active warmup days, followed by placement,
-  before it can send. Lifty starts that placement test by itself when warmup
-  finishes. Paused days and days with a problem don't count, so the date moves later if either
-  happens. Give the returned date and suggest what to prepare meanwhile:
-  targeting, copy and schedule.
+- `personal` (a mailbox the person already uses, declared habitual): no
+  initial warmup period is required. Recommend warmup anyway: it runs
+  alongside outreach and protects inbox placement and reply rates. The
+  placement test needs the warmup setup; Lifty runs it once setup is done.
+  Tradeoff: a warmup service gets access to the mailbox, and warmup emails and
+  replies pass through the inbox. If the founder declines, do not start
+  warmup; say Lifty cannot test the mailbox without it.
+- `outreach` (a dedicated sending mailbox): warmup is required; call
+  `warmup_start` right away. The mailbox needs a healthy check after 21 active
+  warmup days, followed by placement, before it can send. Lifty starts that
+  placement test by itself when warmup finishes. Paused days and days with a
+  problem don't count, so the date moves later if either happens. Give the
+  returned date and suggest what to prepare meanwhile: targeting, copy and
+  schedule.
 
 Once the initial period is complete (`initial_period_complete: true`), warmup
 keeps running while campaigns send. Warmup holds the mailbox again only if
@@ -129,9 +131,10 @@ Warmup never pauses or resumes campaigns.
 mailbox". The page shows the mailbox, the sender name warmup emails will use
 (from the sender's profile) and one "Continue with Google" button. Lifty sets
 the warmup schedule and volume; the founder fills in nothing. The page also
-says that when warmup ends, Lifty sends one test email from the mailbox to
-about 20-40 test inboxes to measure deliverability, and that continuing
-accepts warmup and this test. Say so before sharing the link. Google must
+says when Lifty sends one test email from the mailbox to about 20-40 test
+inboxes (right after setup for a habitual mailbox, after warmup for a
+dedicated one), and that continuing accepts warmup and this test. Say so
+before sharing the link. Google must
 verify that exact address before Lifty shares access with the warmup service,
 once, without storing or logging the tokens. The setup flow does not create
 another email address. If the returned link or status does not support Google
@@ -167,15 +170,17 @@ so and get an explicit yes first. Report each mailbox separately.
 
 ## Placement tests
 
-A placement test shows where a mailbox's email lands: inbox, spam or missing,
-across Gmail, Microsoft (Outlook) and other providers. It runs through
-Mailivery and only for a mailbox Mailivery is already warming. Read
+A placement test shows where a mailbox's email lands (inbox, spam or missing)
+at Gmail, Microsoft and other providers. It needs the mailbox's warmup setup.
+Read
 `placement_status` with the explicit `workspace` and, when the workspace has
 more than one warmed mailbox, its `connection_ref`.
 
-When warmup finishes, Lifty queues one test by itself (`test.automatic:
-true`). Accepting warmup covered it, so do not ask for consent again or call
-`placement_start` for it. It uses a fixed short business email signed with the
+Lifty queues one test by itself (`test.automatic: true`) once warmup runs on
+a habitual mailbox, or when warmup finishes on a dedicated one. Accepting
+warmup covered it, so do not ask for consent again or call `placement_start`
+for it. The result goes to Slack when connected and by email to each member's
+Lifty login address. It uses a fixed short business email signed with the
 sender's signature, never campaign content. Repeated checks never start a
 second automatic test. If it could not start and nothing was sent or billed
 (for example, no test credits), Lifty tries again within a day.

@@ -182,8 +182,13 @@ async function emailPosition(deps: Reads, session: AuthSession, workspace: strin
       await deps.researchOperation(session, "research-schedule.get", { query: {}, body: undefined }))),
   ]);
   const positions = checked.map(({ mailbox, warmup, placement }) => {
-    const passing = !!placement?.passing_until && Date.parse(placement.passing_until) > now;
     const test = placement?.test?.state ?? null;
+    // A client mailbox needs a pass inside its validity window. A founder
+    // workspace has no passing_until (placement is advisory there), so its
+    // latest completed test decides (LIF-1223).
+    const passing = placement?.gates_sending === false
+      ? !!placement.last_passed_at && test !== "failed"
+      : !!placement?.passing_until && Date.parse(placement.passing_until) > now;
     let kind: EmailKind = "connected";
     let cause: "reconnect" | "spam" | "problem" | "placement" | null = null;
     if (mailbox.status === "needs_reconnect") [kind, cause] = ["held", "reconnect"];
@@ -607,7 +612,10 @@ export async function getNextStep(
           tool("campaigns", "tests_post"), tool("senders", "get"), tool("research-schedule", "get"), tool("summary", "context")],
         email.receipt,
       );
-    const alerts = linkedin.length ? [] : [`Ask once where alerts should go, unless Slack is already connected (${tool("notifications", "get")}) or the founder already answered in this conversation: Slack or email. Email needs no setup. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`];
+    // LIF-1223: the placement result reaches the founder in Slack, or by email
+    // at each member's login address, so Slack is offered once more here.
+    const alerts = [`Unless Slack is already connected (${tool("notifications", "get")}) or the founder declined it in this conversation, offer to connect it now so the test result reaches them there; without Slack it arrives by email at their Lifty login address. Slack: ${tool("notifications", "post")}, show its link, verify that attempt, then choose a channel. Declining never blocks.`];
+    const notice = "Tell the founder Lifty will notify them with the placement test result when it finishes. Do not request a placement test yourself for this first one.";
     const weekly = `Ask roughly how many leads they want to reach each week, unless already answered, and save it as the weekly target with ${tool("research-schedule", "patch")} (up to the plan's limit; ${tool("research-schedule", "get")} shows it).`;
     const close = "Close Part 3: tell the founder when Lifty will follow up, using recommended_go_live from warmup_status. Never compute dates yourself. Connecting or warming a mailbox never starts email outreach.";
     if (email.kind === "preparing")
@@ -615,6 +623,7 @@ export async function getNextStep(
         "email_preparing",
         [
           `${name} is being prepared. Report where it stands from ${tool("sending-accounts", "warmup_status")} (state, active days and recommended_go_live) and ${tool("sending-accounts", "placement_status")} for a test in progress.`,
+          notice,
           ...alerts,
           weekly,
           "Meanwhile, offer to prepare the email campaign copy (summary_context task campaigns); it stays unapproved and inactive.",
@@ -628,14 +637,16 @@ export async function getNextStep(
       "email_connected",
       [
         ...(email.unknown ? [`${name}'s warmup or placement status could not be read: read both before offering anything, because preparation may already be running.`] : []),
-        `${name} is connected. Read ${tool("sending-accounts", "warmup_status")} with connection_ref ${mailbox.id} and explain the path from mailbox_use and recommended_go_live: a dedicated sending mailbox warms up first; for a mailbox they already use, warmup is optional and the placement test verifies it. If its checks show an SPF, DMARC or MX record not_valid, say which one to publish first. Start warmup only after the founder agrees, then show the setup link it returns.`,
-        `Request a placement test only when ${tool("sending-accounts", "placement_status")} says can_request, with the founder's explicit consent, using the first email of the real sequence.`,
+        `${name} is connected. Read ${tool("sending-accounts", "warmup_status")} with connection_ref ${mailbox.id} and use its mailbox_use. If its checks show an SPF, DMARC or MX record not_valid, say which one to publish first. The setup link asks for the same Google account again and covers both warmup and the placement test, so ask for no other consent.`,
+        `A dedicated sending mailbox (outreach) needs warmup: call ${tool("sending-accounts", "warmup_start")} right away and show the returned setup link. It needs 21 active warmup days, then Lifty runs one placement test by itself; give the date from recommended_go_live.`,
+        `A mailbox they already use (personal): recommend warmup, because it keeps running alongside outreach and protects inbox placement and reply rates. Lifty tests where the mailbox's email lands as soon as its warmup setup is done. Call ${tool("sending-accounts", "warmup_start")} and show the returned setup link. If the founder declines warmup, do not start it, and say Lifty cannot test the mailbox without that setup.`,
+        notice,
         ...alerts,
         weekly,
         close,
       ],
       [tool("sending-accounts", "warmup_status"), tool("sending-accounts", "warmup_start"), tool("sending-accounts", "placement_status"),
-        tool("sending-accounts", "placement_start"), tool("notifications", "get"), tool("notifications", "post"),
+        tool("notifications", "get"), tool("notifications", "post"),
         tool("research-schedule", "get"), tool("research-schedule", "patch"), tool("summary", "context")],
       email.receipt,
     );

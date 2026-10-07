@@ -274,7 +274,8 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
   // body limit, business validation, jobs and receipt projection run unchanged.
   function forward(context: Context<AppEnvironment>, method: string, route: string, body?: unknown) {
     const headers = new Headers();
-    for (const name of ["authorization", "x-lifty-client-contract", "x-request-id"]) {
+    // x-lifty-workspace keeps a multi-workspace member's selection (LIF-1223).
+    for (const name of ["authorization", "x-lifty-client-contract", "x-request-id", "x-lifty-workspace"]) {
       const value = context.req.header(name);
       if (value) headers.set(name, value);
     }

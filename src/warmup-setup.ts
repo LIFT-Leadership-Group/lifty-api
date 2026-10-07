@@ -21,7 +21,10 @@ export const DEFAULT_WARMUP_POLICY: WarmupPolicy = {version:1, emails_per_day:22
 const name = z.string().trim().max(80).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
 const SetupRecord = z.object({email:z.email().max(254), workspace_ref:z.uuid(), sender_ref:z.uuid(),
   expires_at:z.iso.datetime({offset:true}), state:z.enum(["draft", "authorizing", "claimed", "dispatched"]),
-  policy:WarmupPolicy.nullable(), first_name:name, last_name:name});
+  policy:WarmupPolicy.nullable(), first_name:name, last_name:name,
+  // LIF-1223: a habitual (`personal`) mailbox is tested as soon as warmup runs.
+  // Absent before the Functions migration; the page then shows the dedicated text.
+  mailbox_use:z.enum(["personal", "outreach"]).nullable().optional()});
 export type WarmupSetupRecord = z.infer<typeof SetupRecord>;
 export interface WarmupSetupSettings {
   serverKey:string; publicBaseUrl:string; supabaseUrl:string; publishableKey:string;

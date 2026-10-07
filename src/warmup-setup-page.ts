@@ -17,7 +17,9 @@ export function renderWarmupSetupPage(record:WarmupSetupRecord, intent:string, c
 <div class="mailbox"><strong>${escape(record.email)}</strong></div>
 <form method="post" action="setup" data-pending="Opening Google…"><input type="hidden" name="intent" value="${escape(intent)}"><input type="hidden" name="csrf" value="${escape(csrf)}">
 <p class="hint">Warmup emails go out as ${escape([record.first_name, record.last_name].filter(Boolean).join(" "))}. Lifty sets the warmup schedule and volume.</p>
-<p class="hint">When warmup ends, Lifty sends one test email from this mailbox to about 20–40 test inboxes to measure deliverability. Continuing accepts warmup and this test.</p>
+${record.mailbox_use === "personal"
+  ? `<p class="hint">As soon as warmup starts, Lifty sends one test email from this mailbox to about 20–40 test inboxes to check where your email lands. Warmup then keeps running alongside your outreach to protect your inbox placement. Continuing accepts warmup and this test.</p>`
+  : `<p class="hint">When warmup ends, Lifty sends one test email from this mailbox to about 20–40 test inboxes to measure deliverability. Continuing accepts warmup and this test.</p>`}
 <div class="actions"><button class="primary block" type="submit">Continue with Google</button><p class="disclosure">Google grants full Gmail access, including reading, sending and deleting mail. Lifty shares this access with Mailivery to send and receive warmup mail. <a href="https://liftygtm.com/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy policy</a>.</p></div></form>
 ${pendingSubmitScript}`);
 }

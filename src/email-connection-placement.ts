@@ -8,7 +8,9 @@ import { EmailWorkspace } from "./email-contracts.js";
 // their own session; the Jobs worker creates it in Mailivery, which sends its
 // seeds from that mailbox. Nothing here calls the provider or spends credits.
 // Since 2026-10-05 Lifty also queues one test by itself when a mailbox finishes
-// warmup; accepting warmup covers it (origin `warmup_complete`).
+// warmup; accepting warmup covers it (origin `warmup_complete`). Since LIF-1223
+// a mailbox the founder already uses is tested as soon as Lifty warms it
+// (origin `connected`). Each mailbox gets one automatic test.
 
 export const PlacementStatusRequest = z.object({
   workspace: EmailWorkspace,
@@ -32,7 +34,7 @@ const StoredStatus = z.object({
   gates_sending: z.boolean(), last_passed_at: timestamp.nullable(), passing_until: timestamp.nullable(),
   test: z.object({
     placement_ref: z.uuid(), status: z.enum(["queued", "creating", "ambiguous", "running", "completed", "failed"]),
-    origin: z.enum(["member", "warmup_complete"]), test_ref: z.string().regex(/^[1-9][0-9]{0,17}$/).nullable(), total_seeds: count.nullable(),
+    origin: z.enum(["member", "warmup_complete", "connected"]), test_ref: z.string().regex(/^[1-9][0-9]{0,17}$/).nullable(), total_seeds: count.nullable(),
     requested_at: timestamp, completed_at: timestamp.nullable(), passed: z.boolean().nullable(),
     failure_code: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/).nullable(), policy_version: z.string().max(200).nullable(),
     samples: z.object({ gmail: Counts, microsoft: Counts, overall: Counts }).nullable(),
@@ -115,7 +117,7 @@ export function presentConnectionPlacement(stored: z.infer<typeof StoredStatus>)
   const t = stored.test;
   let test: ConnectionPlacementStatus["test"] = null;
   if (t) {
-    const automatic = t.origin === "warmup_complete";
+    const automatic = t.origin !== "member";
     const retry = automatic && t.failure_code && notCreated.has(t.failure_code) ? " Lifty tries the automatic test again within a day." : "";
     const failure = t.status === "failed" && t.failure_code ? { code: t.failure_code,
       message: `${failureMessages[t.failure_code] ?? "The test did not complete. This is not a placement result."}${retry}` } : null;
@@ -123,7 +125,7 @@ export function presentConnectionPlacement(stored: z.infer<typeof StoredStatus>)
       : t.status === "ambiguous" ? "uncertain" : t.status === "failed" ? "did_not_run" : "running";
     const summary = t.samples ? ` Gmail inbox ${pct(t.samples.gmail.inbox, t.samples.gmail.total)}, Microsoft inbox ${pct(t.samples.microsoft.inbox, t.samples.microsoft.total)}, spam ${pct(t.samples.overall.spam, t.samples.overall.total)}.` : "";
     const label = state === "passed" ? `Passed.${summary}` : state === "failed" ? `Failed.${summary} Passing needs Gmail inbox of at least 70%, some Microsoft inbox and at most 40% spam.`
-      : state === "pending" ? `Queued${automatic ? " automatically because warmup finished" : ""}. Lifty creates the test in Mailivery within about 5 minutes.`
+      : state === "pending" ? `Queued${t.origin === "warmup_complete" ? " automatically because warmup finished" : t.origin === "connected" ? " automatically because the mailbox was connected" : ""}. Lifty creates the test in Mailivery within about 5 minutes.`
       : state === "uncertain" ? "Checking whether Mailivery created the test. Lifty will not create a second one; wait for the next check."
       : state === "running" ? "Mailivery is sending the test from this mailbox and measuring placement. This usually takes 10-20 minutes."
       : `Did not run. ${failure?.message ?? ""}`.trim();

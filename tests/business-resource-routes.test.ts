@@ -1100,6 +1100,12 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
     [{ accounts: [{ ...mailbox, status: "needs_reconnect" }] }, "email_held", "email"],
     [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing }, "paid_plan_needed", "kickoff"],
     [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing, plan: "paid" }, "email_ready", "kickoff"],
+    // A founder workspace has no passing_until (placement is advisory there):
+    // its latest completed test decides (LIF-1223).
+    [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: { gates_sending: false, last_passed_at: "2026-10-07T12:00:00Z",
+      passing_until: null, test: { state: "passed" } } }, "paid_plan_needed", "kickoff"],
+    [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: { gates_sending: false, last_passed_at: "2026-10-07T12:00:00Z",
+      passing_until: null, test: { state: "failed" } } }, "email_held", "email"],
     // Ready needs a passing placement test, not warmup alone.
     [{ warmup: warmupRead("warming", { warmup_ready: true }) }, "email_preparing", "email"],
     // Part 2 comes first while a connected LinkedIn account has no active campaign.
@@ -1111,12 +1117,18 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
     const result = await (await emailHarness(state as never).request("/v1/workspace/next-step")).json();
     expect(result).toMatchObject({ reason, section });
   });
-  it("asks for the alert channel in Part 3 only when the founder skipped LinkedIn", async () => {
-    const alone = await (await emailHarness({}).request("/v1/workspace/next-step")).json();
-    expect(alone.actions.join(" ")).toContain("where alerts should go");
-    const both = await (await emailHarness({ accounts: [linkedinAccount, mailbox], campaigns: ["active"] }).request("/v1/workspace/next-step")).json();
-    expect(both.reason).toBe("email_connected");
-    expect(both.actions.join(" ")).not.toContain("where alerts should go");
+  // LIF-1223: the first placement test is automatic and its result is a notice,
+  // so Part 3 offers Slack whenever it is not connected, after LinkedIn too.
+  it("offers Slack for the placement result in Part 3 and never requests the first test itself", async () => {
+    for (const state of [{}, { accounts: [linkedinAccount, mailbox], campaigns: ["active"] }]) {
+      const result = await (await emailHarness(state as never).request("/v1/workspace/next-step")).json();
+      expect(result.reason).toBe("email_connected");
+      const actions = result.actions.join(" ");
+      expect(actions).toContain("offer to connect it now so the test result reaches them there");
+      expect(actions).toContain("Lifty will notify them with the placement test result");
+      expect(actions).toContain("Lifty tests where the mailbox's email lands as soon as its warmup setup is done");
+      expect(result.recommended_tools).not.toContain("sending_accounts_placement_start");
+    }
   });
   it("hands a free workspace with a ready mailbox to David without activating anything", async () => {
     const result = await (await emailHarness({ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing }).request("/v1/workspace/next-step")).json();

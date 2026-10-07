@@ -34,6 +34,16 @@ it("shows only the mailbox, the sender name it will use and one Google button, w
   expect(csp).toContain(`script-src '${PENDING_SUBMIT_SCRIPT_HASH}';`);
   expect(csp).not.toContain("mailivery");
 });
+it("tells the owner of a habitual mailbox that the test runs as soon as warmup starts (LIF-1223)", async () => {
+  const {app, setup} = harness();
+  vi.mocked(setup.read).mockResolvedValueOnce({email:"ada@example.test", workspace_ref:"22222222-2222-4222-8222-222222222222",
+    sender_ref:"33333333-3333-4333-8333-333333333333", state:"draft", expires_at:"2026-10-01T00:00:00Z", policy:null, first_name:"Ada", last_name:"Lovelace",
+    mailbox_use:"personal"});
+  const html = await (await app.request(`https://api.lifty.test/setup?intent=${token}`)).text();
+  expect(html).toContain("As soon as warmup starts, Lifty sends one test email from this mailbox to about 20–40 test inboxes to check where your email lands.");
+  expect(html).toContain("Continuing accepts warmup and this test.");
+  expect(html).not.toContain("When warmup ends");
+});
 it("rejects cross-origin and missing cookie without changing setup", async () => {
   const {app, setup} = harness();
   for (const origin of ["https://evil.test", "https://api.lifty.test"]) {

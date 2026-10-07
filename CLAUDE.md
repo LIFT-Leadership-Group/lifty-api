@@ -148,3 +148,13 @@ suppression tasks. Source choice is separate from connection and provider
 grants; existing connections do not imply consent. Optional choice/status
 reads that are unavailable stay unknown, and no release here bumps the
 installed client contract.
+
+## Habitual mailbox placement
+
+LIF-1223 tests a mailbox the founder already uses as soon as its warmup
+setup is done (placement origin `connected`) and shows the warmup page's
+timing from the setup record's optional `mailbox_use`. This API revision
+must be active before the Functions migration
+`20261008130000_lif1223_habitual_initial_placement.sql` ships: an older
+API rejects the new origin. The migration's result notices also need the
+matching Jobs revision first.
