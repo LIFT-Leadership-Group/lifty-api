@@ -69,13 +69,21 @@ describe("supported Outreach policy boundary", () => {
     ]) expect(create("email", { ...email, start: [condition] }).success).toBe(false);
     expect(create("linkedin", { ...policy, start }).success).toBe(false);
   });
-  it("exposes only supported sequence counts and receipt delays; the saved sequence owns the count", () => {
+  it("exposes one to five emails with day or business-day receipt delays; the saved sequence owns the count", () => {
     expect(create("email", email).success).toBe(true);
-    expect(create("email", { ...email, steps: email.steps.slice(0, 3) }).success).toBe(false);
-    expect(create("email", { ...email, steps: email.steps.map(step => ({ ...step, delay: { business_days: step.position === 1 ? 0 : 3 } })) }).success).toBe(false);
+    expect(create("email", { ...email, steps: email.steps.slice(0, 1) }).success).toBe(true);
+    expect(create("email", { ...email, steps: email.steps.map(step => ({ ...step, delay: { business_days: step.position === 1 ? 0 : 3 } })) }).success).toBe(true);
+    expect(create("email", { ...email, steps: email.steps.map((step, i) => ({ ...step, delay: { business_days: i ? 31 : 0 } })) }).success).toBe(false);
+    expect(create("email", { ...email, steps: [...email.steps, ...email.steps.slice(0, 2)].map((step, i) => ({ ...step, position: i + 1 })) }).success).toBe(false);
     expect(create("linkedin", email).success).toBe(false);
     expect(create("email", { ...email, steps: email.steps.map((step, i) => ({ ...step, delay: { days: i ? 31 : 0 } })) }).success).toBe(false);
     expect(create("email", { ...email, steps: email.steps.map(step => ({ ...step, execute_within: { days: 3 } })) }).success).toBe(false);
+  });
+  it("the first LinkedIn message may wait after acceptance; the first email has no delay", () => {
+    const waiting = { ...policy, compose_mode: "templates", steps: [{ position: 1, delay: { business_days: 2 }, template: { text: "Hello {first_name}" } }] };
+    expect(create("linkedin", waiting).success).toBe(true);
+    expect(create("email", { ...email, steps: email.steps.map((step, i) => ({ ...step, delay: { days: i ? 3 : 1 } })) }).success).toBe(false);
+    expect(create("linkedin", { ...waiting, steps: [...waiting.steps, { position: 2, delay: { business_days: 0 }, template: { text: "Following up" } }] }).success).toBe(false);
   });
   it("title lanes and first-email openers: one variant per lane and opener, one thread subject per lane", () => {
     expect(create("email", laned()).success).toBe(true);

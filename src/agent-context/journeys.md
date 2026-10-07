@@ -6,7 +6,7 @@ Read the Journey first. Save audience edits to an immutable draft with expected_
 
 The executable version is derived automatically: the active Journey revision plus the revision each activated Campaign selected, and the graph compiled from them. You never send a graph, binding or pin list. A started Journey keeps the executable version it started with, including the Email revision of a lead that has not reached email yet. `executable_version.graph.status` is `compiling` until the graph is installed; no Journey starts on it before then. `executable_version` is null until the Journey revision and a starting Campaign are both active.
 
-The current executable adapter starts each Journey in one Campaign (LinkedIn or email) and supports email starting after LinkedIn. It runs one Campaign per channel, a LinkedIn invitation followed by one to three messages, and four or five emails. These are adapter limits, not a second sequence-count owner.
+The current executable adapter starts each Journey in one Campaign (LinkedIn or email) and supports email starting after LinkedIn. It runs one Campaign per channel, a LinkedIn invitation followed by one to three messages, and one to five emails. These are adapter limits, not a second sequence-count owner.
 
 Unavailable channel data keeps that Campaign pending; another Campaign proceeds only where its start rules permit, and a dependency on an unfinished step waits. A Journey has no pause: pause the Campaign whose automatic steps must stop.
 

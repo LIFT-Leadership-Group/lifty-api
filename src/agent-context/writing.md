@@ -1,6 +1,6 @@
 # LIFT outreach writing guide
 
-Version: lifty-writing.v19
+Version: lifty-writing.v20
 
 Use this guide to recommend or edit outreach with the founder. These are LIFT's
 writing defaults, not claims about response rates. Preserve founder-approved
@@ -39,8 +39,8 @@ it, how the founder's offer relates, and what each message asks the recipient to
 do. Separate observed facts from your interpretation. If the evidence supports
 several angles, recommend one and explain the tradeoff. Use the founder's
 direction when they have already chosen. Show the draft and incorporate their
-feedback before saving with shared workspace `configure` or `modify`. Existing
-fixed campaigns retain legacy `prepare` for full-text compatibility.
+feedback before saving it with `lifty post campaigns` or
+`lifty patch campaigns draft`.
 
 ## Name the author
 
@@ -74,8 +74,9 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
   any company's email, rewrite it.
 - Do not list everything researched about the recipient. Explain why the offer
   may help without claiming they have a problem you cannot verify.
-- Frame company-specific research as an observation in the same sentence, for
-  example "It looks like...". If an inference carries the message, ask the
+- State company-specific research plainly in the same sentence. Never hedge
+  it ("it looks like", "seems like", "I'm guessing"): see
+  `references.anti_slop`. If an inference carries the message, ask the
   recipient to confirm it. Never promise unsupported ROI or quote guessed
   financial metrics.
 - Make one clear ask. Do not open with a meeting or demo request. Later
@@ -110,7 +111,7 @@ name is missing, ask for it before drafting. Do not send unnamed copy.
   with you".
 - Read the copy aloud. If the founder would not say it, rewrite it.
 - Use the confirmed business URL exactly when it supports the ask. Put that
-  exact URL in email 3 or 4 with the offer. Do not drop it to avoid sounding
+  exact URL in the offer email. Do not drop it to avoid sounding
   like "check us out." Naming the saved page is not that phrase. Never invent
   a website or resource. Do not claim an earlier LinkedIn message or email was
   sent unless that history is confirmed for every recipient receiving the text.
@@ -130,7 +131,7 @@ ask for that instead, in the same spoken register. Never write "Want a short con
 "Should I take that", or "Want 15 minutes this week
 for a brief intro call?" Never write "sit with". Do not say the same
 product word twice in one message. Do not scatter: do not jump to who
-owns the work (that is email 5), and do not restart with
+owns the work (that is the exit email), and do not restart with
 "I help with that..." as a new pitch. Never write "so I
 need to know", "I need to know", or tell a
 prospect you require information from them. That is too direct. Ask like a
@@ -143,11 +144,10 @@ saved offer is thin, stay on one clear job and still add a new detail each
 step. Do not invent a product to create specificity, and do not substitute
 stacked words like "the view", "holds it", or "that work" for a job.
 
-For email, use the shape below when it fits the founder's chosen copy. Shared
-email delivery supports four or five steps declared in delivery_specs; its
-compositor supplies subject and body. Legacy fixed prepare takes five subject/
-text objects. Use a consistent subject so follow-ups read as one thread; do not
-change sequence length or add a new subject simply to fill the example.
+For email, use the shape below when it fits the founder's chosen copy. An email
+Campaign has one to five steps; the compositor supplies subject and body.
+Use a consistent subject so follow-ups read as one thread; do not change sequence
+length or add a new subject simply to fill the example.
 
 Use sample evidence to choose an angle that fits the selected audience. A fact
 about one sample company does not become true for every current or future lead.
@@ -165,9 +165,9 @@ individual campaign workflows only when explicitly requested.
 
 Every recommended email uses these six fields, in this order.
 
-1. Subject line. The same wording on emails 1-5.
+1. Subject line. The same wording on every email.
 2. Address. Always `Hi {first_name},` or `Hey {first_name},`. Alternate
-   Hi, Hey, Hi, Hey, Hi. Never write `Hi.` or `Hey.` without `{first_name}`.
+   Hi and Hey. Never write `Hi.` or `Hey.` without `{first_name}`.
    The recipient's first name belongs in this greeting on every email.
 3. Opener. One spoken line that humanizes the outreach. It sits on the
    next line after the greeting. It is a person starting a note, not a
@@ -181,10 +181,10 @@ Every recommended email uses these six fields, in this order.
    every recipient. Do not open with a label for the pain ("The
    after-hours stretch is the one that still lands on a founder.").
 4. Main focus. The core of the email. Two or three sentences. By the end
-   of this section the reader knows who is writing and what they solve.
-   Emails 1-2 do that through the pain. Emails 3-4 do that through the
-   offer. Do not repeat a sentence from the previous email with one word
-   swapped.
+   of this section the reader knows who is writing and what they solve:
+   through the pain in problem emails, through the offer in offer and
+   proof emails. Do not repeat a sentence from the previous email with one
+   word swapped.
 5. Hook. One spoken sentence that ties the main focus to the CTA. It is
    a bridge, not a caption for the email's job. Do not explain why you
    followed up. Never write "I followed up because." Do not announce who
@@ -206,35 +206,40 @@ End every email at the CTA. Do not write a sign-off or the sender's name:
 Lifty adds the sender's saved signature after a blank line, and saved previews
 show it. Overlays and template banks do not include one either.
 
-Jobs by step:
+Jobs by step follow the saved count: five emails are problem, deeper
+problem, offer, proof, exit; four drop the deeper problem; three are
+problem, offer, exit; two are problem, exit; one email opens the problem and
+asks.
 
-- Emails 1-2 focus on a pain or problem this audience may recognize from the
+- Problem emails focus on a pain this audience may recognize from the
   saved offer. Ask; do not diagnose {company}. Do not pitch the
   offer yet.
-- Emails 3-4 focus on the founder's product, offering, or solution for the
-  pains named in 1-2. Email 4 continues that thread. Do not open with a
+- The offer email presents the founder's product, offering, or solution for
+  that pain; the proof email continues that thread. Do not open with a
   named customer's metric as if {company} already has that number.
   Attribute proof to the named customer in the same thought. If a
-  founder-confirmed website is saved, include that exact URL in 3 or 4.
-  Do not invent a demo, method, or site. Email 3 may use: "Would you be
-  open to a 15min intro call later this week or next?" Email 4 needs a
-  new sentence in that family, and the ask must name the saved offer
-  (the list, the note, the walkthrough). Never write "Should I take
-  that." Never write "Want 15 minutes this week for a brief intro
+  founder-confirmed website is saved, include that exact URL in the offer
+  email. Do not invent a demo, method, or site. The offer email may use:
+  "Would you be open to a 15min intro call later this week or next?" The
+  proof email needs a new sentence in that family, and the ask must name the
+  saved offer (the list, the note, the walkthrough). Never write "Should I
+  take that." Never write "Want 15 minutes this week for a brief intro
   call?" Never write "go over one" with no object.
-- Email 5 asks if there is a better point of contact, then closes the
+- The exit email asks if there is a better point of contact, then closes the
   conversation naturally. Do not pitch again. Two short asks only: would
   they point you to whoever owns that work, and can you reconnect later.
 
 ## Email quality bar
 
-When the saved offer is real, write emails to this standard. This is
-direction for a different fictional company. Use it for cadence, opener
-register, paragraph length, and how the ask is phrased. Do not copy its
-customers, product, or proof. Do not find-replace another company's
-emails with this company's nouns.
+When the saved offer is real, write emails to this standard, set for a
+fictional company. Use it for cadence, opener register, paragraph length
+and how the ask is phrased. Do not copy its customers, product or proof.
+Do not find-replace this company's nouns into it.
 
-Subject on all five: When an issue changes owners
+This is the five-email shape; a shorter sequence keeps its roles (three
+emails: Email 1, 3 and 5; two: Email 1 and 5).
+
+Subject on every email: When an issue changes owners
 
 Email 1 has no opener.
 
@@ -319,26 +324,8 @@ feel. Does it live with the ticket, or does someone usually pass it along?"
 LinkedIn ask: "I help support teams keep that context with the ticket.
 Would you be open to a 15min intro call later this week or next?"
 
-Email subject for all five steps: "When an issue changes owners"
-
-Composed email 1, as it should appear:
-
-Subject: When an issue changes owners
-
-Hi {first_name},
-
-I'm Alex at Harborline.
-
-When a customer issue changes owners, the next person often has to rebuild
-the story. That delay is what customers feel.
-
-That's the delay I keep seeing on those handoffs.
-
-How does the next person at {company} pick up the context today?
-
-Do not open with "Quick question". Later emails stay on that job, but each one
-uses new wording: 2 deepens the pain, 3-4 introduce the offer and the saved
-site, 5 asks for a better point of contact and closes naturally. Never write
+Do not open with "Quick question". Later emails stay on that job, with new
+wording in each role above. Never write
 "reply yes." The hook in every email is one sentence that ties the main focus
 to the CTA. Do not use the hook to explain why you followed up. LinkedIn
 message 2 keeps Alex in first person instead of dropping to "the floor"
@@ -355,11 +342,11 @@ placeholders. This review is writing guidance, not a claim that the
 draft is proven to perform. Preserve the founder's chosen wording while
 flagging unsupported claims or contract conflicts.
 
-After discussing the draft, save shared graph, mode and overlay through campaigns
-configure or modify. Read the ready saved preview, including senders, audience,
-composition policy, timing, saved examples and blockers. Legacy fixed campaigns
-retain prepare. Ask for approval of that exact
-version and authorization to activate. Saving, connecting an account or liking
+After saving, preview real leads with `lifty post campaigns tests_post` and
+read them with `lifty get campaigns test_detail` (senders, audience, timing,
+blockers). Get approval of that exact revision before
+`lifty post campaigns publish`, and authorization before
+`lifty post campaigns activate`. Saving, connecting an account or liking
 an angle never authorizes sending. Lifty handles scheduling and execution after
 activation; the local agent does not need to stay open. Material edits require
 a new preview and confirmation under the current campaign policy.

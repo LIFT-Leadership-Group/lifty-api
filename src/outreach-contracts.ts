@@ -60,7 +60,7 @@ export const LanesSchema = z.object({ field: z.literal("title"), default: LaneNa
 });
 const CampaignPolicyFields = z.object({
   start: StartSchema,
-  steps: z.array(Step).min(1).max(5).describe("The saved sequence owns its count. Executable adapter: LinkedIn invitation then 1–3 messages; email 4–5 steps with calendar delays up to 30 days."),
+  steps: z.array(Step).min(1).max(5).describe("The saved sequence owns its count. Executable adapter: LinkedIn invitation then 1–3 messages, the first waiting its delay after acceptance; email 1–5 steps with delays up to 30 days or business days."),
   compose_mode: z.enum(["generate", "templates"]), instructions: z.string().max(30000), lanes: LanesSchema.optional(),
   schedule: Schedule, profile_version: Version, voice_version: z.number().int().nonnegative(), sender_ids: uniqueRefs,
 }).strict();
@@ -83,8 +83,8 @@ export const CampaignPolicySchema = CampaignPolicyFields.superRefine((policy, co
     context.addIssue({ code: "custom", path: ["lanes"], message: "Content lanes route saved templates." });
   policy.steps.forEach((step, index) => {
     const days = "days" in step.delay ? step.delay.days : step.delay.business_days;
-    if (step.position !== index + 1 || (index === 0 ? days !== 0 : days < 1))
-      context.addIssue({ code: "custom", path: ["steps", index], message: "Use contiguous positions; the first delay is zero and later delays are positive." });
+    if (step.position !== index + 1 || (index > 0 && days < 1))
+      context.addIssue({ code: "custom", path: ["steps", index], message: "Use contiguous positions; later delays are positive." });
     const templated = step.template !== undefined || step.variants !== undefined;
     if ((policy.compose_mode === "templates") !== templated || (step.template !== undefined && step.variants !== undefined))
       context.addIssue({ code: "custom", path: ["steps", index], message: "Templates mode saves one template or its variants per step; generate mode uses instructions." });
@@ -120,10 +120,14 @@ export function campaignChannelIssues(policy: z.infer<typeof CampaignPolicySchem
   const issues: string[] = [];
   if (channel !== "email" && policy.start.some(condition => condition.type === "linkedin_first_dm_skipped"))
     issues.push("Only an Email Campaign may start after a LinkedIn first DM is skipped.");
-  if (channel === "email" && (policy.steps.length < 4 || policy.steps.length > 5)) issues.push("The executable adapter supports four or five saved emails.");
+  if (channel === "email" && policy.steps.length > 5) issues.push("The executable adapter supports one to five saved emails.");
   if (channel === "linkedin" && policy.steps.length > 3) issues.push("The executable adapter supports one to three saved LinkedIn messages after the invitation.");
+  // LinkedIn's first delay waits after the invitation is accepted; an email
+  // sequence starts with its Campaign.
+  const firstDelay = policy.steps[0]?.delay;
+  if (channel === "email" && firstDelay && ("days" in firstDelay ? firstDelay.days : firstDelay.business_days) !== 0) issues.push("The first email has no delay: the sequence starts with its Campaign.");
   for (const step of policy.steps) {
-    if (channel === "email" && (!("days" in step.delay) || step.delay.days > 30)) issues.push("Email delays are calendar days, up to 30.");
+    if (channel === "email" && ("days" in step.delay ? step.delay.days : step.delay.business_days) > 30) issues.push("Email delays are up to 30 days or business days.");
     for (const template of [step.template, ...(step.variants ?? [])]) {
       if (!template) continue;
       if (channel === "email" && (step.position === 1) !== (template.subject !== undefined))
@@ -269,7 +273,7 @@ const Selection = z.object({ lane: z.string().nullable(), opener: z.enum(["cold"
   template_ids: z.array(z.string().min(1).max(100)).min(1).max(5).optional(), approach_type: Arm.optional() }).strict();
 const TestOutput = z.object({ output_ref: Ref, digest: Digest, created_at: Timestamp,
   content: z.union([z.object({ linkedin_messages: z.array(z.object({ text: text(3000) }).strict()).min(1).max(3) }).strict(),
-    z.object({ email_steps: z.array(z.object({ subject: text(300), text: text(20000), delay_minutes: z.number().int().min(0).max(43200) }).strict()).min(4).max(5) }).strict()]),
+    z.object({ email_steps: z.array(z.object({ subject: text(300), text: text(20000), delay_minutes: z.number().int().min(0).max(43200) }).strict()).min(1).max(5) }).strict()]),
   selection: Selection,
   context: z.object({ revision_ref: Ref, digest: Digest, profile_version: Version, voice_version: z.number().int().nonnegative(),
     sender_id: Ref, sender_version: Version, prompt_digest: Digest }).strict(),

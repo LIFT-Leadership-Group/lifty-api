@@ -1,6 +1,6 @@
 # LIFT outreach anti-slop list
 
-Version: lifty-anti-slop.v10
+Version: lifty-anti-slop.v11
 
 Do not use these words or phrases in recommended LinkedIn or email copy.
 Match case-insensitively. Do not use close variants that keep the same tell
@@ -8,6 +8,18 @@ Match case-insensitively. Do not use close variants that keep the same tell
 
 This list is curated from LIFT's existing outreach anti-slop rules. It is a
 writing ban, not a claim about response rates.
+
+## Hedges the composer refuses
+
+Copy or a template containing these cannot be composed. State the
+observation plainly.
+
+- it looks like, it looked like, still looks like
+- seems like
+- appears to
+- I'm guessing
+- from what's visible
+- from what I could see, from what I could find, from what I saw
 
 ## Global
 

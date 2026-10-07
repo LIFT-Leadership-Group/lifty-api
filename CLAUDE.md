@@ -169,6 +169,16 @@ must be active before the Functions migration
 API rejects the new origin. The migration's result notices also need the
 matching Jobs revision first.
 
+## Campaign setup limits
+
+The Campaign contract accepts a first LinkedIn delay (counted from the
+invitation's acceptance) and one to five emails with day or business-day
+waits. Deploy order: the Jobs compiler that emits `journey_graph.v1.2`, then
+the Functions migrations `20261009090000_campaign_cadence_runtime.sql` and
+`20261009100000_campaign_setup_limits.sql` (one batch), then this API
+revision. The database stays the final gate, so an earlier API
+only accepts drafts the validator still refuses.
+
 ## Warmup setup verification
 
 Once Mailivery accepts a founder's Google warmup handoff, the callback
