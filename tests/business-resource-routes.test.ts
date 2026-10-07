@@ -1100,6 +1100,12 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
     [{ accounts: [{ ...mailbox, status: "needs_reconnect" }] }, "email_held", "email"],
     [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing }, "paid_plan_needed", "kickoff"],
     [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing, plan: "paid" }, "email_ready", "kickoff"],
+    // A founder workspace has no passing_until (placement is advisory there):
+    // its latest completed test decides (LIF-1223).
+    [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: { gates_sending: false, last_passed_at: "2026-10-07T12:00:00Z",
+      passing_until: null, test: { state: "passed" } } }, "paid_plan_needed", "kickoff"],
+    [{ warmup: warmupRead("warming", { warmup_ready: true }), placement: { gates_sending: false, last_passed_at: "2026-10-07T12:00:00Z",
+      passing_until: null, test: { state: "failed" } } }, "email_held", "email"],
     // Ready needs a passing placement test, not warmup alone.
     [{ warmup: warmupRead("warming", { warmup_ready: true }) }, "email_preparing", "email"],
     // Part 2 comes first while a connected LinkedIn account has no active campaign.

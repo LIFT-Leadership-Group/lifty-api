@@ -182,8 +182,13 @@ async function emailPosition(deps: Reads, session: AuthSession, workspace: strin
       await deps.researchOperation(session, "research-schedule.get", { query: {}, body: undefined }))),
   ]);
   const positions = checked.map(({ mailbox, warmup, placement }) => {
-    const passing = !!placement?.passing_until && Date.parse(placement.passing_until) > now;
     const test = placement?.test?.state ?? null;
+    // A client mailbox needs a pass inside its validity window. A founder
+    // workspace has no passing_until (placement is advisory there), so its
+    // latest completed test decides (LIF-1223).
+    const passing = placement?.gates_sending === false
+      ? !!placement.last_passed_at && test !== "failed"
+      : !!placement?.passing_until && Date.parse(placement.passing_until) > now;
     let kind: EmailKind = "connected";
     let cause: "reconnect" | "spam" | "problem" | "placement" | null = null;
     if (mailbox.status === "needs_reconnect") [kind, cause] = ["held", "reconnect"];
