@@ -23,7 +23,8 @@ describe("outreach writing context", () => {
       expect(context.references.writing).toContain("must name the same job");
       expect(context.references.writing).toContain("one connected thought");
       expect(context.references.writing).toContain("Name the author");
-      expect(context.references.writing).toContain("{{first_name}}");
+      expect(context.references.writing).toContain("{first_name}");
+      expect(context.references.writing).not.toContain("{{");
       expect(context.references.writing).toContain("I'm asking");
       expect(context.references.writing).toContain("LinkedIn message 2 still needs an I");
       expect(context.references.writing).toContain("reframes the last note");
