@@ -163,4 +163,22 @@ describe("Attio CRM stage routes", () => {
     expect(disconnected.status).toBe(200);
     expect(disconnectIntegration.mock.calls[0]?.[1]).toBe("attio");
   });
+
+  // LIF-1223: a member of several workspaces selects one with
+  // x-lifty-workspace; the internal request behind a stage operation must
+  // carry the same selection or the database cannot tell which workspace.
+  it("keeps the selected workspace on the internal request behind a stage disconnect", async () => {
+    const selections: Array<string | null> = [];
+    const disconnectIntegration = vi.fn(async (_session: unknown, provider: string) => ({ provider: provider as "slack", status: "disconnected" as const,
+      portal_id: null, disconnected_at: "2026-10-07T00:00:00Z", workspace: { workspace_ref: workspace.workspace.workspace_ref, name: "Acme" }, revocation_ref: null }));
+    const app = createApp({ ...base, disconnectIntegration, authenticate: async (request: Request) => {
+      selections.push(request.headers.get("x-lifty-workspace"));
+      return { ok: true, session: { userId: "founder", client: {} } };
+    } });
+    const response = await app.request("/v1/workspace/notifications/disconnect",
+      { method: "POST", headers: { ...headers, "x-lifty-workspace": "lifty-gtm" }, body: "{}" });
+    expect(response.status).toBe(200);
+    expect(disconnectIntegration.mock.calls[0]?.[1]).toBe("slack");
+    expect(selections).toEqual(["lifty-gtm", "lifty-gtm"]);
+  });
 });
