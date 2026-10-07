@@ -1,0 +1,1221 @@
+{
+  "queue": {
+    "messages": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Review me",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "f158f4ff-cf44-4c2f-ab06-8e9c33252b84",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:34.495315+00:00",
+        "lead_email": "f158f4ff-cf44-4c2f-ab06-8e9c33252b84@review.test",
+        "message_ref": "61f4ba96-3be3-419a-bf85-e0e0aec35433",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "enroll_failed",
+        "source_digest": "d8fba5bde9d0621bbffea04d85ebc13ad1f1189ff1823134d36386cca500c4c7",
+        "delivery_state": "planned",
+        "not_sent_cause": "unknown",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      },
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Review me",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "5ea8c093-47c5-47b1-844a-2960084a3917",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:34.29812+00:00",
+        "lead_email": "5ea8c093-47c5-47b1-844a-2960084a3917@review.test",
+        "message_ref": "c015933b-dc5b-412b-9d7d-a84e21010c87",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "6af733af5bd85cecfdd269bd0bf7338005cadd050b6fc99d525a2a1fa15a0da7",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      },
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Unsigned historical",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:33.132487+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "d5d1dc48-78de-44bb-9140-9dcfbd79b119",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "6d8c8fb39bbdcae99542e687be74a20cc12a0a775cae40c26e966a7c1cb6634d",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": null,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "next_after": null
+  },
+  "approve": {
+    "history": [],
+    "message": {
+      "steps": null,
+      "status": "draft",
+      "channel": "linkedin",
+      "content": "Review me",
+      "run_ref": null,
+      "sent_at": null,
+      "is_draft": true,
+      "lead_ref": "5ea8c093-47c5-47b1-844a-2960084a3917",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+      "action_ref": null,
+      "created_at": "2026-10-07T01:48:34.29812+00:00",
+      "lead_email": "5ea8c093-47c5-47b1-844a-2960084a3917@review.test",
+      "message_ref": "c015933b-dc5b-412b-9d7d-a84e21010c87",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
+      "review_status": "approved",
+      "source_digest": "2182afb53af545f9503a471a77aa3b31c1d23fab7f5004ab54cd79aa18b5544d",
+      "delivery_state": "planned",
+      "not_sent_cause": null,
+      "sender_version": 1,
+      "lead_linkedin_url": null,
+      "source_message_ref": null
+    },
+    "revisions": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Review me",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "5ea8c093-47c5-47b1-844a-2960084a3917",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:34.29812+00:00",
+        "lead_email": "5ea8c093-47c5-47b1-844a-2960084a3917@review.test",
+        "message_ref": "c015933b-dc5b-412b-9d7d-a84e21010c87",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "approved",
+        "source_digest": "2182afb53af545f9503a471a77aa3b31c1d23fab7f5004ab54cd79aa18b5544d",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "rewrite_work": null,
+    "history_complete": true,
+    "revisions_complete": true
+  },
+  "skip": {
+    "history": [],
+    "message": {
+      "steps": null,
+      "status": "draft",
+      "channel": "linkedin",
+      "content": "Review me",
+      "run_ref": null,
+      "sent_at": null,
+      "is_draft": true,
+      "lead_ref": "ce2f42a1-e670-4abf-9dec-93c215764e2e",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+      "action_ref": null,
+      "created_at": "2026-10-07T01:48:35.345008+00:00",
+      "lead_email": "ce2f42a1-e670-4abf-9dec-93c215764e2e@review.test",
+      "message_ref": "6840c618-66ae-48ce-82bc-4a96a4e25390",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
+      "review_status": "suppressed",
+      "source_digest": "a9b6fa25d8f8ad8b074573c535aa049bd5b32af90689b0afbd8efc258eb0ea43",
+      "delivery_state": "planned",
+      "not_sent_cause": null,
+      "sender_version": 1,
+      "lead_linkedin_url": null,
+      "source_message_ref": null
+    },
+    "revisions": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Review me",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "ce2f42a1-e670-4abf-9dec-93c215764e2e",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:35.345008+00:00",
+        "lead_email": "ce2f42a1-e670-4abf-9dec-93c215764e2e@review.test",
+        "message_ref": "6840c618-66ae-48ce-82bc-4a96a4e25390",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "suppressed",
+        "source_digest": "a9b6fa25d8f8ad8b074573c535aa049bd5b32af90689b0afbd8efc258eb0ea43",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "rewrite_work": null,
+    "history_complete": true,
+    "revisions_complete": true
+  },
+  "retry": {
+    "history": [],
+    "message": {
+      "steps": null,
+      "status": "draft",
+      "channel": "linkedin",
+      "content": "Review me",
+      "run_ref": null,
+      "sent_at": null,
+      "is_draft": true,
+      "lead_ref": "f158f4ff-cf44-4c2f-ab06-8e9c33252b84",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+      "action_ref": null,
+      "created_at": "2026-10-07T01:48:34.495315+00:00",
+      "lead_email": "f158f4ff-cf44-4c2f-ab06-8e9c33252b84@review.test",
+      "message_ref": "61f4ba96-3be3-419a-bf85-e0e0aec35433",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
+      "review_status": "approved",
+      "source_digest": "34ae3bc696ec97c4b8bfe87c4627d521a91af8e0bf6e97bce2cd620e7935306c",
+      "delivery_state": "planned",
+      "not_sent_cause": null,
+      "sender_version": 1,
+      "lead_linkedin_url": null,
+      "source_message_ref": null
+    },
+    "revisions": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Review me",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "f158f4ff-cf44-4c2f-ab06-8e9c33252b84",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:34.495315+00:00",
+        "lead_email": "f158f4ff-cf44-4c2f-ab06-8e9c33252b84@review.test",
+        "message_ref": "61f4ba96-3be3-419a-bf85-e0e0aec35433",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "approved",
+        "source_digest": "34ae3bc696ec97c4b8bfe87c4627d521a91af8e0bf6e97bce2cd620e7935306c",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "rewrite_work": null,
+    "history_complete": true,
+    "revisions_complete": true
+  },
+  "settings": {
+    "settings": {
+      "email": {
+        "mode": "send_and_sample",
+        "sample_rate": 20
+      },
+      "version": 1,
+      "linkedin": {
+        "mode": "send_and_sample",
+        "sample_rate": 20
+      }
+    },
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "settings_changed": {
+    "settings": {
+      "email": {
+        "mode": "send_and_sample",
+        "sample_rate": 20
+      },
+      "version": 2,
+      "linkedin": {
+        "mode": "send_and_sample",
+        "sample_rate": 20
+      }
+    },
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "samples": {
+    "messages": [
+      {
+        "steps": null,
+        "status": "sent",
+        "channel": "linkedin",
+        "content": "Corrected saved draft",
+        "run_ref": null,
+        "sent_at": "2026-10-07T01:48:32.912289+00:00",
+        "is_draft": false,
+        "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:32.447436+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "1bb5c64a-c719-4866-8a2f-53a1152215d8",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "approved",
+        "source_digest": "bd07553345f54e543bce7fbc7f14ccb7d249026604c7383c836b931526ee70ce",
+        "delivery_state": "confirmed",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": "cc193e09-6480-40fc-81e0-d4d0207d7728"
+      },
+      {
+        "steps": null,
+        "status": "sent",
+        "channel": "linkedin",
+        "content": "Review me",
+        "run_ref": null,
+        "sent_at": "2026-10-07T01:48:45.79926+00:00",
+        "is_draft": false,
+        "lead_ref": "c72721ae-8253-4879-9464-c1e71433e7fe",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:45.644655+00:00",
+        "lead_email": "c72721ae-8253-4879-9464-c1e71433e7fe@review.test",
+        "message_ref": "55e95481-0d67-4232-b2de-b40ef124608a",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "approved",
+        "source_digest": "d5b51641b7054ce3a292c1a1ae89c517d60b272585e5d66428df57a081f989d0",
+        "delivery_state": "confirmed",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "next_after": null
+  },
+  "rating": {
+    "feedback": {
+      "note": "Clear ask",
+      "rating": "up",
+      "rated_at": "2026-10-07T01:48:46.057474+00:00",
+      "message_ref": "55e95481-0d67-4232-b2de-b40ef124608a",
+      "source_digest": "d5b51641b7054ce3a292c1a1ae89c517d60b272585e5d66428df57a081f989d0",
+      "learning_scope": "voice"
+    },
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "count": {
+    "count": 14,
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "rewrite": {
+    "history": [],
+    "message": {
+      "steps": null,
+      "status": "draft",
+      "channel": "linkedin",
+      "content": "Draft to rewrite",
+      "run_ref": null,
+      "sent_at": null,
+      "is_draft": true,
+      "lead_ref": "130b024b-5d7b-482a-9fac-c8415ee0ed16",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+      "action_ref": null,
+      "created_at": "2026-10-07T01:48:46.35268+00:00",
+      "lead_email": "130b024b-5d7b-482a-9fac-c8415ee0ed16@review.test",
+      "message_ref": "c38674da-787b-4e6c-ba29-c26bd806e7e2",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
+      "review_status": "pending",
+      "source_digest": "c4d218ad4db7fca3d6d295d4adeb002d1cf1699718426c3e69d7d7e360437652",
+      "delivery_state": "planned",
+      "not_sent_cause": null,
+      "sender_version": 1,
+      "lead_linkedin_url": null,
+      "source_message_ref": null
+    },
+    "revisions": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Draft to rewrite",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "130b024b-5d7b-482a-9fac-c8415ee0ed16",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:46.35268+00:00",
+        "lead_email": "130b024b-5d7b-482a-9fac-c8415ee0ed16@review.test",
+        "message_ref": "c38674da-787b-4e6c-ba29-c26bd806e7e2",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "c4d218ad4db7fca3d6d295d4adeb002d1cf1699718426c3e69d7d7e360437652",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "rewrite_work": {
+      "state": "queued",
+      "work_ref": "cbfaa2d7-6b88-45b6-8b4d-318a1bcdc77c",
+      "error_code": null,
+      "message_ref": "c38674da-787b-4e6c-ba29-c26bd806e7e2",
+      "source_digest": "c4d218ad4db7fca3d6d295d4adeb002d1cf1699718426c3e69d7d7e360437652",
+      "replacement_message_ref": null
+    },
+    "history_complete": true,
+    "revisions_complete": true
+  },
+  "rewrite_done": {
+    "history": [],
+    "message": {
+      "steps": null,
+      "status": "draft",
+      "channel": "linkedin",
+      "content": "Draft to rewrite",
+      "run_ref": null,
+      "sent_at": null,
+      "is_draft": true,
+      "lead_ref": "130b024b-5d7b-482a-9fac-c8415ee0ed16",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+      "action_ref": null,
+      "created_at": "2026-10-07T01:48:46.35268+00:00",
+      "lead_email": "130b024b-5d7b-482a-9fac-c8415ee0ed16@review.test",
+      "message_ref": "c38674da-787b-4e6c-ba29-c26bd806e7e2",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
+      "review_status": "superseded",
+      "source_digest": "600c1409bbd311e0e106c59e1fede01a50257fe83a63eb319bacab9c63409a72",
+      "delivery_state": "planned",
+      "not_sent_cause": null,
+      "sender_version": 1,
+      "lead_linkedin_url": null,
+      "source_message_ref": null
+    },
+    "revisions": [
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "Draft to rewrite",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "130b024b-5d7b-482a-9fac-c8415ee0ed16",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:46.35268+00:00",
+        "lead_email": "130b024b-5d7b-482a-9fac-c8415ee0ed16@review.test",
+        "message_ref": "c38674da-787b-4e6c-ba29-c26bd806e7e2",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "superseded",
+        "source_digest": "600c1409bbd311e0e106c59e1fede01a50257fe83a63eb319bacab9c63409a72",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      },
+      {
+        "steps": null,
+        "status": "draft",
+        "channel": "linkedin",
+        "content": "New writer bytes",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "130b024b-5d7b-482a-9fac-c8415ee0ed16",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "9db1e710-0912-4e1d-b588-4ee121a0f1f7",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:46.866446+00:00",
+        "lead_email": "130b024b-5d7b-482a-9fac-c8415ee0ed16@review.test",
+        "message_ref": "af86381a-4d55-454d-8e33-78778aa59f4b",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "pending",
+        "source_digest": "8cf7625743a05eed966118c9464e95746a151dd457ea43c9bd52ac103fd14497",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": "c38674da-787b-4e6c-ba29-c26bd806e7e2"
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "rewrite_work": {
+      "state": "done",
+      "work_ref": "cbfaa2d7-6b88-45b6-8b4d-318a1bcdc77c",
+      "error_code": null,
+      "message_ref": "c38674da-787b-4e6c-ba29-c26bd806e7e2",
+      "source_digest": "c4d218ad4db7fca3d6d295d4adeb002d1cf1699718426c3e69d7d7e360437652",
+      "replacement_message_ref": "af86381a-4d55-454d-8e33-78778aa59f4b"
+    },
+    "history_complete": true,
+    "revisions_complete": true
+  },
+  "stop": {
+    "lead_ref": "077f303e-4ce4-444c-94dc-e7c6dd736abe",
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "stopped_at": "2026-10-07T01:48:48.098826+00:00",
+    "provider_stops_pending": false
+  },
+  "reply": {
+    "turn": {
+      "draft": "",
+      "state": "pending",
+      "channel": "linkedin",
+      "history": [],
+      "sent_at": null,
+      "version": 0,
+      "lead_ref": "077f303e-4ce4-444c-94dc-e7c6dd736abe",
+      "turn_ref": "6304a5ed-3492-4fa7-a585-6d32d6bed1f5",
+      "lead_name": null,
+      "sender_id": null,
+      "account_id": null,
+      "created_at": "2026-10-07T01:48:48.678658+00:00",
+      "inbound_at": "2026-10-07T01:48:48.669113+00:00",
+      "lead_email": "077f303e-4ce4-444c-94dc-e7c6dd736abe@review.test",
+      "sender_name": null,
+      "campaign_ref": null,
+      "inbound_text": "Reply after manual stop",
+      "source_digest": "83f0820fe0939842f3791af94785c60dd5ada9710019a994612cb0c5f2949f35",
+      "follow_up_due_at": null,
+      "history_complete": false,
+      "lead_linkedin_url": null
+    },
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "reply_list": {
+    "turns": [
+      {
+        "draft": "Exact member edited answer.",
+        "state": "processing",
+        "channel": "email",
+        "history": [],
+        "sent_at": null,
+        "version": 1,
+        "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+        "turn_ref": "2bd86053-7bfb-41af-b179-af5e8f36cd05",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "395b95e4-58db-4702-9a2b-5a37b4140609",
+        "created_at": "2026-10-07T01:48:49.05564+00:00",
+        "inbound_at": "2026-10-07T01:48:49.046963+00:00",
+        "lead_email": "saved@message.test",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "inbound_text": "Please explain the next step",
+        "source_digest": "5826097d2f0b71ddd0fee737fd1c3cda3de1b95991ed8720bd8115353487e8b4",
+        "follow_up_due_at": null,
+        "history_complete": true,
+        "lead_linkedin_url": null
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "next_after": null
+  },
+  "reply_before_send": {
+    "turn": {
+      "draft": "",
+      "state": "pending",
+      "channel": "email",
+      "history": [],
+      "sent_at": null,
+      "version": 0,
+      "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+      "turn_ref": "2bd86053-7bfb-41af-b179-af5e8f36cd05",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "395b95e4-58db-4702-9a2b-5a37b4140609",
+      "created_at": "2026-10-07T01:48:49.05564+00:00",
+      "inbound_at": "2026-10-07T01:48:49.046963+00:00",
+      "lead_email": "saved@message.test",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "inbound_text": "Please explain the next step",
+      "source_digest": "86c3750265c82c0e480aec64111f8c29d93eda0e900d3ad63f2244f2b6f42578",
+      "follow_up_due_at": null,
+      "history_complete": true,
+      "lead_linkedin_url": null
+    },
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "reply_send": {
+    "turn": {
+      "draft": "Exact member edited answer.",
+      "state": "processing",
+      "channel": "email",
+      "history": [],
+      "sent_at": null,
+      "version": 1,
+      "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+      "turn_ref": "2bd86053-7bfb-41af-b179-af5e8f36cd05",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "395b95e4-58db-4702-9a2b-5a37b4140609",
+      "created_at": "2026-10-07T01:48:49.05564+00:00",
+      "inbound_at": "2026-10-07T01:48:49.046963+00:00",
+      "lead_email": "saved@message.test",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "inbound_text": "Please explain the next step",
+      "source_digest": "5826097d2f0b71ddd0fee737fd1c3cda3de1b95991ed8720bd8115353487e8b4",
+      "follow_up_due_at": null,
+      "history_complete": true,
+      "lead_linkedin_url": null
+    },
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "reply_skipped": {
+    "turn": {
+      "draft": "",
+      "state": "suppressed",
+      "channel": "linkedin",
+      "history": [],
+      "sent_at": null,
+      "version": 2,
+      "lead_ref": "077f303e-4ce4-444c-94dc-e7c6dd736abe",
+      "turn_ref": "6304a5ed-3492-4fa7-a585-6d32d6bed1f5",
+      "lead_name": null,
+      "sender_id": null,
+      "account_id": null,
+      "created_at": "2026-10-07T01:48:48.678658+00:00",
+      "inbound_at": "2026-10-07T01:48:48.669113+00:00",
+      "lead_email": "077f303e-4ce4-444c-94dc-e7c6dd736abe@review.test",
+      "sender_name": null,
+      "campaign_ref": null,
+      "inbound_text": "Reply after manual stop",
+      "source_digest": "a24458e04974dd8f2459019d8c7a0fb9fc080802a43adc4f1d424308c8ab8352",
+      "follow_up_due_at": null,
+      "history_complete": false,
+      "lead_linkedin_url": null
+    },
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    }
+  },
+  "email_approve": {
+    "history": [],
+    "message": {
+      "steps": [
+        {
+          "text": "Corrected body\n\nRegards, Pinned Person",
+          "subject": "Corrected subject",
+          "position": 1
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 2
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 3
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 4
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 5
+        },
+        {
+          "text": "Corrected final body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 6
+        }
+      ],
+      "status": "draft",
+      "channel": "email",
+      "content": "Saved sequence",
+      "run_ref": null,
+      "sent_at": null,
+      "is_draft": true,
+      "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "395b95e4-58db-4702-9a2b-5a37b4140609",
+      "action_ref": null,
+      "created_at": "2026-10-07T01:48:33.61659+00:00",
+      "lead_email": "saved@message.test",
+      "message_ref": "5226ac2c-4027-4a21-925f-dff758013f8e",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
+      "review_status": "approved",
+      "source_digest": "56b95cb91dc9337e7fd618f1ad1a81eca0a139ab89fc7f22aae6069ba72bcca4",
+      "delivery_state": "planned",
+      "not_sent_cause": null,
+      "sender_version": 1,
+      "lead_linkedin_url": null,
+      "source_message_ref": "b76694d2-dd9b-4bdd-9f70-6fd29f767470"
+    },
+    "revisions": [
+      {
+        "steps": [
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 1
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 2
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 3
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 4
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 5
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 6
+          }
+        ],
+        "status": "draft",
+        "channel": "email",
+        "content": "Saved sequence",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:33.481449+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "b76694d2-dd9b-4bdd-9f70-6fd29f767470",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "superseded",
+        "source_digest": "1fe563239b19ea59b704cba9b3cafeb325c9e6756a805d6f3fffde697e9ffcc0",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      },
+      {
+        "steps": [
+          {
+            "text": "Corrected body\n\nRegards, Pinned Person",
+            "subject": "Corrected subject",
+            "position": 1
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 2
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 3
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 4
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 5
+          },
+          {
+            "text": "Corrected final body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 6
+          }
+        ],
+        "status": "draft",
+        "channel": "email",
+        "content": "Saved sequence",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "395b95e4-58db-4702-9a2b-5a37b4140609",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:33.61659+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "5226ac2c-4027-4a21-925f-dff758013f8e",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "approved",
+        "source_digest": "56b95cb91dc9337e7fd618f1ad1a81eca0a139ab89fc7f22aae6069ba72bcca4",
+        "delivery_state": "planned",
+        "not_sent_cause": null,
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": "b76694d2-dd9b-4bdd-9f70-6fd29f767470"
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "rewrite_work": null,
+    "history_complete": true,
+    "revisions_complete": true
+  },
+  "email_uncertain": {
+    "history": [],
+    "message": {
+      "steps": [
+        {
+          "text": "Corrected body\n\nRegards, Pinned Person",
+          "subject": "Corrected subject",
+          "position": 1
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 2
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 3
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 4
+        },
+        {
+          "text": "Saved body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 5
+        },
+        {
+          "text": "Corrected final body\n\nRegards, Pinned Person",
+          "subject": "Saved subject",
+          "position": 6
+        }
+      ],
+      "status": "draft",
+      "channel": "email",
+      "content": "Saved sequence",
+      "run_ref": null,
+      "sent_at": null,
+      "is_draft": true,
+      "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+      "direction": "outbound",
+      "lead_name": null,
+      "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+      "account_id": "395b95e4-58db-4702-9a2b-5a37b4140609",
+      "action_ref": null,
+      "created_at": "2026-10-07T01:48:33.61659+00:00",
+      "lead_email": "saved@message.test",
+      "message_ref": "5226ac2c-4027-4a21-925f-dff758013f8e",
+      "sender_name": "Pinned Person",
+      "campaign_ref": null,
+      "review_reason": null,
+      "review_status": "enroll_failed",
+      "source_digest": "0ad98557f0b143c37e258701521b2a9ce6e6392d8e31d9d316802210dd5e30b7",
+      "delivery_state": "unknown",
+      "not_sent_cause": "unknown",
+      "sender_version": 1,
+      "lead_linkedin_url": null,
+      "source_message_ref": "b76694d2-dd9b-4bdd-9f70-6fd29f767470"
+    },
+    "revisions": [
+      {
+        "steps": [
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 1
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 2
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 3
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 4
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 5
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 6
+          }
+        ],
+        "status": "draft",
+        "channel": "email",
+        "content": "Saved sequence",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": null,
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:33.481449+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "b76694d2-dd9b-4bdd-9f70-6fd29f767470",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "superseded",
+        "source_digest": "1fe563239b19ea59b704cba9b3cafeb325c9e6756a805d6f3fffde697e9ffcc0",
+        "delivery_state": "unknown",
+        "not_sent_cause": "unknown",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": null
+      },
+      {
+        "steps": [
+          {
+            "text": "Corrected body\n\nRegards, Pinned Person",
+            "subject": "Corrected subject",
+            "position": 1
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 2
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 3
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 4
+          },
+          {
+            "text": "Saved body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 5
+          },
+          {
+            "text": "Corrected final body\n\nRegards, Pinned Person",
+            "subject": "Saved subject",
+            "position": 6
+          }
+        ],
+        "status": "draft",
+        "channel": "email",
+        "content": "Saved sequence",
+        "run_ref": null,
+        "sent_at": null,
+        "is_draft": true,
+        "lead_ref": "7d56d8f9-21d2-4dd3-82b6-5d9b221b13f9",
+        "direction": "outbound",
+        "lead_name": null,
+        "sender_id": "bdc8b6f7-231c-4ba1-95a0-b5eeaaaeec6f",
+        "account_id": "395b95e4-58db-4702-9a2b-5a37b4140609",
+        "action_ref": null,
+        "created_at": "2026-10-07T01:48:33.61659+00:00",
+        "lead_email": "saved@message.test",
+        "message_ref": "5226ac2c-4027-4a21-925f-dff758013f8e",
+        "sender_name": "Pinned Person",
+        "campaign_ref": null,
+        "review_reason": null,
+        "review_status": "enroll_failed",
+        "source_digest": "0ad98557f0b143c37e258701521b2a9ce6e6392d8e31d9d316802210dd5e30b7",
+        "delivery_state": "unknown",
+        "not_sent_cause": "unknown",
+        "sender_version": 1,
+        "lead_linkedin_url": null,
+        "source_message_ref": "b76694d2-dd9b-4bdd-9f70-6fd29f767470"
+      }
+    ],
+    "workspace": {
+      "name": "Message revision contracts",
+      "state": "ready_for_connections",
+      "workspace_ref": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+    },
+    "rewrite_work": null,
+    "history_complete": true,
+    "revisions_complete": true
+  },
+  "requests": {
+    "settings_update": {
+      "path": {
+        "workspace_id": "db043fba-2be7-4b89-b974-6ae112c2a0a9"
+      },
+      "body": {
+        "expected_version": 1,
+        "linkedin": {
+          "mode": "send_and_sample",
+          "sample_rate": 20
+        }
+      }
+    },
+    "rewrite": {
+      "path": {
+        "workspace_id": "db043fba-2be7-4b89-b974-6ae112c2a0a9",
+        "message_id": "c38674da-787b-4e6c-ba29-c26bd806e7e2"
+      },
+      "body": {
+        "request_ref": "bde08798-3842-4913-90a1-a1e1fa72dfdc",
+        "source_digest": "c4d218ad4db7fca3d6d295d4adeb002d1cf1699718426c3e69d7d7e360437652",
+        "expected_review_status": "pending"
+      }
+    },
+    "reply_send": {
+      "path": {
+        "workspace_id": "db043fba-2be7-4b89-b974-6ae112c2a0a9",
+        "turn_id": "2bd86053-7bfb-41af-b179-af5e8f36cd05"
+      },
+      "body": {
+        "expected_version": 0,
+        "source_digest": "86c3750265c82c0e480aec64111f8c29d93eda0e900d3ad63f2244f2b6f42578",
+        "action": "send",
+        "text": "Exact member edited answer."
+      }
+    },
+    "reply_skip": {
+      "path": {
+        "workspace_id": "db043fba-2be7-4b89-b974-6ae112c2a0a9",
+        "turn_id": "6304a5ed-3492-4fa7-a585-6d32d6bed1f5"
+      },
+      "body": {
+        "expected_version": 0,
+        "source_digest": "83f0820fe0939842f3791af94785c60dd5ada9710019a994612cb0c5f2949f35",
+        "action": "skip"
+      }
+    },
+    "stop": {
+      "path": {
+        "workspace_id": "db043fba-2be7-4b89-b974-6ae112c2a0a9",
+        "lead_id": "077f303e-4ce4-444c-94dc-e7c6dd736abe"
+      },
+      "body": {
+        "request_ref": "8f6736e8-1967-4eca-b6b8-d191c849fd9b",
+        "confirm": true
+      }
+    },
+    "rating": {
+      "path": {
+        "workspace_id": "db043fba-2be7-4b89-b974-6ae112c2a0a9",
+        "message_id": "55e95481-0d67-4232-b2de-b40ef124608a"
+      },
+      "body": {
+        "source_digest": "d5b51641b7054ce3a292c1a1ae89c517d60b272585e5d66428df57a081f989d0",
+        "rating": "up",
+        "note": "Clear ask",
+        "learning_scope": "voice"
+      }
+    }
+  }
+}

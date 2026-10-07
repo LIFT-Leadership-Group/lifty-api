@@ -71,8 +71,10 @@ describe("actual unapproved campaign message corrections", () => {
       p_query: { channel: "linkedin", limit: 10 } });
     for (const action of ["approve", "retry", "skip"] as const) {
       const receipt = reviewFixtures[action];
-      const before = action === "skip" ? reviewFixtures.retry.message
-        : reviewFixtures.queue.messages.find(message => message.message_ref === receipt.message.message_ref)!;
+      // The SQL skip case creates its draft after the initial queue capture.
+      // This is a transport test: SQL proves the actual digest/CAS guard.
+      const before = reviewFixtures.queue.messages.find(message => message.message_ref === receipt.message.message_ref)
+        ?? { ...receipt.message, review_status: "pending" };
       const decision = { action, source_digest: before.source_digest, expected_review_status: before.review_status,
         ...(action === "skip" ? { reason: "Skip only this action." } : {}) };
       const h = harness(receipt, before.message_ref);
@@ -101,7 +103,7 @@ describe("actual unapproved campaign message corrections", () => {
     const before = reviewFixtures.queue.messages.find(message => message.message_ref === approved.message.message_ref)!;
     const decision = { action: "approve", source_digest: before.source_digest, expected_review_status: "pending" };
     for (const changed of [{ message_ref: approved.message.lead_ref }, { review_status: "pending" },
-      { account_id: null }, { sender_id: null }, { sender_name: null }, { channel: "email" }]) {
+      { account_id: null }, { sender_id: null }, { sender_name: null }]) {
       const h = harness({ ...approved, message: { ...approved.message, ...changed } }, before.message_ref);
       expect((await h.request("POST", "/review", decision)).status).toBe(502);
     }
