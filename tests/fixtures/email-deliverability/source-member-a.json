@@ -241,7 +241,17 @@
     "smartlead_daily": []
    },
    "workspace_managed_by": "lift",
-   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   "workspace_ref": "10391000-0000-4000-8000-000000000001",
+   "sending": {
+    "limit": 10,
+    "used": null,
+    "available": null,
+    "ambiguous": null,
+    "shared": true,
+    "timezone": "UTC",
+    "day_started_at": "2026-09-29T00:00:00+00:00",
+    "resets_at": "2026-09-30T00:00:00+00:00"
+   }
   },
   {
    "availability": {
@@ -372,7 +382,17 @@
     "smartlead_daily": []
    },
    "workspace_managed_by": "lift",
-   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   "workspace_ref": "10391000-0000-4000-8000-000000000001",
+   "sending": {
+    "limit": null,
+    "used": null,
+    "available": null,
+    "ambiguous": null,
+    "shared": false,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   }
   },
   {
    "availability": {
@@ -898,7 +918,17 @@
     ]
    },
    "workspace_managed_by": "lift",
-   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   "workspace_ref": "10391000-0000-4000-8000-000000000001",
+   "sending": {
+    "limit": null,
+    "used": null,
+    "available": null,
+    "ambiguous": null,
+    "shared": false,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   }
   },
   {
    "availability": {
@@ -951,7 +981,17 @@
     "smartlead_daily": []
    },
    "workspace_managed_by": "lift",
-   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   "workspace_ref": "10391000-0000-4000-8000-000000000001",
+   "sending": {
+    "limit": null,
+    "used": null,
+    "available": null,
+    "ambiguous": null,
+    "shared": false,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   }
   },
   {
    "availability": {
@@ -1157,7 +1197,17 @@
     "smartlead_daily": []
    },
    "workspace_managed_by": "lift",
-   "workspace_ref": "10391000-0000-4000-8000-000000000001"
+   "workspace_ref": "10391000-0000-4000-8000-000000000001",
+   "sending": {
+    "limit": 10,
+    "used": 4,
+    "available": 6,
+    "ambiguous": false,
+    "shared": false,
+    "timezone": "America/New_York",
+    "day_started_at": "2026-09-29T04:00:00+00:00",
+    "resets_at": "2026-09-30T04:00:00+00:00"
+   }
   }
  ],
  "next_cursor": null,

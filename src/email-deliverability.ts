@@ -6,7 +6,8 @@ import { addUtcDays, blockingMessage, checkValue, dnsHoldRecords } from "./email
 import {
   DELIVERABILITY_DETAIL_MAX_REPORTS, DELIVERABILITY_SCHEMA_VERSION, DeliverabilityQuery, DeliverabilityResponse, DeliverabilitySource,
   type Campaign, type DeliverabilityMailbox, type DeliverabilityQueryInput, type PlacementDetail, type PlacementTest, type Reason,
-  type SourceCampaign, type SourceConnection, type SourceMailbox, type SourceMailivery, type SourceTest, type State, type WarmupSource,
+  type SourceCampaign, type SourceConnection, type SourceMailbox, type SourceMailivery, type SourceSending, type SourceTest, type State,
+  type WarmupSource,
 } from "./email-deliverability-contracts.js";
 import type { PlacementReportReader } from "./email-deliverability-placement.js";
 
@@ -553,6 +554,40 @@ function presentStatus(parts: {
   return make("not_ready", "Not ready yet", "muted", readiness.description, readiness.reasons);
 }
 
+/**
+ * LIF-1341: today's sends against the inbox's daily limit, as the send budget
+ * counts them. Nothing here estimates a count or decides whether a send may go.
+ */
+function presentSending(source: SourceSending | null | undefined): DeliverabilityMailbox["sending"] {
+  const at = (value: string | null | undefined) => Number.isFinite(ms(value)) ? iso(ms(value)) : null;
+  const base = { limit: n(source?.limit), used_today: null, remaining_today: null, timezone: n(source?.timezone),
+    day_started_at: at(source?.day_started_at), resets_at: at(source?.resets_at) };
+  if (!source) {
+    return { ...base, state: make("unknown", "Today's sends unknown", "muted",
+      "This server doesn't report today's sends for this inbox. A missing count is not zero sends.") };
+  }
+  if (source.limit === null || source.limit === undefined) {
+    return { ...base, state: make("not_set", "No Lifty daily limit", "muted",
+      "No email connection in Lifty sends from this inbox, so Lifty sets no daily limit for it. Sends from other tools aren't counted here.") };
+  }
+  if (source.shared) {
+    return { ...base, state: make("unknown", "Today's sends not shown", "muted",
+      `Another workspace also uses this inbox, so its sends today aren't shown here. This workspace's limit is ${source.limit} a day.`) };
+  }
+  if (source.used === null || source.used === undefined || source.available === null || source.available === undefined) {
+    return { ...base, state: make("unknown", "Today's sends unknown", "muted", "Lifty couldn't count today's sends for this inbox.") };
+  }
+  const zone = source.timezone ?? "UTC";
+  const reasons = source.ambiguous ? [reason("send_unconfirmed", "A send from this inbox is still being confirmed, so Lifty waits before sending more from it.")] : [];
+  const counted = { ...base, used_today: source.used, remaining_today: source.available };
+  const used = `Lifty has used ${source.used} of this inbox's ${source.limit} daily sends today, counting replies and sends in progress.`;
+  if (source.available === 0) {
+    return { ...counted, state: make("limit_reached", "Daily limit reached", "warn", `${used} It can send again after midnight (${zone}).`, reasons) };
+  }
+  return { ...counted, state: make("available", `${source.available} of ${source.limit} left today`, source.ambiguous ? "watch" : "ok",
+    `${used} The count resets at midnight (${zone}). Room left today doesn't mean the inbox is ready; its status says whether campaigns can use it.`, reasons) };
+}
+
 function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: string; name: string }>, now: Date, detail: PlacementDetail[] | null): DeliverabilityMailbox {
   const connections = source.connections.map(connection => presentConnection(source, connection));
   const connected = new Set(connections.filter(item => item.status === "connected").map(item => item.provider));
@@ -585,6 +620,7 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
     readiness, warmup, recovery, campaigns, placement, approval,
     notes: { human: source.smartlead?.notes?.trim() || null },
     connections: connections.map(({ gate: _gate, ...connection }) => connection),
+    sending: presentSending(source.sending),
     availability: source.availability,
   };
 }

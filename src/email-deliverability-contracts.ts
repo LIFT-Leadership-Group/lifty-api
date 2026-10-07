@@ -105,6 +105,20 @@ const SourceConnection = z.object({
 });
 export type SourceConnection = z.infer<typeof SourceConnection>;
 
+// LIF-1341: the send budget's figures for this inbox in this workspace. used,
+// available and ambiguous are null when the inbox is also another workspace's.
+const SourceSending = z.object({
+  limit: Count.nullish(),
+  used: Count.nullish(),
+  available: Count.nullish(),
+  ambiguous: z.boolean().nullish(),
+  shared: z.boolean().nullish(),
+  timezone: z.string().max(64).nullish(),
+  day_started_at: Timestamp.nullish(),
+  resets_at: Timestamp.nullish(),
+});
+export type SourceSending = z.infer<typeof SourceSending>;
+
 const SourceSmartlead = z.object({
   account_id: z.number().int(),
   warmup_started_at: Timestamp.nullish(),
@@ -179,6 +193,8 @@ const SourceMailbox = z.object({
   senders: z.array(z.object({ sender_ref: Uuid, name: z.string().max(200) })).max(50),
   identity: z.object({ status: z.enum(["resolved", "ambiguous_owner", "unassigned"]) }),
   connections: z.array(SourceConnection).max(50),
+  // Added by LIF-1341; absent from earlier databases.
+  sending: SourceSending.nullish(),
   smartlead: SourceSmartlead.nullish(),
   warmup: z.object({
     smartlead: SourceSmartleadWarmup.nullish(),
@@ -251,6 +267,7 @@ export const CampaignSummaryCode = ["in_campaign_enabled", "in_campaign_blocked"
 export const CampaignCode = ["active", "paused", "draft", "closed_to_new_leads", "completed", "archived", "error", "unknown"] as const;
 export const ApprovalCode = ["approved", "awaiting_approval", "not_approved", "not_applicable"] as const;
 export const IdentityCode = ["resolved", "ambiguous_owner", "unassigned"] as const;
+export const SendingCode = ["available", "limit_reached", "not_set", "unknown"] as const;
 export const PostureCode = ["healthy", "watch", "degraded", "critical", "insufficient_data", "unknown", "none"] as const;
 
 export const PlacementTest = z.object({
@@ -352,6 +369,17 @@ export const Connection = z.object({
   holds: z.array(z.object({ reason: z.string().max(200), updated_at: Timestamp.nullable() }).strict()).max(50),
 }).strict();
 
+/** Today's sends against the inbox's daily limit: the send budget's own figures, never estimated. */
+export const Sending = z.object({
+  state: state(SendingCode),
+  limit: Count.nullable(),
+  used_today: Count.nullable(),
+  remaining_today: Count.nullable(),
+  timezone: z.string().max(64).nullable(),
+  day_started_at: Timestamp.nullable(),
+  resets_at: Timestamp.nullable(),
+}).strict();
+
 export const DeliverabilityMailbox = z.object({
   mailbox_ref: Ref,
   workspace: z.object({ workspace_ref: Uuid, slug: z.string().max(100).nullable(), name: z.string().max(200).nullable() }).strict(),
@@ -392,6 +420,7 @@ export const DeliverabilityMailbox = z.object({
   /** Human-entered notes, never mixed with generated explanations. */
   notes: z.object({ human: z.string().max(5000).nullable() }).strict(),
   connections: z.array(Connection).max(50),
+  sending: Sending,
   availability: z.object({ smartlead_registry: z.boolean(), smartlead_warmup: z.boolean(), mailivery_warmup: z.boolean(), placement_tests: z.boolean() }).strict(),
 }).strict();
 export type DeliverabilityMailbox = z.infer<typeof DeliverabilityMailbox>;

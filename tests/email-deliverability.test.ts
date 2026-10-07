@@ -145,6 +145,23 @@ describe("mixed providers, identity and missing evidence", () => {
     expect(mixed.status.code).toBe("paused");
   });
 
+  it("reports today's sends as the send budget counts them, never as an estimate", () => {
+    type SourceSending = NonNullable<Source["mailboxes"][number]["sending"]>;
+    const sending = (edit: Partial<SourceSending> | null) => inbox(present(withInbox("uni-only@a.test", mailbox => {
+      mailbox.sending = edit === null ? null : { ...mailbox.sending!, ...edit };
+    })), "uni-only@a.test").sending;
+    expect(sending({})).toMatchObject({ limit: 10, used_today: 4, remaining_today: 6, timezone: "America/New_York",
+      resets_at: "2026-09-30T04:00:00.000Z", state: { code: "available", tone: "ok", label: "6 of 10 left today" } });
+    expect(sending({ used: 10, available: 0 })).toMatchObject({ used_today: 10, remaining_today: 0, state: { code: "limit_reached", tone: "warn" } });
+    expect(sending({ ambiguous: true }).state).toMatchObject({ code: "available", tone: "watch", reasons: [{ code: "send_unconfirmed" }] });
+    // An older database or an uncounted inbox is unknown, never zero sends.
+    expect(sending(null)).toMatchObject({ limit: null, used_today: null, state: { code: "unknown", description: expect.stringMatching(/not zero sends/) } });
+    expect(sending({ used: null, available: null })).toMatchObject({ limit: 10, used_today: null, state: { code: "unknown" } });
+    // A mailbox shared with another workspace never shows that tenant's sends.
+    expect(sending({ shared: true, used: 3, available: 7 })).toMatchObject({ limit: 10, used_today: null, remaining_today: null, state: { code: "unknown" } });
+    expect(sending({ limit: null })).toMatchObject({ limit: null, used_today: null, state: { code: "not_set" } });
+  });
+
   it("never merges the same address across tenants", () => {
     const fleet = present(source("source-fleet-fixtures.json"));
     const a = inbox(fleet, "mixed@a.test", "fixture-a");
