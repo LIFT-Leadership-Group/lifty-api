@@ -5,6 +5,9 @@ import { callStageMcpTool, getStageMcpTools } from "../src/mcp-stage-tools.js";
 // Captured by Functions scripts/test-lif1082-customer-exclusions.py after a
 // clean migration replay: both authenticated RPCs return the complete status.
 import sqlReceipt from "./customer-exclusions-sql-fixture.json" with { type: "json" };
+// Captured from Functions public.get_workspace_suppression_freshness (LIF-1128)
+// after a clean migration replay: a connected Attio workspace without deal stages.
+import sqlFreshness from "./suppression-freshness-sql-fixture.json" with { type: "json" };
 
 const workspace = "22222222-2222-4222-8222-222222222222";
 const receipt = {
@@ -18,8 +21,11 @@ const receipt = {
   added_domains: 2, removed_domains: 0, added_emails: 3, removed_emails: 0,
 };
 const csv = 'domain,email,name\r\nHTTPS://WWW.Customer.Example/path,VIP@Customer.Example,"Doe, Jane"\r\ncustomer.example.,vip@customer.example,Duplicate\r\nGMAIL.COM,Founder+test@Gmail.com,Free mail\r\n,Existing@Sub.Business.Example,\r\nbad domain,broken@@example.com,\r\ngmail.com,,\r\n,,\r\nrelativeonly,person@business.example,\r\nanother.example,,\r\n';
+const { workspace_ref: _capturedRef, ...crmRefresh } = sqlFreshness;
+const freshnessFor = (ref: string) => ({ ...sqlFreshness, workspace_ref: ref });
 type Rpc = (name: string, args: Record<string, unknown>) => unknown;
-function harness(rpc: Rpc = name => name.startsWith("get_") ? { ...receipt, candidates_excluded: 17 } : receipt) {
+function harness(rpc: Rpc = name => name === "get_workspace_suppression_freshness" ? freshnessFor(workspace)
+  : name.startsWith("get_") ? { ...receipt, candidates_excluded: 17 } : receipt) {
   const client = { rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
     try { return { data: await rpc(name, args), error: null }; } catch (error) { return { data: null, error }; }
   }) };
@@ -103,9 +109,10 @@ describe("customer exclusion file import", () => {
 
 describe("customer exclusion status and transport", () => {
   it("transports the real SQL GET and replacement receipts without losing their metadata", async () => {
-    const h = harness(name => name.startsWith("get_") ? sqlReceipt.get : sqlReceipt.replace);
+    const h = harness(name => name === "get_workspace_suppression_freshness" ? freshnessFor(sqlReceipt.get.workspace_ref)
+      : name.startsWith("get_") ? sqlReceipt.get : sqlReceipt.replace);
     const read = await h.read();
-    expect([read.status, await read.json()]).toEqual([200, sqlReceipt.get]);
+    expect([read.status, await read.json()]).toEqual([200, { ...sqlReceipt.get, crm_refresh: crmRefresh }]);
     const replaced = await h.upload({ csv });
     expect([replaced.status, await replaced.json()]).toEqual([200, sqlReceipt.replace]);
   });
@@ -113,11 +120,27 @@ describe("customer exclusion status and transport", () => {
   it("reads the selected workspace's counts and latest rejected rows without calling providers", async () => {
     const h = harness();
     const response = await h.read();
-    expect([response.status, response.headers.get("cache-control"), await response.json()]).toEqual([200, "no-store", { ...receipt, candidates_excluded: 17 }]);
-    expect(h.client.rpc).toHaveBeenCalledExactlyOnceWith("get_workspace_customer_exclusions", { p_workspace: null });
+    expect([response.status, response.headers.get("cache-control"), await response.json()])
+      .toEqual([200, "no-store", { ...receipt, candidates_excluded: 17, crm_refresh: crmRefresh }]);
+    expect(h.client.rpc.mock.calls).toEqual([
+      ["get_workspace_customer_exclusions", { p_workspace: null }],
+      ["get_workspace_suppression_freshness", { p_workspace: null }],
+    ]);
     expect(h.provider).not.toHaveBeenCalled();
     expect((await h.read(`?workspace_ref=${workspace}`)).status).toBe(400);
-    expect(h.client.rpc).toHaveBeenCalledTimes(1);
+    expect(h.client.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["an unavailable read", () => { throw { code: "PGRST202", message: "private database detail" }; }],
+    ["a malformed answer", () => ({ ...freshnessFor(workspace), state: "unknown" })],
+    ["another workspace's answer", () => freshnessFor("33333333-3333-4333-8333-333333333333")],
+  ])("keeps the founder list readable and reports crm_refresh null on %s", async (_name, freshness) => {
+    const h = harness(name => name === "get_workspace_suppression_freshness" ? freshness() : { ...receipt, candidates_excluded: 17 });
+    const response = await h.read();
+    const body = await response.text();
+    expect([response.status, JSON.parse(body)]).toEqual([200, { ...receipt, candidates_excluded: 17, crm_refresh: null }]);
+    expect(body).not.toContain("private database detail");
   });
 
   it.each(["get_workspace_customer_exclusions", "replace_workspace_customer_exclusions"])("maps a foreign workspace denial at %s without exposing data", async rpcName => {
@@ -161,7 +184,7 @@ describe("customer exclusion status and transport", () => {
     const result = await callStageMcpTool("customer_exclusions_status", { workspace: "example" }, new Request("https://api.example/mcp", {
       headers: { authorization: "Bearer session" },
     }), async (route, init) => h.app.request(route, init));
-    expect(result.structuredContent).toEqual({ status: 200, data: { ...receipt, candidates_excluded: 17 } });
+    expect(result.structuredContent).toEqual({ status: 200, data: { ...receipt, candidates_excluded: 17, crm_refresh: crmRefresh } });
     const openapi = await (await h.app.request("/openapi.json")).json();
     expect(openapi.paths["/v1/workspace/customer-exclusions/import"].post.requestBody.content["application/json"].schema.properties.csv.type).toBe("string");
   });

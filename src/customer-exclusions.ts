@@ -27,6 +27,24 @@ export const CustomerExclusionsReceipt = z.object({
   added_domains: Count, removed_domains: Count, added_emails: Count, removed_emails: Count,
 }).strict();
 export const CustomerExclusionsStatus = CustomerExclusionsReceipt.extend({ candidates_excluded: Count }).strict();
+// LIF-1128: the CRM-derived customer list's freshness, decided in the database
+// from the nightly sync ledger. Null when that read is unavailable. Strict on
+// purpose: an unreviewed database field degrades to unknown (null), never to a
+// silently reshaped answer; the captured SQL fixture test catches the drift.
+const Stamp = z.iso.datetime({ offset: true });
+const CrmRefreshSource = z.object({
+  source: z.enum(["crm_closed_won", "crm_customer", "crm_open_deal"]), required: z.boolean(),
+  last_status: z.enum(["ok", "failed", "skipped", "unsupported", "off"]).nullable(),
+  last_attempt_at: Stamp.nullable(), last_success_at: Stamp.nullable(), fresh: z.boolean(), stored_domains: Count,
+}).strict();
+export const CrmRefresh = z.object({
+  state: z.enum(["fresh", "stale", "missing", "not_required"]), reason: z.string().max(100).nullable(),
+  crm_scope: z.enum(["connected", "disconnected", "never_connected"]), provider: z.enum(["hubspot", "attio"]).nullable(),
+  active_outreach: z.boolean(), fresh_within_hours: z.number().int().positive(), checked_at: Stamp,
+  last_attempt_at: Stamp.nullable(), last_attempt_status: z.enum(["succeeded", "provider_failed", "skipped"]).nullable(),
+  last_skip_reason: z.string().max(100).nullable(), sources: z.array(CrmRefreshSource).length(3),
+}).strict();
+export const CustomerExclusionsStatusRead = CustomerExclusionsStatus.extend({ crm_refresh: CrmRefresh.nullable() }).strict();
 // The existing company identity policy in Jobs uses this same list. Personal
 // mail hosts cannot identify a customer company; exact emails remain valid.
 const freeMailDomains = new Set([
@@ -174,9 +192,9 @@ export const customerExclusionsOperationDefinitions = {
   "customer-exclusions": {
     status: {
       method: "GET", route, cli: { operation: "status" }, rpc: "get_workspace_customer_exclusions", path: Empty,
-      query: Empty, request: null, invalid: { status: 400, code: "INVALID_REQUEST" }, response: CustomerExclusionsStatus,
+      query: Empty, request: null, invalid: { status: 400, code: "INVALID_REQUEST" }, response: CustomerExclusionsStatusRead,
       success: 200, args: () => ({}),
-      description: "Read total saved and founder-uploaded customer domain/email counts, the latest founder CSV import revision, accepted/rejected rows with reasons, founder-upload added/removed counts and candidates excluded. Total saved domains include CRM and manual protections. Read-only; unavailable does not mean an empty list.",
+      description: "Read total saved and founder-uploaded customer domain/email counts, the latest founder CSV import revision, accepted/rejected rows with reasons, founder-upload added/removed counts and candidates excluded. Total saved domains include CRM and manual protections. crm_refresh reports whether the CRM-derived customer list is fresh, stale, missing or not required, with the reason and each source's last attempt and success; null means it could not be read. Read-only; unavailable does not mean an empty list.",
     },
     import: {
       method: "POST", route: `${route}/import`, cli: { operation: "import" }, rpc: "replace_workspace_customer_exclusions", path: Empty,
@@ -199,7 +217,23 @@ export async function executeCustomerExclusionsOperation(session: AuthSession, k
   try { result = await (session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc(definition.rpc, args); }
   catch (cause) { throw rpcFailure(cause, { operation: definition.rpc, ...unavailable }); }
   if (result.error) throw rpcFailure(result.error, { operation: definition.rpc, ...unavailable });
-  const parsed = definition.response.safeParse(result.data);
+  const status = key === "customer-exclusions.status";
+  const parsed = (status ? CustomerExclusionsStatus : definition.response).safeParse(result.data);
   if (!parsed.success) throw new PublicError({ status: 502, ...unavailable });
-  return parsed.data;
+  if (!status) return parsed.data;
+  const receipt = parsed.data as z.infer<typeof CustomerExclusionsStatus>;
+  return { ...receipt, crm_refresh: await readCrmRefresh(session, receipt.workspace_ref) };
+}
+
+// The founder list stays readable when only the CRM freshness read fails; the
+// same tenant boundary applies, and a foreign answer is discarded.
+async function readCrmRefresh(session: AuthSession, workspaceRef: string): Promise<z.infer<typeof CrmRefresh> | null> {
+  try {
+    const result = await (session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> })
+      .rpc("get_workspace_suppression_freshness", { p_workspace: null });
+    if (result.error || !result.data || typeof result.data !== "object") return null;
+    const { workspace_ref: ref, ...value } = result.data as Record<string, unknown>;
+    const parsed = CrmRefresh.safeParse(value);
+    return ref === workspaceRef && parsed.success ? parsed.data : null;
+  } catch { return null; }
 }
