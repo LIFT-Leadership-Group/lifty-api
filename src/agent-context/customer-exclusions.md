@@ -21,7 +21,7 @@ reads from a connected CRM every night. `fresh` means it refreshed recently.
 two days. `missing` means a required CRM source (for example closed-won deals)
 has never been read, so the customers it holds are not excluded.
 `not_required` means there is no CRM. `reason`
-names the cause, for example `no_deal_stage_config`,
+names the cause, for example `closed_won_stage_not_found` (an Attio deal pipeline without its won stage),
 `hubspot_deals_read_scope_missing`, `provider_failed` or `crm_disconnected`;
 `sources` shows each CRM source's last attempt and last success. `fresh` covers
 only the sources marked `required`: Attio supplies no customer flag, so an

@@ -58,7 +58,7 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   OUTREACH_REVISION_MISMATCH: "Read the resource and use its exact revision and digest.",
   OUTREACH_APPROVAL_REQUIRED: "Publish the exact chosen revision before activating it.",
   OUTREACH_CONFIGURATION_REQUIRED: "Activate the approved Journey and the Campaign that starts it; the executable version is derived from them.",
-  OUTREACH_CUSTOMER_LIST_NOT_CURRENT: "The CRM customer list is missing or out of date, so current customers cannot be excluded yet. Read customer-exclusions status: crm_refresh names the reason. Fix it, or reconnect the CRM, then activate again.",
+  OUTREACH_CUSTOMER_LIST_NOT_CURRENT: "The connected CRM's customer list is missing or out of date, so current customers cannot be excluded yet. Read customer-exclusions status: crm_refresh names the reason. Lifty rereads the CRM within 15 minutes of a fix; activate again once it reports fresh.",
   OUTREACH_MESSAGE_MOVED: "This message is no longer the exact unapproved draft you read. Read its current review state before retrying.",
   OUTREACH_SEND_UNCONFIRMED: "This message has begun, unknown or confirmed sending work. Read its saved evidence before changing it; repeating a send could duplicate it.",
   OUTREACH_TARGET_STOPPED: "Outreach has stopped for this person. Read its current state before reviewing more messages.",
