@@ -158,3 +158,13 @@ must be active before the Functions migration
 `20261008130000_lif1223_habitual_initial_placement.sql` ships: an older
 API rejects the new origin. The migration's result notices also need the
 matching Jobs revision first.
+
+## Campaign setup limits
+
+The Campaign contract accepts a first LinkedIn delay (counted from the
+invitation's acceptance) and one to five emails with day or business-day
+waits. Deploy order: the Jobs compiler that emits `journey_graph.v1.2`, then
+the Functions migrations `20261009090000_campaign_cadence_runtime.sql` and
+`20261009100000_campaign_setup_limits.sql` (one batch), then this API
+revision. The database stays the final gate, so an earlier API
+only accepts drafts the validator still refuses.

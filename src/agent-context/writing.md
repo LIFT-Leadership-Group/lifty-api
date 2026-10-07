@@ -144,7 +144,7 @@ step. Do not invent a product to create specificity, and do not substitute
 stacked words like "the view", "holds it", or "that work" for a job.
 
 For email, use the shape below when it fits the founder's chosen copy. Shared
-email delivery supports four or five steps declared in delivery_specs; its
+email delivery supports one to five steps declared in delivery_specs; its
 compositor supplies subject and body. Legacy fixed prepare takes five subject/
 text objects. Use a consistent subject so follow-ups read as one thread; do not
 change sequence length or add a new subject simply to fill the example.
