@@ -71,7 +71,9 @@ describe("shared OAuth login and consent", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     const html = await response.text();
-    expect(html).not.toContain("evil.test"); expect(html).not.toContain("127.0.0.1");
+    // The CLI's token callback (and an injected port) never reaches the OAuth
+    // page; its loopback allowlist for native MCP clients is expected (LIF-1347).
+    expect(html).not.toContain("evil.test"); expect(html).not.toContain("http://127.0.0.1:"); expect(html).not.toContain("4444");
     expect(html).toContain(authorizationId);
     expect((await app.request("/oauth/consent?authorization_id=invalid")).status).toBe(400);
     expect((await createApp().request("/oauth/consent?authorization_id=" + authorizationId)).status).toBe(404);
@@ -99,6 +101,22 @@ describe("shared OAuth login and consent", () => {
     expect(b.location.href).not.toContain("127.0.0.1");
     await b.get(action).dispatch("click");
     expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+  it("returns local MCP clients to their loopback redirect and nothing else over http (LIF-1347)", async () => {
+    for (const [redirect, allowed] of [["http://127.0.0.1:53682/callback", true], ["http://localhost:8080/cb", true], ["http://[::1]:7777/cb", true],
+      ["http://chat.example.test/cb", false], ["http://localhost.evil.test/cb", false], ["http://127.0.0.1.nip.io/cb", false],
+      ["http://user:pass@localhost:8080/cb", false]] as const) {
+      const fetcher = vi.fn(async (_url: string, _init: RequestInit) => reply())
+        .mockResolvedValueOnce(reply(200, { access_token: "PRIVATE_ACCESS", refresh_token: "PRIVATE_REFRESH", expires_in: 3600 }))
+        .mockResolvedValueOnce(reply(200, { ...details, redirect_uri: redirect }))
+        .mockResolvedValueOnce(reply(200, { redirect_url: redirect + "?code=authorization-code&state=state" }));
+      const b = oauthLogin(fetcher); await signIn(b);
+      expect(b.get("approve").disabled, redirect).toBe(!allowed);
+      if (allowed) {
+        await b.get("approve").dispatch("click");
+        expect(b.location.assign, redirect).toHaveBeenCalledWith(redirect + "?code=authorization-code&state=state");
+      } else expect(b.get("auth-error").textContent, redirect).toContain("expired");
+    }
   });
   it("handles previously granted consent, expired authorizations and unsafe redirects without persisting or disclosing tokens", async () => {
     for (const payload of [ { redirect_url: details.redirect_uri + "?code=existing" }, { redirect_url: "javascript:alert(1)" }, { message: "PRIVATE_DETAIL" } ]) {

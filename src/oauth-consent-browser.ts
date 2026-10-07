@@ -4,9 +4,16 @@
  * The shared login deliberately keeps tokens in memory without a CDN script.
  */
 export const oauthConsentBrowserScript = `
-    function oauthRedirect(value) {
+    // Native MCP clients (Claude Code, Codex) receive the code on a loopback
+    // port over http (RFC 8252 7.3); every other redirect is https (LIF-1347).
+    function allowedRedirect(value) {
       const url = new URL(value);
-      if (url.protocol !== "https:" || url.username || url.password) throw new Error("invalid_redirect");
+      const loopback = url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+      if ((url.protocol !== "https:" && !loopback) || url.username || url.password) throw new Error("invalid_redirect");
+      return url;
+    }
+    function oauthRedirect(value) {
+      const url = allowedRedirect(value);
       // Only an Auth response supplies this URL; the page's query never does.
       session = null;
       window.location.assign(url.href);
@@ -39,9 +46,8 @@ export const oauthConsentBrowserScript = `
       try {
         const details = await getAuthorizationDetails();
         if (details.redirect_url) { oauthRedirect(details.redirect_url); return; }
-        const redirect = new URL(details.redirect_uri);
-        if (redirect.protocol !== "https:" || redirect.username || redirect.password
-          || typeof details.client?.name !== "string" || typeof details.scope !== "string") throw new Error("invalid_details");
+        allowedRedirect(details.redirect_uri);
+        if (typeof details.client?.name !== "string" || typeof details.scope !== "string") throw new Error("invalid_details");
         byId("client-name").textContent = details.client.name;
         byId("client-redirect").textContent = details.redirect_uri;
         byId("client-scopes").textContent = details.scope || "Basic account access";
