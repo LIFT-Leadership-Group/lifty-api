@@ -12,6 +12,17 @@ assume a CRM or make a separate CRM subscription a prerequisite for Lifty.
 Leads and research remain in the Lifty workspace, and outreach setup can proceed
 without an external CRM connection.
 
+CRM connection is separate from customer-data access. A founder may use the
+CRM only to receive leads and decline customer reads. Read
+`customer_exclusions_source_choice_get` (summary_context task
+customer-exclusions) for their explicit choice. Only `crm` authorizes its
+selected sources; provider grants or a successful connection do not establish
+consent. Offer CRM exclusions, a customer file, or neither only while the saved
+choice is `unselected`; save their answer with
+`customer_exclusions_source_choice_post` and the current version. Do not ask
+again after a saved choice. A file upload does not change this choice. Every
+saved exclusion remains enforced after customer reads are turned off.
+
 HubSpot and Attio connect through this stage. Offer the one the founder uses.
 An Attio founder gets Attio consent, never a HubSpot link, and the reverse. For
 any other CRM, explain that this Lifty connection flow does not support it yet
@@ -46,6 +57,9 @@ show the real returned link. The founder selects and authorizes the account in
 the CRM itself, not by sending credentials or tokens in chat. Retain
 `attempt_ref` and verify it with GET after consent. No missing field
 questionnaire precedes the link. Connecting never starts outreach.
+For enabled, authorized customer sources, connection and reconnection queue a
+durable customer-list refresh even if the saved list is already fresh. Declined
+sources are never queued. A queued refresh is pending, not current protection.
 
 For HubSpot's initial required company setup, follow
 `references.company_mapping` using `mapping_context` and PATCH. That bounded
@@ -119,6 +133,9 @@ To disconnect the CRM, use `disconnect` only after the founder confirms.
 It is refused while a sync runs. Records already written stay in the CRM.
 Lifty deletes its Attio token; the founder can also remove the Lifty app in
 Attio's settings.
+Disconnect keeps the saved customer list; outreach continues using those
+exclusions and reports the disconnected source. It never clears exclusions or
+changes the founder's saved customer-source choice.
 `client_mapping_context` and `client_mapping_apply` run the bounded company
 mapping for an explicitly named workspace you belong to; the plan's
 `workspace_ref` selects that workspace.

@@ -23,15 +23,17 @@ const receipt = {
 const csv = 'domain,email,name\r\nHTTPS://WWW.Customer.Example/path,VIP@Customer.Example,"Doe, Jane"\r\ncustomer.example.,vip@customer.example,Duplicate\r\nGMAIL.COM,Founder+test@Gmail.com,Free mail\r\n,Existing@Sub.Business.Example,\r\nbad domain,broken@@example.com,\r\ngmail.com,,\r\n,,\r\nrelativeonly,person@business.example,\r\nanother.example,,\r\n';
 const { workspace_ref: _capturedRef, ...crmRefresh } = sqlFreshness;
 const freshnessFor = (ref: string) => ({ ...sqlFreshness, workspace_ref: ref });
+const sourceChoice = { workspace_ref: workspace, mode: "unselected", provider: null, sources: [], version: 0, updated_at: null, refresh_pending: false };
 type Rpc = (name: string, args: Record<string, unknown>) => unknown;
 function harness(rpc: Rpc = name => name === "get_workspace_suppression_freshness" ? freshnessFor(workspace)
-  : name.startsWith("get_") ? { ...receipt, candidates_excluded: 17 } : receipt) {
+  : name === "get_workspace_customer_source_choice" ? sourceChoice
+  : name.startsWith("get_") ? { ...receipt, candidates_excluded: 17 } : receipt, workspaceRef?: string) {
   const client = { rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
     try { return { data: await rpc(name, args), error: null }; } catch (error) { return { data: null, error }; }
   }) };
   const provider = vi.fn();
   const app = createApp({
-    authenticate: async () => ({ ok: true, session: { userId: "founder", client } }), log: () => {},
+    authenticate: async () => ({ ok: true, session: { userId: "founder", client, ...(workspaceRef ? { workspaceRef } : {}) } }), log: () => {},
     enqueueFirstRun: provider, startHubspotConnect: provider, startAttioConnect: provider,
   });
   const headers = { authorization: "Bearer session", "x-lifty-client-contract": STAGE_CLIENT_CONTRACT, "x-lifty-workspace": "example" };
@@ -39,8 +41,76 @@ function harness(rpc: Rpc = name => name === "get_workspace_suppression_freshnes
   const upload = (body: unknown) => app.request("/v1/workspace/customer-exclusions/import", {
     method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(body),
   });
-  return { app, read, upload, client, provider };
+  const choice = (body?: unknown) => app.request("/v1/workspace/customer-exclusions/source-choice", {
+    method: body === undefined ? "GET" : "POST", headers: { ...headers, "content-type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  return { app, read, upload, choice, client, provider };
 }
+
+describe("explicit customer source choice", () => {
+  it("reads an unselected choice without treating a CRM connection as consent", async () => {
+    const h = harness();
+    const response = await h.choice();
+    expect([response.status, await response.json()]).toEqual([200, sourceChoice]);
+    expect(h.client.rpc).toHaveBeenCalledExactlyOnceWith("get_workspace_customer_source_choice", { p_workspace: null });
+    expect(h.provider).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { mode: "crm", provider: "hubspot", sources: ["crm_closed_won", "crm_customer"], expected_version: 0 },
+    { mode: "file", provider: null, sources: [], expected_version: 1 },
+    { mode: "none", provider: null, sources: [], expected_version: 2 },
+  ])("saves the explicit $mode choice through its versioned member RPC", async input => {
+    const saved = { ...sourceChoice, ...input, version: input.expected_version + 1, updated_at: "2026-10-07T12:00:00Z" };
+    delete (saved as Record<string, unknown>).expected_version;
+    const h = harness(() => saved);
+    const response = await h.choice(input);
+    expect([response.status, await response.json()]).toEqual([200, saved]);
+    expect(h.client.rpc).toHaveBeenCalledExactlyOnceWith("set_workspace_customer_source_choice", {
+      p_workspace: null, p_mode: input.mode, p_provider: input.provider, p_sources: input.sources, p_expected_version: input.expected_version,
+    });
+    expect(h.provider).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { mode: "crm", provider: null, sources: ["crm_closed_won"], expected_version: 0 },
+    { mode: "crm", provider: "attio", sources: [], expected_version: 0 },
+    { mode: "crm", provider: "hubspot", sources: ["crm_customer", "crm_customer"], expected_version: 0 },
+    { mode: "none", provider: "hubspot", sources: [], expected_version: 0 },
+    { mode: "file", provider: null, sources: ["crm_customer"], expected_version: 0 },
+    { mode: "none", provider: null, sources: [], expected_version: 0, workspace_ref: workspace },
+  ])("refuses invalid or foreign choice inputs before a mutation", async input => {
+    const h = harness();
+    const response = await h.choice(input);
+    expect([response.status, (await response.json()).error.code]).toEqual([422, "CUSTOMER_SOURCE_CHOICE_INVALID"]);
+    expect(h.client.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([["CUSTOMER_SOURCE_CHOICE_MOVED", "PT409", 409], ["CUSTOMER_SOURCE_CHOICE_INVALID", "PT422", 422]] as const)("preserves the typed %s error", async (code, dbCode, status) => {
+    const h = harness(() => { throw { code: dbCode, message: code, details: "private data" }; });
+    const response = await h.choice({ mode: "none", provider: null, sources: [], expected_version: 0 });
+    expect([response.status, (await response.json()).error.code]).toEqual([status, code]);
+  });
+
+  it("forwards the named admin workspace and rejects a receipt from another tenant", async () => {
+    const h = harness(() => ({ ...sourceChoice, workspace_ref: "33333333-3333-4333-8333-333333333333" }), workspace);
+    const response = await h.choice();
+    expect([response.status, (await response.json()).error.code]).toEqual([403, "WORKSPACE_FORBIDDEN"]);
+    expect(h.client.rpc).toHaveBeenCalledExactlyOnceWith("get_workspace_customer_source_choice", { p_workspace: workspace });
+  });
+
+  it("keeps unavailable choices unknown and authenticates before reads or writes", async () => {
+    const h = harness(() => { throw { code: "PGRST202", message: "private database detail" }; });
+    const response = await h.choice();
+    const body = await response.text();
+    expect([response.status, JSON.parse(body).error.code]).toEqual([502, "CUSTOMER_SOURCE_CHOICE_UNAVAILABLE"]);
+    expect(body).not.toContain("private database detail");
+    const app = createApp();
+    expect((await app.request("/v1/workspace/customer-exclusions/source-choice")).status).toBe(401);
+    expect((await app.request("/v1/workspace/customer-exclusions/source-choice", { method: "POST", body: JSON.stringify({ mode: "none", provider: null, sources: [], expected_version: 0 }) })).status).toBe(401);
+  });
+});
 
 describe("customer exclusion file import", () => {
   it("normalizes, deduplicates, protects free-mail people exactly and reports rejected row numbers", async () => {
@@ -112,7 +182,7 @@ describe("customer exclusion status and transport", () => {
     const h = harness(name => name === "get_workspace_suppression_freshness" ? freshnessFor(sqlReceipt.get.workspace_ref)
       : name.startsWith("get_") ? sqlReceipt.get : sqlReceipt.replace);
     const read = await h.read();
-    expect([read.status, await read.json()]).toEqual([200, { ...sqlReceipt.get, crm_refresh: crmRefresh }]);
+    expect([read.status, await read.json()]).toEqual([200, { ...sqlReceipt.get, crm_refresh: crmRefresh, source_choice: null }]);
     const replaced = await h.upload({ csv });
     expect([replaced.status, await replaced.json()]).toEqual([200, sqlReceipt.replace]);
   });
@@ -121,14 +191,15 @@ describe("customer exclusion status and transport", () => {
     const h = harness();
     const response = await h.read();
     expect([response.status, response.headers.get("cache-control"), await response.json()])
-      .toEqual([200, "no-store", { ...receipt, candidates_excluded: 17, crm_refresh: crmRefresh }]);
+      .toEqual([200, "no-store", { ...receipt, candidates_excluded: 17, crm_refresh: crmRefresh, source_choice: sourceChoice }]);
     expect(h.client.rpc.mock.calls).toEqual([
       ["get_workspace_customer_exclusions", { p_workspace: null }],
       ["get_workspace_suppression_freshness", { p_workspace: null }],
+      ["get_workspace_customer_source_choice", { p_workspace: null }],
     ]);
     expect(h.provider).not.toHaveBeenCalled();
     expect((await h.read(`?workspace_ref=${workspace}`)).status).toBe(400);
-    expect(h.client.rpc).toHaveBeenCalledTimes(2);
+    expect(h.client.rpc).toHaveBeenCalledTimes(3);
   });
 
   it.each([
@@ -139,7 +210,20 @@ describe("customer exclusion status and transport", () => {
     const h = harness(name => name === "get_workspace_suppression_freshness" ? freshness() : { ...receipt, candidates_excluded: 17 });
     const response = await h.read();
     const body = await response.text();
-    expect([response.status, JSON.parse(body)]).toEqual([200, { ...receipt, candidates_excluded: 17, crm_refresh: null }]);
+    expect([response.status, JSON.parse(body)]).toEqual([200, { ...receipt, candidates_excluded: 17, crm_refresh: null, source_choice: null }]);
+    expect(body).not.toContain("private database detail");
+  });
+
+  it.each([
+    ["an unavailable read", () => { throw { code: "PGRST202", message: "private database detail" }; }],
+    ["a malformed choice", () => ({ ...sourceChoice, mode: "crm", provider: null })],
+    ["a foreign choice", () => ({ ...sourceChoice, workspace_ref: "33333333-3333-4333-8333-333333333333" })],
+  ])("keeps CRM freshness and saved exclusions readable with a null source choice on %s", async (_name, choice) => {
+    const h = harness(name => name === "get_workspace_customer_source_choice" ? choice()
+      : name === "get_workspace_suppression_freshness" ? freshnessFor(workspace) : receipt);
+    const response = await h.read();
+    const body = await response.text();
+    expect([response.status, JSON.parse(body)]).toEqual([200, { ...receipt, crm_refresh: crmRefresh, source_choice: null }]);
     expect(body).not.toContain("private database detail");
   });
 
@@ -177,15 +261,24 @@ describe("customer exclusion status and transport", () => {
     expect(Object.entries(context.operations!).map(([key, op]) => [key, op.method, op.cli?.operation, op.route])).toEqual([
       ["status", "GET", "status", "/v1/workspace/customer-exclusions"],
       ["import", "POST", "import", "/v1/workspace/customer-exclusions/import"],
+      ["source_choice_get", "GET", "source-choice", "/v1/workspace/customer-exclusions/source-choice"],
+      ["source_choice_post", "POST", "source-choice", "/v1/workspace/customer-exclusions/source-choice"],
     ]);
     const tools = Object.fromEntries(getStageMcpTools().map(tool => [tool.name, tool]));
     expect(tools.customer_exclusions_status?.annotations.readOnlyHint).toBe(true);
     expect(tools.customer_exclusions_import?.description).toContain("Writes commit synchronously");
+    expect(tools.customer_exclusions_source_choice_get?.annotations.readOnlyHint).toBe(true);
+    expect(tools.customer_exclusions_source_choice_post?.annotations.readOnlyHint).toBe(false);
     const result = await callStageMcpTool("customer_exclusions_status", { workspace: "example" }, new Request("https://api.example/mcp", {
       headers: { authorization: "Bearer session" },
     }), async (route, init) => h.app.request(route, init));
-    expect(result.structuredContent).toEqual({ status: 200, data: { ...receipt, candidates_excluded: 17, crm_refresh: crmRefresh } });
+    expect(result.structuredContent).toEqual({ status: 200, data: { ...receipt, candidates_excluded: 17, crm_refresh: crmRefresh, source_choice: sourceChoice } });
+    const choiceResult = await callStageMcpTool("customer_exclusions_source_choice_get", { workspace: "example" }, new Request("https://api.example/mcp", {
+      headers: { authorization: "Bearer session" },
+    }), async (route, init) => h.app.request(route, init));
+    expect(choiceResult.structuredContent).toEqual({ status: 200, data: sourceChoice });
     const openapi = await (await h.app.request("/openapi.json")).json();
     expect(openapi.paths["/v1/workspace/customer-exclusions/import"].post.requestBody.content["application/json"].schema.properties.csv.type).toBe("string");
+    expect(openapi.paths["/v1/workspace/customer-exclusions/source-choice"].post.requestBody.content["application/json"].schema.properties.expected_version.type).toBe("integer");
   });
 });

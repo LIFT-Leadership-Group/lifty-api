@@ -101,6 +101,7 @@ async function nextStep(state: Partial<typeof base>) {
     getHubspotConnection: async () => ({ provider: "hubspot", status: "not_connected" }),
     getAttioConnection: async () => ({ provider: "attio", status: "not_connected" }),
     getCrmSyncStatus: async () => ({ state: "none" }),
+    customerExclusionsOperation: async () => ({ workspace_ref: workspaceRef, mode: "unselected", provider: null, sources: [], version: 0, updated_at: null, refresh_pending: false }),
     getEmailWarmup: async () => current.warmup,
     getEmailPlacement: async () => current.placement,
     researchOperation: async () => schedule(current.plan),

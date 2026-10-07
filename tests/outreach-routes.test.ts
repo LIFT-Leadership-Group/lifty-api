@@ -66,12 +66,21 @@ describe("canonical Outreach member transport", () => {
   it("publication and activation use different exact contracts; approval alone selects nothing and grants no intent", async () => {
     const published = { ...campaign, version: 2, draft_revision: revision(policy, true), revisions: [revision(policy, true)] };
     const h = harness(name => name === "publish_lifty_campaign" ? { workspace, campaign: published }
-      : { workspace, campaign: { ...published, version: 3, state: "active", active_revision: revision(policy, true) }, journey: { ...journey, executable_version: executableVersion } });
+      : { workspace, campaign: { ...published, version: 3, state: "active", active_revision: revision(policy, true) }, journey: { ...journey, executable_version: executableVersion },
+        customer_list: { state: "fresh", reason: null, checked_at: "2026-10-07T04:05:00.123+00:00" } });
     const pub = await (await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/publish`, { expected_version: 1, revision_ref: revisionRef, digest })).json();
     expect(pub.campaign).toMatchObject({ state: "inactive", active_revision: null, draft_revision: { approval: { actor_ref: senderId } } });
     const activated = await (await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 2, revision_ref: revisionRef, digest })).json();
     expect(activated.journey.executable_version).toEqual(executableVersion); expect(activated.campaign.state).toBe("active");
+    expect(activated.customer_list).toEqual({ state: "fresh", reason: null, checked_at: "2026-10-07T04:05:00.123+00:00" });
     expect(h.rpc.mock.calls.map(call => call[0])).toEqual(["publish_lifty_campaign", "activate_lifty_campaign"]);
+  });
+  it("LIF-1128: refuses activation while the CRM customer list is not current and says where to read why", async () => {
+    const h = harness(() => { throw { code: "PT409", message: "OUTREACH_CUSTOMER_LIST_NOT_CURRENT" }; });
+    const response = await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 2, revision_ref: revisionRef, digest });
+    const { error } = await response.json();
+    expect([response.status, error.code]).toEqual([409, "OUTREACH_CUSTOMER_LIST_NOT_CURRENT"]);
+    expect(error.message).toContain("crm_refresh");
   });
   it("never confirms a wrong approval digest, an unselected or paused activation, or a version pinning another revision", async () => {
     const other = { ...executableVersion, campaigns: [{ ...executableVersion.campaigns[0]!, revision: { revision_ref: senderId, digest } }] };

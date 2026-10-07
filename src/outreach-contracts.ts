@@ -247,7 +247,12 @@ export const JourneySummarySchema = z.object({ journey_ref: Ref, version: Versio
   draft_revision: RevisionSummarySchema, executable_version: ExecutableVersionSchema.nullable() }).strict();
 export const JourneysSchema = z.object({ ...Workspace, journeys: z.array(JourneySummarySchema).max(100), next_cursor: Ref.nullable() }).strict();
 export const CampaignsSchema = z.object({ ...Workspace, campaigns: z.array(CampaignSummarySchema).max(100), next_cursor: Ref.nullable() }).strict();
-export const CampaignActivationResultSchema = CampaignResultSchema.extend({ journey: JourneySchema }).strict();
+// LIF-1128: the CRM customer-list decision the activation was accepted under.
+// Optional so the API can deploy before the database adds it.
+const CustomerListReceiptSchema = z.object({
+  state: z.enum(["fresh", "stale", "missing", "not_required"]), reason: z.string().max(100).nullable(), checked_at: z.iso.datetime({ offset: true }),
+}).strict();
+export const CampaignActivationResultSchema = CampaignResultSchema.extend({ journey: JourneySchema, customer_list: CustomerListReceiptSchema.optional() }).strict();
 export type JourneyPolicy = z.infer<typeof JourneyPolicySchema>;
 export type CampaignPolicy = z.infer<typeof CampaignPolicySchema>;
 

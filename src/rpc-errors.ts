@@ -58,6 +58,7 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   OUTREACH_REVISION_MISMATCH: "Read the resource and use its exact revision and digest.",
   OUTREACH_APPROVAL_REQUIRED: "Publish the exact chosen revision before activating it.",
   OUTREACH_CONFIGURATION_REQUIRED: "Activate the approved Journey and the Campaign that starts it; the executable version is derived from them.",
+  OUTREACH_CUSTOMER_LIST_NOT_CURRENT: "An enabled CRM customer source is missing or out of date. Read customer-exclusions status for its crm_refresh reason and repair that source; activate again once it is current. The founder can explicitly choose file-only or neither instead. Saved exclusions and started Journeys remain protected.",
   OUTREACH_MESSAGE_MOVED: "This message is no longer the exact unapproved draft you read. Read its current review state before retrying.",
   OUTREACH_SEND_UNCONFIRMED: "This message has begun, unknown or confirmed sending work. Read its saved evidence before changing it; repeating a send could duplicate it.",
   OUTREACH_TARGET_STOPPED: "Outreach has stopped for this person. Read its current state before reviewing more messages.",
@@ -81,6 +82,8 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   CUSTOMER_EXCLUSIONS_INVALID: "Repair the customer CSV using the current import schema.",
   CUSTOMER_EXCLUSIONS_TOO_LARGE: "The customer list exceeds the import limit. Use the current CSV size and row limits.",
   CUSTOMER_EXCLUSIONS_REVISION_CONFLICT: "This import revision already records different customer data. Read status and import the intended file again.",
+  CUSTOMER_SOURCE_CHOICE_INVALID: "Choose the current CRM provider and authorized sources, or choose file/none with a null provider and no CRM sources.",
+  CUSTOMER_SOURCE_CHOICE_MOVED: "The customer-source choice changed. Read its current version and save only the founder's intended choice again.",
   // Calibration sample runs.
   RUN_NOT_CONFIGURED:
     "Save targeting and research criteria before starting the sample.",

@@ -1387,6 +1387,11 @@
       "name": "LIF1188 Contract",
       "state": "ready_for_connections",
       "workspace_ref": "b4c08e54-c08d-4c81-9a94-2939259020c0"
+    },
+    "customer_list": {
+      "state": "not_required",
+      "reason": null,
+      "checked_at": "2026-10-06T23:06:30.177943+00:00"
     }
   }
 }
