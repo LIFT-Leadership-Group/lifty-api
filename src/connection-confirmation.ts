@@ -11,18 +11,27 @@ export const CONNECTION_FLOWS = {
   slack: { path:'/slack/callback', label:'Slack', entries:['/slack/start'] },
   attio: { path:'/attio/callback', label:'Attio', entries:['/attio/start'] },
   warmup: { path:'/warmup/google/callback', label:'email warmup', entries:['/warmup/setup','/warmup/received'] },
-  email: { path:'/connect/email/return', label:'email', entries:['/connect/email'] },
-  linkedin: { path:'/connect/linkedin/return', label:'LinkedIn', entries:['/connect/linkedin'] },
+  email: { path:'/connect/email/return', label:'email', entries:['/connect/email'], retry:'/connect/email' },
+  linkedin: { path:'/connect/linkedin/return', label:'LinkedIn', entries:['/connect/linkedin'], retry:'/connect/linkedin' },
 } as const;
 export type ConnectionFlow = keyof typeof CONNECTION_FLOWS;
+/**
+ * What the page tells the person while the attempt is still pending: why the
+ * provider refused the sign-in (with a retry of the same attempt where one can
+ * work), or that a warmup handoff is starting. Never terminal evidence.
+ */
+export const ConfirmationAttention = z.enum(['released','exists','in_use','already_connected','canceled','provider','starting']);
+export type ConfirmationAttention = z.infer<typeof ConfirmationAttention>;
 export const ConfirmationResult = z.discriminatedUnion('status', [
-  z.object({status:z.literal('pending')}),
+  z.object({status:z.literal('pending'), attention:ConfirmationAttention.optional()}),
   z.object({status:z.literal('connected'), account:z.string().max(254).nullable()}),
   z.object({status:z.literal('failed'), reason:z.enum(['canceled','exists','provider','verification','ended','invalid'])}),
 ]);
 export type ConfirmationResult = z.infer<typeof ConfirmationResult>;
 const Input = z.strictObject({state:z.string().min(1).max(4096),code:z.string().min(1).max(4096).optional(),
-  denied:z.boolean().optional(),errorType:z.string().max(100).optional()});
+  denied:z.boolean().optional(),errorType:z.string().max(100).optional(),
+  // The provider account a refusal names (api/already_exists); an untrusted hint.
+  errorDetail:z.string().regex(/^acc_[A-Za-z0-9_-]{1,251}$/).optional()});
 export type ConfirmationInput = z.infer<typeof Input>;
 export interface ConfirmationAdapter {
   origin?:string;
@@ -54,13 +63,30 @@ export const invalidConfirmation = ():ConfirmationResult => ({status:'failed',re
 export const CONFIRMATION_SCRIPT = String.raw`(async function(){
 var url=new URL(location.href),q=url.searchParams,root=document.getElementById('confirmation'),key=root.dataset.stateKey,body={state:q.get(key)||''};
 var code=q.get('code'),denied=q.has('error'),errorType=q.get('error_type')||(q.has('error_title')?'provider_rejected':'');
+var errorDetail=errorType==='api/already_exists'&&/^acc_[A-Za-z0-9_-]{1,251}$/.test(q.get('error_detail')||'')?q.get('error_detail'):'';
 var title=document.getElementById('confirmation-title'),detail=document.getElementById('confirmation-detail'),spinner=document.getElementById('confirmation-spinner');
-var label=root.dataset.label,warmup=root.dataset.warmup==='true',finished=false;
-url.search='';url.searchParams.set(key,body.state);history.replaceState(null,'',url.pathname+url.search);
+var actions=document.getElementById('confirmation-actions'),retry=document.getElementById('confirmation-retry');
+var label=root.dataset.label,warmup=root.dataset.warmup==='true',finished=false,shown='',until=Date.now()+90000,delay=1000,cap=8000;
+url.search='';url.searchParams.set(key,body.state);if(errorType)url.searchParams.set('error_type',errorType);if(errorDetail)url.searchParams.set('error_detail',errorDetail);history.replaceState(null,'',url.pathname+url.search);
+var notes={
+ released:['Try connecting again','This '+label+' account was still linked to an earlier Lifty connection, which stopped the sign-in. Lifty removed that old link. Try again and choose the same account.',1],
+ exists:['This account is already linked','This '+label+' account is already linked to Lifty, so it could not be added again. Try again, or return to Lifty if it keeps happening.',1],
+ in_use:['Connected in another workspace','This '+label+' account is connected in another Lifty workspace. Disconnect it there first, or try again with a different account.',1],
+ already_connected:['Already connected','This '+label+' account is already connected to this workspace. Return to Lifty to continue.',0],
+ canceled:['Sign-in not finished','The sign-in was canceled before it finished. Try again when you are ready.',1],
+ provider:['The sign-in did not finish','The sign-in stopped before Lifty received the account. Try again. If it fails again, return to Lifty for help.',1],
+ starting:['Starting warmup','Google access is confirmed. Warmup usually starts within 20 minutes, and this page updates when it does. You can also close it and return to Lifty.',0]
+};
+function attend(attention){
+ var note=notes[attention];if(!note||shown===attention)return;shown=attention;
+ title.textContent=note[0];detail.textContent=note[1];spinner.hidden=attention!=='starting';
+ if(note[2]&&root.dataset.retry){retry.href=root.dataset.retry+'?'+key+'='+encodeURIComponent(body.state);actions.hidden=false;}else actions.hidden=true;
+ if(attention==='starting'){until=Math.max(until,Date.now()+1500000);cap=30000;}
+}
 function show(result){
  if(finished||!result||!['pending','connected','failed'].includes(result.status))return;
- if(result.status==='pending')return;
- finished=true;spinner.hidden=true;
+ if(result.status==='pending'){if(result.attention)attend(result.attention);return;}
+ finished=true;spinner.hidden=true;actions.hidden=true;
  if(result.status==='connected'){title.textContent=warmup?'Warmup is running':label+' is connected';detail.textContent='Lifty verified '+(result.account||'the connection')+'. Return to Lifty to continue. Connecting does not start outreach.';if(label==='Slack')detail.textContent+=' Invite @Lifty to the channel where you want notifications, then tell Lifty which channel you chose.';}
  else{title.textContent='Connection needs attention';detail.textContent=result.reason==='canceled'?'Authorization was not completed. Return to Lifty to check this attempt.':result.reason==='verification'?'The selected account could not be verified. Return to Lifty for help.':'Return to Lifty to check this attempt and the next step before requesting another link.';if(label==='HubSpot'&&result.reason==='canceled')detail.textContent+=' If permissions were blocked, ask a HubSpot super admin to approve Lifty in Settings > Integrations > Connected Apps > Approved apps.';}
 }
@@ -70,15 +96,16 @@ async function request(stage,payload,ms){
 }
 if(code||denied){var submission=Object.assign({},body,code?{code:code}:{denied:true});code=null;request('process',submission,50000);}
 if(errorType)body.errorType=errorType;
-var until=Date.now()+90000,delay=1000;
-while(!finished&&Date.now()<until){await request('status',body,10000);if(finished)break;await new Promise(function(resolve){setTimeout(resolve,delay)});delay=Math.min(delay*2,8000);}
-if(!finished){spinner.hidden=true;title.textContent='Still checking';detail.textContent='The result is not confirmed yet. Return to Lifty to check this same attempt. Do not repeat authorization just because this page timed out.';}
+if(errorDetail)body.errorDetail=errorDetail;
+while(!finished&&Date.now()<until){await request('status',body,10000);if(finished)break;await new Promise(function(resolve){setTimeout(resolve,delay)});delay=Math.min(delay*2,cap);}
+if(!finished&&(!shown||shown==='starting')){spinner.hidden=true;actions.hidden=true;title.textContent='Still checking';detail.textContent='The result is not confirmed yet. Return to Lifty to check this same attempt. Do not repeat authorization just because this page timed out.';}
 })();`;
 const scriptHash = createHash('sha256').update(CONFIRMATION_SCRIPT).digest('base64');
+const actionStyles = '.actions{margin:24px 0 0}.actions a{display:inline-flex;align-items:center;min-height:50px;padding:12px 26px;border:1px solid hsl(99 34% 65% / .75);border-radius:9px;background:var(--lime);color:var(--paper);font-weight:600;text-decoration:none}.actions a:hover{background:var(--lime-hover)}';
 export function renderConfirmationPage(flow:ConnectionFlow, valid=true) {
-  const {label}=CONNECTION_FLOWS[flow];
-  return renderLiftyPage({title:valid?'Checking your connection':'Connection needs attention',content:
-    `<section id="confirmation" data-label="${label}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}" aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${valid?'Checking your connection':'Connection needs attention'}</h1><p id="confirmation-detail" class="intro">${valid?'Lifty is verifying your '+label+' connection. This page will update automatically.':'Return to Lifty to check this attempt and get the next step.'}</p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
+  const definition:{label:string;retry?:string}=CONNECTION_FLOWS[flow], {label}=definition;
+  return renderLiftyPage({title:valid?'Checking your connection':'Connection needs attention',styles:actionStyles,content:
+    `<section id="confirmation" data-label="${label}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}"${definition.retry?` data-retry="${definition.retry}"`:''} aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${valid?'Checking your connection':'Connection needs attention'}</h1><p id="confirmation-detail" class="intro">${valid?'Lifty is verifying your '+label+' connection. This page will update automatically.':'Return to Lifty to check this attempt and get the next step.'}</p><p id="confirmation-actions" class="actions" hidden><a id="confirmation-retry" href="">Try again</a></p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
 }
 export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string};
 export function createConfirmationRouter(flow:ConnectionFlow, adapter:ConfirmationAdapter, options:{prefix?:string;origin?:string;log?:(event:ConfirmationLog)=>void}={}) {

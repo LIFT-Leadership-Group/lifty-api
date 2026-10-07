@@ -47,6 +47,10 @@ never report an account as disconnected or missing from a failed read.
    live in another workspace; another link will not fix it), `identity_mismatch`
    (another mailbox/profile signed in), `provider_rejected` (offer one new
    attempt, then ask for LIFT review). `expired`: start a new connect.
+   When the sign-in is refused, the return page says why and offers "Try
+   again" with the same link until the attempt expires. If it says an earlier
+   Lifty connection still held the account, Lifty already removed that old
+   link; the person signs in again with the same account.
 
 Connecting never activates a campaign or sends anything.
 
@@ -142,7 +146,9 @@ setup, report the actual blocker and involve support. Do not create another
 account or invent a link.
 
 After the founder finishes, read `warmup_status` again. The state moves from
-waiting for authorization to warming after Lifty's next check.
+waiting for authorization to warming after Lifty's next check. The setup page
+says warmup is starting and usually starts within 20 minutes; that wait is
+normal, not a stuck setup.
 `warmup_start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
 verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
 another Lifty workspace already warms the same mailbox. It fails with

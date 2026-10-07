@@ -83,7 +83,7 @@ export function createAccountConnectRouter(connection: AccountConnection,
     app.route("/", createConfirmationRouter(channel, {
       validate: input => { connection.validate(channel, input.state); },
       // The provider returns without a code; status alone reads/reconciles the attempt.
-      status: input => connection.confirm(channel, input.state, hostedReturnError(input.errorType)),
+      status: input => connection.confirm(channel, input.state, hostedReturnError(input.errorType), input.errorDetail),
     }, { origin: options.origin, ...(options.log ? { log: options.log } : {}) }));
   }
   return app;
