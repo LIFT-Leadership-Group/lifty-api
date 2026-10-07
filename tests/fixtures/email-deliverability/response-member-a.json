@@ -498,6 +498,21 @@
      "holds": []
     }
    ],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends not shown",
+     "tone": "muted",
+     "description": "Another workspace also uses this inbox, so its sends today aren't shown here. This workspace's limit is 10 a day.",
+     "reasons": []
+    },
+    "limit": 10,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": "UTC",
+    "day_started_at": "2026-09-29T00:00:00.000Z",
+    "resets_at": "2026-09-30T00:00:00.000Z"
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": true,
@@ -755,6 +770,21 @@
     "human": null
    },
    "connections": [],
+   "sending": {
+    "state": {
+     "code": "not_set",
+     "label": "No Lifty daily limit",
+     "tone": "muted",
+     "description": "No email connection in Lifty sends from this inbox, so Lifty sets no daily limit for it. Sends from other tools aren't counted here.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": false,
@@ -1379,6 +1409,21 @@
     "human": "A human note"
    },
    "connections": [],
+   "sending": {
+    "state": {
+     "code": "not_set",
+     "label": "No Lifty daily limit",
+     "tone": "muted",
+     "description": "No email connection in Lifty sends from this inbox, so Lifty sets no daily limit for it. Sends from other tools aren't counted here.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": true,
@@ -1564,6 +1609,21 @@
     "human": null
    },
    "connections": [],
+   "sending": {
+    "state": {
+     "code": "not_set",
+     "label": "No Lifty daily limit",
+     "tone": "muted",
+     "description": "No email connection in Lifty sends from this inbox, so Lifty sets no daily limit for it. Sends from other tools aren't counted here.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": false,
@@ -1935,6 +1995,21 @@
      ]
     }
    ],
+   "sending": {
+    "state": {
+     "code": "available",
+     "label": "6 of 10 left today",
+     "tone": "ok",
+     "description": "Lifty has used 4 of this inbox's 10 daily sends today, counting replies and sends in progress. The count resets at midnight (America/New_York). Room left today doesn't mean the inbox is ready; its status says whether campaigns can use it.",
+     "reasons": []
+    },
+    "limit": 10,
+    "used_today": 4,
+    "remaining_today": 6,
+    "timezone": "America/New_York",
+    "day_started_at": "2026-09-29T04:00:00.000Z",
+    "resets_at": "2026-09-30T04:00:00.000Z"
+   },
    "availability": {
     "smartlead_registry": false,
     "smartlead_warmup": false,

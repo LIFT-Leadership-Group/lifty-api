@@ -542,6 +542,21 @@
      "holds": []
     }
    ],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends unknown",
+     "tone": "muted",
+     "description": "This server doesn't report today's sends for this inbox. A missing count is not zero sends.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": true,
@@ -799,6 +814,21 @@
     "human": null
    },
    "connections": [],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends unknown",
+     "tone": "muted",
+     "description": "This server doesn't report today's sends for this inbox. A missing count is not zero sends.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": false,
@@ -1423,6 +1453,21 @@
     "human": "A human note"
    },
    "connections": [],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends unknown",
+     "tone": "muted",
+     "description": "This server doesn't report today's sends for this inbox. A missing count is not zero sends.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": true,
@@ -1608,6 +1653,21 @@
     "human": null
    },
    "connections": [],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends unknown",
+     "tone": "muted",
+     "description": "This server doesn't report today's sends for this inbox. A missing count is not zero sends.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": false,
@@ -1979,6 +2039,21 @@
      ]
     }
    ],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends unknown",
+     "tone": "muted",
+     "description": "This server doesn't report today's sends for this inbox. A missing count is not zero sends.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": false,
     "smartlead_warmup": false,
@@ -2304,6 +2379,21 @@
     "human": "B secret note"
    },
    "connections": [],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends unknown",
+     "tone": "muted",
+     "description": "This server doesn't report today's sends for this inbox. A missing count is not zero sends.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": true,
     "smartlead_warmup": true,
@@ -2506,6 +2596,21 @@
      "holds": []
     }
    ],
+   "sending": {
+    "state": {
+     "code": "unknown",
+     "label": "Today's sends unknown",
+     "tone": "muted",
+     "description": "This server doesn't report today's sends for this inbox. A missing count is not zero sends.",
+     "reasons": []
+    },
+    "limit": null,
+    "used_today": null,
+    "remaining_today": null,
+    "timezone": null,
+    "day_started_at": null,
+    "resets_at": null
+   },
    "availability": {
     "smartlead_registry": false,
     "smartlead_warmup": false,
