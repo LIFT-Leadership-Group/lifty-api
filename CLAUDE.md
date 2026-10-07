@@ -168,3 +168,15 @@ must be active before the Functions migration
 `20261008130000_lif1223_habitual_initial_placement.sql` ships: an older
 API rejects the new origin. The migration's result notices also need the
 matching Jobs revision first.
+
+## Warmup setup verification
+
+Once Mailivery accepts a founder's Google warmup handoff, the callback
+triggers the Jobs task `lifty-email-warmup-verify` (one run per OAuth attempt),
+which starts that binding and its habitual placement test right away instead
+of at the next scheduled passes. A failed trigger never fails the handoff; the
+scheduled reconcile still covers it. The Functions migration
+`20261008220000_warmup_receipt_started_placement.sql` makes the receipt count a
+just-started binding as connected and adds the optional `placement` (`when`,
+`notify`) the page promises. Without it the receipt still waits for the first
+scheduled readback, so ship Jobs and that migration before this revision.

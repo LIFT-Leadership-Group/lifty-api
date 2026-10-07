@@ -9,6 +9,8 @@ const CRM_SYNC_TASK_ID = "lifty-crm-sync";
 const CRM_MAPPING_TASK_ID = "lifty-crm-mapping-sync";
 const INTEGRATION_REVOKE_TASK_ID = "lifty-integration-revoke";
 const NOTIFICATION_DELIVERY_TASK_ID = "notification-delivery";
+const WARMUP_VERIFY_TASK_ID = "lifty-email-warmup-verify";
+const WARMUP_VERIFY_TIMEOUT_MS = 5000;
 const IDEMPOTENCY_TTL = "1h";
 
 export interface TriggerClientSettings {
@@ -119,6 +121,19 @@ export function createNotificationDeliveryTrigger(
       { deliveryId },
       `${NOTIFICATION_DELIVERY_TASK_ID}:${deliveryId}`,
     );
+}
+
+export type EnqueueWarmupVerify = (senderRef: string, attempt: string) => Promise<{ id: string }>;
+
+/** Mailivery accepted a founder's warmup handoff: Jobs verifies and starts that
+ * binding now instead of at its next scheduled pass. One run per OAuth attempt.
+ * Bounded, because it runs inside the founder's confirmation request. */
+export function createWarmupVerifyTrigger(settings: TriggerClientSettings): EnqueueWarmupVerify {
+  const fetchImpl = settings.fetchImpl ?? fetch;
+  const bounded: TriggerClientSettings = { ...settings,
+    fetchImpl: (input, init) => fetchImpl(input, { ...init, signal: AbortSignal.timeout(WARMUP_VERIFY_TIMEOUT_MS) }) };
+  return async (senderRef, attempt) =>
+    triggerTask(bounded, WARMUP_VERIFY_TASK_ID, { senderRef }, `${WARMUP_VERIFY_TASK_ID}:${attempt}`);
 }
 
 function enqueueFailed(cause: unknown): PublicError {

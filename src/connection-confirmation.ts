@@ -24,7 +24,9 @@ export const ConfirmationAttention = z.enum(['released','exists','in_use','alrea
 export type ConfirmationAttention = z.infer<typeof ConfirmationAttention>;
 export const ConfirmationResult = z.discriminatedUnion('status', [
   z.object({status:z.literal('pending'), attention:ConfirmationAttention.optional()}),
-  z.object({status:z.literal('connected'), account:z.string().max(254).nullable()}),
+  // Warmup only: when the placement test runs and where its result goes.
+  z.object({status:z.literal('connected'), account:z.string().max(254).nullable(),
+    placement:z.object({when:z.enum(['now','after_warmup']), notify:z.array(z.enum(['email','slack'])).max(2)}).optional()}),
   z.object({status:z.literal('failed'), reason:z.enum(['canceled','exists','provider','verification','ended','invalid'])}),
 ]);
 export type ConfirmationResult = z.infer<typeof ConfirmationResult>;
@@ -75,7 +77,7 @@ var notes={
  already_connected:['Already connected','This '+label+' account is already connected to this workspace. Return to Lifty to continue.',0],
  canceled:['Sign-in not finished','The sign-in was canceled before it finished. Try again when you are ready.',1],
  provider:['The sign-in did not finish','The sign-in stopped before Lifty received the account. Try again. If it fails again, return to Lifty for help.',1],
- starting:['Starting warmup','Google access is confirmed. Warmup usually starts within 20 minutes, and this page updates when it does. You can also close it and return to Lifty.',0]
+ starting:['Starting warmup','Google access is confirmed. Lifty is starting warmup now, usually within a few minutes, and this page updates when it does. You can also close it and return to Lifty.',0]
 };
 function attend(attention){
  var note=notes[attention];if(!note||shown===attention)return;shown=attention;
@@ -83,11 +85,18 @@ function attend(attention){
  if(note[2]&&root.dataset.retry){retry.href=root.dataset.retry+'?'+key+'='+encodeURIComponent(body.state);actions.hidden=false;}else actions.hidden=true;
  if(attention==='starting'){until=Math.max(until,Date.now()+1500000);cap=30000;}
 }
+function placement(p){
+ if(!p||(p.when!=='now'&&p.when!=='after_warmup'))return '';
+ var n=Array.isArray(p.notify)?p.notify:[],slack=n.indexOf('slack')>=0,email=n.indexOf('email')>=0;
+ var where=slack&&email?'on Slack and by email':slack?'on Slack':email?'by email':'';
+ if(p.when==='now')return ' Lifty is now sending one test email from this mailbox to about 20 to 40 test inboxes to see where your email lands. '+(where?'You will get the result '+where+', usually within 20 minutes.':'The result is usually ready in Lifty within 20 minutes.');
+ return ' When warmup ends, Lifty sends one test email from this mailbox to about 20 to 40 test inboxes'+(where?' and sends you the result '+where+'.':' and shows you the result in Lifty.');
+}
 function show(result){
  if(finished||!result||!['pending','connected','failed'].includes(result.status))return;
  if(result.status==='pending'){if(result.attention)attend(result.attention);return;}
  finished=true;spinner.hidden=true;actions.hidden=true;
- if(result.status==='connected'){title.textContent=warmup?'Warmup is running':label+' is connected';detail.textContent='Lifty verified '+(result.account||'the connection')+'. Return to Lifty to continue. Connecting does not start outreach.';if(label==='Slack')detail.textContent+=' Invite @Lifty to the channel where you want notifications, then tell Lifty which channel you chose.';}
+ if(result.status==='connected'){title.textContent=warmup?'Warmup is running':label+' is connected';detail.textContent='Lifty verified '+(result.account||'the connection')+'.'+(warmup?placement(result.placement):'')+' Return to Lifty to continue. Connecting does not start outreach.';if(label==='Slack')detail.textContent+=' Invite @Lifty to the channel where you want notifications, then tell Lifty which channel you chose.';}
  else{title.textContent='Connection needs attention';detail.textContent=result.reason==='canceled'?'Authorization was not completed. Return to Lifty to check this attempt.':result.reason==='verification'?'The selected account could not be verified. Return to Lifty for help.':'Return to Lifty to check this attempt and the next step before requesting another link.';if(label==='HubSpot'&&result.reason==='canceled')detail.textContent+=' If permissions were blocked, ask a HubSpot super admin to approve Lifty in Settings > Integrations > Connected Apps > Approved apps.';}
 }
 async function request(stage,payload,ms){
