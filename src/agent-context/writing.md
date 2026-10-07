@@ -151,8 +151,11 @@ change sequence length or add a new subject simply to fill the example.
 
 Use sample evidence to choose an angle that fits the selected audience. A fact
 about one sample company does not become true for every current or future lead.
-Legacy fixed workspace templates allow only `{{first_name}}`, `{{last_name}}`
-and `{{company_name}}`. Shared template banks have their existing slot catalog,
+Templates take placeholders in single braces. Lifty fills `{first_name}` and
+`{company}` (the company's spoken name) from each lead, and `{sender_first_name}`
+from the mailbox in email only; there is no last-name placeholder. Any other
+lower-case slot, such as `{pain}`, is written for each lead from the campaign
+instructions. Shared template banks have their existing slot catalog,
 and generate mode composes using the reusable overlay and each lead's evidence.
 Keep sample-specific facts out of universal instructions. Review saved examples
 as examples of that policy; they do not imply a fixed recipient list. Follow
@@ -163,8 +166,8 @@ individual campaign workflows only when explicitly requested.
 Every recommended email uses these six fields, in this order.
 
 1. Subject line. The same wording on emails 1-5.
-2. Address. Always `Hi {{first_name}},` or `Hey {{first_name}},`. Alternate
-   Hi, Hey, Hi, Hey, Hi. Never write `Hi.` or `Hey.` without `{{first_name}}`.
+2. Address. Always `Hi {first_name},` or `Hey {first_name},`. Alternate
+   Hi, Hey, Hi, Hey, Hi. Never write `Hi.` or `Hey.` without `{first_name}`.
    The recipient's first name belongs in this greeting on every email.
 3. Opener. One spoken line that humanizes the outreach. It sits on the
    next line after the greeting. It is a person starting a note, not a
@@ -206,11 +209,11 @@ show it. Overlays and template banks do not include one either.
 Jobs by step:
 
 - Emails 1-2 focus on a pain or problem this audience may recognize from the
-  saved offer. Ask; do not diagnose {{company_name}}. Do not pitch the
+  saved offer. Ask; do not diagnose {company}. Do not pitch the
   offer yet.
 - Emails 3-4 focus on the founder's product, offering, or solution for the
   pains named in 1-2. Email 4 continues that thread. Do not open with a
-  named customer's metric as if {{company_name}} already has that number.
+  named customer's metric as if {company} already has that number.
   Attribute proof to the named customer in the same thought. If a
   founder-confirmed website is saved, include that exact URL in 3 or 4.
   Do not invent a demo, method, or site. Email 3 may use: "Would you be
@@ -237,17 +240,17 @@ Email 1 has no opener.
 
 Email 1
 
-Hi {{first_name}},
+Hi {first_name},
 
 I'm Alex at Harborline. When a customer issue changes owners, the next person often has to rebuild the story. I started the company to help support teams keep that context with the ticket, so the new owner is not guessing.
 
 That is the window where they either inherit something usable or start over.
 
-Is getting that handoff written down part of what you're setting up at {{company_name}}?
+Is getting that handoff written down part of what you're setting up at {company}?
 
 Email 2
 
-Hey {{first_name}},
+Hey {first_name},
 
 Checking back in case this got buried.
 
@@ -255,11 +258,11 @@ When a new owner takes a ticket, they usually get the thread and still miss the 
 
 That is usually what I help unblock: they were asked to own the reply, but nobody handed them the context.
 
-Do you have a written handoff for the next person at {{company_name}}, or does it still live in someone's head?
+Do you have a written handoff for the next person at {company}, or does it still live in someone's head?
 
 Email 3
 
-Hi {{first_name}},
+Hi {first_name},
 
 I'll keep this short.
 
@@ -271,21 +274,21 @@ Would you be open to a 15min intro call later this week or next?
 
 Email 4
 
-Hey {{first_name}},
+Hey {first_name},
 
 Coming back one more time.
 
 Harborline is that written handoff plus a short weekly pass of the tickets that lost context. One team I work with stopped rebuilding the same story on every owner change.
 
-Would a short intro call next week make sense, so I can walk one {{company_name}} handoff with you?
+Would a short intro call next week make sense, so I can walk one {company} handoff with you?
 
 Email 5
 
-Hi {{first_name}},
+Hi {first_name},
 
 Last note from me.
 
-I'm assuming the timing is off, or this belongs to someone else at {{company_name}}.
+I'm assuming the timing is off, or this belongs to someone else at {company}.
 
 If someone there owns the queue or the handoffs, would you mind pointing me in their direction?
 
@@ -297,12 +300,12 @@ These examples assume a fictional business that helps support teams hand off
 customer issues. Use them to understand the writing choices, not as facts or
 approved copy for the current workspace. The sender is "Alex".
 
-LinkedIn, fragmented (do not write this): "Hi {{first_name}}, before the ticket
-is overdue at {{company_name}}, how does the next person pick up the context?"
+LinkedIn, fragmented (do not write this): "Hi {first_name}, before the ticket
+is overdue at {company}, how does the next person pick up the context?"
 The overdue-ticket clause and the handoff question are two jobs.
 
-LinkedIn, connected: "Hi {{first_name}}, I'm Alex at Harborline. When a
-customer issue changes owners at {{company_name}}, how does the next person
+LinkedIn, connected: "Hi {first_name}, I'm Alex at Harborline. When a
+customer issue changes owners at {company}, how does the next person
 pick up the context?"
 
 LinkedIn, scattered (do not write this): message 1 asks how they keep the
@@ -322,7 +325,7 @@ Composed email 1, as it should appear:
 
 Subject: When an issue changes owners
 
-Hi {{first_name}},
+Hi {first_name},
 
 I'm Alex at Harborline.
 
@@ -331,7 +334,7 @@ the story. That delay is what customers feel.
 
 That's the delay I keep seeing on those handoffs.
 
-How does the next person at {{company_name}} pick up the context today?
+How does the next person at {company} pick up the context today?
 
 Do not open with "Quick question". Later emails stay on that job, but each one
 uses new wording: 2 deepens the pain, 3-4 introduce the offer and the saved

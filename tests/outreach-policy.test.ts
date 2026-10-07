@@ -90,6 +90,21 @@ describe("supported Outreach policy boundary", () => {
     expect(create("email", splitThread).success).toBe(false);
     expect(create("email", { ...laned(), compose_mode: "generate" }).success).toBe(false);
   });
+  it("saves template placeholders the composer can fill, in its single-brace syntax (LIF-1333)", () => {
+    const linkedin = (text: string) => create("linkedin", { ...policy, compose_mode: "templates", steps: [{ position: 1, delay: { business_days: 0 }, template: { text } }] });
+    const saved = linkedin("Hola {{first_name}}, ¿en {{ company_name }} y {company_name} tienen {pain}?");
+    expect(saved).toMatchObject({ success: true, data: { policy: { steps: [{ template: { text: "Hola {first_name}, ¿en {company} y {company} tienen {pain}?" } }] } } });
+    for (const text of ["Hi {{last_name}}", "Hi {last_name}", "Hi {First Name}", "Hi {{firstName}}", "Hi {first_name}}", "Hi {sender_first_name}"])
+      expect(linkedin(text).success, text).toBe(false);
+    const mail = { ...email, compose_mode: "templates", steps: email.steps.map(step => ({ ...step,
+      template: { ...(step.position === 1 ? { subject: "For {{company_name}}" } : {}), text: "Hi {{first_name}}, {sender_first_name} here." } })) };
+    const mailed = create("email", mail);
+    expect(mailed.success && mailed.data.policy.steps.map(step => step.template)[0]).toEqual({ subject: "For {company}", text: "Hi {first_name}, {sender_first_name} here." });
+    const draft = (text: string) => CampaignDraftSchema.safeParse({ expected_version: 1, revision_ref: revisionRef,
+      changes: { steps: [{ position: 1, delay: { business_days: 0 }, template: { text } }] } });
+    expect(draft("Hey {{FIRST_NAME}}")).toMatchObject({ success: true, data: { changes: { steps: [{ template: { text: "Hey {first_name}" } }] } } });
+    expect(draft("Hey {{unknown}}").success).toBe(false);
+  });
   it("Journey holds only the audience and shared stops; no graph or timing", () => {
     expect(JourneyPolicySchema.safeParse(journeyPolicy).success).toBe(true);
     expect(JourneyPolicySchema.safeParse({ ...journeyPolicy, audience: { kind: "qualified", tier: "A" } }).success).toBe(false);

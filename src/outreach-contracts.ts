@@ -159,19 +159,55 @@ export function campaignChannelIssues(policy: z.infer<typeof CampaignPolicySchem
   }
   return [...new Set(issues)];
 }
+// Jobs renders single-brace slots: {first_name} and {company} from the lead,
+// {sender_first_name} from the email mailbox, and any other lower-case slot
+// from the writer. A request's mail-merge spelling of those fields is saved in
+// that syntax; any other brace would reach the composer unrendered and fail
+// every preview (LIF-1333). Saved revisions are read as stored.
+const MERGE_FIELDS: Record<string, string> = { first_name: "first_name", company: "company", company_name: "company", sender_first_name: "sender_first_name" };
+export function canonicalTemplateText(value: string): string {
+  return value.replace(/\{\{\s*([A-Za-z_]+)\s*\}\}|\{(company_name)\}/g, (match, double?: string, single?: string) => {
+    const field = MERGE_FIELDS[(double ?? single)!.toLowerCase()];
+    return field ? `{${field}}` : match;
+  });
+}
+const canonicalTemplate = <T extends { text: string; subject?: string | undefined }>(template: T): T =>
+  ({ ...template, text: canonicalTemplateText(template.text), ...(template.subject === undefined ? {} : { subject: canonicalTemplateText(template.subject) }) });
+const canonicalSteps = (steps: z.infer<typeof Step>[]) => steps.map(step => ({ ...step,
+  ...(step.template ? { template: canonicalTemplate(step.template) } : {}), ...(step.variants ? { variants: step.variants.map(canonicalTemplate) } : {}) }));
+function placeholderIssues(steps: z.infer<typeof Step>[] | undefined, context: z.RefinementCtx, path: Array<string | number>, channel?: "email" | "linkedin") {
+  steps?.forEach((step, index) => [step.template, ...(step.variants ?? [])].forEach(template => {
+    for (const saved of template ? [template.subject, template.text] : []) {
+      if (saved === undefined) continue;
+      const value = canonicalTemplateText(saved);
+      const message = /\{\{?\s*last_name\s*\}?\}/.test(value)
+        ? "Lifty fills only {first_name} and {company} from the lead; leave the last name out."
+        : /[{}]/.test(value.replace(/\{[a-z][a-z0-9_]*\}/g, ""))
+          ? "Write placeholders with single braces and a lower-case name: {first_name}, {company}, or a writer slot such as {pain}."
+          : channel === "linkedin" && value.includes("{sender_first_name}")
+            ? "{sender_first_name} is filled only in email; a LinkedIn message already comes from its sender."
+            : undefined;
+      if (message) context.addIssue({ code: "custom", path: [...path, index], message });
+    }
+  }));
+}
 export const JourneyPathSchema = z.object({ journey_ref: Ref }).strict();
 export const CampaignPathSchema = z.object({ campaign_ref: Ref }).strict();
 export const PageQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(100).optional(), cursor: Ref.optional() }).strict();
 export const CampaignQuerySchema = PageQuerySchema.extend({ journey_ref: Ref.optional(), channel: z.enum(["linkedin", "email"]).optional() }).strict();
 export const JourneyCreateSchema = z.object({ name: Name, policy: JourneyPolicySchema }).strict();
 export const CampaignCreateSchema = z.object({ name: Name, journey_ref: Ref, channel: z.enum(["linkedin", "email"]), policy: CampaignPolicySchema }).strict()
-  .superRefine((value, context) => campaignChannelIssues(value.policy, value.channel).forEach(message => context.addIssue({ code: "custom", path: ["policy"], message })));
+  .superRefine((value, context) => {
+    campaignChannelIssues(value.policy, value.channel).forEach(message => context.addIssue({ code: "custom", path: ["policy"], message }));
+    placeholderIssues(value.policy.steps, context, ["policy", "steps"], value.channel);
+  }).transform(value => ({ ...value, policy: { ...value.policy, steps: canonicalSteps(value.policy.steps) } }));
 export const JourneyDraftSchema = z.object({ expected_version: Version, revision_ref: Ref,
   changes: JourneyPolicySchema.partial().strict().refine(value => Object.keys(value).length > 0),
 }).strict();
 export const CampaignDraftSchema = z.object({ expected_version: Version, revision_ref: Ref,
   changes: CampaignPolicyFields.extend({ lanes: LanesSchema.nullable() }).partial().strict().refine(value => Object.keys(value).length > 0),
-}).strict();
+}).strict().superRefine((value, context) => placeholderIssues(value.changes.steps, context, ["changes", "steps"]))
+  .transform(value => value.changes.steps ? { ...value, changes: { ...value.changes, steps: canonicalSteps(value.changes.steps) } } : value);
 export const ExactRevisionSchema = z.object({ revision_ref: Ref, digest: Digest }).strict();
 export const PublishSchema = ExactRevisionSchema.extend({ expected_version: Version }).strict();
 export const ActivateSchema = PublishSchema;
