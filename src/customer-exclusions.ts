@@ -28,7 +28,9 @@ export const CustomerExclusionsReceipt = z.object({
 }).strict();
 export const CustomerExclusionsStatus = CustomerExclusionsReceipt.extend({ candidates_excluded: Count }).strict();
 // LIF-1128: the CRM-derived customer list's freshness, decided in the database
-// from the nightly sync ledger. Null when that read is unavailable.
+// from the nightly sync ledger. Null when that read is unavailable. Strict on
+// purpose: an unreviewed database field degrades to unknown (null), never to a
+// silently reshaped answer; the captured SQL fixture test catches the drift.
 const Stamp = z.iso.datetime({ offset: true });
 const CrmRefreshSource = z.object({
   source: z.enum(["crm_closed_won", "crm_customer", "crm_open_deal"]), required: z.boolean(),
