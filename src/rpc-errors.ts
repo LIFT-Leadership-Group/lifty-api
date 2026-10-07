@@ -62,6 +62,7 @@ export const RPC_ERROR_MESSAGES: Record<string, string> = {
   OUTREACH_SEND_UNCONFIRMED: "This message has begun, unknown or confirmed sending work. Read its saved evidence before changing it; repeating a send could duplicate it.",
   OUTREACH_TARGET_STOPPED: "Outreach has stopped for this person. Read its current state before reviewing more messages.",
   OUTREACH_REPLY_MOVED: "This reply turn changed or was already answered. Read its current state before deciding again.",
+  OUTREACH_SETTINGS_MOVED: "Review settings changed since you read them. Read the current settings and apply your change again.",
   OUTREACH_REPLY_ROUTE_UNAVAILABLE: "The original reply account or conversation could not be verified. Read its status before sending.",
   OUTREACH_ACCOUNT_UNAVAILABLE: "The saved account is not ready to send. Check its status in Senders before trying again.",
   OUTREACH_APPROACH_UNAVAILABLE: "This message's approved writing approach is no longer available. Read its Campaign before approving it.",

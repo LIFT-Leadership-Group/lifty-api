@@ -128,6 +128,23 @@ describe("member Review transport", () => {
       expect(h.rpc).toHaveBeenCalledOnce();
     }
   });
+  it("reports a stale Review decision or settings version as a conflict to re-read", async () => {
+    for (const [action, code] of [
+      ["review_settings_patch", "OUTREACH_SETTINGS_MOVED"],
+      ["reply_review_post", "OUTREACH_REPLY_MOVED"],
+      ["message_rewrite_post", "OUTREACH_MESSAGE_MOVED"],
+    ] as const) {
+      const rpc = vi.fn(async () => ({ data: null, error: { code: "PT409", message: code, details: null } }));
+      const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "member", client: { rpc } } }), log: () => {} });
+      const value = cases.find(value => value.action === action)!;
+      const definition = memberReviewOperationDefinitions[action];
+      const response = await app.request(definition.route.replace(/\{[^}]+\}/g, value.ref ?? ""), { method: definition.method,
+        headers: { authorization: "Bearer test", "x-lifty-client-contract": STAGE_CLIENT_CONTRACT, "content-type": "application/json" },
+        body: JSON.stringify(value.body) });
+      expect(response.status, code).toBe(409);
+      expect((await response.json()).error.code, code).toBe(code);
+    }
+  });
   it("rejects invalid consent and revision selectors before any RPC", async () => {
     for (const [action, body] of [
       ["lead_stop_post", { request_ref: message.message_ref, confirm: false }],
