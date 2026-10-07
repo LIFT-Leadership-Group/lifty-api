@@ -247,3 +247,16 @@ describe("customer surfaces name no provider or retired volume knob", () => {
     expect(getStageMcpTools().map(tool => tool.name).filter(name => /recovery|capacity|allowance|apollo/.test(name))).toEqual([]);
   });
 });
+
+describe("context size", () => {
+  // MCP connectors receive each stage context as one tool result, and Claude
+  // rejects results over 25,000 tokens: about 75K characters of this JSON
+  // (LIF-1338). Campaigns still exceeds it through its policy request schemas
+  // and writing reference; its cap only stops it growing.
+  it("keeps every stage context within an MCP connector's tool-result limit", () => {
+    for (const stage of Object.keys(stageOperations)) {
+      const size = JSON.stringify(getAgentContext(stage)).length;
+      expect(size, stage).toBeLessThanOrEqual(stage === "campaigns" ? 110_000 : 75_000);
+    }
+  });
+});

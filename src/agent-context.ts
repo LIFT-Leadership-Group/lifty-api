@@ -173,24 +173,63 @@ function compactSchema(value: unknown): unknown {
       .map(([key, item]) => [key, compactSchema(item)]),
   );
 }
+// Success schemas were most of every document (112K of sending-accounts' 153K
+// characters; deliverability alone 49K), beyond MCP connectors' tool-result
+// limit (LIF-1338). The agent reads the actual response, so a document keeps
+// only the response's outline: types, required fields and short enums two
+// levels deep. Full schemas stay in /openapi.json; no client parses these.
+const OUTLINE_DEPTH = 2;
+function responseOutline(value: unknown, depth = 0): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const schema = value as Record<string, unknown>;
+  const outline: Record<string, unknown> = {};
+  for (const key of ["type", "const", "required"] as const) if (schema[key] !== undefined) outline[key] = schema[key];
+  if (Array.isArray(schema.enum) && schema.enum.length <= 12) outline.enum = schema.enum;
+  for (const key of ["anyOf", "oneOf"] as const)
+    if (Array.isArray(schema[key])) outline[key] = (schema[key] as unknown[]).map((branch) => responseOutline(branch, depth));
+  if (schema.items) outline.items = depth < OUTLINE_DEPTH ? responseOutline(schema.items, depth + 1) : {};
+  if (schema.properties && typeof schema.properties === "object")
+    outline.properties = Object.fromEntries(Object.entries(schema.properties as Record<string, unknown>).map(([name, child]) =>
+      [name, depth < OUTLINE_DEPTH ? responseOutline(child, depth + 1) : typeOnly(child)]));
+  return outline;
+}
+const typeOnly = (value: unknown) =>
+  value && typeof value === "object" && "type" in value ? { type: (value as { type: unknown }).type } : {};
+// An outline several operations return (Campaign message reads and reviews,
+// sending-account changes) is published once in the document's schemas.
 function compactOperations(operations: Record<string, StageOperation>) {
-  return Object.fromEntries(
-    Object.entries(operations).map(([name, operation]) => [
-      name,
-      {
-        ...operation,
-        request: compactSchema(operation.request) as StageOperation["request"],
-        responses: Object.fromEntries(
-          Object.entries(operation.responses).map(([status, schema]) => [
-            status,
-            status.startsWith("2")
-              ? compactSchema(schema)
-              : { $ref: "#/schemas/error" },
-          ]),
-        ),
-      },
-    ]),
-  );
+  const outlines = Object.entries(operations).flatMap(([name, operation]) =>
+    Object.entries(operation.responses).filter(([status]) => status.startsWith("2"))
+      .map(([status, schema]) => ({ key: `${name}_${status}`, outline: responseOutline(compactSchema(schema)) })));
+  const shared = new Map<string, string>();
+  for (const { key, outline } of outlines) {
+    const text = JSON.stringify(outline);
+    if (!shared.has(text) && outlines.filter((item) => JSON.stringify(item.outline) === text).length > 1) shared.set(text, `response_${key}`);
+  }
+  const schemas = Object.fromEntries([...shared].map(([text, name]) => [name, JSON.parse(text) as Record<string, unknown>]));
+  const response = (name: string, status: string) => {
+    const outline = outlines.find((item) => item.key === `${name}_${status}`)!.outline;
+    const ref = shared.get(JSON.stringify(outline));
+    return ref ? { $ref: `#/schemas/${ref}` } : outline;
+  };
+  return {
+    schemas,
+    operations: Object.fromEntries(
+      Object.entries(operations).map(([name, operation]) => [
+        name,
+        {
+          ...operation,
+          request: compactSchema(operation.request) as StageOperation["request"],
+          responses: Object.fromEntries(
+            Object.entries(operation.responses).map(([status]) => [
+              status,
+              status.startsWith("2") ? response(name, status) : { $ref: "#/schemas/error" },
+            ]),
+          ),
+        },
+      ]),
+    ),
+  };
 }
 
 // Reads a document's files, the caller's draft winning over the published
@@ -232,6 +271,7 @@ export function getAgentContext(task: string, drafts: readonly ContextDraft[] = 
   const references = Object.fromEntries(
     Object.entries(source.references).map(([name, file]) => [name, read(file)]),
   );
+  const compacted = source.operations && task !== "stages" ? compactOperations(source.operations) : null;
   const content = {
     format: "lifty-context.v1" as const,
     task,
@@ -249,10 +289,8 @@ export function getAgentContext(task: string, drafts: readonly ContextDraft[] = 
     // change at runtime in tests and the revision must follow them). Key
     // order is part of the revision: stage documents put operations before
     // references, the index after.
-    schemas: source.operations && task !== "stages" ? { error: errorSchema } : {},
-    ...(source.operations && task !== "stages"
-      ? { operations: compactOperations(source.operations) }
-      : {}),
+    schemas: compacted ? { error: errorSchema, ...compacted.schemas } : {},
+    ...(compacted ? { operations: compacted.operations } : {}),
     references,
     ...(task === "stages" ? { operations: {} } : {}),
     ...marker(),
