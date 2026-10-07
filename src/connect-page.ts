@@ -27,12 +27,13 @@ const escape = (value: string) => value.replace(/[&<>"']/g, character => ({ "&":
 const choice = (input: string, name: string, detail: string) =>
   `<label class="choice"><span class="choice-copy"><span class="choice-name">${name}</span><span class="choice-detail">${detail}</span></span>${input}</label>`;
 
-// An existing mailbox is the default. A dedicated sending mailbox needs
-// verified warmup before campaigns send (Email block policy).
+// An existing mailbox is the default and is tested right after setup
+// (LIF-1223). A dedicated sending mailbox needs verified warmup before
+// campaigns send (Email block policy).
 function emailDeclaration(): string {
   return `<fieldset><legend>How do you use this mailbox?</legend><div class="choices">${[
     choice(`<input type="radio" name="mailbox_use" value="habitual" aria-label="A mailbox I already use" checked required>`,
-      "A mailbox I already use", "Your everyday personal or business mailbox. Campaigns can start once you approve them."),
+      "A mailbox I already use", "Your everyday personal or business mailbox. Lifty tests where its email lands as soon as you finish setup."),
     choice(`<input type="radio" name="mailbox_use" value="dedicated" aria-label="A dedicated sending mailbox" required>`,
       "A dedicated sending mailbox", "A new or separate address for outreach. It needs 21 active days of warmup before campaigns send."),
   ].join("")}</div></fieldset>`;

@@ -1111,12 +1111,18 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
     const result = await (await emailHarness(state as never).request("/v1/workspace/next-step")).json();
     expect(result).toMatchObject({ reason, section });
   });
-  it("asks for the alert channel in Part 3 only when the founder skipped LinkedIn", async () => {
-    const alone = await (await emailHarness({}).request("/v1/workspace/next-step")).json();
-    expect(alone.actions.join(" ")).toContain("where alerts should go");
-    const both = await (await emailHarness({ accounts: [linkedinAccount, mailbox], campaigns: ["active"] }).request("/v1/workspace/next-step")).json();
-    expect(both.reason).toBe("email_connected");
-    expect(both.actions.join(" ")).not.toContain("where alerts should go");
+  // LIF-1223: the first placement test is automatic and its result is a notice,
+  // so Part 3 offers Slack whenever it is not connected, after LinkedIn too.
+  it("offers Slack for the placement result in Part 3 and never requests the first test itself", async () => {
+    for (const state of [{}, { accounts: [linkedinAccount, mailbox], campaigns: ["active"] }]) {
+      const result = await (await emailHarness(state as never).request("/v1/workspace/next-step")).json();
+      expect(result.reason).toBe("email_connected");
+      const actions = result.actions.join(" ");
+      expect(actions).toContain("offer to connect it now so the test result reaches them there");
+      expect(actions).toContain("Lifty will notify them with the placement test result");
+      expect(actions).toContain("Lifty tests where the mailbox's email lands as soon as its warmup setup is done");
+      expect(result.recommended_tools).not.toContain("sending_accounts_placement_start");
+    }
   });
   it("hands a free workspace with a ready mailbox to David without activating anything", async () => {
     const result = await (await emailHarness({ warmup: warmupRead("warming", { warmup_ready: true }), placement: passing }).request("/v1/workspace/next-step")).json();

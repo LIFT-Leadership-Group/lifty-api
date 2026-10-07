@@ -142,7 +142,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
       message: `${spam.spam_count} of ${spam.sent} warmup emails landed in spam over the last ${spam.window_days} days. Lifty holds this mailbox's sending until a later check is below the limit. Warmup keeps running.` };
   } else if (!stored.warmup_required) {
     goLive = { kind: "now", date: addUtcDays(now, 0), remaining_active_days: null,
-      message: "No initial warmup period is required for this habitual mailbox. Placement is the next readiness check; measured warmup spam can still hold sending." };
+      message: "No initial warmup period is required for this habitual mailbox. Lifty tests where its email lands as soon as warmup setup is done; warmup then keeps running alongside outreach. Measured warmup spam can still hold sending." };
   } else if (stored.warmup_complete) {
     goLive = { kind: "unlocked", date: addUtcDays(now, 0), remaining_active_days: 0,
       message: "The initial warmup period is complete. Placement is the next readiness check: Lifty starts one placement test for this mailbox automatically. Keep warmup running; measured spam can hold sending independently of campaign or account pauses." };
