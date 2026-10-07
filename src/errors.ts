@@ -1,7 +1,7 @@
 export interface UpstreamDiagnostics {
   upstream_operation: string;
   upstream_code?: string;
-  upstream_kind: "database_storage" | "database_timeout" | "database_error" | "transport";
+  upstream_kind: "database_storage" | "database_timeout" | "database_error" | "transport" | "edge_function";
 }
 
 export interface PublicErrorOptions {
