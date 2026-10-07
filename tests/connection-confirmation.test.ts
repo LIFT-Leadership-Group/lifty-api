@@ -94,8 +94,10 @@ it('keeps malformed dependency receipts pending instead of inventing an invalid 
 });
 
 function browser(href:string,fetchImpl:typeof fetch){
-  const elements:Record<string,{textContent:string;hidden:boolean;dataset:Record<string,string>}>=Object.fromEntries(['confirmation','confirmation-title','confirmation-detail','confirmation-spinner'].map(k=>[k,{textContent:'',hidden:false,dataset:{}}]));
-  elements.confirmation!.dataset={label:'email',warmup:'false',stateKey:href.includes('/connect/')?'intent':'state'};
+  const elements:Record<string,{textContent:string;hidden:boolean;href:string;dataset:Record<string,string>}>=Object.fromEntries(['confirmation','confirmation-title','confirmation-detail','confirmation-spinner','confirmation-actions','confirmation-retry'].map(k=>[k,{textContent:'',hidden:k==='confirmation-actions',href:'',dataset:{}}]));
+  const warmup=href.includes('/warmup/');
+  elements.confirmation!.dataset={label:warmup?'email warmup':'email',warmup:String(warmup),stateKey:href.includes('/connect/')?'intent':'state',
+    ...(href.includes('/connect/email/')?{retry:'/connect/email'}:{})};
   const location={href};
   const history={replaceState:vi.fn((_state:unknown,_title:string,path:string)=>{location.href=new URL(path,location.href).href;})};
   const context={URL,AbortController,JSON,Date,Promise,setTimeout,clearTimeout,location,history,fetch:fetchImpl,document:{getElementById:(id:string)=>elements[id]}};
@@ -126,6 +128,50 @@ it('a failed status transport never navigates away or spins forever',async()=>{
   expect(page.elements['confirmation-title']!.textContent).toBe('Still checking');expect(page.elements['confirmation-spinner']!.hidden).toBe(true);
   expect(page.location.href).toBe('https://api.lifty.test/connect/email/return?intent=capability');
   expect(vi.mocked(fetchImpl).mock.calls.length).toBeLessThan(20);
+});
+it('explains a refusal with a retry of the same attempt, keeps listening and shows a late success',async()=>{
+  vi.useFakeTimers();const bodies:Record<string,string>[]=[];let connected=false;
+  const fetchImpl=vi.fn(async(_input:unknown,init?:RequestInit)=>{bodies.push(JSON.parse(String(init!.body)));
+    return Response.json(connected?{status:'connected',account:null}:{status:'pending',attention:'released'});}) as typeof fetch;
+  const page=browser('https://api.lifty.test/connect/email/return?intent=capability&error_type=api/already_exists&error_detail=acc_old&error_title=PRIVATE',fetchImpl);
+  const work=page.run();await vi.advanceTimersByTimeAsync(1);
+  expect(bodies[0]).toEqual({state:'capability',errorType:'api/already_exists',errorDetail:'acc_old'});
+  expect(page.elements['confirmation-title']!.textContent).toBe('Try connecting again');
+  expect(page.elements['confirmation-detail']!.textContent).toContain('Lifty removed that old link');
+  expect(page.elements['confirmation-actions']!.hidden).toBe(false);expect(page.elements['confirmation-spinner']!.hidden).toBe(true);
+  expect(page.elements['confirmation-retry']!.href).toBe('/connect/email?intent=capability');
+  // Only the state and the safe refusal hints survive, so a reload explains the same refusal.
+  expect(page.location.href).toBe('https://api.lifty.test/connect/email/return?intent=capability&error_type=api%2Falready_exists&error_detail=acc_old');
+  connected=true;await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-title']!.textContent).toBe('email is connected');expect(page.elements['confirmation-actions']!.hidden).toBe(true);
+});
+it('never forwards a refusal detail that is not an account id, and offers no retry without an entry',async()=>{
+  vi.useFakeTimers();const bodies:Record<string,string>[]=[];
+  const fetchImpl=vi.fn(async(_input:unknown,init?:RequestInit)=>{bodies.push(JSON.parse(String(init!.body)));return Response.json({status:'pending',attention:'provider'});}) as typeof fetch;
+  const page=browser('https://api.lifty.test/connect/linkedin/return?intent=capability&error_type=api/already_exists&error_detail=PRIVATE%20text',fetchImpl);
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(bodies.every(body=>!('errorDetail' in body))).toBe(true);expect(page.location.href).not.toContain('PRIVATE');
+  expect(page.elements['confirmation-title']!.textContent).toBe('The sign-in did not finish');expect(page.elements['confirmation-actions']!.hidden).toBe(true);
+});
+it('waits for a warmup handoff that is starting instead of timing out, and shows when warmup runs',async()=>{
+  vi.useFakeTimers();const started=Date.now();
+  const fetchImpl=vi.fn(async(input:unknown)=>Response.json(String(input).endsWith('/process')||Date.now()-started<12*60000
+    ?{status:'pending',attention:'starting'}:{status:'connected',account:'founder@example.test'})) as typeof fetch;
+  const page=browser('https://api.lifty.test/warmup/google/callback?state=capability&code=PRIVATE_CODE',fetchImpl);
+  const work=page.run();await vi.advanceTimersByTimeAsync(5*60000);
+  expect(page.elements['confirmation-title']!.textContent).toBe('Starting warmup');expect(page.elements['confirmation-spinner']!.hidden).toBe(false);
+  expect(page.elements['confirmation-actions']!.hidden).toBe(true);
+  await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-title']!.textContent).toBe('Warmup is running');
+  expect(vi.mocked(fetchImpl).mock.calls.length).toBeLessThan(40);
+});
+it('stops waiting for a starting warmup after 25 minutes without inventing a result',async()=>{
+  vi.useFakeTimers();
+  const fetchImpl=vi.fn(async()=>Response.json({status:'pending',attention:'starting'})) as typeof fetch;
+  const page=browser('https://api.lifty.test/warmup/google/callback?state=capability',fetchImpl);
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-title']!.textContent).toBe('Still checking');expect(page.elements['confirmation-spinner']!.hidden).toBe(true);
+  expect(vi.mocked(fetchImpl).mock.calls.length).toBeLessThan(70);
 });
 it.each(['hubspot','slack','attio'] as const)('%s never repeats an exchanged code and reads durable success after a lost response',async provider=>{
   let claimed=false,connected=false;const complete=vi.fn(async()=>{connected=true;throw new Error('lost store response');});

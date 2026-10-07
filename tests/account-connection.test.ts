@@ -28,6 +28,8 @@ function attemptDb(channel: "email" | "linkedin" = "email") {
     expected_identity: null as Record<string, string> | null, transport: { ...transport },
     authorization: { received: false, account_id: null as string | null, return_error: null as string | null },
     ops: [] as string[], payloads: {} as Record<string, Record<string, unknown>>,
+    // The conflict read's answer (undefined: the read is unavailable) and the revocation context.
+    conflict: undefined as Record<string, unknown> | undefined, revocation: null as Record<string, unknown> | null,
   };
 }
 const snapshot = (db: Db, extra: Record<string, unknown> = {}) => ({
@@ -53,8 +55,12 @@ function stub(db: Db, provider: Partial<Provider> = {}) {
       return Response.json({ object: "Account", id: "acc_new", application_id: "app_test", account_scope_id: null, user_id: "user-1",
         provider: "google", status: "running", is_locked: false, metadata: { products_connection_status: { gmail: "running" } } });
     }
-    expect(url.toString()).toBe("https://project.supabase.co/rest/v1/rpc/lifty_sending_account_provider");
     const body = JSON.parse(String(init!.body));
+    if (url.toString() === "https://project.supabase.co/rest/v1/rpc/lifty_sending_account_conflict") {
+      db.ops.push("conflict"); db.payloads.conflict = body;
+      return db.conflict ? Response.json(db.conflict) : Response.json({ message: "unavailable" }, { status: 503 });
+    }
+    expect(url.toString()).toBe("https://project.supabase.co/rest/v1/rpc/lifty_sending_account_provider");
     expect(body.p_server_key).toBe(db.channel === "email" ? emailKey : linkedinKey);
     const op = body.p_operation as string, payload = body.p_payload as Record<string, unknown>;
     db.ops.push(op); db.payloads[op] = payload;
@@ -65,9 +71,12 @@ function stub(db: Db, provider: Partial<Provider> = {}) {
       return Response.json(snapshot(db, { claimed }));
     }
     if (op === "save_link") { db.internal_state = "ready"; db.hosted_url = String(payload.url); }
-    if (op === "return_error") db.authorization.return_error = String(payload.return_error);
+    // Like the database, only the first hint is kept.
+    if (op === "return_error") db.authorization.return_error ??= String(payload.return_error);
     if (op === "fail") { db.internal_state = "failed"; db.state = "failed"; db.reason = String(payload.reason); }
     if (op === "complete") { db.internal_state = "completed"; db.state = "connected"; }
+    if (op === "revocation_context") return Response.json(db.revocation);
+    if (op === "revocation_confirmed") return Response.json({ account: {} });
     return Response.json(snapshot(db));
   });
   vi.stubGlobal("fetch", fetchImpl);
@@ -77,9 +86,9 @@ const app = () => createProductionApp(loadConfig(env));
 const intent = (channel: "email" | "linkedin" = "email") => sealConnectAttempt(channel, attemptId, channel === "email" ? emailKey : linkedinKey);
 const form = (body: string, origin = "https://api.lifty.test") => ({ method: "POST",
   headers: { origin, "content-type": "application/x-www-form-urlencoded" }, body });
-const status = (channel: string, state: string, errorType?: string) => ({ method: "POST",
+const status = (channel: string, state: string, errorType?: string, errorDetail?: string) => ({ method: "POST",
   headers: { origin: "https://api.lifty.test", "content-type": "application/json", "x-lifty-connection": "1" },
-  body: JSON.stringify({ state, ...(errorType ? { errorType } : {}) }) });
+  body: JSON.stringify({ state, ...(errorType ? { errorType } : {}), ...(errorDetail ? { errorDetail } : {}) }) });
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -126,7 +135,7 @@ describe("Lifty connect page", () => {
   it("rejects forged, cross-channel, malformed and cross-origin requests before any database or provider call", async () => {
     const db = attemptDb(); const { fetchImpl } = stub(db); const server = app();
     const email = intent();
-    for (const path of [`/connect/linkedin?intent=${encodeURIComponent(email)}`, `/connect/email?intent=${encodeURIComponent(email.slice(0, -2) + "AA")}`,
+    for (const path of [`/connect/linkedin?intent=${encodeURIComponent(email)}`, `/connect/email?intent=${encodeURIComponent(email.slice(0, -2) + (email.endsWith("AA") ? "BB" : "AA"))}`,
       `/connect/email?intent=${encodeURIComponent(email)}&intent=${encodeURIComponent(email)}`, `/connect/email?intent=${encodeURIComponent(email)}&next=x`]) {
       expect((await server.request(path)).status, path).toBe(400);
     }
@@ -185,7 +194,7 @@ describe("shared confirmation for sending accounts", () => {
     expect(shell.status).toBe(200);
     expect(await shell.text()).toContain("Checking your connection");
     const hinted = await server.request("/connect/email/return/status", status("email", state, "canceled"));
-    expect(await hinted.json()).toEqual({ status: "pending" });
+    expect(await hinted.json()).toEqual({ status: "pending", attention: "canceled" });
     expect(db.ops).toEqual(["context", "return_error"]);
     expect(db.state).toBe("pending");
     // The signed authorization arrives later (another tab): it wins.
@@ -195,6 +204,52 @@ describe("shared confirmation for sending accounts", () => {
     expect(db.payloads.complete).toEqual({ attempt_id: attemptId, verified: { api_version: "v2", application_id: "app_test",
       account_scope_id: null, account_id: "acc_new", user_id: "user-1", email: "ana@example.test" } });
     expect(provider.calls).toEqual(["GET /v2/accounts/acc_new", "GET /v2/acc_new/email-senders"]);
+  });
+
+  it("explains a provider refusal and releases the retained account it names, so the same attempt can be retried", async () => {
+    const retained = "a0000000-0000-4000-8000-000000000009";
+    const db = attemptDb(); db.declaration = { mailbox_use: "habitual" }; db.internal_state = "ready"; db.hosted_url = hostedLink;
+    db.conflict = { conflict: "retained", account_id: retained };
+    db.revocation = { revocable: true, transport: { ...transport, account_id: "acc_old" } };
+    const { provider } = stub(db); const server = app(); const state = intent();
+    const shell = await (await server.request(`/connect/email/return?intent=${encodeURIComponent(state)}&error_type=api%2Falready_exists&error_detail=acc_old`)).text();
+    expect(shell).toContain('data-retry="/connect/email"');
+    const refused = await server.request("/connect/email/return/status", status("email", state, "api/already_exists", "acc_old"));
+    expect(await refused.json()).toEqual({ status: "pending", attention: "released" });
+    expect(db.ops).toEqual(["context", "return_error", "conflict", "revocation_context", "revocation_confirmed"]);
+    expect(db.payloads.conflict).toEqual({ p_server_key: emailKey, p_attempt_id: attemptId, p_account_id: "acc_old" });
+    expect(provider.calls).toEqual(["DELETE /v2/accounts/acc_old"]);
+    expect(db.payloads.revocation_confirmed).toEqual({ account_id: retained, provider_account_id: "acc_old", evidence: "deleted" });
+    expect(db.state).toBe("pending");
+
+    // Live accounts are named without a workspace; anything uncertain stays generic.
+    const cases: Array<[Record<string, unknown> | undefined, string]> = [[{ conflict: "live_elsewhere" }, "in_use"],
+      [{ conflict: "live_here" }, "already_connected"], [{ conflict: "released" }, "released"], [{ conflict: "kept" }, "exists"],
+      [{ conflict: "none" }, "exists"], [undefined, "exists"]];
+    for (const [conflict, attention] of cases) {
+      db.conflict = conflict; db.ops = [];
+      const response = await server.request("/connect/email/return/status", status("email", state, "api/already_exists", "acc_old"));
+      expect(await response.json()).toEqual({ status: "pending", attention });
+      expect(db.ops).toEqual(["context", "conflict"]);
+    }
+    db.conflict = { conflict: "retained", account_id: retained }; db.ops = [];
+    const unnamed = await server.request("/connect/email/return/status", status("email", state, "api/already_exists"));
+    expect(await unnamed.json()).toEqual({ status: "pending", attention: "exists" });
+    const failed = await server.request("/connect/email/return/status", status("email", state, "api/internal_error", "acc_old"));
+    expect(await failed.json()).toEqual({ status: "pending", attention: "provider" });
+    // Neither reads the conflict: an unnamed refusal or another provider error.
+    expect(db.ops).toEqual(["context", "context", "return_error"]);
+    // A provider deletion Lifty cannot confirm is not reported as released.
+    provider.deleteStatus = 500; provider.calls.length = 0; db.ops = [];
+    const unconfirmed = await server.request("/connect/email/return/status", status("email", state, "api/already_exists", "acc_old"));
+    expect(await unconfirmed.json()).toEqual({ status: "pending", attention: "exists" });
+    expect(db.ops).toEqual(["context", "conflict", "revocation_context"]);
+
+    // The retry returns through the same attempt; the signed authorization still wins.
+    db.authorization = { received: true, account_id: "acc_new", return_error: "account_exists" }; db.ops = [];
+    const confirmed = await server.request("/connect/email/return/status", status("email", state));
+    expect(await confirmed.json()).toEqual({ status: "connected", account: null });
+    expect(db.ops).toEqual(["context", "complete"]);
   });
 
   it("keeps an unverified primary mailbox pending and accepts later verified evidence", async () => {
