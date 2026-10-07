@@ -558,7 +558,7 @@ function presentStatus(parts: {
  * LIF-1341: today's sends against the inbox's daily limit, as the send budget
  * counts them. Nothing here estimates a count or decides whether a send may go.
  */
-function presentSending(source: SourceSending | null | undefined): DeliverabilityMailbox["sending"] {
+function presentSending(source: SourceSending | null | undefined, connections: SourceConnection[]): DeliverabilityMailbox["sending"] {
   const at = (value: string | null | undefined) => Number.isFinite(ms(value)) ? iso(ms(value)) : null;
   const base = { limit: n(source?.limit), used_today: null, remaining_today: null, timezone: n(source?.timezone),
     day_started_at: at(source?.day_started_at), resets_at: at(source?.resets_at) };
@@ -569,6 +569,13 @@ function presentSending(source: SourceSending | null | undefined): Deliverabilit
   if (source.limit === null || source.limit === undefined) {
     return { ...base, state: make("not_set", "No Lifty daily limit", "muted",
       "No email connection in Lifty sends from this inbox, so Lifty sets no daily limit for it. Sends from other tools aren't counted here.") };
+  }
+  // Smartlead runs its own campaigns from these inboxes and sets their daily
+  // limit; Lifty's budget would read as a cap the inbox doesn't follow.
+  const connected = connections.filter(connection => connection.status === "connected");
+  if (connected.length > 0 && connected.every(connection => connection.provider === "smartlead")) {
+    return { ...base, limit: null, state: make("not_set", "Daily limit set by the campaign platform", "muted",
+      "This inbox sends through the campaign platform, which sets its daily limit. Lifty doesn't cap or count those sends here.") };
   }
   if (source.shared) {
     return { ...base, state: make("unknown", "Today's sends not shown", "muted",
@@ -620,7 +627,7 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
     readiness, warmup, recovery, campaigns, placement, approval,
     notes: { human: source.smartlead?.notes?.trim() || null },
     connections: connections.map(({ gate: _gate, ...connection }) => connection),
-    sending: presentSending(source.sending),
+    sending: presentSending(source.sending, source.connections),
     availability: source.availability,
   };
 }

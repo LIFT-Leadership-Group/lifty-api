@@ -160,6 +160,13 @@ describe("mixed providers, identity and missing evidence", () => {
     // A mailbox shared with another workspace never shows that tenant's sends.
     expect(sending({ shared: true, used: 3, available: 7 })).toMatchObject({ limit: 10, used_today: null, remaining_today: null, state: { code: "unknown" } });
     expect(sending({ limit: null })).toMatchObject({ limit: null, used_today: null, state: { code: "not_set" } });
+    // Smartlead sends from its own campaigns: Lifty's budget is not this inbox's limit.
+    const viaSmartlead = inbox(present(withInbox("uni-only@a.test", mailbox => {
+      mailbox.connections = mailbox.connections.map(connection => ({ ...connection, provider: "smartlead" }));
+      mailbox.sending = { ...mailbox.sending!, used: 10, available: 0 };
+    })), "uni-only@a.test").sending;
+    expect(viaSmartlead).toMatchObject({ limit: null, used_today: null, remaining_today: null,
+      state: { code: "not_set", label: "Daily limit set by the campaign platform" } });
   });
 
   it("never merges the same address across tenants", () => {
