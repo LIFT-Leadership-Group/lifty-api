@@ -8,6 +8,7 @@ import {
   stageOperations,
   type StageOperation,
 } from "./stage-contracts.js";
+import { liveAntiSlopSection } from "./writing-rules.js";
 
 // The transport an installed client implements: authentication, the request
 // envelope, the context document and the operation catalog format. It is not
@@ -232,19 +233,27 @@ function compactOperations(operations: Record<string, StageOperation>) {
   };
 }
 
+// Files whose served text ends with live data. The banned-phrase list is the
+// database rulebook Jobs uses, so no copy of it is checked in here.
+const LIVE_SECTIONS: Readonly<Record<string, () => string>> = { "anti-slop": liveAntiSlopSection };
+
 // Reads a document's files, the caller's draft winning over the published
 // file. Drafts for files this document does not use are ignored.
 function fileReader(drafts: readonly ContextDraft[]) {
   const served = new Map<string, ContextDraft>();
   const read = (file: string) => {
+    const live = LIVE_SECTIONS[file];
     const draft = drafts.find((item) => item.file === file);
+    let content: string;
     if (draft) {
       served.set(file, draft);
-      return draft.content;
+      content = draft.content;
+    } else {
+      const published = CONTEXT_FILES[file];
+      if (published === undefined) throw new Error(`Missing context file ${file}`);
+      content = published;
     }
-    const published = CONTEXT_FILES[file];
-    if (published === undefined) throw new Error(`Missing context file ${file}`);
-    return published;
+    return live ? `${content.trimEnd()}\n\n${live()}\n` : content;
   };
   const marker = () =>
     served.size

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { WorkspaceIdentitySchema } from "./business-contracts.js";
+import { WritingRecommendationsSchema } from "./writing-rules.js";
 
 const Ref = z.uuid();
 const Version = z.number().int().positive();
@@ -246,7 +247,10 @@ export const CampaignSchema = z.object({ campaign_ref: Ref, journey_ref: Ref, ch
 });
 const Workspace = { workspace: WorkspaceIdentitySchema };
 export const JourneyResultSchema = z.object({ ...Workspace, journey: JourneySchema }).strict();
-export const CampaignResultSchema = z.object({ ...Workspace, campaign: CampaignSchema }).strict();
+// Banned phrases in the draft's saved templates. Recommendations only: they
+// never block a save, preview or approval. Absent when the list is unknown.
+export const CampaignResultSchema = z.object({ ...Workspace, campaign: CampaignSchema,
+  writing_recommendations: WritingRecommendationsSchema.optional() }).strict();
 export const JourneySummarySchema = z.object({ journey_ref: Ref, version: Version, name: Name, active_revision: RevisionSummarySchema.nullable(),
   draft_revision: RevisionSummarySchema, executable_version: ExecutableVersionSchema.nullable() }).strict();
 export const JourneysSchema = z.object({ ...Workspace, journeys: z.array(JourneySummarySchema).max(100), next_cursor: Ref.nullable() }).strict();

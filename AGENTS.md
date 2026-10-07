@@ -101,6 +101,23 @@ Each document's files are declared in `src/agent-context.ts`; key order is
 part of the revision, so keep published documents byte-identical when
 restructuring them.
 
+## Shared writing rules
+
+The banned-phrase list Lifty serves is the database rulebook Jobs composes
+against (`outreach_rulebooks` key `anti_slop`), not a checked-in copy.
+`src/writing-rules.ts` reads it through the anon RPC `get_lifty_writing_rules`
+(Functions migration `20261009120000_lifty_writing_rules_read.sql`) at startup
+and every five minutes, keeping the last list on a failed read. The
+`anti-slop` context file holds only the instructions; the live list is appended
+when a document is served. Campaign responses add `writing_recommendations` for
+banned phrases in the draft's saved templates. They are recommendations and
+never block a save, preview, approval or activation; the field is absent while
+the list is unknown. This API works before the migration ships (it serves a
+short fallback note), so the order is free. Edit phrases in the ops dashboard
+rulebook, never in this repository. `src/generated/anti-slop.ts` is the Jobs
+matcher; regenerate it with `node scripts/sync-writing-rules.mjs
+<lift-gtm-jobs-checkout>` when Jobs changes it.
+
 ## Connection confirmation
 
 Browser integration callbacks use `src/connection-confirmation.ts` and its typed
