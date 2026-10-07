@@ -13,12 +13,14 @@ describe("outreach writing context", () => {
       expect(response.status).toBe(200);
       const context = await response.json();
       expect(context.references.writing).toEqual(expect.any(String));
-      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v19\n/);
+      expect(context.references.writing).toMatch(/^# LIFT outreach writing guide\n\nVersion: lifty-writing\.v20\n/);
       expect(context.references.writing).toContain("Email shape");
       expect(context.references.writing).toContain("Subject line");
       expect(context.references.writing).toContain("Use a consistent subject so follow-ups read as one thread");
-      expect(context.references.writing).toContain("Emails 1-2 focus on a pain");
-      expect(context.references.writing).toContain("Emails 3-4 focus on the founder's product");
+      expect(context.references.writing).toContain("Jobs by step follow the saved count");
+      expect(context.references.writing).toContain("Problem emails focus on a pain");
+      expect(context.references.writing).toContain("The offer email presents the founder's product");
+      expect(context.references.writing).not.toContain("It looks like...");
       expect(context.references.writing).toContain("Two short asks only");
       expect(context.references.writing).toContain("must name the same job");
       expect(context.references.writing).toContain("one connected thought");
@@ -48,8 +50,9 @@ describe("outreach writing context", () => {
       expect(context.references.writing).toContain("Do not find-replace");
       expect(context.references.writing).toContain("Email 1 may omit the opener");
       expect(context.references.anti_slop).toEqual(expect.any(String));
-      expect(context.references.anti_slop).toMatch(/^# LIFT outreach anti-slop list\n\nVersion: lifty-anti-slop\.v10\n/);
+      expect(context.references.anti_slop).toMatch(/^# LIFT outreach anti-slop list\n\nVersion: lifty-anti-slop\.v11\n/);
       expect(context.references.anti_slop).toContain("quick question");
+      expect(context.references.anti_slop).toContain("I'm guessing");
       expect(context.references.anti_slop).toContain("I don't want to keep asking you");
       expect(context.references.anti_slop).toContain("I'm in this");
       expect(context.references.anti_slop).toContain("I stay on this");
