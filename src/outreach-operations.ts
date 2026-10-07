@@ -6,6 +6,7 @@ import { validateIdentityInput, type IdentityDefinition, type IdentityInput } fr
 import * as c from "./outreach-contracts.js";
 import { memberReviewOperationDefinitions, memberReviewReceiptMatches } from "./member-review-operations.js";
 import { writingRecommendations } from "./writing-rules.js";
+import { testFailureMessage, type TestFailure } from "./campaign-test-failure.js";
 
 const Empty = z.object({}).strict();
 export type OutreachInput = IdentityInput;
@@ -171,6 +172,9 @@ export async function executeOutreachOperation(session: AuthSession, key: string
             || saved.samples.some(sample => !("lead_refs" in requested.sample) || !requested.sample.lead_refs.includes(sample.lead_ref))))
         throw new PublicError({ status: 502, ...unavailable });
     }
+    // LIF-1292: relay a failed sample's reason instead of a bare "failed".
+    for (const sample of (parsed.data as { test?: { samples: Array<{ failure?: TestFailure | null }> } }).test?.samples ?? [])
+      if (sample.failure) sample.failure.message = testFailureMessage(sample.failure);
     return parsed.data;
   }
   if ((input.path.journey_ref && value.journey?.journey_ref !== input.path.journey_ref)
