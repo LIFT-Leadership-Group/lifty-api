@@ -44,7 +44,19 @@ export const CrmRefresh = z.object({
   last_attempt_at: Stamp.nullable(), last_attempt_status: z.enum(["succeeded", "provider_failed", "skipped"]).nullable(),
   last_skip_reason: z.string().max(100).nullable(), sources: z.array(CrmRefreshSource).length(3),
 }).strict();
-export const CustomerExclusionsStatusRead = CustomerExclusionsStatus.extend({ crm_refresh: CrmRefresh.nullable() }).strict();
+const CrmProvider = z.enum(["hubspot", "attio"]);
+const CustomerSource = z.enum(["crm_closed_won", "crm_customer", "crm_open_deal"]);
+const CustomerSources = z.array(CustomerSource).max(3).refine(sources => new Set(sources).size === sources.length, "Choose each source once.");
+const validChoice = (value: { mode: string; provider: string | null; sources: string[] }) =>
+  value.mode === "crm" ? value.provider !== null && value.sources.length > 0 : value.provider === null && value.sources.length === 0;
+export const CustomerSourceChoice = z.object({
+  workspace_ref: z.uuid(), mode: z.enum(["unselected", "crm", "file", "none"]), provider: CrmProvider.nullable(), sources: CustomerSources,
+  version: Count, updated_at: z.iso.datetime({ offset: true }).nullable(), refresh_pending: z.boolean(),
+}).strict().refine(validChoice, "The provider and sources must match the saved mode.");
+export const CustomerSourceChoiceRequest = z.object({
+  mode: z.enum(["crm", "file", "none"]), provider: CrmProvider.nullable(), sources: CustomerSources, expected_version: Count,
+}).strict().refine(validChoice, "CRM needs a provider and at least one source; file and none need a null provider and no CRM sources.");
+export const CustomerExclusionsStatusRead = CustomerExclusionsStatus.extend({ crm_refresh: CrmRefresh.nullable(), source_choice: CustomerSourceChoice.nullable() }).strict();
 // The existing company identity policy in Jobs uses this same list. Personal
 // mail hosts cannot identify a customer company; exact emails remain valid.
 const freeMailDomains = new Set([
@@ -57,12 +69,12 @@ const invalidCode = "CUSTOMER_EXCLUSIONS_INVALID";
 const invalid = (message: string) => new PublicError({ status: 422, code: invalidCode, message });
 const tooLarge = () => new PublicError({ status: 413, code: "PAYLOAD_TOO_LARGE", message: "Use a CSV of at most 128 KiB, 5000 data rows, 32 columns and 10000 distinct customer identities." });
 
-export function validateCustomerExclusionsInput(schema: z.ZodType, input: unknown, write: boolean): unknown {
+export function validateCustomerExclusionsInput(schema: z.ZodType, input: unknown, write: boolean, code = invalidCode): unknown {
   if (write && input && typeof input === "object" && "csv" in input && typeof input.csv === "string" && Buffer.byteLength(input.csv, "utf8") > MAX_CSV_BYTES) throw tooLarge();
   const parsed = schema.safeParse(input);
   if (!parsed.success) throw new PublicError({
-    status: write ? 422 : 400, code: write ? invalidCode : "INVALID_REQUEST",
-    message: write ? "Supply a customer CSV using the current import schema." : "Use the current customer exclusion query schema.",
+    status: write ? 422 : 400, code: write ? code : "INVALID_REQUEST",
+    message: write ? code === "CUSTOMER_SOURCE_CHOICE_INVALID" ? "Choose CRM sources, a customer file or neither using the current schema." : "Supply a customer CSV using the current import schema." : "Use the current customer exclusion query schema.",
     issues: parsed.error.issues.slice(0, 20).map(issue => ({
       code: issue.code, path: `/${issue.path.map(String).join("/")}`, message: "This field does not match the current schema.",
       suggestion: "Send only the fields published by this operation.",
@@ -194,13 +206,28 @@ export const customerExclusionsOperationDefinitions = {
       method: "GET", route, cli: { operation: "status" }, rpc: "get_workspace_customer_exclusions", path: Empty,
       query: Empty, request: null, invalid: { status: 400, code: "INVALID_REQUEST" }, response: CustomerExclusionsStatusRead,
       success: 200, args: () => ({}),
-      description: "Read total saved and founder-uploaded customer domain/email counts, the latest founder CSV import revision, accepted/rejected rows with reasons, founder-upload added/removed counts and candidates excluded. Total saved domains include CRM and manual protections. crm_refresh reports whether the CRM-derived customer list is fresh, stale, missing or not required, with the reason and each source's last attempt and success; null means it could not be read. Read-only; unavailable does not mean an empty list.",
+      description: "Read total saved and founder-uploaded customer domain/email counts, the latest founder CSV import revision, accepted/rejected rows with reasons, founder-upload added/removed counts and candidates excluded. Total saved domains include CRM and manual protections. source_choice separately reports the founder's explicit CRM, file or neither choice; connecting a CRM does not enable customer reads. crm_refresh reports freshness for enabled CRM sources, with each source's last attempt and success. Null reads are unknown. Read-only; unavailable does not mean an empty list.",
     },
     import: {
       method: "POST", route: `${route}/import`, cli: { operation: "import" }, rpc: "replace_workspace_customer_exclusions", path: Empty,
       query: Empty, request: CustomerExclusionsImportRequest, invalid: { status: 422, code: invalidCode }, response: CustomerExclusionsStatus,
       success: 200, args: input => importArguments(CustomerExclusionsImportRequest.parse(input.body).csv),
-      description: "Replace this workspace's founder-uploaded customers from a CSV of company domains and/or exact emails. Deduplicates case/scheme/www domain variants; free-mail hosts protect only exact emails. Rejected rows contain row numbers and reasons. Returns saved counts and added/removed counts; a header-only CSV clears the founder upload. CRM/manual protections remain. Does not acquire leads, call a provider, resume research or send outreach.",
+      description: "Replace this workspace's founder-uploaded customers from a CSV of company domains and/or exact emails. Deduplicates case/scheme/www domain variants; free-mail hosts protect only exact emails. Rejected rows contain row numbers and reasons. Returns saved counts and added/removed counts; a header-only CSV clears the founder upload. CRM/manual protections remain. Does not change source choice, grant customer-data access, acquire leads, call a provider, resume research or send outreach.",
+    },
+    source_choice_get: {
+      method: "GET", route: `${route}/source-choice`, cli: { operation: "source-choice" }, rpc: "get_workspace_customer_source_choice", path: Empty,
+      query: Empty, request: null, invalid: { status: 400, code: "INVALID_REQUEST" }, response: CustomerSourceChoice,
+      success: 200, args: () => ({}),
+      description: "Read the founder's explicit customer-source choice and current version, independently of CRM connection or provider grants. Unselected means no choice has been saved and authorizes no CRM customer reads. CRM lists the selected sources; file and none enable no CRM reads. All saved exclusions remain enforced. Read-only; unavailable is unknown, never consent.",
+    },
+    source_choice_post: {
+      method: "POST", route: `${route}/source-choice`, cli: { operation: "source-choice" }, rpc: "set_workspace_customer_source_choice", path: Empty,
+      query: Empty, request: CustomerSourceChoiceRequest, invalid: { status: 422, code: "CUSTOMER_SOURCE_CHOICE_INVALID" }, response: CustomerSourceChoice,
+      success: 200, args: input => {
+        const choice = CustomerSourceChoiceRequest.parse(input.body);
+        return { p_mode: choice.mode, p_provider: choice.provider, p_sources: choice.sources, p_expected_version: choice.expected_version };
+      },
+      description: "Save the founder's explicit choice using expected_version from source-choice GET. CRM requires the current provider and each authorized source once; file and none require a null provider and no CRM sources. Enabling CRM queues a durable refresh; only enabled required sources can hold new Journey starts or activation when stale. File/none stop CRM customer reads and preserve every saved exclusion. Uploads can complement CRM without changing this choice. Does not activate or resume outreach. After an uncertain response read the saved choice before retrying.",
     },
   },
 } satisfies Record<string, Record<string, IdentityDefinition>>;
@@ -211,8 +238,11 @@ export async function executeCustomerExclusionsOperation(session: AuthSession, k
   const entry = customerExclusionsEntries().find(item => item.key === key);
   if (!entry) throw new Error("Unknown customer exclusion operation");
   const { definition } = entry;
-  const unavailable = { code: "CUSTOMER_EXCLUSIONS_UNAVAILABLE", message: "Customer exclusions could not be verified. Read status again before retrying an import." };
-  const args = { p_workspace: null, ...definition.args(input) };
+  const sourceChoice = key === "customer-exclusions.source_choice_get" || key === "customer-exclusions.source_choice_post";
+  const unavailable = sourceChoice
+    ? { code: "CUSTOMER_SOURCE_CHOICE_UNAVAILABLE", message: "The customer-source choice could not be verified. Read it again before retrying; unavailable is not consent." }
+    : { code: "CUSTOMER_EXCLUSIONS_UNAVAILABLE", message: "Customer exclusions could not be verified. Read status again before retrying an import." };
+  const args = { p_workspace: session.workspaceRef ?? null, ...definition.args(input) };
   let result: { data: unknown; error: unknown };
   try { result = await (session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc(definition.rpc, args); }
   catch (cause) { throw rpcFailure(cause, { operation: definition.rpc, ...unavailable }); }
@@ -220,9 +250,12 @@ export async function executeCustomerExclusionsOperation(session: AuthSession, k
   const status = key === "customer-exclusions.status";
   const parsed = (status ? CustomerExclusionsStatus : definition.response).safeParse(result.data);
   if (!parsed.success) throw new PublicError({ status: 502, ...unavailable });
+  if (sourceChoice && session.workspaceRef && (parsed.data as z.infer<typeof CustomerSourceChoice>).workspace_ref !== session.workspaceRef)
+    throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "The customer-source choice belongs to another workspace." });
   if (!status) return parsed.data;
   const receipt = parsed.data as z.infer<typeof CustomerExclusionsStatus>;
-  return { ...receipt, crm_refresh: await readCrmRefresh(session, receipt.workspace_ref) };
+  const [crm_refresh, source_choice] = await Promise.all([readCrmRefresh(session, receipt.workspace_ref), readSourceChoice(session, receipt.workspace_ref)]);
+  return { ...receipt, crm_refresh, source_choice };
 }
 
 // The founder list stays readable when only the CRM freshness read fails; the
@@ -230,10 +263,18 @@ export async function executeCustomerExclusionsOperation(session: AuthSession, k
 async function readCrmRefresh(session: AuthSession, workspaceRef: string): Promise<z.infer<typeof CrmRefresh> | null> {
   try {
     const result = await (session.client as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> })
-      .rpc("get_workspace_suppression_freshness", { p_workspace: null });
+      .rpc("get_workspace_suppression_freshness", { p_workspace: session.workspaceRef ?? null });
     if (result.error || !result.data || typeof result.data !== "object") return null;
     const { workspace_ref: ref, ...value } = result.data as Record<string, unknown>;
     const parsed = CrmRefresh.safeParse(value);
     return ref === workspaceRef && parsed.success ? parsed.data : null;
+  } catch { return null; }
+}
+
+async function readSourceChoice(session: AuthSession, workspaceRef: string): Promise<z.infer<typeof CustomerSourceChoice> | null> {
+  try {
+    const result = await executeCustomerExclusionsOperation(session, "customer-exclusions.source_choice_get", { path: {}, query: {}, body: undefined });
+    const choice = CustomerSourceChoice.parse(result);
+    return choice.workspace_ref === workspaceRef ? choice : null;
   } catch { return null; }
 }

@@ -1236,21 +1236,21 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       { state: "none" },
       "Ask once whether",
     ],
-    // Without a CRM the founder can save existing customers from a file, or skip it.
+    // A CRM connection and customer-list authorization are separate choices.
     [
       { status: "not_connected", provider: "hubspot" },
       { state: "none" },
-      "customer_exclusions_status first and skip the offer when a list is saved",
+      "customer_exclusions_status first for saved protections",
     ],
     [
       { status: "not_connected", provider: "hubspot" },
       { state: "none" },
-      "They can skip it now and add the file any time",
+      "Neither allows setup to continue",
     ],
     [
       { status: "not_connected", provider: "hubspot" },
       { state: "none" },
-      "read their deals and closed customers so it never looks for leads at those companies",
+      "Connecting does not authorize reading their customer list",
     ],
     [
       { ...crmConnected, reconnect_required: true },
@@ -1288,6 +1288,7 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
         outreachOperation: async (_session, key) => emptyOutreach(key),
         getHubspotConnection: async () => connection as never,
         getCrmSyncStatus: async () => sync as never,
+        customerExclusionsOperation: async () => ({ workspace_ref: workspaceRef, mode: "unselected", provider: null, sources: [], version: 0, updated_at: null, refresh_pending: false }),
         startCrmSyncRun: write,
         // No outreach account yet: the founder is still closing Part 1.
         identityOperation: async () => ({ status: 200, body: { ...sendersFixture, senders: [] } }),
@@ -1308,6 +1309,28 @@ describe("resource resumption preserves research, campaign and CRM decisions", (
       expect(write).not.toHaveBeenCalled();
     },
   );
+  it.each([
+    { mode: "none", provider: null, sources: [] },
+    { mode: "file", provider: null, sources: [] },
+    { mode: "crm", provider: "hubspot", sources: ["crm_customer"] },
+  ])("does not repeat the customer offer after a saved $mode choice", async choice => {
+    const write = vi.fn();
+    const h = harness(undefined, null, {
+      getRunStatus: async () => runFixture,
+      outreachOperation: async (_session, key) => emptyOutreach(key),
+      getHubspotConnection: async () => crmConnected,
+      getCrmSyncStatus: async () => ({ state: "none" }),
+      customerExclusionsOperation: async () => ({ ...choice, workspace_ref: workspaceRef, version: 1, updated_at: "2026-10-07T12:00:00Z", refresh_pending: false }),
+      startCrmSyncRun: write,
+      identityOperation: async () => ({ status: 200, body: { ...sendersFixture, senders: [] } }),
+    });
+    const result = await (await h.request("/v1/workspace/next-step")).json();
+    expect(result).toMatchObject({ state: "review", reason: "sample_ready_for_founder_review" });
+    expect(result.actions[2]).toContain(`saved ${choice.mode} choice`);
+    expect(result.actions[2]).not.toContain("Separately offer customer exclusions");
+    expect(result.recommended_tools).not.toContain("customer_exclusions_source_choice_post");
+    expect(write).not.toHaveBeenCalled();
+  });
   it("preserves leads-only review through optional CRM failures and never claims a new connection is needed", async () => {
     const h = harness(undefined, null, {
       getRunStatus: async () => runFixture,

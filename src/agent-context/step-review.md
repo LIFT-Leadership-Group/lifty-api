@@ -33,15 +33,18 @@ change needs its own confirmation.
 
 Follow the CRM action in `actions`; ask about it once. HubSpot and Attio
 connect here; for another CRM say it is not supported yet and continue.
-When you offer it, explain that a connected CRM also lets Lifty read the
-founder's deals and closed customers so it never looks for leads at those
-companies.
-
-- Without a CRM: offer to save the companies that are already their customers
-  from a file so Lifty never contacts them. Read `customer_exclusions_status`
-  first and skip the offer when a list is saved; import with
-  `customer_exclusions_import` (summary_context task customer-exclusions).
-  They can skip it now and add the file any time.
+Connecting a CRM to receive leads does not authorize reading its customers.
+Separately read `customer_exclusions_source_choice_get`. If it is `unselected`,
+offer selected CRM customer sources, a customer file, or neither once. Save
+their explicit choice with `customer_exclusions_source_choice_post` and the
+read's version (summary_context task customer-exclusions). A saved CRM, file or
+neither choice answers this question; keep it and do not ask again. If the
+read is unavailable, retry it without assuming consent or blocking setup.
+Read `customer_exclusions_status` for existing protections before a file
+import with `customer_exclusions_import`. Importing never changes source
+choice or grants CRM access. A file can complement CRM exclusions. Neither
+allows setup to continue; explain that unknown existing customers will not be
+excluded. Saved exclusions and do-not-contact rules remain active in every mode.
 
 - Connect: `crm_post` with the founder's `provider` (`hubspot` or `attio`), show the returned link right away as a Markdown link,
   and after the founder finishes, `crm_get` with that `attempt_ref`. Only

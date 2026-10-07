@@ -2,11 +2,34 @@
 
 Use this stage when the founder asks to protect existing customers or provides
 a customer file. Read `references.common` in full. This works with or without
-a connected CRM. next_step offers it at the sample review, with the CRM
-question, when no CRM is connected (a connected CRM excludes the companies on
-its closed-won deals, and for HubSpot also companies flagged as customers,
-once `crm_refresh` reports them fresh). The founder can skip it then and add or
-replace the file any time.
+a connected CRM. Customer exclusions are optional. Connecting HubSpot or Attio
+to receive leads does not authorize reading its customer data.
+
+Read `source_choice_get` before offering this choice. `unselected` authorizes
+no CRM customer reads. Ask once whether the founder wants selected CRM sources,
+a customer file, or neither; save only their explicit answer with
+`source_choice_post` and `expected_version` from the read. A saved `none`, `file`
+or `crm` choice answers the question: do not offer it repeatedly. The founder
+can change it later. An unavailable choice is unknown; retry the read without
+assuming permission or requiring a choice to continue setup.
+
+For `crm`, use the current provider (`hubspot` or `attio`) and only the sources
+the founder authorizes: `crm_closed_won` (companies on won deals),
+`crm_customer` (HubSpot companies flagged as customers), or `crm_open_deal`
+(companies with open deals). Choose each once. Attio has no customer flag.
+For `file` or `none`, send a null provider and an empty sources list. Include
+the current version even when it is 0. On `CUSTOMER_SOURCE_CHOICE_MOVED`, read
+again and save only the intended answer. After a lost response, read the choice
+before retrying. `refresh_pending` means a durable refresh is waiting; it does
+not prove the customer list is current.
+
+File-only and neither allow activation and new Journey starts without CRM
+freshness checks. With neither, explain that unknown existing customers will
+not be protected. Saved customer exclusions and do-not-contact protections
+remain enforced in every mode. Turning CRM reads off preserves the last saved
+list. A file can complement an enabled CRM source: importing does not grant
+CRM access, disable CRM sources, or change the saved choice. Removing imported
+customers remains a separate explicit import action.
 
 Read `status` before an import. It separates total saved domain/email counts
 from the founder-uploaded counts. It also shows the latest founder import
@@ -15,22 +38,30 @@ added/removed counts and the number of candidates excluded. Saved
 domain counts include CRM and manual protections. An unavailable status is
 unknown; retry the read before reporting that there are no customers saved.
 
-`status` also returns `crm_refresh`: the state of the customer list Lifty
-reads from a connected CRM every night. `fresh` means it refreshed recently.
+`status` also returns `source_choice`, independently of the CRM connection,
+and `crm_refresh`: freshness of enabled CRM customer sources. A null
+`source_choice` could not be read and is unknown. `fresh` means required sources refreshed recently.
 `stale` means the last saved list still applies but has not refreshed in over
 two days. `missing` means a required CRM source (for example closed-won deals)
 has never been read, so the customers it holds are not excluded.
-`not_required` means there is no CRM. `reason`
+`not_required` means no enabled required CRM source needs this check. `reason`
 names the cause, for example `closed_won_stage_not_found` (an Attio deal pipeline without its won stage),
 `hubspot_deals_read_scope_missing`, `provider_failed` or `crm_disconnected`;
 `sources` shows each CRM source's last attempt and last success. `fresh` covers
 only the sources marked `required`: Attio supplies no customer flag, so an
 Attio workspace is protected by its closed-won deals only, and a customer who
 never had a closed-won deal needs the customer file. Saved protections from a
-source that is fresh still apply when another source is missing. When it is
-missing or stale, tell the founder plainly that their CRM customers may not be
-excluded, explain the reason, and offer the customer file in the meantime.
-Never say a connected CRM protects its customers unless the state is `fresh`.
+source that is fresh still apply when another source is missing. An enabled,
+connected required source that is missing, stale or loses credentials holds
+activation changes and new Journey starts; started Journeys continue. Explain
+the reason and repair that source. Do not silently change the founder's choice
+to clear a failure. They can explicitly choose file-only or neither instead.
+A disconnected CRM continues on its last saved list and alerts; it does not
+hold outreach. Structurally unavailable sources are report-only. Connecting
+or reconnecting queues a refresh only for enabled, authorized sources, even
+when the saved list is fresh; it never resumes outreach.
+Never say connecting alone protects CRM customers. Only the enabled sources
+marked `required` and reported `fresh` have current CRM protection.
 A null `crm_refresh` could not be read: it is unknown, not fresh.
 
 The CSV needs a `domain`, `company_domain` or `website` column, an `email`

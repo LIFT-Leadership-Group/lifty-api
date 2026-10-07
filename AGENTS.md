@@ -123,3 +123,15 @@ before this API revision. Deploy the database through its production-database
 job first. The API reads and replaces founder-upload membership through member
 RPCs; unavailable reads stay unknown. CRM and manual protections are preserved,
 and a file containing only rejected customer rows cannot clear the saved list.
+
+LIF-1128's explicit customer-source choice additionally requires
+`20261008080000_lif1128_optional_customer_sources.sql`; activation/admission
+holds require `20261008090000_lif1128_activation_hold.sql`. Pause the old Jobs
+suppression nightly, catch-up and manual tasks and drain running syncs before
+applying these migrations: the previous Jobs revision treats connection as
+permission to read customers. Deploy the database through its required gates,
+then the consent-aware Jobs revision and this API revision, before resuming
+suppression tasks. Source choice is separate from connection and provider
+grants; existing connections do not imply consent. Optional choice/status
+reads that are unavailable stay unknown, and no release here bumps the
+installed client contract.

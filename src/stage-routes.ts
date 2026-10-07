@@ -197,7 +197,7 @@ export function registerStageRoutes(app: OpenAPIHono<AppEnvironment>, dependenci
       // JSON escaping can expand one decoded CSV byte to six wire bytes.
       // The importer still bounds the decoded UTF-8 file to 128 KiB.
       const body = definition.request
-        ? validateCustomerExclusionsInput(definition.request, await readBody(context, definition.invalid.code, 769 * 1024), true)
+        ? validateCustomerExclusionsInput(definition.request, await readBody(context, definition.invalid.code, key === "customer-exclusions.import" ? 769 * 1024 : undefined), true, definition.invalid.code)
         : undefined;
       return context.json(definition.response.parse(await dependencies.customerExclusionsOperation(context.get("authSession"), key, { path: {}, query, body })));
     });

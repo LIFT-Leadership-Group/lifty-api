@@ -19,6 +19,7 @@ import { CampaignsSchema } from "./outreach-contracts.js";
 import { SendersGetSchema } from "./identity-contracts.js";
 import { ResearchScheduleSchema } from "./research-operations.js";
 import { PublicError } from "./errors.js";
+import { CustomerSourceChoice } from "./customer-exclusions.js";
 import { z } from "zod";
 import { stageOperations } from "./stage-contracts.js";
 import { operationToolNames } from "./operation-names.js";
@@ -214,6 +215,7 @@ type Reads = Pick<
   | "getEmailWarmup"
   | "getEmailPlacement"
   | "researchOperation"
+  | "customerExclusionsOperation"
 >;
 // The session forwards the caller's workspace selection; every read below
 // resolves the same workspace through the shared database rule.
@@ -433,7 +435,7 @@ export async function getNextStep(
     if (crm.status === "available") {
       if (crm.value.status !== "connected")
         crmAction =
-          `Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio), and explain that connecting it also lets Lifty read their deals and closed customers so it never looks for leads at those companies. Connect only after a separate explicit request, with crm_post for the CRM they use. If they do not connect a CRM, offer to save the companies that are already their customers from a file so Lifty never contacts them: read ${tool("customer-exclusions", "status")} first and skip the offer when a list is saved, then ${tool("customer-exclusions", "import")} (summary_context task customer-exclusions). They can skip it now and add the file any time. A leads-only workspace can remain here.`;
+          "Ask once whether the founder wants these leads and their research in their CRM (HubSpot or Attio). Connect only after a separate explicit request, with crm_post for the CRM they use. Connecting does not authorize reading their customer list. A leads-only workspace can remain here.";
       else if (crm.value.reconnect_required)
         crmAction =
           "The saved CRM connection needs reconnecting. Reconnect only after a separate explicit request; a leads-only workspace can remain here.";
@@ -467,6 +469,18 @@ export async function getNextStep(
           crmAction = `The CRM sync failed (${sync.value.error_code ?? "unknown"}). Read crm_sync_status and resolve its blocker before offering a retry.`;
       }
     }
+    const customerChoice = await readComponent(async () => {
+      const choice = CustomerSourceChoice.parse(await deps.customerExclusionsOperation(session, "customer-exclusions.source_choice_get", { path: {}, query: {}, body: undefined }));
+      if (choice.workspace_ref !== ref)
+        throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "The customer-source choice changed workspace." });
+      return choice;
+    });
+    if (customerChoice.status === "unavailable")
+      crmAction += ` Read ${tool("customer-exclusions", "source_choice_get")} before offering customer exclusions because the saved choice is unavailable; continue setup without treating that as consent or asking the founder to choose again.`;
+    else if (customerChoice.value.mode === "unselected")
+      crmAction += ` Separately offer customer exclusions once: authorize selected CRM sources, use a customer file, or choose neither. Read ${tool("customer-exclusions", "status")} first for saved protections, then save their explicit choice with ${tool("customer-exclusions", "source_choice_post")} using version ${customerChoice.value.version}; a customer file uses ${tool("customer-exclusions", "import")} (summary_context task customer-exclusions). Neither allows setup to continue; explain that unknown existing customers will not be excluded. Do not read CRM customers without their separate authorization.`;
+    else
+      crmAction += ` Customer exclusions already have the founder's saved ${customerChoice.value.mode} choice. Keep it and do not offer the choice again; they can explicitly change it later. Every saved exclusion remains enforced.`;
     return response(
       "sample_ready_for_founder_review",
       [
@@ -489,6 +503,7 @@ export async function getNextStep(
         tool("crm", "patch"),
         tool("crm", "sync_start"),
         tool("crm", "sync_status"),
+        tool("customer-exclusions", "source_choice_get"),
         tool("senders", "get"),
         tool("sending-accounts", "connect"),
         tool("summary", "context"),
