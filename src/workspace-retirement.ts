@@ -28,7 +28,7 @@ const messages: Record<string, string> = {
   workspace_identity_mismatch:
     "The workspace ID, slug and name do not match. Read its current identity before retiring it.",
   workspace_not_lifty:
-    "Only a workspace created by LIFTY can be retired through this command.",
+    "LIFT manages this workspace, so it cannot be retired here. Ask the LIFT team to retire it.",
   workspace_cross_tenant_reference:
     "This workspace has shared references that prevent safe retirement. Contact LIFT support.",
   workspace_retirement_blocked:
