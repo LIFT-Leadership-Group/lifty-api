@@ -1,6 +1,7 @@
 import { operationToolNames } from "./operation-names.js";
+import { createHash } from "node:crypto";
 import { z } from "zod";
-import { STAGE_CLIENT_CONTRACT } from "./agent-context.js";
+import { AgentContextSchema, STAGE_CLIENT_CONTRACT } from "./agent-context.js";
 import { stageOperations, type StageOperation } from "./stage-contracts.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -99,6 +100,21 @@ function result(data: Record<string, unknown>, isError = false) {
 }
 const invalid = () => result({ error: { code: "INVALID_REQUEST", message: "Use this tool's current path, query and body schema." } }, true);
 
+// MCP clients already load the operation input schemas through tools/list.
+// Keep all guidance, references and draft provenance, without returning the
+// same catalog a second time. HTTP/CLI contexts retain their complete schemas.
+function contextGuide(data: unknown) {
+  const parsed = AgentContextSchema.safeParse(data);
+  if (!parsed.success) return data;
+  const { operations: _operations, schemas: _schemas, revision: _revision, ...guide } = parsed.data;
+  const content = {
+    ...guide,
+    instructions: `${guide.instructions}\n\nMCP tools publish their current input schemas in tools/list. Use each tool's inputSchema for path, query and body; this document supplies the current guidance and references.`,
+    schemas: {},
+  };
+  return { ...content, revision: `sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}` };
+}
+
 export async function callStageMcpTool(name: string, args: unknown, request: Request, dispatch: McpRouteDispatch) {
   const entry = entries().find(item => item.tool.name === name);
   if (!entry) return result({ error: { code: "UNKNOWN_TOOL", message: "Refresh the tools list and use an available Lifty tool." } }, true);
@@ -142,6 +158,7 @@ export async function callStageMcpTool(name: string, args: unknown, request: Req
   });
   let data: unknown;
   try { data = await response.json(); } catch { return result({ error: { code: "INVALID_RESPONSE", message: "Lifty could not verify the response. Read status before retrying a write." } }, true); }
+  if (response.ok && operation.method === "GET" && route.startsWith("/v1/context/")) data = contextGuide(data);
   return result({ status: response.status, data,
     ...(response.headers.has("retry-after") ? { retry_after_seconds: Number(response.headers.get("retry-after")) } : {}) }, !response.ok);
 }

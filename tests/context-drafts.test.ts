@@ -4,6 +4,7 @@ import { createApp } from "../src/app.js";
 import { CONTEXT_FILES, STAGE_CLIENT_CONTRACT, getAgentContext } from "../src/agent-context.js";
 import { nextStepGuide } from "../src/next-step.js";
 import { profileFixture } from "./business-fixtures.js";
+import { callStageMcpTool } from "../src/mcp-stage-tools.js";
 
 // LIF-1298: a marked test workspace's drafts replace published context files
 // in what its agent reads; every other caller, and any failed read, gets the
@@ -35,7 +36,7 @@ function harness(drafts: unknown, options: { admin?: unknown } = {}) {
   });
   const get = (path: string, authorized = true) => app.request(path, { headers: {
     ...(authorized ? { authorization: "Bearer founder" } : {}), "x-lifty-client-contract": STAGE_CLIENT_CONTRACT } });
-  return { get, calls };
+  return { app, get, calls };
 }
 
 describe("context drafts", () => {
@@ -68,6 +69,14 @@ describe("context drafts", () => {
     expect(signedIn.drafts).toEqual([{ draft_ref: draft("interview", "").draft_ref, file: "interview", revision: 3 }]);
     expect(signedIn.revision).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(signedIn.revision).not.toBe(anonymous.revision);
+
+    const mcp = await callStageMcpTool("summary_context", { path: { task: "business" } },
+      new Request("https://example.test/mcp", { headers: { authorization: "Bearer founder" } }),
+      (route, init) => Promise.resolve(h.app.request(route, init)));
+    expect(mcp.structuredContent.data).toMatchObject({
+      references: { interview: "# Draft interview" }, drafts: signedIn.drafts, schemas: {},
+    });
+    expect((mcp.structuredContent.data as Record<string, unknown>).revision).not.toBe(signedIn.revision);
   });
 
   it("gives admins every published file with its hash, and marks drafts whose file changed since", async () => {

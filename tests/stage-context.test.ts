@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { createApp } from "../src/app.js";
-import { getStageMcpTools } from "../src/mcp-stage-tools.js";
+import { callStageMcpTool, getStageMcpTools } from "../src/mcp-stage-tools.js";
+import { createHash } from "node:crypto";
 import { RPC_ERROR_MESSAGES } from "../src/rpc-errors.js";
 import {
   getAgentContext,
@@ -249,14 +250,33 @@ describe("customer surfaces name no provider or retired volume knob", () => {
 });
 
 describe("context size", () => {
-  // MCP connectors receive each stage context as one tool result, and Claude
-  // rejects results over 25,000 tokens: about 75K characters of this JSON
-  // (LIF-1338). Campaigns still exceeds it through its policy request schemas
-  // and writing reference; its cap only stops it growing.
-  it("keeps every stage context within an MCP connector's tool-result limit", () => {
-    for (const stage of Object.keys(stageOperations)) {
-      const size = JSON.stringify(getAgentContext(stage)).length;
-      expect(size, stage).toBeLessThanOrEqual(stage === "campaigns" ? 110_000 : 75_000);
+  // The installed CLI needs its catalog. MCP already receives input schemas
+  // in tools/list; repeating that catalog exceeds Claude's tool-result limit.
+  it("keeps every served MCP context within the connector limit without losing guidance", async () => {
+    const app = createApp();
+    const request = new Request("https://api.example.test/mcp");
+    const dispatch = (route: string, init: RequestInit) => Promise.resolve(app.request(route, init));
+    for (const stage of ["campaigns", ...Object.keys(stageOperations).filter(stage => stage !== "campaigns")]) {
+      const original = getAgentContext(stage)!;
+      const result = await callStageMcpTool("summary_context", { path: { task: stage } }, request, dispatch);
+      expect(result.isError, stage).toBe(false);
+      const text = result.content[0]!.text;
+      expect(text.length, stage).toBeLessThanOrEqual(75_000);
+      expect(JSON.parse(text)).toEqual(result.structuredContent);
+      const data = result.structuredContent.data as Record<string, unknown>;
+      expect(data.instructions, stage).toContain(original.instructions);
+      expect(data.references, stage).toEqual(original.references);
+      expect(data.operations, stage).toBeUndefined();
+      expect(data.schemas, stage).toEqual({});
+      const { revision, ...content } = data;
+      expect(revision, stage).toBe(`sha256:${createHash("sha256").update(JSON.stringify(content)).digest("hex")}`);
+      // The same endpoint still serves the complete installed-client catalog.
+      const http = await (await app.request(`/v1/context/${stage}`)).json();
+      expect(http.operations, stage).toEqual(original.operations);
+      expect(http.schemas, stage).toEqual(original.schemas);
     }
+    const direct = await callStageMcpTool("sending_accounts_context", {}, request, dispatch);
+    expect(direct.structuredContent.data).toMatchObject({ task: "sending-accounts", schemas: {} });
+    expect((direct.structuredContent.data as Record<string, unknown>).operations).toBeUndefined();
   });
 });
