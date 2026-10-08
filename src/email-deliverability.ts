@@ -127,7 +127,12 @@ function placementRule(mailbox: SourceMailbox): { maxAgeDays: number | null; rul
   return { maxAgeDays: null, applies: false, disabled: false, rule: "No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency." };
 }
 
-function presentPlacement(mailbox: SourceMailbox, now: Date, detail: PlacementDetail[] | null): DeliverabilityMailbox["placement"] {
+function initialWarmupPending(warmup: DeliverabilityMailbox["warmup"]): boolean {
+  return (warmup.status.code === "active" || warmup.status.code === "pending")
+    && warmup.sources.some(source => source.period_complete === false);
+}
+
+function presentPlacement(mailbox: SourceMailbox, warmup: DeliverabilityMailbox["warmup"], now: Date, detail: PlacementDetail[] | null): DeliverabilityMailbox["placement"] {
   const source = mailbox.placement;
   const recent = source.recent_tests.map(test => presentTest(test, now));
   const latestCompleted = source.latest_completed_test ? presentTest(source.latest_completed_test, now) : null;
@@ -150,8 +155,10 @@ function presentPlacement(mailbox: SourceMailbox, now: Date, detail: PlacementDe
   if (latestAttempt?.execution_reason?.code === "disabled_by_policy") reasons.push(latestAttempt.execution_reason);
   let status: DeliverabilityMailbox["placement"]["status"];
   if (source.test_count === 0) {
-    status = make("no_tests", "No placement test yet", rule.applies ? "warn" : "muted",
-      rule.applies ? "No placement test has been recorded for this inbox. Missing evidence is not a passing result." : `No placement test has been recorded for this inbox. ${rule.rule}`, reasons);
+    const afterWarmup = rule.applies && initialWarmupPending(warmup);
+    status = make("no_tests", "No placement test yet", rule.applies && !afterWarmup ? "warn" : "muted",
+      afterWarmup ? "The first placement test is due after the initial warmup period finishes. No test has been recorded yet."
+        : rule.applies ? "No placement test has been recorded for this inbox. Missing evidence is not a passing result." : `No placement test has been recorded for this inbox. ${rule.rule}`, reasons);
   } else if (!latestCompleted) {
     status = make("no_result", "No placement result yet", "warn",
       "Tests were attempted, but none has completed with a result. A pending or failed run is not a placement verdict.", reasons);
@@ -542,6 +549,18 @@ function presentStatus(parts: {
   if (warmup.status.code === "problem") return make("warmup_problem", warmup.status.label, "warn", warmup.status.description, warmup.status.reasons);
   if (approval.status.code === "awaiting_approval") return make("needs_approval", "Needs approval", "watch", approval.status.description, approval.status.reasons);
   const ready = readiness.code === "ready" || readiness.code === "partially_ready";
+  // A permissive sending path does not make the first test overdue during
+  // initial warmup. Actual failures, recovery and campaign blocks still win.
+  if (placement.status.code === "no_tests" && initialWarmupPending(warmup)) {
+    return make("warming", warmup.status.label, "muted", `${warmup.status.description} ${placement.status.description}`, warmup.status.reasons);
+  }
+  // Missing placement can itself close the send gate. Do not require an open
+  // gate to report that first test due once the required period is complete.
+  if (placement.status.code === "no_tests" && placement.evidence.max_age_days !== null
+    && warmup.sources.some(source => source.period_complete === true)
+    && !warmup.sources.some(source => source.period_complete === false)) {
+    return make("placement_due", "Placement test due", "warn", placement.status.description, placement.status.reasons);
+  }
   if (ready && placement.evidence.max_age_days !== null && (placement.status.code === "stale" || placement.status.code === "no_tests" || placement.status.code === "no_result")) {
     return make("placement_due", "Placement test due", "warn", placement.status.description, placement.status.reasons);
   }
@@ -605,7 +624,7 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
   const paths = [...(smartlead ? [smartlead] : []), ...connectionPaths];
   const readiness = presentReadiness(paths);
   const warmup = presentWarmup(source, now);
-  const placement = presentPlacement(source, now, detail);
+  const placement = presentPlacement(source, warmup, now, detail);
   const campaigns = presentCampaigns(source.campaigns.map(item => presentCampaign(item, paths)));
   const approval = presentApproval(source, now);
   const recovery = presentRecovery(source, now);
