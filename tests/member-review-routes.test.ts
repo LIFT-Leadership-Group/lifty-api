@@ -121,7 +121,8 @@ describe("member Review transport", () => {
       ["reply_review_post", { workspace, turn: { ...turn, draft: "An older draft." } }],
       ["replies_get", { workspace, turns: [{ ...turn, history: [{ ...sample, lead_ref: workspace.workspace_ref }] }], next_after: null }],
       ["message_rewrite_post", { ...rewrite, rewrite_work: { ...rewrite.rewrite_work, message_ref: message.lead_ref } }],
-      ["message_rewrite_post", { ...rewrite, history: [{ ...sample, account_id: message.lead_ref }] }],
+      ["message_rewrite_post", { ...rewrite, history: [{ ...sample, account_id: message.lead_ref, sender_id: message.lead_ref }] }],
+      ["message_rewrite_post", { ...rewrite, revisions: [{ ...sample, account_id: message.lead_ref }] }],
       ["message_rewrite_post", { ...rewrite, rewrite_work: { ...rewrite.rewrite_work, state: "done", replacement_message_ref: null } }],
       ["lead_stop_post", { workspace, lead_ref: message.message_ref, stopped_at: time, provider_stops_pending: false }],
     ];

@@ -107,9 +107,12 @@ describe("actual unapproved campaign message corrections", () => {
       const h = harness({ ...approved, message: { ...approved.message, ...changed } }, before.message_ref);
       expect((await h.request("POST", "/review", decision)).status).toBe(502);
     }
-    const foreignHistory = { ...approved.message, account_id: approved.message.lead_ref };
+    const foreignHistory = { ...approved.message, account_id: approved.message.lead_ref, sender_id: approved.message.lead_ref };
     const h = harness({ ...approved, history: [foreignHistory] }, approved.message.message_ref);
     expect((await h.request("GET")).status).toBe(502);
+    // The same person's earlier account (before a provider cutover) is the same conversation.
+    const earlierAccount = { ...approved.message, account_id: approved.message.lead_ref };
+    expect((await harness({ ...approved, history: [earlierAccount] }, approved.message.message_ref).request("GET")).status).toBe(200);
     for (const code of ["OUTREACH_MESSAGE_MOVED", "OUTREACH_SEND_UNCONFIRMED", "OUTREACH_TARGET_STOPPED", "OUTREACH_APPROACH_UNAVAILABLE", "OUTREACH_SENDER_UNAVAILABLE", "OUTREACH_TEMPLATE_UNAVAILABLE"]) {
       const error = Object.assign(new Error(code), { code: "PT409" });
       const rpc = vi.fn(async () => ({ data: null, error }));
