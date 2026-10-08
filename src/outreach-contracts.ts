@@ -42,7 +42,8 @@ const Subject = text(300).refine(value => !/[\r\n]/.test(value));
 const CatalogId = z.string().min(1).max(100).regex(/^[A-Za-z0-9._-]+$/);
 const Arm = z.enum(["direct", "pain", "personal", "strategic"]);
 const line = (max: number) => text(max).refine(value => !/[\r\n]/.test(value));
-const Template = z.object({ subject: Subject.optional(), text: text(20000),
+const DisplayName = text(100).refine(value => !/[\u0000-\u001f\u007f]/.test(value), "Use a nonblank single-line template name of at most 100 characters.");
+const Template = z.object({ subject: Subject.optional(), text: text(20000), display_name: DisplayName.optional(),
   id: CatalogId.optional(), arms: z.array(Arm).min(1).max(4).refine(values => new Set(values).size === values.length).optional(),
   variant: CatalogId.optional(), coverage: z.enum(["broad", "signal_specific"]).optional(),
   fit: line(2000).optional(), slots_spec: line(4000).optional(),
@@ -50,6 +51,7 @@ const Template = z.object({ subject: Subject.optional(), text: text(20000),
 const Variant = Template.extend({ lane: LaneName.optional(), opener: z.enum(["cold", "linkedin_bridge"]).optional() }).strict();
 const Step = z.object({ position: z.number().int().min(1).max(5), delay: DelaySchema,
   template: Template.optional(), variants: z.array(Variant).min(1).max(40).optional(),
+  writing_instructions: text(10000).optional().describe("Optional guidance for this message in generate mode; preserves campaign-wide instructions and Business voice."),
 }).strict();
 // Deterministic content lanes: the lead's title picks the first rule whose
 // terms it contains, otherwise (including a missing title) the default lane.
@@ -182,20 +184,25 @@ const canonicalTemplate = <T extends { text: string; subject?: string | undefine
 const canonicalSteps = (steps: z.infer<typeof Step>[]) => steps.map(step => ({ ...step,
   ...(step.template ? { template: canonicalTemplate(step.template) } : {}), ...(step.variants ? { variants: step.variants.map(canonicalTemplate) } : {}) }));
 function placeholderIssues(steps: z.infer<typeof Step>[] | undefined, context: z.RefinementCtx, path: Array<string | number>, channel?: "email" | "linkedin") {
-  steps?.forEach((step, index) => [step.template, ...(step.variants ?? [])].forEach(template => {
-    for (const saved of template ? [template.subject, template.text] : []) {
-      if (saved === undefined) continue;
-      const value = canonicalTemplateText(saved);
-      const message = /\{\{?\s*last_name\s*\}?\}/.test(value)
-        ? "Lifty fills only {first_name} and {company} from the lead; leave the last name out."
-        : /[{}]/.test(value.replace(/\{[a-z][a-z0-9_]*\}/g, ""))
-          ? "Write placeholders with single braces and a lower-case name: {first_name}, {company}, or a writer slot such as {pain}."
-          : channel === "linkedin" && value.includes("{sender_first_name}")
-            ? "{sender_first_name} is filled only in email; a LinkedIn message already comes from its sender."
-            : undefined;
-      if (message) context.addIssue({ code: "custom", path: [...path, index], message });
-    }
-  }));
+  steps?.forEach((step, index) => {
+    const choices = step.template ? [{ template: step.template, path: ["template"] as Array<string | number> }]
+      : (step.variants ?? []).map((template, variantIndex) => ({ template, path: ["variants", variantIndex] as Array<string | number> }));
+    choices.forEach(({ template, path: templatePath }) => {
+      for (const field of ["subject", "text"] as const) {
+        const saved = template[field];
+        if (saved === undefined) continue;
+        const value = canonicalTemplateText(saved);
+        const message = /\{\{?\s*last_name\s*\}?\}/.test(value)
+          ? "Lifty fills only {first_name} and {company} from the lead; leave the last name out."
+          : /[{}]/.test(value.replace(/\{[a-z][a-z0-9_]*\}/g, ""))
+            ? "Write placeholders with single braces and a lower-case name: {first_name}, {company}, or a writer slot such as {pain}."
+            : channel === "linkedin" && value.includes("{sender_first_name}")
+              ? "{sender_first_name} is filled only in email; a LinkedIn message already comes from its sender."
+              : undefined;
+        if (message) context.addIssue({ code: "custom", path: [...path, index, ...templatePath, field], message });
+      }
+    });
+  });
 }
 export const JourneyPathSchema = z.object({ journey_ref: Ref }).strict();
 export const CampaignPathSchema = z.object({ campaign_ref: Ref }).strict();
@@ -221,7 +228,10 @@ export const CampaignPauseSchema = z.object({ expected_version: Version }).stric
 const Approval = z.object({ actor_ref: Ref, approved_at: Timestamp }).strict();
 const revision = <T extends z.ZodType>(content: T) => ExactRevisionSchema.extend({ content, created_at: Timestamp, approval: Approval.nullable() }).strict();
 export const JourneyRevisionSchema = revision(JourneyPolicySchema);
-export const CampaignRevisionSchema = revision(CampaignPolicySchema);
+// Stored history remains readable when a newer authoring/readiness rule rejects
+// it. Writes and exact publication are validated authoritatively in Functions;
+// response parsing checks source shape without reinterpreting saved policy.
+export const CampaignRevisionSchema = revision(CampaignPolicyFields);
 export const RevisionSummarySchema = ExactRevisionSchema.extend({ approval: Approval.nullable() }).strict();
 // One executable Journey version: the exact sources selected for new Journey
 // starts and whether its automatically derived graph is installed.
@@ -242,8 +252,6 @@ export const CampaignSchema = z.object({ campaign_ref: Ref, journey_ref: Ref, ch
   state: CampaignState, active_revision: CampaignRevisionSchema.nullable(),
   draft_revision: CampaignRevisionSchema, revisions: z.array(CampaignRevisionSchema).max(100),
 }).strict().superRefine((value, context) => {
-  for (const rev of [value.draft_revision, ...value.revisions, ...(value.active_revision ? [value.active_revision] : [])])
-    for (const message of campaignChannelIssues(rev.content, value.channel)) context.addIssue({ code: "custom", message });
   if (value.state !== "inactive" && !value.active_revision) context.addIssue({ code: "custom", message: "An activated Campaign has a selected revision." });
 });
 const Workspace = { workspace: WorkspaceIdentitySchema };
