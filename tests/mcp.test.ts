@@ -54,6 +54,17 @@ describe("MCP HTTP boundary", () => {
         // SDK 1.30.1 declares sessionId as string|undefined on this transport
         // but optional string on Transport; runtime is the SDK's own transport.
         await client.connect(transport as Parameters<Client["connect"]>[0]);
+        expect(client.getServerVersion()).toMatchObject({ icons: [{
+          src: "https://api.lifty.test/brand/lifty-orbit-icon.png", mimeType: "image/png", sizes: ["512x512"],
+        }] });
+        const icon = await app.request("https://untrusted.test/brand/lifty-orbit-icon.png");
+        expect(icon.status).toBe(200);
+        expect(icon.headers.get("content-type")).toBe("image/png");
+        expect(icon.headers.get("cache-control")).toBe("public, max-age=3600");
+        expect(icon.headers.get("x-content-type-options")).toBe("nosniff");
+        const bytes = Buffer.from(await icon.arrayBuffer());
+        expect([...bytes.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+        expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([512, 512]);
         const list = await client.listTools();
         expect(list.tools.length).toBeGreaterThan(40);
         expect(list.tools.every(tool => tool.title && typeof tool.annotations?.readOnlyHint === "boolean")).toBe(true);

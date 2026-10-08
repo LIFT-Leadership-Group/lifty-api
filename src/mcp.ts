@@ -59,7 +59,10 @@ export const MCP_INSTRUCTIONS = [
 ].join("\n");
 
 function createMcpServer(session: AuthSession, request: Request, settings: McpSettings, registry?: McpToolRegistry) {
-  const server = new Server({ name: "lifty", version: "0.1.0" }, { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS });
+  const server = new Server({ name: "lifty", version: "0.1.0", icons: [{
+    src: new URL("/brand/lifty-orbit-icon.png", settings.resourceUrl).href,
+    mimeType: "image/png", sizes: ["512x512"],
+  }] }, { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS });
   const securitySchemes = [{ type: "oauth2", scopes: ["openid", "email", "profile"] }];
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [whoami, ...(registry?.tools ?? [])].map(tool => ({
     ...tool, securitySchemes, _meta: { ...tool._meta, securitySchemes },

@@ -822,6 +822,7 @@ export function createApp(
   registerOpenApi(app);
   const mutationWindows = new Map<string, { count: number; resetsAt: number }>();
   const favicon = readFileSync(new URL("./favicon.ico", import.meta.url));
+  const connectorIcon = readFileSync(new URL("./lifty-orbit-icon.png", import.meta.url));
 
   app.use("*", async (context, next) => {
     const suppliedRequestId = RequestIdSchema.safeParse(
@@ -842,6 +843,11 @@ export function createApp(
   if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup,logConfirmation));
   app.get("/favicon.ico", (context) => context.body(new Uint8Array(favicon).buffer, 200, {
     "content-type": "image/x-icon",
+    "cache-control": "public, max-age=3600",
+    "x-content-type-options": "nosniff",
+  }));
+  app.get("/brand/lifty-orbit-icon.png", (context) => context.body(new Uint8Array(connectorIcon).buffer, 200, {
+    "content-type": "image/png",
     "cache-control": "public, max-age=3600",
     "x-content-type-options": "nosniff",
   }));
