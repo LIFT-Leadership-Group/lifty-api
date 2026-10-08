@@ -29,9 +29,19 @@ describe("supported Outreach policy boundary", () => {
       variants: step.variants.map(variant => ({ ...variant, display_name: "Shared readable label" })) })) };
     expect(create("email", named)).toMatchObject({ success: true, data: { policy: named } });
     expect(CampaignDraftSchema.parse({ expected_version: 1, revision_ref: revisionRef, changes: { steps: named.steps } }).changes.steps).toEqual(named.steps);
-    const generated = { ...policy, steps: [{ ...policy.steps[0]!, writing_instructions: "x".repeat(10000) }] };
-    expect(create("linkedin", generated).success).toBe(true);
-    expect(create("linkedin", { ...simple, steps: [{ ...simple.steps[0]!, template: { ...simple.steps[0]!.template, display_name: "x".repeat(100) } }] }).success).toBe(true);
+    for (const writing_instructions of ["x".repeat(10000), "🚀".repeat(10000)]) {
+      const generated = { ...policy, steps: [{ ...policy.steps[0]!, writing_instructions }] };
+      expect(create("linkedin", generated)).toMatchObject({ success: true, data: { policy: generated } });
+      expect(CampaignDraftSchema.parse({ expected_version: 1, revision_ref: revisionRef, changes: { steps: generated.steps } }).changes.steps).toEqual(generated.steps);
+      const result = { workspace, campaign: { ...campaign, draft_revision: revision(generated), revisions: [revision(generated)] } };
+      expect(CampaignResultSchema.parse(result)).toEqual(result);
+    }
+    for (const display_name of ["x".repeat(100), "🚀".repeat(100)]) {
+      const named = { ...simple, steps: [{ ...simple.steps[0]!, template: { ...simple.steps[0]!.template, display_name } }] };
+      expect(create("linkedin", named)).toMatchObject({ success: true, data: { policy: named } });
+      const result = { workspace, campaign: { ...campaign, draft_revision: revision(named), revisions: [revision(named)] } };
+      expect(CampaignResultSchema.parse(result)).toEqual(result);
+    }
   });
   it("rejects invalid names/guidance at the exact message and template field", () => {
     for (const display_name of ["", " \t", "\u00a0", "x".repeat(101), "🚀".repeat(101), "Line\nBreak", "Tab\tName", "Bad\u007fName", null]) {
