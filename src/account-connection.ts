@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { connectionFetch, type ConfirmationAttention, type ConfirmationResult } from "./connection-confirmation.js";
 import { openConnectAttempt, sealConnectAttempt, type ConnectChannel } from "./connect-state.js";
@@ -6,7 +7,8 @@ import { HostedReturnError } from "./hosted-return-error.js";
 import { parseHostedAuthOrigin } from "./hosted-auth-branding.js";
 import { unipileV2AuthState } from "./unipile-v2-state.js";
 import { PublicError } from "./errors.js";
-import type { Account } from "./identity-contracts.js";
+import { AccountConnectionProgress, type Account } from "./identity-contracts.js";
+import { HostedLinkIssue } from "./unipile-v2-provider.js";
 
 // One controller for every sending-account connection: the browser connect
 // page, the shared confirmation shell, the attempt read's reconciliation and
@@ -33,9 +35,11 @@ const Snapshot = z.object({
     declaration: z.record(z.string(), z.unknown()).nullable(),
     expires_at: z.iso.datetime({ offset: true }),
     hosted_url: z.string().nullable(),
+    progress: AccountConnectionProgress,
   }).strip(),
   transport: ProviderTransport,
   authorization: z.object({ received: z.boolean(), account_id: z.string().nullable(), return_error: HostedReturnError.nullable() }).strip(),
+  issuance: z.object({ claim_id: Uuid.nullable(), lease_expires_at: z.iso.datetime({ offset: true }).nullable(), dispatched_at: z.iso.datetime({ offset: true }).nullable() }).strip(),
   claimed: z.boolean().optional(),
 }).strip();
 type Snapshot = z.infer<typeof Snapshot>;
@@ -47,7 +51,8 @@ const Conflict = z.discriminatedUnion("conflict", [
 export type ConnectOutcome =
   | { kind: "declare"; senderName: string }
   | { kind: "redirect"; url: string }
-  | { kind: "checking" };
+  | { kind: "checking" }
+  | { kind: "preparing" };
 export type EmailDeclaration = { mailbox_use: "habitual" | "dedicated" };
 export type LinkedinDeclaration = { habitual_personal_account: true; no_other_automation: true };
 
@@ -118,31 +123,64 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     return url.toString();
   };
 
-  // Claim the single link for this attempt, or reuse the one already issued.
-  async function handoff(channel: ConnectChannel, intent: string, current: Snapshot): Promise<ConnectOutcome> {
+  // Entry documents only read local durable state. Provider work starts after
+  // the shared shell is visible, through its bounded process request.
+  function handoff(current: Snapshot): ConnectOutcome {
     const attempt = current.attempt;
     if (attempt.internal_state === "completed" || current.authorization.received) return { kind: "checking" };
     if (attempt.state === "expired") throw rpcError({ message: "account_attempt_expired" });
     if (attempt.state === "failed") throw rpcError({ message: "account_attempt_unavailable" });
     if (!attempt.declaration) return { kind: "declare", senderName: attempt.sender.name };
     if (attempt.internal_state === "ready" && attempt.hosted_url) return { kind: "redirect", url: hosted(attempt.hosted_url) };
-    const claim = attempt.internal_state === "pending" ? await snapshot(channel, "issue_link", { attempt_id: attempt.id }) : current;
-    if (!claim.claimed) {
-      if (claim.attempt.internal_state === "ready" && claim.attempt.hosted_url) return { kind: "redirect", url: hosted(claim.attempt.hosted_url) };
-      return { kind: "checking" };
-    }
+    return { kind: "preparing" };
+  }
+
+  async function prepare(channel: ConnectChannel, intent: string): Promise<ConfirmationResult> {
+    const id = open(channel, intent), claimId = randomUUID(), started = Date.now();
+    let current = await snapshot(channel, "context", { attempt_id: id });
+    if (current.authorization.received) return result(await reconcile(channel, current));
+    const progress = current.attempt.progress;
+    if (current.attempt.state !== "pending" || !current.attempt.declaration
+      || current.attempt.internal_state === "ready"
+      || (progress.stage === "recovery_required" && !progress.retryable)) return result(current);
+    let stage: "preparation" | "provider" | "persistence" = "preparation";
     try {
-      const state = unipileV2AuthState(channel, attempt.id, key(channel));
-      await rpc(channel, "auth_state", { attempt_id: attempt.id, state });
-      const url = await provider.createLink({ channel, state, transport: claim.transport, expiresAt: attempt.expires_at,
-        redirectUri: `${settings.publicBaseUrl}/connect/${channel}/return?intent=${encodeURIComponent(intent)}` });
-      await rpc(channel, "save_link", { attempt_id: attempt.id, url });
-      return { kind: "redirect", url: hosted(url) };
-    } catch {
-      // A lost provider/save response cannot prove rejection. Retain the claim
-      // so retries only read this attempt; late signed authorization can finish it.
-      return { kind: "checking" };
+      current = await snapshot(channel, "claim_link", { attempt_id: id, claim_id: claimId });
+      if (!current.claimed) return result(current);
+      const state = unipileV2AuthState(channel, id, key(channel));
+      // Only the first acknowledged dispatch can call the provider. A lost
+      // dispatch receipt must not be replayed, even by the same claim owner.
+      current = await snapshot(channel, "dispatch_link", { attempt_id: id, claim_id: claimId, state });
+      if (!current.claimed) return result(current);
+      stage = "provider";
+      const url = hosted(await provider.createLink({ channel, state, transport: current.transport, expiresAt: current.attempt.expires_at,
+        redirectUri: `${settings.publicBaseUrl}/connect/${channel}/return?intent=${encodeURIComponent(intent)}` }));
+      stage = "persistence";
+      // Retrying this exact durable write is safe; recreating the provider link
+      // is not. Read after a lost save response before retrying that same URL.
+      for (let save = 0; save < 2; save++) {
+        try { return result(await snapshot(channel, "save_link_claim", { attempt_id: id, claim_id: claimId, url })); }
+        catch (error) {
+          try {
+            current = await snapshot(channel, "context", { attempt_id: id });
+            if (current.attempt.hosted_url || current.authorization.received || current.attempt.state !== "pending") return result(current);
+          } catch { /* The bounded second save can still recover a lost read. */ }
+          if (save === 1) throw error;
+        }
+      }
+    } catch (error) {
+      // These receipts contain only a stage, classified outcome and status.
+      // No provider body, URL, auth state or exception message is persisted.
+      try {
+        await rpc(channel, "link_issue", { attempt_id: id, claim_id: claimId, stage,
+          outcome: stage === "provider" && error instanceof HostedLinkIssue ? error.outcome : "uncertain",
+          ...(stage === "provider" && error instanceof HostedLinkIssue && error.upstreamStatus !== undefined ? { upstream_status: error.upstreamStatus } : {}),
+          elapsed_ms: Math.max(0, Date.now() - started) });
+      } catch { /* A missing receipt never authorizes another dispatch. */ }
     }
+    // The next safe read also discovers an authorization or a save which won
+    // the race while this request was interrupted.
+    return result(await snapshot(channel, "context", { attempt_id: id }));
   }
 
   // Finish an authorization the provider signed for this attempt. Only verified
@@ -195,10 +233,14 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
   }
   function result(current: Snapshot): ConfirmationResult {
     const { attempt } = current;
-    if (attempt.internal_state === "completed" || attempt.state === "connected") return { status: "connected", account: null };
-    if (attempt.state === "failed") return { status: "failed", reason: attempt.reason ? failureReason[attempt.reason] : "ended" };
-    if (attempt.state === "expired") return { status: "failed", reason: "ended" };
-    return { status: "pending" };
+    if (attempt.internal_state === "completed" || attempt.state === "connected") return { status: "connected", account: null, reference: attempt.id };
+    if (attempt.state === "failed") return { status: "failed", reason: attempt.reason ? failureReason[attempt.reason] : "ended", reference: attempt.id };
+    if (attempt.state === "expired") return { status: "failed", reason: "ended", reference: attempt.id };
+    if (attempt.progress.stage === "sign_in_required") {
+      if (!attempt.hosted_url) throw rpcError(null);
+      hosted(attempt.hosted_url);
+    }
+    return { status: "pending", progress: attempt.progress, reference: attempt.id };
   }
 
   return {
@@ -208,27 +250,29 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     /** GET connect page: declaration form, provider handoff, or receipt. */
     async page(channel: ConnectChannel, intent: string): Promise<ConnectOutcome> {
       const id = open(channel, intent);
-      return handoff(channel, intent, await snapshot(channel, "context", { attempt_id: id }));
+      return handoff(await snapshot(channel, "context", { attempt_id: id }));
     },
     /** POST connect page: record the person's declaration, then hand off. */
     async declare(channel: ConnectChannel, intent: string, declaration: EmailDeclaration | LinkedinDeclaration): Promise<ConnectOutcome> {
       const id = open(channel, intent);
-      return handoff(channel, intent, await snapshot(channel, "declare", { attempt_id: id, declaration }));
+      return handoff(await snapshot(channel, "declare", { attempt_id: id, declaration }));
     },
+    prepare,
     /** Confirmation shell status: the same evidence as the attempt read. */
     async confirm(channel: ConnectChannel, intent: string, returnError: HostedReturnError | null, accountRef?: string): Promise<ConfirmationResult> {
       const id = open(channel, intent);
       let current = await snapshot(channel, "context", { attempt_id: id });
       // A provider-reported error explains a missing authorization; it never
       // overrides a signed one and leaves the attempt open.
-      if (returnError && !current.authorization.received && current.attempt.internal_state !== "completed") {
-        if (current.attempt.internal_state === "ready" && current.authorization.return_error !== returnError) {
-          await rpc(channel, "return_error", { attempt_id: id, return_error: returnError });
+      const hint = returnError ?? current.authorization.return_error;
+      if (hint && !current.authorization.received && current.attempt.internal_state !== "completed") {
+        if (current.attempt.internal_state === "ready" && current.authorization.return_error !== hint) {
+          await rpc(channel, "return_error", { attempt_id: id, return_error: hint });
         }
         // Browser hints are not terminal evidence. Keep polling so a delayed
         // authorization can still establish the authoritative outcome.
         const pending = result(current);
-        return pending.status === "pending" ? { status: "pending", attention: await explain(channel, id, returnError, accountRef) } : pending;
+        return pending.status === "pending" ? { ...pending, attention: await explain(channel, id, hint, accountRef) } : pending;
       }
       current = await reconcile(channel, current);
       return result(current);

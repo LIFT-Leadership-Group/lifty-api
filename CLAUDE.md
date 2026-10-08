@@ -144,6 +144,17 @@ revocation path before the retry. The Functions migration
 warmup `starting` receipt. This API works before it ships (the explanation
 stays generic), so the order is free.
 
+LIF-1371 requires Functions migration
+`20261010120000_lif1371_connection_recovery.sql` before this API revision.
+The progress member RPC leaves the old member response compatible during
+rollout. Sending-account preparation runs after the shared shell loads;
+claim/dispatch fences allow recovery only before provider dispatch. An unknown
+dispatched link stays on the same attempt for support and late authorization;
+never reset its fence or issue a replacement to clear a spinner. A lost save
+response can retry the exact hosted URL, without creating another provider link.
+Browser and agent progress come from the same database projection. Operational
+logs use the non-secret attempt reference, stage and classified outcome.
+
 ## Sample review confirmation
 
 LIF-1303 records the founder's confirmation of the calibration sample

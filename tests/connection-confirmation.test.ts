@@ -94,9 +94,9 @@ it('keeps malformed dependency receipts pending instead of inventing an invalid 
 });
 
 function browser(href:string,fetchImpl:typeof fetch){
-  const elements:Record<string,{textContent:string;hidden:boolean;href:string;dataset:Record<string,string>}>=Object.fromEntries(['confirmation','confirmation-title','confirmation-detail','confirmation-spinner','confirmation-actions','confirmation-retry'].map(k=>[k,{textContent:'',hidden:k==='confirmation-actions',href:'',dataset:{}}]));
+  const elements:Record<string,{textContent:string;hidden:boolean;href:string;dataset:Record<string,string>;addEventListener:ReturnType<typeof vi.fn>}>=Object.fromEntries(['confirmation','confirmation-title','confirmation-detail','confirmation-spinner','confirmation-actions','confirmation-retry','confirmation-check','confirmation-reference'].map(k=>[k,{textContent:'',hidden:k==='confirmation-actions',href:'',dataset:{},addEventListener:vi.fn()}]));
   const warmup=href.includes('/warmup/');
-  elements.confirmation!.dataset={label:warmup?'email warmup':'email',warmup:String(warmup),stateKey:href.includes('/connect/')?'intent':'state',
+  elements.confirmation!.dataset={prepare:String(new URL(href).searchParams.get('prepare')==='1'),label:warmup?'email warmup':'email',warmup:String(warmup),stateKey:href.includes('/connect/')?'intent':'state',
     ...(href.includes('/connect/email/')?{retry:'/connect/email'}:{})};
   const location={href};
   const history={replaceState:vi.fn((_state:unknown,_title:string,path:string)=>{location.href=new URL(path,location.href).href;})};
@@ -206,4 +206,91 @@ it.each(['hubspot','slack','attio'] as const)('%s never repeats an exchanged cod
     expect(await response.json()).toEqual({status:'connected',account:null});
   }
   expect(complete).toHaveBeenCalledTimes(1);
+});
+
+it('prepares a sending-account link once after the shell, then offers a same-attempt sign-in action',async()=>{
+  vi.useFakeTimers();const requests:string[]=[];
+  const fetchImpl=vi.fn(async(input:unknown)=>{
+    requests.push(String(input));
+    return Response.json({status:'pending',progress:{stage:'sign_in_required'},reference:'11111111-1111-4111-8111-111111111111'});
+  }) as typeof fetch;
+  const page=browser('https://api.lifty.test/connect/email/return?intent=capability&prepare=1',fetchImpl);
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(requests.filter(path=>path.endsWith('/process'))).toHaveLength(1);
+  expect(page.elements['confirmation-title']!.textContent).toBe('Ready to sign in');
+  expect(page.elements['confirmation-retry']!.textContent).toBe('Continue to sign in');
+  expect(page.elements['confirmation-retry']!.href).toBe('/connect/email?intent=capability');
+  expect(page.elements['confirmation-actions']!.hidden).toBe(false);
+  expect(page.elements['confirmation-reference']!.textContent).toContain('11111111-1111-4111-8111-111111111111');
+  expect(page.elements['confirmation-check']!.hidden).toBe(false);
+});
+it('keeps uncertain preparation actionable without a retry and checks status without another process',async()=>{
+  vi.useFakeTimers();let connected=false;const requests:string[]=[];
+  const fetchImpl=vi.fn(async(input:unknown)=>{requests.push(String(input));return Response.json(connected
+    ?{status:'connected',account:null}
+    :{status:'pending',progress:{stage:'recovery_required',reason:'issuance_uncertain',retryable:false},reference:'11111111-1111-4111-8111-111111111111'});
+  }) as typeof fetch;
+  const page=browser('https://api.lifty.test/connect/email/return?intent=capability&prepare=1',fetchImpl);
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-title']!.textContent).toBe('Sign-in preparation needs attention');
+  expect(page.elements['confirmation-detail']!.textContent).toContain('Return to Lifty with the connection reference');
+  expect(page.elements['confirmation-actions']!.hidden).toBe(true);
+  expect(page.elements['confirmation-spinner']!.hidden).toBe(true);
+  expect(page.elements['confirmation-check']!.hidden).toBe(false);
+  connected=true;
+  const click=page.elements['confirmation-check']!.addEventListener.mock.calls[0]![1] as ()=>void;
+  click();await vi.runAllTimersAsync();
+  expect(page.elements['confirmation-title']!.textContent).toBe('email is connected');
+  expect(requests.filter(path=>path.endsWith('/process'))).toHaveLength(1);
+});
+it('offers a safe pre-dispatch recovery but preserves a provider refusal instead of redirecting into a loop',async()=>{
+  vi.useFakeTimers();
+  const page=browser('https://api.lifty.test/connect/email/return?intent=capability',vi.fn(async()=>Response.json({status:'pending',
+    progress:{stage:'recovery_required',reason:'preparation_interrupted',retryable:true}})) as typeof fetch);
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-retry']!.textContent).toBe('Resume preparation');
+  expect(page.elements['confirmation-actions']!.hidden).toBe(false);
+  const requests:string[]=[];
+  const refused=browser('https://api.lifty.test/connect/email/return?intent=capability&prepare=1&error_type=api/already_exists',vi.fn(async(input:unknown)=>{
+    requests.push(String(input));return Response.json({status:'pending',progress:{stage:'sign_in_required'},attention:'exists'});
+  }) as typeof fetch);
+  const refusal=refused.run();await vi.runAllTimersAsync();await refusal;
+  expect(refused.elements['confirmation-title']!.textContent).toBe('This account is already linked');
+  expect(requests.every(path=>path.endsWith('/status'))).toBe(true);
+  expect(refused.location.href).toContain('/return?');
+});
+it.each(['prepare=2','prepare=1&prepare=1'])('rejects invalid preparation markers before work: %s',async marker=>{
+  const work=vi.fn(async()=>({status:'pending' as const}));
+  const router=createConfirmationRouter('email',{validate:()=>{},status:work,process:work});
+  const response=await router.request('https://api.lifty.test/connect/email/return?intent=capability&'+marker);
+  expect(await response.text()).not.toContain('<script>');expect(work).not.toHaveBeenCalled();
+});
+
+it('rechecking the same preparing state restores the live view and ignores overlapping clicks',async()=>{
+  vi.useFakeTimers();let requests=0;
+  const page=browser('https://api.lifty.test/connect/email/return?intent=capability',vi.fn(async()=>{
+    requests++;return Response.json({status:'pending',progress:{stage:'preparing'}});
+  }) as typeof fetch);
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-title']!.textContent).toBe('Sign-in preparation is still pending');
+  const click=page.elements['confirmation-check']!.addEventListener.mock.calls[0]![1] as ()=>void;
+  const before=requests;click();click();await vi.advanceTimersByTimeAsync(1);
+  expect(requests-before).toBe(1);
+  expect(page.elements['confirmation-title']!.textContent).toBe('Preparing sign-in');
+  expect(page.elements['confirmation-spinner']!.hidden).toBe(false);
+  await vi.runAllTimersAsync();
+});
+it('correlates regenerated browser links to the same non-secret attempt and logs preparation outcomes',async()=>{
+  const logs:unknown[]=[],reference='11111111-1111-4111-8111-111111111111';
+  let connected=false;
+  const router=createConfirmationRouter('email',{validate:()=>{},status:async()=>connected?{status:'connected',account:null,reference}:{status:'pending',reference,
+    progress:{stage:'recovery_required',reason:'issuance_uncertain',retryable:false}}},{log:event=>logs.push(event)});
+  for(const state of ['secret-link-one','secret-link-two'])await router.request('https://api.lifty.test/connect/email/return/status',
+    {method:'POST',headers,body:JSON.stringify({state})});
+  const expected={correlation:createHash('sha256').update('email\0'+reference).digest('hex').slice(0,24),reference,
+    progress_stage:'recovery_required',recovery_reason:'issuance_uncertain'};
+  connected=true;
+  await router.request('https://api.lifty.test/connect/email/return/status',{method:'POST',headers,body:JSON.stringify({state:'secret-link-three'})});
+  expect(logs).toMatchObject([expected,expected,{correlation:expected.correlation,reference,outcome:'connected'}]);
+  expect(JSON.stringify(logs)).not.toContain('secret-link');
 });

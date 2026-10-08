@@ -79,13 +79,13 @@ export const identityOperationDefinitions = {
       method: "POST", route: `${accountsRoute}/connect`, cli: { operation: "connect" }, rpc: "connect_lifty_sending_account",
       path: Empty, query: Empty, request: contracts.ConnectSchema, invalid: invalidRequest,
       response: contracts.ConnectResultSchema, success: 200, args: input => ({ p_payload: input.body }),
-      description: "Start connecting a LinkedIn account or mailbox for an existing sender_id (from the senders roster). Returns connection_url: Lifty's page asks the person's declaration, then their sign-in. An open attempt for the same sender and channel is reused (created:false). The account exists only after a verified authorization; read sending-accounts attempt. Connecting never activates a campaign or sends.",
+      description: "Start connecting a LinkedIn account or mailbox for an existing sender_id (from the senders roster). Returns connection_url and durable progress: declaration, preparing, sign-in, verifying, recovery or complete. An unresolved attempt for the same sender and channel is reused (created:false), even when its link text changes. For recovery_required follow retryable; if false, read this attempt and ask LIFT support with its id, without offering a replacement link. The account exists only after verified authorization. Connecting never activates a campaign or sends.",
     },
     attempt: {
-      method: "GET", route: `${accountsRoute}/attempts/{id}`, cli: { operation: "attempt" }, rpc: "get_lifty_sending_account_attempt",
+      method: "GET", route: `${accountsRoute}/attempts/{id}`, cli: { operation: "attempt" }, rpc: "get_lifty_sending_account_attempt_progress",
       path: contracts.IdPath, query: Empty, request: null, invalid: invalidRequest,
       response: contracts.AttemptSchema, success: 200, args: input => ({ p_attempt_id: path(input) }),
-      description: "Read one connection attempt: pending, connected (account_id), failed (reason) or expired, plus the person's declaration. May finish an authorization the person already gave. A failed or timed-out read is unknown, not a failure: poll with bounded backoff.",
+      description: "Read one connection attempt: pending, connected (account_id), failed (reason) or expired, plus declaration and durable progress. sign_in_required means the person still needs to open the same connection link. recovery_required says whether preparing the same link can be retried; if retryable:false, report its id to LIFT support and keep checking this attempt. Only verifying may finish authorization already received. A failed or timed-out read is unknown, not a failed connection: use bounded backoff.",
     },
     reconnect: {
       method: "POST", route: `${accountsRoute}/{id}/reconnect`, cli: { operation: "reconnect" }, rpc: "reconnect_lifty_sending_account",
@@ -175,12 +175,13 @@ export async function executeIdentityOperation(session: AuthSession, key: string
   const data = await call(definition.rpc, definition.args(input));
   if (key === "sending-accounts.connect" || key === "sending-accounts.reconnect") {
     const { channel, ...started } = verified(StartedAttempt, data);
+    const attempt = verified(contracts.AttemptSchema, await call("get_lifty_sending_account_attempt_progress", { p_attempt_id: started.id }));
     return { status: 200, body: verified(contracts.ConnectResultSchema,
-      { ...started, connection_url: connector.connectionUrl(channel, started.id) }) };
+      { ...started, progress: attempt.progress, connection_url: connector.connectionUrl(channel, started.id) }) };
   }
   if (key === "sending-accounts.attempt") {
     const attempt = verified(contracts.AttemptSchema, data);
-    if (attempt.state !== "pending") return { status: 200, body: attempt };
+    if (attempt.state !== "pending" || attempt.progress.stage !== "verifying") return { status: 200, body: attempt };
     // A provider or verification failure leaves the attempt pending; only the
     // durable attempt decides the outcome.
     try { await connector.reconcileAttempt(attempt.channel, attempt.id); } catch { return { status: 200, body: attempt }; }

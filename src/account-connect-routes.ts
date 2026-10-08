@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { createConfirmationRouter, type ConfirmationLog } from "./connection-confirmation.js";
+import { createConfirmationRouter, withConnectionDeadline, type ConfirmationLog } from "./connection-confirmation.js";
 import type { AccountConnection, ConnectOutcome } from "./account-connection.js";
 import { renderConnectMessagePage, renderConnectPage } from "./connect-page.js";
 import { hostedReturnError } from "./hosted-return-error.js";
@@ -22,7 +22,7 @@ export function createAccountConnectRouter(connection: AccountConnection,
     c.html(renderConnectMessagePage(title, text), status);
   const render = (c: Context, channel: ConnectChannel, intent: string, outcome: ConnectOutcome) => {
     if (outcome.kind === "redirect") return c.redirect(outcome.url, 303);
-    if (outcome.kind === "checking") return c.redirect(`/connect/${channel}/return?intent=${encodeURIComponent(intent)}`, 303);
+    if (outcome.kind === "checking" || outcome.kind === "preparing") return c.redirect(`/connect/${channel}/return?intent=${encodeURIComponent(intent)}${outcome.kind === "preparing" ? "&prepare=1" : ""}`, 303);
     return c.html(renderConnectPage(channel, intent, outcome.senderName));
   };
   app.use("/connect/*", async (c, next) => {
@@ -30,7 +30,7 @@ export function createAccountConnectRouter(connection: AccountConnection,
     // same-origin keeps the form's Origin check usable without leaking the link to the provider.
     c.header("referrer-policy", "same-origin");
     c.header("content-security-policy", `default-src 'none'; style-src 'unsafe-inline'; script-src '${PENDING_SUBMIT_SCRIPT_HASH}'; form-action 'self' ${options.hostedOrigins.join(" ")}; base-uri 'none'; frame-ancestors 'none'`);
-    await next();
+    await withConnectionDeadline(8_000, next);
   });
   // Never log intents, provider URLs or bodies; the page shows a safe next step.
   app.onError((error, c) => error instanceof PublicError && error.status < 500
@@ -82,7 +82,9 @@ export function createAccountConnectRouter(connection: AccountConnection,
     });
     app.route("/", createConfirmationRouter(channel, {
       validate: input => { connection.validate(channel, input.state); },
-      // The provider returns without a code; status alone reads/reconciles the attempt.
+      // Preparation is a separate fenced process after the shell is visible.
+      process: input => connection.prepare(channel, input.state),
+      // Provider returns only read/reconcile; they never issue another link.
       status: input => connection.confirm(channel, input.state, hostedReturnError(input.errorType), input.errorDetail),
     }, { origin: options.origin, ...(options.log ? { log: options.log } : {}) }));
   }
