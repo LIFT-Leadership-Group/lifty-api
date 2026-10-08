@@ -7,6 +7,7 @@ const transport:UnipileTransport={api_version:"v2",connection_ref:null,canonical
 const email="founder@example.test";
 const account={object:"Account",id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",
   provider:"google",status:"running",is_locked:false,metadata:{v1_account_id:"legacy_account",products_connection_status:{gmail:"running"}}};
+const outlook={...account,provider:"outlook",oauth_scope:"User.Read,Mail.ReadWrite,Mail.Send",metadata:{v1_account_id:"legacy_account",products_connection_status:{outlook:"running"}}};
 const senders={data:[{object:"EmailSender",email,is_primary:true,verification_status:"verified"}]};
 const profile={object:"UserProfile",provider:"linkedin",id:"owner",type:"individual",display_name:"Founder",public_identifier:"founder",specifics:{network_distance:"SELF"}};
 function harness(options:{account?:unknown;senders?:unknown;profile?:unknown;link?:string;status?:number;body?:Response}={}) {
@@ -24,17 +25,17 @@ function harness(options:{account?:unknown;senders?:unknown;profile?:unknown;lin
   return {calls,provider:createUnipileV2Provider({accessToken:"v2-test-key",applicationId:"app_test",hostedAuthOrigins:["https://connect-v2.lifty.test"],fetchImpl})};
 }
 describe("Unipile V2 authenticated contract",()=>{
-  it("retains canonical legacy identity after exact application/scope/owner/alias readback",async()=>{
-    const h=harness();
-    expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toEqual({accountId:"legacy_account",email,type:"GOOGLE_OAUTH",healthy:true,healthStatus:"running",
+  it.each([account,outlook])("retains canonical identity after exact application/scope/owner/alias readback: $provider",async(raw)=>{
+    const h=harness({account:raw});
+    expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toEqual({accountId:"legacy_account",email,type:raw.provider === "outlook" ? "OUTLOOK" : "GOOGLE_OAUTH",healthy:true,healthStatus:"running",
       verifiedTransport:{api_version:"v2",account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",owner_profile_id:null,v1_account_id:"legacy_account"}});
     expect(h.calls.map(c=>c.url)).toEqual(["https://api.unipile.com/v2/accounts/acc_test","https://api.unipile.com/v2/acc_test/email-senders"]);
   });
-  it.each([
+  for (const raw of [account,outlook]) it.each([
     {id:"foreign"},{application_id:"app_foreign"},{account_scope_id:"foreign"},{account_scope_id:null},{user_id:"other"},
     {metadata:{v1_account_id:"other"}},{metadata:{}},{provider:"linkedin"},
-  ])("rejects authentic but incorrectly bound account %j",async(change)=>{
-    const h=harness({account:{...account,...change}});
+  ])(`rejects authentic but incorrectly bound ${raw.provider} account %j`,async(change)=>{
+    const h=harness({account:{...raw,...change}});
     await expect(h.provider.readEmailIdentity("acc_test",transport,email)).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
     expect(h.calls).toHaveLength(1);
   });
@@ -43,20 +44,20 @@ describe("Unipile V2 authenticated contract",()=>{
     const identity=await h.provider.readEmailIdentity("acc_test",{...transport,provider_namespace:"unipile:v2:app_test",canonical_account_id:null,account_id:null,user_id:null,v1_account_id:null},email);
     expect(identity.accountId).toBe("acc_test");expect(identity.verifiedTransport.v1_account_id).toBeNull();
   });
-  it.each(["outlook","imap"])("does not substitute Gmail evidence for unverified V2 %s policy",async(provider)=>{
+  it.each(["imap"])("does not substitute Gmail evidence for unverified V2 %s policy",async(provider)=>{
     const h=harness({account:{...account,provider}});
     await expect(h.provider.readEmailIdentity("acc_test",transport,email)).rejects.toMatchObject({code:"UNIPILE_MAILBOX_UNVERIFIABLE"});
     expect(h.calls).toHaveLength(1);
   });
-  it.each([
+  for (const raw of [account,outlook]) it.each([
     {data:[]},{data:[...senders.data,...senders.data]},
     {data:[{...senders.data[0],is_primary:false}]},{data:[{...senders.data[0],verification_status:"unknown"}]},
     {...senders,next_cursor:"more"},{...senders,total_count:2},
   ])("fails closed on ambiguous/incomplete primary address evidence %j",async(senders)=>{
-    await expect(harness({senders}).provider.readEmailIdentity("acc_test",transport,email)).rejects.toBeDefined();
+    await expect(harness({account:raw,senders}).provider.readEmailIdentity("acc_test",transport,email)).rejects.toBeDefined();
   });
-  it("rejects an alias even when a provider profile contains it",async()=>{
-    await expect(harness().provider.readEmailIdentity("acc_test",transport,"alias@example.test")).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
+  it.each([account,outlook])("rejects an alias even when a provider profile contains it: $provider",async(raw)=>{
+    await expect(harness({account:raw}).provider.readEmailIdentity("acc_test",transport,"alias@example.test")).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
   });
   it.each([{status:"disconnected"},{status:"errored"},{is_locked:true},{metadata:{...account.metadata,products_connection_status:{gmail:"disconnected"}}},{metadata:{...account.metadata,products_connection_status:{google_calendar:"running"}}}])("never reports unhealthy Gmail as running %j",async(change)=>{
     expect((await harness({account:{...account,...change}}).provider.readEmailIdentity("acc_test",transport,email)).healthy).toBe(false);
@@ -65,6 +66,21 @@ describe("Unipile V2 authenticated contract",()=>{
     const h=harness({account:{...account,status,metadata:{...account.metadata,products_connection_status:{gmail:"running",google_calendar:"errored"}}}});
     expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toMatchObject({healthy:true,healthStatus:"running",email});
     expect(h.calls).toHaveLength(2);
+  });
+  it.each([undefined,"","User.Read,Calendars.ReadWrite","User.Read,Mail.Send","User.Read,Mail.ReadWrite","User.Read,Mail.Read,Mail.Send"])("requires Microsoft mail read/write and send permissions: %s",async(oauth_scope)=>{
+    const h=harness({account:{...outlook,oauth_scope}});
+    expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toMatchObject({type:"OUTLOOK",healthy:false,healthStatus:"unknown"});
+    expect(h.calls).toHaveLength(1);
+  });
+  it("accepts Microsoft Graph-qualified granted permissions",async()=>{
+    expect(await harness({account:{...outlook,oauth_scope:"https://graph.microsoft.com/User.Read https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send"}}).provider.readEmailIdentity("acc_test",transport,email)).toMatchObject({type:"OUTLOOK",healthy:true});
+  });
+  it.each([{status:"partial"},{status:"degraded"},{status:"disconnected"},{is_locked:true},
+    {metadata:{...outlook.metadata,products_connection_status:{outlook:"errored"}}},
+    {metadata:{...outlook.metadata,products_connection_status:{}}}])("never treats uncertain or unhealthy Microsoft as ready: %j",async(change)=>{
+    const h=harness({account:{...outlook,...change}});
+    expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toMatchObject({type:"OUTLOOK",healthy:false});
+    expect(h.calls).toHaveLength(1);
   });
   it("uses an independent self profile for LinkedIn identity",async()=>{
     const h=harness({account:{...account,provider:"linkedin"}});
@@ -79,7 +95,7 @@ describe("Unipile V2 authenticated contract",()=>{
     for(const reconnect of [false,true]){
       const h=harness();await h.provider.createLink({channel:"email",state:"opaque-state",redirectUri:"https://api.lifty.test/return",expiresAt:"2026-09-18T00:00:00.000Z",transport:{...transport,account_id:reconnect?"acc_test":null}});
       const body=JSON.parse(String(h.calls[0]?.init?.body));
-      expect(body).toEqual({...(reconnect?{account_id:"acc_test"}:{providers:["google"]}),account_scope_id:"scope_test",domain:"connect-v2.lifty.test",
+      expect(body).toEqual({...(reconnect?{account_id:"acc_test"}:{providers:["google","outlook"]}),config:{outlook:{oauth_scope:["User.Read","Mail.ReadWrite","Mail.Send","offline_access"]}},account_scope_id:"scope_test",domain:"connect-v2.lifty.test",
         state:"opaque-state",redirect_uri:"https://api.lifty.test/return",expires_on:"2026-09-18T00:00:00.000Z"});
       expect(body).not.toHaveProperty("notify_url");
     }

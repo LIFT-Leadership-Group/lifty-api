@@ -114,7 +114,7 @@ leads, invent fit, or acquire repeated waves to satisfy the objective.
    A connected mailbox is not an email choice. Explain the chosen sequence
    before writing templates, then follow the campaign context's copy choice.
    Reuse the stated channel choice. Read the current `senders` and `sending-accounts` guides to
-   connect the sender's Google mailbox or LinkedIn account and verify the exact attempt; the person answers the
+   connect the sender's Google or Microsoft 365 mailbox or LinkedIn account and verify the exact attempt; the person answers the
    account declarations on Lifty's connect page. Skip an already healthy connection unless reconnecting was
    explicitly requested. If they choose existing B leads,
    review their saved evidence against the current ICP and make the selected

@@ -34,14 +34,21 @@ const admissionStatus = { "api/invalid_parameters": 400, "api/missing_authorizat
 const Account = z.object({
   object: z.literal("Account"), id: ProviderIdentifier, application_id: ProviderIdentifier,
   account_scope_id: ProviderIdentifier.nullish(), user_id: z.string().min(1).max(255),
-  provider: z.enum(["linkedin", "google", "outlook", "imap"]),
+  provider: z.enum(["linkedin", "google", "outlook", "imap"]), oauth_scope: z.string().nullish(),
   status: z.enum(["running", "errored", "disconnected", "degraded", "partial"]), is_locked: z.boolean(),
   metadata: z.object({ v1_account_id: ProviderIdentifier.optional(),
     products_connection_status: z.record(z.string(), z.enum(["running", "disconnected", "errored"])).optional() }),
 });
 const Senders = z.object({data: z.array(z.object({object: z.literal("EmailSender"), email: z.email(),
   is_primary: z.boolean(), verification_status: z.enum(["verified", "pending", "unknown"])})),
-  next_cursor: z.string().optional(), total_count: z.number().int().nonnegative().optional()});
+  next_cursor: z.string().nullish(), total_count: z.number().int().nonnegative().optional()});
+// Unipile V2 methods-scope: Outlook sending creates a draft, so Mail.Send
+// also requires Mail.ReadWrite. Account.oauth_scope lists granted permissions.
+const outlookScopes = ["User.Read", "Mail.ReadWrite", "Mail.Send"];
+function hasOutlookMailScopes(scope: string | null | undefined) {
+  const granted = new Set((scope ?? "").split(/[,\s]+/).map(value => value.replace(/^https:\/\/graph\.microsoft\.com\//, "")));
+  return outlookScopes.every(value => granted.has(value));
+}
 const Profile = z.object({object: z.literal("UserProfile"), provider: z.literal("linkedin"),
   id: ProviderIdentifier, type: z.literal("individual"), display_name: z.string().max(400),
   profile_url: z.string().optional(), public_identifier: z.string().optional(),
@@ -116,7 +123,10 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
       user_id: account.user_id, owner_profile_id: null, v1_account_id: account.metadata.v1_account_id ?? null};
     const products = account.metadata.products_connection_status;
     const gmailStatus = products ? products.gmail : account.status;
-    const healthy = !account.is_locked && (channel === "email"
+    const healthy = !account.is_locked && (account.provider === "outlook"
+      ? hasOutlookMailScopes(account.oauth_scope) && account.status === "running"
+        && (!products || (Object.keys(products).length > 0 && Object.values(products).every(status => status === "running")))
+      : channel === "email"
       ? ["running", "partial", "degraded"].includes(account.status) && gmailStatus === "running"
       : account.status === "running" && (!products || Object.values(products).every(status => status === "running")));
     const healthStatus: LinkedinIdentity["healthStatus"] = account.is_locked ? "locked" : healthy ? "running"
@@ -127,7 +137,8 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     validateTransport(input.transport);
     const origin = input.transport.hosted_auth_origin;
     const raw = await request("auth/link", {
-      ...(input.transport.account_id ? {account_id: input.transport.account_id} : {providers: input.channel === "linkedin" ? ["linkedin"] : ["google"]}),
+      ...(input.transport.account_id ? {account_id: input.transport.account_id} : {providers: input.channel === "linkedin" ? ["linkedin"] : ["google", "outlook"]}),
+      ...(input.channel === "email" ? {config: {outlook: {oauth_scope: [...outlookScopes, "offline_access"]}}} : {}),
       ...(input.transport.account_scope_id ? {account_scope_id: input.transport.account_scope_id} : {}),
       domain: new URL(origin).hostname,
       expires_on: input.expiresAt, redirect_uri: input.redirectUri, state: input.state,
@@ -140,24 +151,26 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
   }
   async function readEmailIdentity(accountId: string, transport: UnipileTransport, expectedEmail?: string | null) {
     const {account, verifiedTransport, healthy} = await readAccount(accountId, transport, "email");
-    // V2 does not expose V1's IMAP/SMTP identity evidence or delegated Outlook
-    // mailbox flag. Keep those providers on V1 until equivalent proof is documented.
-    if (account.provider !== "google") fail("UNIPILE_MAILBOX_UNVERIFIABLE", 409);
+    // V2 EmailSender.is_primary is documented as the address used to authenticate
+    // Google/Outlook. Aliases and delegated addresses cannot replace this proof.
+    // IMAP still lacks equivalent authenticated endpoint evidence.
+    if (account.provider !== "google" && account.provider !== "outlook") fail("UNIPILE_MAILBOX_UNVERIFIABLE", 409);
     // An unhealthy provider may reject profile calls. A previously verified
     // mailbox can still be reported unhealthy without inventing fresh proof.
-    const gmailStatus = account.metadata.products_connection_status?.gmail ?? account.status;
+    const type = account.provider === "outlook" ? "OUTLOOK" as const : "GOOGLE_OAUTH" as const;
+    const gmailStatus = account.provider === "google" ? account.metadata.products_connection_status?.gmail ?? account.status : account.status;
     const healthStatus = account.is_locked ? "locked" : healthy ? "running"
       : account.status === "disconnected" || gmailStatus === "disconnected" ? "disconnected"
       : account.status === "errored" || gmailStatus === "errored" ? "errored" : "unknown";
     if (!healthy && expectedEmail) return {accountId:transport.canonical_account_id ?? accountId,
-      email:expectedEmail.toLowerCase(),type:"GOOGLE_OAUTH" as const,healthy:false,healthStatus,verifiedTransport};
+      email:expectedEmail.toLowerCase(),type,healthy:false,healthStatus,verifiedTransport};
     const parsed = Senders.safeParse(await request(`${encodeURIComponent(accountId)}/email-senders`));
     if (!parsed.success || parsed.data.next_cursor || (parsed.data.total_count !== undefined && parsed.data.total_count !== parsed.data.data.length)) fail();
     const primaries = parsed.data.data.filter(sender => sender.is_primary);
     if (primaries.length !== 1 || primaries[0]!.verification_status !== "verified") fail("UNIPILE_MAILBOX_UNVERIFIABLE", 409);
     const email = primaries[0]!.email.toLowerCase();
     if (expectedEmail && expectedEmail.toLowerCase() !== email) fail("UNIPILE_IDENTITY_MISMATCH", 409);
-    return {accountId: transport.canonical_account_id ?? accountId, email, type: "GOOGLE_OAUTH" as const, healthy, healthStatus, verifiedTransport};
+    return {accountId: transport.canonical_account_id ?? accountId, email, type, healthy, healthStatus, verifiedTransport};
   }
   async function readLinkedinIdentity(accountId: string, transport: UnipileTransport, expectedProfileId?: string | null) {
     const {account, verifiedTransport, healthy, healthStatus} = await readAccount(accountId, transport, "linkedin");

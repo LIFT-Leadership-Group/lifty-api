@@ -33,8 +33,10 @@ never report an account as disconnected or missing from a failed read.
    Ask nothing else: Lifty's connect page asks the person's declaration (for
    LinkedIn, that it is their habitual personal account with no other
    automation tool; for email, a mailbox they already use or a dedicated
-   sending mailbox), then opens the sign-in. Only Google is offered for new
-   mailboxes. A sender has at most one LinkedIn account
+   sending mailbox), then opens the sign-in. Google and Microsoft 365/Outlook
+   are offered for new mailboxes. Use the owner’s primary mailbox; aliases and shared/delegated
+   mailboxes are not supported. Connecting never resumes outreach or switches
+   away from Smartlead. A sender has at most one LinkedIn account
    (`LINKEDIN_ALREADY_CONNECTED`: reconnect that one instead).
 3. Use the returned `progress` before presenting the next step. For
    `declaration_required` or `sign_in_required`, show `connection_url` as a
@@ -110,7 +112,14 @@ omitted; with several it is required and the operation returns
 POST inputs belong in body. Every workspace uses the same operations, and each
 mailbox has its own warmup: starting one never stops another.
 
-Warmup authorization is a separate Google step from the account connection.
+Microsoft mailbox connections support sending and inbox reads, but the Mailivery
+setup link currently supports Google only. Do not call `warmup_start` for a
+Microsoft mailbox or direct its owner through Google warmup authorization.
+Preserve existing Smartlead warmup until a supported Microsoft warmup connection
+is verified; do not claim Mailivery is running or bypass readiness holds.
+
+For Google mailboxes, warmup authorization is a separate step from the account
+connection.
 Show the returned Lifty setup link for that exact mailbox; the owner must
 choose the same Google account again. Warmup setup uses Google OAuth only.
 Never request an App Password or route the founder to a password form.
