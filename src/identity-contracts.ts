@@ -60,6 +60,13 @@ export const SenderDeleteResultSchema = z.object({ ...Workspace,
 }).strict();
 export const AccountsGetSchema = z.object({ ...Workspace, accounts: z.array(AccountSchema).max(5000) }).strict();
 export const AccountResultSchema = z.object({ ...Workspace, account: AccountSchema }).strict();
+/** Durable stage shared by the browser and member/agent reads. A timeout is not a failed connection. */
+export const AccountConnectionProgress = z.discriminatedUnion("stage", [
+  z.object({ stage: z.enum(["declaration_required", "preparing", "sign_in_required", "verifying", "complete"]) }).strict(),
+  z.object({ stage: z.literal("recovery_required"), reason: z.enum(["preparation_interrupted", "provider_rejected", "issuance_uncertain"]),
+    retryable: z.boolean() }).strict(),
+]);
+export type AccountConnectionProgress = z.infer<typeof AccountConnectionProgress>;
 export const AttemptSchema = z.object({
   ...Workspace,
   id: Id,
@@ -70,11 +77,12 @@ export const AttemptSchema = z.object({
   account_id: Id.nullable(),
   declaration: Declaration.nullable(),
   expires_at: Timestamp,
+  progress: AccountConnectionProgress,
 }).strict();
 export type Attempt = z.infer<typeof AttemptSchema>;
 // The database opens or reuses the durable attempt; the API adds the link.
 export const ConnectStartSchema = z.object({ ...Workspace, id: Id, expires_at: Timestamp, created: z.boolean() }).strict();
-export const ConnectResultSchema = ConnectStartSchema.extend({ connection_url: z.url() }).strict();
+export const ConnectResultSchema = ConnectStartSchema.extend({ connection_url: z.url(), progress: AccountConnectionProgress }).strict();
 
 export const IdPath = z.object({ id: Id }).strict();
 export const SenderCreateSchema = z.object({

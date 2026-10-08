@@ -16,6 +16,21 @@ export interface UnipileV2Settings {
   /** Include earlier verified domains until every outstanding link has expired. */
   hostedAuthOrigins: string[];
 }
+/** Safe diagnostics only; never retain vendor bodies, URLs, or arbitrary error text. */
+export class HostedLinkIssue extends Error {
+  constructor(readonly code: string, readonly outcome: "rejected" | "uncertain", readonly upstreamStatus?: number) {
+    super("Lifty could not prepare the sign-in link.");
+    this.name = "HostedLinkIssue";
+  }
+}
+// Documented admission errors, not arbitrary 4xx or forwarded provider errors.
+// Rejection explains the outcome; it does not itself authorize another dispatch.
+// https://developer.unipile.com/v2.0/reference/error-responses
+const HostedAdmissionError = z.object({ object: z.literal("Error"), type: z.enum([
+  "api/invalid_parameters", "api/missing_authorization", "api/expired_authorization", "api/insufficient_permissions",
+]), status: z.number().int() }).strip();
+const admissionStatus = { "api/invalid_parameters": 400, "api/missing_authorization": 401,
+  "api/expired_authorization": 401, "api/insufficient_permissions": 403 } as const;
 const Account = z.object({
   object: z.literal("Account"), id: ProviderIdentifier, application_id: ProviderIdentifier,
   account_scope_id: ProviderIdentifier.nullish(), user_id: z.string().min(1).max(255),
@@ -46,15 +61,16 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
   async function request(path: string, body?: Record<string, unknown>, method: "GET" | "POST" | "DELETE" = body ? "POST" : "GET", deadline?: AbortSignal): Promise<unknown> {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeoutMs);
     const signal = deadline ? AbortSignal.any([controller.signal, deadline]) : controller.signal;
+    let upstreamStatus: number | undefined;
     try {
       const response = await fetchImpl(`https://api.unipile.com/v2/${path}`, {
         method, redirect: "error", signal,
         headers: {"X-API-KEY": settings.accessToken, accept: "application/json", ...(body ? {"content-type": "application/json"} : {})},
         ...(body ? {body: JSON.stringify(body)} : {}),
       });
-      if (!response.ok) {
+      upstreamStatus = response.status;
+      if (!response.ok && path !== "auth/link") {
         void response.body?.cancel().catch(() => {});
-        if (path === "auth/link") fail(`UNIPILE_HOSTED_HTTP_${response.status}`);
         if (response.status === 404) fail("UNIPILE_ACCOUNT_NOT_FOUND", 409);
         fail();
       }
@@ -63,10 +79,19 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
       await response.body.pipeTo(new WritableStream<Uint8Array>({write(chunk) {
         size += chunk.byteLength; if (size > 1_048_576) fail(); chunks.push(chunk);
       }}), {signal});
-      return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+      const raw: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      if (!response.ok) {
+        const error = HostedAdmissionError.safeParse(raw);
+        const rejected = error.success && error.data.status === response.status && admissionStatus[error.data.type] === response.status;
+        throw new HostedLinkIssue(`UNIPILE_HOSTED_HTTP_${response.status}`, rejected ? "rejected" : "uncertain", response.status);
+      }
+      return raw;
     } catch (error) {
+      if (error instanceof HostedLinkIssue) throw error;
+      if (path === "auth/link") throw new HostedLinkIssue(upstreamStatus !== undefined && upstreamStatus >= 400
+        ? `UNIPILE_HOSTED_HTTP_${upstreamStatus}` : "UNIPILE_HOSTED_TRANSPORT_FAILED", "uncertain", upstreamStatus);
       if (error instanceof PublicError) throw error;
-      fail(path === "auth/link" ? "UNIPILE_HOSTED_TRANSPORT_FAILED" : "UNIPILE_UNAVAILABLE");
+      fail();
     } finally {clearTimeout(timer);}
   }
   function validateTransport(transport: UnipileTransport) {
@@ -108,9 +133,9 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
       expires_on: input.expiresAt, redirect_uri: input.redirectUri, state: input.state,
     });
     const parsed = z.object({object: z.literal("HostedAuthLink"), link: z.url()}).safeParse(raw);
-    if (!parsed.success) fail("UNIPILE_HOSTED_RESPONSE_INVALID");
+    if (!parsed.success) throw new HostedLinkIssue("UNIPILE_HOSTED_RESPONSE_INVALID", "uncertain", 200);
     const link = new URL(parsed.data.link);
-    if (link.origin !== origin || link.username || link.password || link.hash || link.port) fail("UNIPILE_HOSTED_URL_INVALID");
+    if (link.origin !== origin || link.username || link.password || link.hash || link.port) throw new HostedLinkIssue("UNIPILE_HOSTED_URL_INVALID", "uncertain", 200);
     return link.toString();
   }
   async function readEmailIdentity(accountId: string, transport: UnipileTransport, expectedEmail?: string | null) {

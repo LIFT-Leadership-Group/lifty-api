@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
+import { AccountConnectionProgress } from './identity-contracts.js';
 import { PublicError } from './errors.js';
 import { renderLiftyPage } from './lifty-brand.js';
 
@@ -23,11 +24,11 @@ export type ConnectionFlow = keyof typeof CONNECTION_FLOWS;
 export const ConfirmationAttention = z.enum(['released','exists','in_use','already_connected','canceled','provider','starting']);
 export type ConfirmationAttention = z.infer<typeof ConfirmationAttention>;
 export const ConfirmationResult = z.discriminatedUnion('status', [
-  z.object({status:z.literal('pending'), attention:ConfirmationAttention.optional()}),
+  z.object({status:z.literal('pending'), attention:ConfirmationAttention.optional(), progress:AccountConnectionProgress.optional(), reference:z.uuid().optional()}),
   // Warmup only: when the placement test runs and where its result goes.
-  z.object({status:z.literal('connected'), account:z.string().max(254).nullable(),
+  z.object({status:z.literal('connected'), account:z.string().max(254).nullable(), reference:z.uuid().optional(),
     placement:z.object({when:z.enum(['now','after_warmup']), notify:z.array(z.enum(['email','slack'])).max(2)}).optional()}),
-  z.object({status:z.literal('failed'), reason:z.enum(['canceled','exists','provider','verification','ended','invalid'])}),
+  z.object({status:z.literal('failed'), reason:z.enum(['canceled','exists','provider','verification','ended','invalid']), reference:z.uuid().optional()}),
 ]);
 export type ConfirmationResult = z.infer<typeof ConfirmationResult>;
 const Input = z.strictObject({state:z.string().min(1).max(4096),code:z.string().min(1).max(4096).optional(),
@@ -44,6 +45,10 @@ export interface ConfirmationAdapter {
 }
 export type ConfirmationAdapters = Partial<Record<ConnectionFlow, ConfirmationAdapter>>;
 const deadline = new AsyncLocalStorage<{signal:AbortSignal;upstream_status?:number;upstream_outcome?:string}>();
+/** Entry/declaration requests use the same bounded I/O contract as callbacks. */
+export function withConnectionDeadline<T>(milliseconds:number, work:()=>Promise<T>):Promise<T> {
+  return deadline.run({signal:AbortSignal.timeout(milliseconds)}, work);
+}
 /** All dependency I/O in a confirmation request shares one deadline, including body reads. */
 export function connectionFetch(fetchImpl:typeof fetch):typeof fetch {
   return async (input, init) => {
@@ -67,9 +72,10 @@ var url=new URL(location.href),q=url.searchParams,root=document.getElementById('
 var code=q.get('code'),denied=q.has('error'),errorType=q.get('error_type')||(q.has('error_title')?'provider_rejected':'');
 var errorDetail=errorType==='api/already_exists'&&/^acc_[A-Za-z0-9_-]{1,251}$/.test(q.get('error_detail')||'')?q.get('error_detail'):'';
 var title=document.getElementById('confirmation-title'),detail=document.getElementById('confirmation-detail'),spinner=document.getElementById('confirmation-spinner');
-var actions=document.getElementById('confirmation-actions'),retry=document.getElementById('confirmation-retry');
+var actions=document.getElementById('confirmation-actions'),retry=document.getElementById('confirmation-retry'),check=document.getElementById('confirmation-check'),reference=document.getElementById('confirmation-reference');
+var prepare=root.dataset.prepare==='true',lastProgress='',polling=false;
 var label=root.dataset.label,warmup=root.dataset.warmup==='true',finished=false,shown='',until=Date.now()+90000,delay=1000,cap=8000;
-url.search='';url.searchParams.set(key,body.state);if(errorType)url.searchParams.set('error_type',errorType);if(errorDetail)url.searchParams.set('error_detail',errorDetail);history.replaceState(null,'',url.pathname+url.search);
+url.search='';url.searchParams.set(key,body.state);if(errorType)url.searchParams.set('error_type',errorType);if(errorDetail)url.searchParams.set('error_detail',errorDetail);if(prepare)url.searchParams.set('prepare','1');history.replaceState(null,'',url.pathname+url.search);
 var notes={
  released:['Try connecting again','This '+label+' account was still linked to an earlier Lifty connection, which stopped the sign-in. Lifty removed that old link. Try again and choose the same account.',1],
  exists:['This account is already linked','This '+label+' account is already linked to Lifty, so it could not be added again. Try again, or return to Lifty if it keeps happening.',1],
@@ -82,8 +88,27 @@ var notes={
 function attend(attention){
  var note=notes[attention];if(!note||shown===attention)return;shown=attention;
  title.textContent=note[0];detail.textContent=note[1];spinner.hidden=attention!=='starting';
+ retry.textContent='Try again';
  if(note[2]&&root.dataset.retry){retry.href=root.dataset.retry+'?'+key+'='+encodeURIComponent(body.state);actions.hidden=false;}else actions.hidden=true;
  if(attention==='starting'){until=Math.max(until,Date.now()+1500000);cap=30000;}
+}
+function progress(p,ref){
+ if(!p||typeof p.stage!=='string')return;
+ lastProgress=p.stage;
+ if(typeof ref==='string'&&/^[a-f0-9-]{36}$/i.test(ref)){reference.textContent='Connection reference: '+ref;reference.hidden=false;}
+ if(shown===p.stage+(p.reason||''))return;shown=p.stage+(p.reason||'');
+ actions.hidden=true;spinner.hidden=true;
+ var path=root.dataset.retry;
+ function resume(text){if(path){retry.textContent=text;retry.href=path+'?'+key+'='+encodeURIComponent(body.state);actions.hidden=false;}}
+ if(p.stage==='declaration_required'){title.textContent='A confirmation is needed';detail.textContent='Continue to the connection page and confirm how you use this account.';resume('Continue');}
+ else if(p.stage==='preparing'){title.textContent='Preparing sign-in';detail.textContent='Lifty is preparing the secure sign-in page. Sign-in has not finished yet.';spinner.hidden=false;}
+ else if(p.stage==='sign_in_required'){title.textContent='Ready to sign in';detail.textContent='Continue to sign in to your '+label+' account. Lifty will verify it after you finish.';resume('Continue to sign in');}
+ else if(p.stage==='verifying'){title.textContent='Checking your connection';detail.textContent='Lifty received the authorization and is verifying the account.';spinner.hidden=false;}
+ else if(p.stage==='recovery_required'){
+  title.textContent=p.reason==='provider_rejected'?'Sign-in could not start':'Sign-in preparation needs attention';
+  detail.textContent=p.retryable?'The preparation was interrupted before sign-in started. Continue to safely resume this attempt.':(p.reason==='provider_rejected'?'Lifty could not start the sign-in page.':'Lifty could not confirm that the sign-in page was prepared.')+' Return to Lifty with the connection reference for help. Check this same attempt before starting another authorization.';
+  if(p.retryable)resume('Resume preparation');
+ }
 }
 function placement(p){
  if(!p||(p.when!=='now'&&p.when!=='after_warmup'))return '';
@@ -94,8 +119,8 @@ function placement(p){
 }
 function show(result){
  if(finished||!result||!['pending','connected','failed'].includes(result.status))return;
- if(result.status==='pending'){if(result.attention)attend(result.attention);return;}
- finished=true;spinner.hidden=true;actions.hidden=true;
+ if(result.status==='pending'){if(result.progress)progress(result.progress,result.reference);if(result.attention)attend(result.attention);return;}
+ finished=true;spinner.hidden=true;actions.hidden=true;check.hidden=true;
  if(result.status==='connected'){title.textContent=warmup?'Warmup is running':label+' is connected';detail.textContent='Lifty verified '+(result.account||'the connection')+'.'+(warmup?placement(result.placement):'')+' Return to Lifty to continue. Connecting does not start outreach.';if(label==='Slack')detail.textContent+=' Invite @Lifty to the channel where you want notifications, then tell Lifty which channel you chose.';}
  else{title.textContent='Connection needs attention';detail.textContent=result.reason==='canceled'?'Authorization was not completed. Return to Lifty to check this attempt.':result.reason==='verification'?'The selected account could not be verified. Return to Lifty for help.':'Return to Lifty to check this attempt and the next step before requesting another link.';if(label==='HubSpot'&&result.reason==='canceled')detail.textContent+=' If permissions were blocked, ask a HubSpot super admin to approve Lifty in Settings > Integrations > Connected Apps > Approved apps.';}
 }
@@ -103,20 +128,34 @@ async function request(stage,payload,ms){
  var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},ms);
  try{var response=await fetch(url.pathname+'/'+stage,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','x-lifty-connection':'1'},body:JSON.stringify(payload),signal:controller.signal});if(response.ok)show(await response.json());}catch(e){}finally{clearTimeout(timer);}
 }
+if(prepare&&!code&&!denied&&!errorType)request('process',body,50000);
 if(code||denied){var submission=Object.assign({},body,code?{code:code}:{denied:true});code=null;request('process',submission,50000);}
 if(errorType)body.errorType=errorType;
 if(errorDetail)body.errorDetail=errorDetail;
-while(!finished&&Date.now()<until){await request('status',body,10000);if(finished)break;await new Promise(function(resolve){setTimeout(resolve,delay)});delay=Math.min(delay*2,cap);}
-if(!finished&&(!shown||shown==='starting')){spinner.hidden=true;actions.hidden=true;title.textContent='Still checking';detail.textContent='The result is not confirmed yet. Return to Lifty to check this same attempt. Do not repeat authorization just because this page timed out.';}
+async function poll(){
+ if(polling)return;polling=true;shown='';check.hidden=true;
+ while(!finished&&Date.now()<until){await request('status',body,10000);if(finished)break;await new Promise(function(resolve){setTimeout(resolve,delay)});delay=Math.min(delay*2,cap);}
+ if(!finished){
+  spinner.hidden=true;check.hidden=false;
+  if(!shown||shown==='starting'||lastProgress==='preparing'||lastProgress==='verifying'){
+   actions.hidden=true;title.textContent=lastProgress==='preparing'?'Sign-in preparation is still pending':'Still checking';
+   detail.textContent='The result is not confirmed yet. Check the status of this same attempt, or return to Lifty with the connection reference for help.';
+  }
+ }
+ polling=false;
+}
+check.addEventListener('click',function(){if(finished||polling)return;until=Date.now()+90000;delay=1000;poll();});
+await poll();
 })();`;
 const scriptHash = createHash('sha256').update(CONFIRMATION_SCRIPT).digest('base64');
-const actionStyles = '.actions{margin:24px 0 0}.actions a{display:inline-flex;align-items:center;min-height:50px;padding:12px 26px;border:1px solid hsl(99 34% 65% / .75);border-radius:9px;background:var(--lime);color:var(--paper);font-weight:600;text-decoration:none}.actions a:hover{background:var(--lime-hover)}';
-export function renderConfirmationPage(flow:ConnectionFlow, valid=true) {
+const actionStyles = '.actions{margin:24px 0 0}.actions a,.check-status{display:inline-flex;align-items:center;min-height:50px;padding:12px 26px;border:1px solid hsl(99 34% 65% / .75);border-radius:9px;background:var(--lime);color:var(--paper);font-weight:600;text-decoration:none}.actions a:hover,.check-status:hover{background:var(--lime-hover)}';
+export function renderConfirmationPage(flow:ConnectionFlow, valid=true, prepare=false) {
   const definition:{label:string;retry?:string}=CONNECTION_FLOWS[flow], {label}=definition;
-  return renderLiftyPage({title:valid?'Checking your connection':'Connection needs attention',styles:actionStyles,content:
-    `<section id="confirmation" data-label="${label}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}"${definition.retry?` data-retry="${definition.retry}"`:''} aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${valid?'Checking your connection':'Connection needs attention'}</h1><p id="confirmation-detail" class="intro">${valid?'Lifty is verifying your '+label+' connection. This page will update automatically.':'Return to Lifty to check this attempt and get the next step.'}</p><p id="confirmation-actions" class="actions" hidden><a id="confirmation-retry" href="">Try again</a></p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
+  const title=valid?(prepare?'Preparing sign-in':'Checking your connection'):'Connection needs attention';
+  return renderLiftyPage({title,styles:actionStyles,content:
+    `<section id="confirmation" data-label="${label}" data-prepare="${prepare}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}"${definition.retry?` data-retry="${definition.retry}"`:''} aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${title}</h1><p id="confirmation-detail" class="intro">${valid?(prepare?'Lifty is preparing the secure sign-in page. Sign-in has not finished yet.':'Lifty is reading the status of this connection. This page will update automatically.'):'Return to Lifty to check this attempt and get the next step.'}</p><p id="confirmation-actions" class="actions" hidden><a id="confirmation-retry" href="">Try again</a></p><p><button id="confirmation-check" class="check-status" type="button" hidden>Check status</button></p><p id="confirmation-reference" class="reassurance" hidden></p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
 }
-export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string};
+export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string;reference?:string;progress_stage?:string;recovery_reason?:string};
 export function createConfirmationRouter(flow:ConnectionFlow, adapter:ConfirmationAdapter, options:{prefix?:string;origin?:string;log?:(event:ConfirmationLog)=>void}={}) {
   const app=new Hono();
   const path=CONNECTION_FLOWS[flow].path.slice((options.prefix??'').length);
@@ -129,9 +168,11 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
     const q=new URL(c.req.url).searchParams;
     const key=['email','linkedin'].includes(flow)?'intent':'state';
     const parsed=Input.safeParse({state:q.get(key)??'',...(q.has('code')?{code:q.get('code')}:{}),...(q.has('error')?{denied:true}:{})});
-    let valid=parsed.success && [key,'code','error'].every(key=>q.getAll(key).length<=1);
+    const prepare=q.get('prepare')==='1'&&['email','linkedin'].includes(flow);
+    let valid=parsed.success && [key,'code','error','prepare'].every(key=>q.getAll(key).length<=1)
+      && (!q.has('prepare')||prepare);
     if(valid&&parsed.success){try{adapter.validate(parsed.data,c);}catch{valid=false;}}
-    return c.html(renderConfirmationPage(flow,valid),200);
+    return c.html(renderConfirmationPage(flow,valid,prepare),200);
   });
   for(const stage of ['process','status'] as const)app.post(path+'/'+stage,async c=>{
     headers(c);
@@ -167,7 +208,8 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
       else if(error instanceof PublicError&&error.status>=400&&error.status<500&&error.code!=='WARMUP_SETUP_UNAVAILABLE')result=invalidConfirmation();
       else status=202;
     }
-    options.log?.({flow,stage,outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{}),...(providerError?{provider_error:providerError}:{})});
+    if(result.reference)correlation=createHash('sha256').update(flow+'\0'+result.reference).digest('hex').slice(0,24);
+    options.log?.({flow,stage,...(result.reference?{reference:result.reference}:{}),...(result.status==='pending'&&result.progress?{progress_stage:result.progress.stage,...(result.progress.stage==='recovery_required'?{recovery_reason:result.progress.reason}:{})}:{}),outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{}),...(providerError?{provider_error:providerError}:{})});
     return c.json(result,status===202?202:200);
   });
   return app;

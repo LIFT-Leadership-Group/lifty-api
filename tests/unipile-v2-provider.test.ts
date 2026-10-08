@@ -99,6 +99,26 @@ describe("Unipile V2 authenticated contract",()=>{
     await expect(h.provider.createLink({channel:"email",state:"opaque",redirectUri:"https://api.lifty.test/return",expiresAt:"2026-09-18T00:00:00.000Z",transport})).rejects.toMatchObject({code:"UNIPILE_HOSTED_HTTP_503"});
     expect(h.calls).toHaveLength(1);
   });
+  it.each([
+    [400,"api/invalid_parameters","rejected"],
+    [401,"api/expired_authorization","rejected"],
+    [403,"api/insufficient_permissions","rejected"],
+    [400,"provider/invalid_parameters","uncertain"],
+    [400,"unknown/error","uncertain"],
+    [503,"api/invalid_parameters","uncertain"],
+  ] as const)("classifies hosted setup %s %s without replay or secret diagnostics",async(status,type,outcome)=>{
+    const h=harness({body:new Response(JSON.stringify({object:"Error",status,type,title:"secret title",detail:"secret token",req_id:"secret request"}),{status})});
+    const issue=await h.provider.createLink({channel:"linkedin",state:"opaque",redirectUri:"https://api.lifty.test/return",expiresAt:"2099-01-01T00:00:00Z",transport}).catch(error=>error);
+    expect(issue).toMatchObject({outcome,upstreamStatus:status,code:`UNIPILE_HOSTED_HTTP_${status}`});
+    expect(String(issue)+JSON.stringify(issue)).not.toContain("secret");
+    expect(h.calls).toHaveLength(1);
+  });
+  it("keeps malformed successful hosted responses uncertain",async()=>{
+    const h=harness({body:new Response("{broken secret")});
+    await expect(h.provider.createLink({channel:"email",state:"opaque",redirectUri:"https://api.lifty.test/return",expiresAt:"2099-01-01T00:00:00Z",transport}))
+      .rejects.toMatchObject({outcome:"uncertain",upstreamStatus:200});
+    expect(h.calls).toHaveLength(1);
+  });
 });
 
 describe("V2 bounded HTTP",()=>{

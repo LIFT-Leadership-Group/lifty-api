@@ -19,7 +19,8 @@ const account = (id = accountId, overrides: Record<string, unknown> = {}) => ({
 const blocked = (id = accountId) => account(id, { status: "disconnected", state: "paused", disconnected_at: now });
 const sender = { id: senderId, version: 2, name: "Ana Pérez", signature: null, booking_url: null, accounts: [account()] };
 const attempt = (state: string, extra: Record<string, unknown> = {}) => ({ workspace, id: attemptId, sender_id: senderId, channel: "email",
-  state, reason: null, account_id: null, declaration: null, expires_at: "2099-01-01T00:00:00Z", ...extra });
+  state, reason: null, account_id: null, declaration: null, expires_at: "2099-01-01T00:00:00Z",
+  progress: {stage: state === "pending" ? "verifying" : "complete"}, ...extra });
 
 type Rpc = (name: string, args: Record<string, unknown>) => unknown;
 function harness(rpc: Rpc, connector: Partial<AccountConnector> = {}) {
@@ -111,7 +112,7 @@ describe("Identity member routes", () => {
       patch_lifty_sender: dbError("PT409", "VERSION_CONFLICT", { current_version: 3 }),
       resume_lifty_sending_account: dbError("PT409", "ACCOUNT_DISCONNECTED"),
       connect_lifty_sending_account: dbError("PT409", "LINKEDIN_ALREADY_CONNECTED"),
-      get_lifty_sending_account_attempt: dbError("PT404", "CONNECTION_ATTEMPT_NOT_FOUND"),
+      get_lifty_sending_account_attempt_progress: dbError("PT404", "CONNECTION_ATTEMPT_NOT_FOUND"),
       get_lifty_senders: dbError("PT409", "lifty_workspace_ambiguous", { workspaces: [{ workspace_ref: workspace.workspace_ref, name: "Example", slug: "example" }] }),
       get_lifty_sending_accounts: dbError("XX000", "private database detail"),
     };
@@ -132,16 +133,34 @@ describe("Identity member routes", () => {
   });
 
   it("returns Lifty's connect link for the durable attempt and never exposes internal fields", async () => {
-    const h = harness(name => name === "connect_lifty_sending_account"
+    const progress = {stage: "declaration_required"};
+    const h = harness(name => name === "get_lifty_sending_account_attempt_progress" ? attempt("pending", {progress}) : name === "connect_lifty_sending_account"
       ? { workspace, id: attemptId, channel: "linkedin", expires_at: "2099-01-01T00:00:00Z", created: false }
       : { workspace, id: attemptId, channel: "email", expires_at: "2099-01-01T00:00:00Z", created: true });
     const connected = await h.request("POST", "/v1/workspace/sending-accounts/connect", { sender_id: senderId, channel: "linkedin" });
     expect(await connected.json()).toEqual({ workspace, id: attemptId, expires_at: "2099-01-01T00:00:00Z", created: false,
-      connection_url: `https://api.lifty.test/connect/linkedin?intent=sealed-${attemptId}` });
+      connection_url: `https://api.lifty.test/connect/linkedin?intent=sealed-${attemptId}`, progress });
     const reconnect = await h.request("POST", `/v1/workspace/sending-accounts/${accountId}/reconnect`);
     expect((await reconnect.json()).connection_url).toBe(`https://api.lifty.test/connect/email?intent=sealed-${attemptId}`);
     expect(h.calls.map(call => call.args)).toEqual([{ p_workspace_id: null, p_payload: { sender_id: senderId, channel: "linkedin" } },
-      { p_workspace_id: null, p_account_id: accountId }]);
+      { p_workspace_id: null, p_attempt_id: attemptId }, { p_workspace_id: null, p_account_id: accountId },
+      { p_workspace_id: null, p_attempt_id: attemptId }]);
+  });
+
+  it.each([
+    {stage:"sign_in_required"},
+    {stage:"recovery_required", reason:"issuance_uncertain", retryable:false},
+    {stage:"recovery_required", reason:"preparation_interrupted", retryable:true},
+  ])("returns durable pre-authorization progress without doing provider work: %j", async progress => {
+    const h = harness(name => {
+      expect(name).toBe("get_lifty_sending_account_attempt_progress");
+      return attempt("pending",{progress});
+    });
+    const response = await h.request("GET", `/v1/workspace/sending-accounts/attempts/${attemptId}`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({state:"pending",progress});
+    expect(h.effects.reconcileAttempt).not.toHaveBeenCalled();
+    expect(h.calls).toHaveLength(1);
   });
 
   it("lets only the attempt read finish an authorization, and treats a failed provider check as still pending", async () => {
