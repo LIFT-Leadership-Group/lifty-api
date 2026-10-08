@@ -67,6 +67,14 @@ describe("supported Outreach policy boundary", () => {
     expect(CampaignResultSchema.parse(saved)).toEqual(saved);
     expect(JSON.stringify(CampaignResultSchema.parse(saved))).toBe(JSON.stringify(saved));
     expect(create("linkedin", policy)).toMatchObject({ success: true, data: { policy } });
+    // An older invalid family/route must be visible so a founder can repair it;
+    // authoring still rejects it, and reads keep its exact immutable digest.
+    const missing = catalog();
+    missing.steps[0]!.variants = missing.steps[0]!.variants.filter(v => !(v.opener === "linkedin_bridge" && v.arms.includes("pain")));
+    missing.steps[1]!.variants = missing.steps[1]!.variants.filter(v => v.arms.includes("direct"));
+    expect(create("email", missing).success).toBe(false);
+    const savedCatalog = { workspace, campaign: { ...campaign, channel: "email", draft_revision: revision(missing), revisions: [revision(missing)] } };
+    expect(CampaignResultSchema.parse(savedCatalog)).toEqual(savedCatalog);
   });
   it("retains an authored template catalog and separate research routes without changing the step count", () => {
     const saved = catalog();

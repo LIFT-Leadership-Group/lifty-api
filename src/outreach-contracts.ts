@@ -228,7 +228,10 @@ export const CampaignPauseSchema = z.object({ expected_version: Version }).stric
 const Approval = z.object({ actor_ref: Ref, approved_at: Timestamp }).strict();
 const revision = <T extends z.ZodType>(content: T) => ExactRevisionSchema.extend({ content, created_at: Timestamp, approval: Approval.nullable() }).strict();
 export const JourneyRevisionSchema = revision(JourneyPolicySchema);
-export const CampaignRevisionSchema = revision(CampaignPolicySchema);
+// Stored history remains readable when a newer authoring/readiness rule rejects
+// it. Writes and exact publication are validated authoritatively in Functions;
+// response parsing checks source shape without reinterpreting saved policy.
+export const CampaignRevisionSchema = revision(CampaignPolicyFields);
 export const RevisionSummarySchema = ExactRevisionSchema.extend({ approval: Approval.nullable() }).strict();
 // One executable Journey version: the exact sources selected for new Journey
 // starts and whether its automatically derived graph is installed.
@@ -249,8 +252,6 @@ export const CampaignSchema = z.object({ campaign_ref: Ref, journey_ref: Ref, ch
   state: CampaignState, active_revision: CampaignRevisionSchema.nullable(),
   draft_revision: CampaignRevisionSchema, revisions: z.array(CampaignRevisionSchema).max(100),
 }).strict().superRefine((value, context) => {
-  for (const rev of [value.draft_revision, ...value.revisions, ...(value.active_revision ? [value.active_revision] : [])])
-    for (const message of campaignChannelIssues(rev.content, value.channel)) context.addIssue({ code: "custom", message });
   if (value.state !== "inactive" && !value.active_revision) context.addIssue({ code: "custom", message: "An activated Campaign has a selected revision." });
 });
 const Workspace = { workspace: WorkspaceIdentitySchema };
