@@ -217,3 +217,11 @@ class `cause` and AgentAPI `http_status`), and the API adds a founder-facing
 API revision first: the Functions migration that stores and returns failures
 comes next, then the Jobs runner that reports the real code. An older API
 rejects a response that carries the new field.
+
+## Sending without a post-send sample
+
+LIF-1360: a channel's `sample_rate` may be 0, meaning the channel sends
+without a post-send sample. This API revision, the Jobs revision that accepts 0
+and the dashboard must all be active before any workspace is set to 0; the
+Functions migration `20261009150000_lif1360_sample_review_off.sql` is what
+allows saving it.

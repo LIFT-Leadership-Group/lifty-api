@@ -101,6 +101,15 @@ describe("member Review transport", () => {
         ...(value.body ? { p_payload: value.body } : {}) });
     }
   });
+  it("reads and saves a channel that sends without a post-send sample (rate 0)", async () => {
+    const unsampled = { ...settings, email: { mode: "send_and_sample", sample_rate: 0 } };
+    const read = await harness({ workspace, settings: unsampled }).request(cases[0]!);
+    expect(read.status).toBe(200);
+    expect((await read.json()).settings.email).toEqual(unsampled.email);
+    const h = harness({ workspace, settings: unsampled });
+    expect((await h.request(cases[1]!, { expected_version: 1, email: unsampled.email })).status).toBe(200);
+    expect(h.rpc).toHaveBeenCalledOnce();
+  });
   it("keeps pending provider work pending and rejects wrong identities or unsupported confirmations", async () => {
     const changed: Array<[Case["action"], unknown]> = [
       ["review_settings_patch", { workspace, settings: { ...settings, version: 1 } }],
