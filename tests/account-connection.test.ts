@@ -52,9 +52,9 @@ const snapshot = (db: Db, extra: Record<string, unknown> = {}) => ({
   transport: db.transport, issuance: db.issuance,
   authorization: { ...db.authorization, event_id: null, at: null }, ...extra });
 
-interface Provider { verificationStatus: "verified" | "pending"; senders: string; accountStatus: number; deleteStatus: number; calls: string[]; bodies: Record<string, unknown>[] }
+interface Provider { mailboxProvider: "google" | "outlook"; verificationStatus: "verified" | "pending"; senders: string; accountStatus: number; deleteStatus: number; calls: string[]; bodies: Record<string, unknown>[] }
 function stub(db: Db, provider: Partial<Provider> = {}) {
-  const p: Provider = { verificationStatus: "verified", senders: "ana@example.test", accountStatus: 200, deleteStatus: 200, calls: [], bodies: [], ...provider };
+  const p: Provider = { mailboxProvider: "google", verificationStatus: "verified", senders: "ana@example.test", accountStatus: 200, deleteStatus: 200, calls: [], bodies: [], ...provider };
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input));
     if (url.origin === "https://api.unipile.com") {
@@ -64,7 +64,7 @@ function stub(db: Db, provider: Partial<Provider> = {}) {
       if (p.accountStatus !== 200) return new Response("PRIVATE provider body", { status: p.accountStatus });
       if (url.pathname.endsWith("/email-senders")) return Response.json({ data: [{ object: "EmailSender", email: p.senders, is_primary: true, verification_status: p.verificationStatus }] });
       return Response.json({ object: "Account", id: "acc_new", application_id: "app_test", account_scope_id: null, user_id: "user-1",
-        provider: "google", status: "running", is_locked: false, metadata: { products_connection_status: { gmail: "running" } } });
+        provider: p.mailboxProvider, oauth_scope: "User.Read,Mail.ReadWrite,Mail.Send", status: "running", is_locked: false, metadata: { products_connection_status: { gmail: "running" } } });
     }
     const body = JSON.parse(String(init!.body));
     if (url.toString() === "https://project.supabase.co/rest/v1/rpc/lifty_sending_account_conflict") {
@@ -130,7 +130,7 @@ describe("Lifty connect page", () => {
     expect(db.declaration).toEqual({ mailbox_use: "dedicated" });
     // The state is persisted before the provider creates the link.
     expect(db.ops).toEqual(["context", "declare", "context", "claim_link", "dispatch_link", "save_link_claim"]);
-    expect(provider.bodies).toEqual([expect.objectContaining({ providers: ["google"], domain: "connect.lifty.test",
+    expect(provider.bodies).toEqual([expect.objectContaining({ providers: ["google", "outlook"], domain: "connect.lifty.test",
       redirect_uri: `https://api.lifty.test/connect/email/return?intent=${encodeURIComponent(state)}`, state: db.payloads.dispatch_link!.state })]);
 
     for (let visit = 0; visit < 2; visit++) {
@@ -313,9 +313,9 @@ describe("Lifty connect page", () => {
 });
 
 describe("shared confirmation for sending accounts", () => {
-  it("treats a browser error as a hint and completes only a signed authorization with verified identity", async () => {
+  it.each(["google", "outlook"] as const)("treats a browser error as a hint and completes only a signed authorization with verified identity: %s", async (mailboxProvider) => {
     const db = attemptDb(); db.declaration = { mailbox_use: "habitual" }; db.internal_state = "ready"; db.hosted_url = hostedLink;
-    const { provider } = stub(db); const server = app(); const state = intent();
+    const { provider } = stub(db, { mailboxProvider }); const server = app(); const state = intent();
     const shell = await server.request(`/connect/email/return?intent=${encodeURIComponent(state)}&error_type=canceled`);
     expect(shell.status).toBe(200);
     expect(await shell.text()).toContain("Checking your connection");
@@ -387,10 +387,10 @@ describe("shared confirmation for sending accounts", () => {
     expect(provider.calls).toEqual([]); expect(db.ops).toEqual(["context"]);
   });
 
-  it("keeps an unverified primary mailbox pending and accepts later verified evidence", async () => {
+  it.each(["google", "outlook"] as const)("keeps an unverified primary mailbox pending and accepts later verified evidence: %s", async (mailboxProvider) => {
     const db = attemptDb(); db.expected_identity = { email: "ana@example.test" };
     db.authorization = { received: true, account_id: "acc_new", return_error: null };
-    const { provider } = stub(db, { verificationStatus: "pending" });
+    const { provider } = stub(db, { mailboxProvider, verificationStatus: "pending" });
     const server = app();
     const pending = await server.request("/connect/email/return/status", status("email", intent()));
     expect(await pending.json()).toMatchObject({ status: "pending" });
@@ -402,17 +402,17 @@ describe("shared confirmation for sending accounts", () => {
     expect(db.ops.filter(op => op === "complete")).toHaveLength(1);
   });
 
-  it("fails a reconnect authorized by another mailbox and keeps provider outages pending", async () => {
+  it.each(["google", "outlook"] as const)("fails a reconnect authorized by another mailbox and keeps provider outages pending: %s", async (mailboxProvider) => {
     const mismatch = attemptDb(); mismatch.expected_identity = { email: "ana@example.test" };
     mismatch.authorization = { received: true, account_id: "acc_new", return_error: null };
-    stub(mismatch, { senders: "someone-else@example.test" });
+    stub(mismatch, { mailboxProvider, senders: "someone-else@example.test" });
     const failed = await app().request("/connect/email/return/status", status("email", intent()));
     expect(await failed.json()).toEqual({ status: "failed", reason: "verification", reference: attemptId });
     expect(mismatch.payloads.fail).toEqual({ attempt_id: attemptId, reason: "identity_mismatch" });
     expect(mismatch.ops).not.toContain("complete");
 
     const outage = attemptDb(); outage.authorization = { received: true, account_id: "acc_new", return_error: null };
-    stub(outage, { accountStatus: 503 });
+    stub(outage, { mailboxProvider, accountStatus: 503 });
     const pending = await app().request("/connect/email/return/status", status("email", intent()));
     expect(pending.status).toBe(202);
     expect(await pending.json()).toMatchObject({ status: "pending" });
