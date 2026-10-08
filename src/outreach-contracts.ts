@@ -317,6 +317,12 @@ export const CampaignMessageSchema = z.object({ message_ref: Ref, lead_ref: Ref,
   not_sent_cause: z.enum(["account_disconnected", "sender_unavailable", "provider_rejected", "unknown"]).nullable().optional(),
 }).strict().refine(message => message.direction !== "outbound" || message.delivery_state !== "confirmed" || message.sent_at !== null,
   "Confirmed outbound delivery requires its saved receipt time.");
+type ConversationOwner = Pick<z.infer<typeof CampaignMessageSchema>, "lead_ref" | "channel" | "account_id" | "sender_id">;
+/** History is one person's conversation with the lead on this channel, from any of their accounts (LIF-1361). */
+export function inConversation(message: z.infer<typeof CampaignMessageSchema>, owner: ConversationOwner): boolean {
+  return message.lead_ref === owner.lead_ref && message.channel === owner.channel && message.account_id !== null
+    && (message.account_id === owner.account_id || (message.sender_id !== null && message.sender_id === owner.sender_id));
+}
 export const CampaignMessageResultSchema = z.object({ ...Workspace, message: CampaignMessageSchema,
   history: z.array(CampaignMessageSchema).max(100), history_complete: z.boolean(),
   revisions: z.array(CampaignMessageSchema).max(100), revisions_complete: z.boolean(),

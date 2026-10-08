@@ -128,8 +128,7 @@ export async function executeOutreachOperation(session: AuthSession, key: string
   }
   if (["message_get", "message_revisions_post", "message_review_post"].includes(entry.action)) {
     const { message, history, revisions } = c.CampaignMessageResultSchema.parse(parsed.data);
-    if (message.direction !== "outbound" || history.some(item => item.lead_ref !== message.lead_ref || item.channel !== message.channel
-      || !message.account_id || item.account_id !== message.account_id)
+    if (message.direction !== "outbound" || history.some(item => !message.account_id || !c.inConversation(item, message))
       || revisions.some(item => item.lead_ref !== message.lead_ref || item.channel !== message.channel || item.account_id !== message.account_id))
       throw new PublicError({ status: 502, ...unavailable });
   }

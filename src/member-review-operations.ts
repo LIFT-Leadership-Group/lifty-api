@@ -84,7 +84,8 @@ export function memberReviewReceiptMatches(action: string, input: IdentityInput,
       return receipt.message.message_ref === input.path.message_ref && work != null
         && work.message_ref === input.path.message_ref && work.source_digest === request.source_digest
         && receipt.message.direction === "outbound"
-        && [...receipt.history, ...receipt.revisions].every(message => message.lead_ref === receipt.message.lead_ref
+        && receipt.history.every(message => c.inConversation(message, receipt.message))
+        && receipt.revisions.every(message => message.lead_ref === receipt.message.lead_ref
           && message.channel === receipt.message.channel && message.account_id === receipt.message.account_id);
     }
     case "lead_stop_post": return c.StopLeadOutreachResultSchema.parse(value).lead_ref === input.path.lead_ref;
@@ -92,6 +93,5 @@ export function memberReviewReceiptMatches(action: string, input: IdentityInput,
   }
 }
 function sameConversation(turn: z.infer<typeof c.ReplyTurnSchema>): boolean {
-  return turn.history.every(message => message.lead_ref === turn.lead_ref && message.channel === turn.channel
-    && turn.account_id !== null && message.account_id === turn.account_id);
+  return turn.history.every(message => turn.account_id !== null && c.inConversation(message, turn));
 }
