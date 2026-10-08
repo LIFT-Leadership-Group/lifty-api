@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CampaignCreateSchema, JourneyPolicySchema, CampaignDraftSchema } from "../src/outreach-contracts.js";
-import { policy, senderId, campaignRef, journeyRef, journeyPolicy, revisionRef } from "./outreach-fixtures.js";
+import { CampaignCreateSchema, JourneyPolicySchema, CampaignDraftSchema, CampaignResultSchema } from "../src/outreach-contracts.js";
+import { policy, senderId, campaignRef, journeyRef, journeyPolicy, revisionRef, campaign, workspace, revision } from "./outreach-fixtures.js";
 const create = (channel: string, value: unknown) => CampaignCreateSchema.safeParse({ name: "Campaign", journey_ref: journeyRef, channel, policy: value });
 const email = { ...policy, start: [{ type: "sent", campaign_ref: campaignRef, step: 2, after: { business_days: 2 } },
   { type: "unaccepted", campaign_ref: campaignRef, after: { business_days: 5 } }],
@@ -17,6 +17,65 @@ const catalog = () => ({ ...email, compose_mode: "templates", steps: email.steps
     ...(opener ? { opener } : {}), ...(step.position === 1 ? { subject: `${arm} thread` } : {}), text: `${arm} ${step.position} for {company}`,
   }))) })) });
 describe("supported Outreach policy boundary", () => {
+  it("preserves optional names and per-message guidance without changing identity or implying a catalog", () => {
+    const simple = { ...policy, compose_mode: "templates", steps: [{ position: 1, delay: { business_days: 0 },
+      writing_instructions: "  Confirmed evidence only.\n\tKeep the question short.\r\n",
+      template: { display_name: "  Señal del negocio 🚀  ", text: "Hello {first_name}" } }] };
+    const parsed = create("linkedin", simple);
+    expect(parsed).toMatchObject({ success: true, data: { policy: simple } });
+    if (parsed.success) expect(parsed.data.policy.steps[0]!.template).not.toHaveProperty("id");
+    const source = catalog();
+    const named = { ...source, steps: source.steps.map(step => ({ ...step, writing_instructions: "Keep the saved route.",
+      variants: step.variants.map(variant => ({ ...variant, display_name: "Shared readable label" })) })) };
+    expect(create("email", named)).toMatchObject({ success: true, data: { policy: named } });
+    expect(CampaignDraftSchema.parse({ expected_version: 1, revision_ref: revisionRef, changes: { steps: named.steps } }).changes.steps).toEqual(named.steps);
+    for (const writing_instructions of ["x".repeat(10000), "🚀".repeat(10000)]) {
+      const generated = { ...policy, steps: [{ ...policy.steps[0]!, writing_instructions }] };
+      expect(create("linkedin", generated)).toMatchObject({ success: true, data: { policy: generated } });
+      expect(CampaignDraftSchema.parse({ expected_version: 1, revision_ref: revisionRef, changes: { steps: generated.steps } }).changes.steps).toEqual(generated.steps);
+      const result = { workspace, campaign: { ...campaign, draft_revision: revision(generated), revisions: [revision(generated)] } };
+      expect(CampaignResultSchema.parse(result)).toEqual(result);
+    }
+    for (const display_name of ["x".repeat(100), "🚀".repeat(100)]) {
+      const named = { ...simple, steps: [{ ...simple.steps[0]!, template: { ...simple.steps[0]!.template, display_name } }] };
+      expect(create("linkedin", named)).toMatchObject({ success: true, data: { policy: named } });
+      const result = { workspace, campaign: { ...campaign, draft_revision: revision(named), revisions: [revision(named)] } };
+      expect(CampaignResultSchema.parse(result)).toEqual(result);
+    }
+  });
+  it("rejects invalid names/guidance at the exact message and template field", () => {
+    for (const display_name of ["", " \t", "\u00a0", "x".repeat(101), "🚀".repeat(101), "Line\nBreak", "Tab\tName", "Bad\u007fName", null]) {
+      const parsed = create("linkedin", { ...policy, compose_mode: "templates", steps: [{ position: 1, delay: { business_days: 0 },
+        template: { display_name, text: "Hello" } }] });
+      expect(parsed.success, String(display_name)).toBe(false);
+      if (!parsed.success) expect(parsed.error.issues.some(issue => issue.path.join("/") === "policy/steps/0/template/display_name")).toBe(true);
+    }
+    for (const writing_instructions of ["", " \n\t\r", "\ufeff", "x".repeat(10001), "🚀".repeat(10001), "Bad\u000bText", "Bad\u001fText", "Bad\u007fText", null]) {
+      const parsed = CampaignDraftSchema.safeParse({ expected_version: 1, revision_ref: revisionRef,
+        changes: { steps: [{ ...policy.steps[0]!, writing_instructions }] } });
+      expect(parsed.success, String(writing_instructions)).toBe(false);
+      if (!parsed.success) expect(parsed.error.issues.some(issue => issue.path.join("/") === "changes/steps/0/writing_instructions")).toBe(true);
+    }
+    const malformed = catalog(); malformed.steps[0]!.variants[1]!.text = "Hey {{unknown}}";
+    const parsed = create("email", malformed);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues[0]!.path).toEqual(["policy", "steps", 0, "variants", 1, "text"]);
+  });
+  it("reads historical bytes and digests without optional field defaults or request normalization", () => {
+    const historical = { ...policy, compose_mode: "templates", steps: [{ position: 1, delay: { business_days: 0 }, template: { text: "Hi {{first_name}}" } }] };
+    const saved = { workspace, campaign: { ...campaign, draft_revision: revision(historical), revisions: [revision(historical)] } };
+    expect(CampaignResultSchema.parse(saved)).toEqual(saved);
+    expect(JSON.stringify(CampaignResultSchema.parse(saved))).toBe(JSON.stringify(saved));
+    expect(create("linkedin", policy)).toMatchObject({ success: true, data: { policy } });
+    // An older invalid family/route must be visible so a founder can repair it;
+    // authoring still rejects it, and reads keep its exact immutable digest.
+    const missing = catalog();
+    missing.steps[0]!.variants = missing.steps[0]!.variants.filter(v => !(v.opener === "linkedin_bridge" && v.arms.includes("pain")));
+    missing.steps[1]!.variants = missing.steps[1]!.variants.filter(v => v.arms.includes("direct"));
+    expect(create("email", missing).success).toBe(false);
+    const savedCatalog = { workspace, campaign: { ...campaign, channel: "email", draft_revision: revision(missing), revisions: [revision(missing)] } };
+    expect(CampaignResultSchema.parse(savedCatalog)).toEqual(savedCatalog);
+  });
   it("retains an authored template catalog and separate research routes without changing the step count", () => {
     const saved = catalog();
     expect(create("email", saved)).toMatchObject({ success: true, data: { policy: saved } });
