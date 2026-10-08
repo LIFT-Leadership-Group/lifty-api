@@ -143,7 +143,7 @@ warmup `starting` receipt. This API works before it ships (the explanation
 stays generic), so the order is free.
 
 LIF-1371 requires Functions migration
-`20261010110000_lif1371_connection_recovery.sql` before this API revision.
+`20261010120000_lif1371_connection_recovery.sql` before this API revision.
 The progress member RPC leaves the old member response compatible during
 rollout. Sending-account preparation runs after the shared shell loads;
 claim/dispatch fences allow recovery only before provider dispatch. An unknown
