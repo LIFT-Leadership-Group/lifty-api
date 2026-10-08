@@ -250,6 +250,56 @@ describe("send gates by workspace owner", () => {
   });
 });
 
+describe("first placement timing", () => {
+  function firstTest(edit: (mailbox: Source["mailboxes"][number]) => void = () => {}) {
+    return withInbox("sl-only@a.test", item => {
+      item.campaigns = [];
+      item.placement = { test_count: 0, latest_test_ref: null, latest_completed_test_ref: null, latest_completed_test: null, recent_tests: [] };
+      item.smartlead!.approved_for_outbound = false;
+      item.smartlead!.placement_gate_passed_at = null;
+      item.smartlead!.warmup_started_at = "2026-09-16T00:00:00Z";
+      item.smartlead!.cold_eligible_at = "2026-10-07T00:00:00Z";
+      item.warmup.smartlead!.active_since = "2026-09-16T00:00:00Z";
+      edit(item);
+    });
+  }
+
+  it.each([true, false])("shows initial warmup before a missing first test even when is_eligible=%s", (eligible) => {
+    const mailbox = inbox(present(firstTest(item => { item.smartlead!.is_eligible = eligible; })), "sl-only@a.test");
+    expect(mailbox.status.code).toBe("warming");
+    expect(mailbox.placement.status).toMatchObject({ code: "no_tests", tone: "muted", description: expect.stringMatching(/after.*warmup/i) });
+    expect(mailbox.readiness.code).toBe(eligible ? "ready" : "blocked");
+  });
+
+  it.each([true, false])("makes the first test due at completion even when is_eligible=%s", (eligible) => {
+    const value = firstTest(item => { item.smartlead!.is_eligible = eligible; });
+    const mailbox = inbox(presentDeliverability(value, new Date("2026-10-07T00:00:00Z")), "sl-only@a.test");
+    expect(mailbox.status.code).toBe("placement_due");
+    expect(mailbox.placement.status.tone).toBe("warn");
+    expect(mailbox.readiness.code).toBe(eligible ? "ready" : "blocked");
+  });
+
+  it("keeps recovery and warmup failures ahead of a deferred first test", () => {
+    const failed = firstTest(item => { item.warmup.smartlead!.health = "fail"; });
+    expect(inbox(present(failed), "sl-only@a.test").status.code).toBe("warmup_problem");
+    const paused = firstTest(item => { item.smartlead!.mitigation_state = "paused"; });
+    expect(inbox(present(paused), "sl-only@a.test").status.code).toBe("paused");
+  });
+
+  it("defers Mailivery outreach inboxes but does not impose initial warmup on habitual inboxes", () => {
+    const value = withInbox("uni-only@a.test", item => {
+      item.campaigns = [];
+      item.connections[0]!.holds = [];
+      item.connections[0]!.send_block_reason = null;
+      item.connections[0]!.mailbox_use = "outreach";
+      item.placement = { test_count: 0, latest_test_ref: null, latest_completed_test_ref: null, latest_completed_test: null, recent_tests: [] };
+    });
+    expect(inbox(present(value), "uni-only@a.test").status.code).toBe("warming");
+    value.mailboxes.find(item => item.email === "uni-only@a.test")!.connections[0]!.mailbox_use = "personal";
+    expect(inbox(present(value), "uni-only@a.test").status.code).toBe("placement_due");
+  });
+});
+
 describe("warmup states", () => {
   const mailivery = (edit: (item: Source["mailboxes"][number]["warmup"]["mailivery"][number]) => void) =>
     inbox(present(withInbox("uni-only@a.test", item => edit(item.warmup.mailivery[0]!))), "uni-only@a.test").warmup;
