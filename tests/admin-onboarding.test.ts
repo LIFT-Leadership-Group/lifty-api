@@ -81,7 +81,9 @@ describe("admin onboarding read", () => {
       [reviewing, "sample_ready_for_founder_review", null],
       [broken, null, "BUSINESS_UNAVAILABLE"],
     ]);
-    expect(body.workspaces[1]).toMatchObject({ provisioned_by: null, slug: "workspace-1", plan: { kind: "managed" } });
+    expect(body.workspaces[1]).toMatchObject({ slug: "workspace-1", plan: { kind: "managed" } });
+    // LIF-1198: provisioning origin never reaches the operator view, whatever the database sends.
+    expect(body.workspaces.some((item: object) => "provisioned_by" in item)).toBe(false);
     expect(body.workspaces[1].plan).toEqual({ kind: "managed" });
     expect(JSON.stringify(body)).not.toContain("founder@example.invalid");
     expect(JSON.stringify(body)).not.toContain("private failure");
