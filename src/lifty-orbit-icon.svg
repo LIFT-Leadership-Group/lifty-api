@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <!-- Approved Orbita Fase geometry: components/landing/lifty-mark.tsx. -->
+  <rect width="400" height="400" rx="88" fill="hsl(155,18%,9%)"/>
+  <g transform="translate(20 65)" fill="hsl(99,34%,65%)">
+    <path d="M216 47C225 47 228 54 221 61C158 78 80 125 64 163C37 226 144 229 236 188C270 173 297 150 311 123L324 147C289 191 224 226 161 244C82 267 23 251 11 220C-10 166 85 89 178 58C193 53 205 49 216 47Z"/>
+    <path d="M268 17C311 16 349 41 351 78C352 91 347 104 341 113C334 122 326 113 324 102C316 71 294 50 255 42C251 41 251 37 254 34L264 20Q265 17 268 17Z"/>
+  </g>
+</svg>

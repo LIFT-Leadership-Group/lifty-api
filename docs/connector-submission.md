@@ -67,13 +67,20 @@ capability below against the released tool catalog before submission.
 | Support contact | juan@liftleadershipgroup.com, the existing published contact |
 | Privacy policy | https://liftygtm.com/privacy-policy. Publish the connector data-flow disclosure and compare it with actual tool responses. |
 | Terms | https://liftygtm.com/terms-of-service |
-| Icon | Existing public PNGs: https://liftygtm.com/brand/lifty-icon.png at 256 by 256, or https://liftygtm.com/brand/lifty-origami-icon.png at 1254 by 1254. Check the portal's current asset constraints. |
+| Icon | Approved Órbita Fase PNG (512 by 512): https://api.liftygtm.com/brand/lifty-orbit-icon.png after this API release is deployed. Source asset: `src/lifty-orbit-icon.png`, rendered from `src/lifty-orbit-icon.svg` (dashboard `app/icon.svg`). Use this asset when uploading a connector or directory logo. Check the portal's current asset constraints. |
 | MCP URL | Pending deployed and verified endpoint. Do not submit a placeholder. |
 | Authentication | OAuth authorization code with S256 PKCE. Select the registration method proven in both client rehearsals. |
 | Category | Choose the portal's current category that describes sales and workspace productivity. |
 | Countries | Publisher must select only the places where Lifty is actually supported. No country list has been approved here. |
 | Release notes | First remote MCP connector release, after the prerequisites above pass. |
 | Screenshots | No custom MCP UI is currently part of these issues. OpenAI says to omit screenshots for plugins without UI; Claude's carousel requirement applies to MCP Apps with UI. |
+
+The MCP initialization response advertises this same PNG in `serverInfo.icons`,
+using the configured API origin. Existing uploaded connector logos are managed
+by the client: [ChatGPT's app owner can edit a developer-mode app's logo through
+Manage](https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt).
+Updating the server does not guarantee replacement of an existing uploaded or
+cached logo. Use the new PNG when creating the connector or updating its logo.
 
 Starter prompts for the portal:
 
