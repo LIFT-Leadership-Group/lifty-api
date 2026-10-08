@@ -103,6 +103,17 @@ Each document's files are declared in `src/agent-context.ts`; key order is
 part of the revision, so keep published documents byte-identical when
 restructuring them.
 
+## Campaign authoring fields
+
+LIF-1378 adds optional template/variant `display_name` and step
+`writing_instructions` to the existing Campaign policy and immutable revisions.
+Deploy Functions migration `20261010130000_lif1378_campaign_authoring_fields.sql`
+before clients save these fields, and deploy the compatible Jobs generation
+consumer before enabling per-message instructions. Names do not change source
+IDs or make simple templates an authored catalog. Absent fields add no defaults
+or historical digest changes; `fit` and raw `slots_spec` retain their existing
+selection and personalization roles.
+
 ## Shared writing rules
 
 The banned-phrase list Lifty serves is the database rulebook Jobs composes
