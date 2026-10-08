@@ -333,7 +333,7 @@ export const CampaignReviewsQuerySchema = z.object({ channel: z.enum(["linkedin"
 export const CampaignReviewsSchema = z.object({ ...Workspace, messages: z.array(CampaignMessageSchema).max(100), next_after: Ref.nullable() }).strict();
 export const ReviewPageQuerySchema = CampaignReviewsQuerySchema.omit({ review_status: true });
 const ChannelReviewPolicy = z.object({ mode: z.enum(["approve_each", "send_and_sample"]),
-  sample_rate: z.union([z.literal(10), z.literal(20), z.literal(50)]),
+  sample_rate: z.union([z.literal(0), z.literal(10), z.literal(20), z.literal(50)]),
 }).strict();
 export const ReviewSettingsSchema = z.object({ version: Version, linkedin: ChannelReviewPolicy, email: ChannelReviewPolicy }).strict();
 export const ReviewSettingsResultSchema = z.object({ ...Workspace, settings: ReviewSettingsSchema }).strict();
