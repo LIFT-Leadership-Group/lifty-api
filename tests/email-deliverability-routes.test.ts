@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createEmailDeliverabilityOperations, presentDeliverability } from "../src/email-deliverability.js";
 import { DeliverabilitySource, type PlacementDetail, type SourceTest } from "../src/email-deliverability-contracts.js";
+import type { Account } from "../src/identity-contracts.js";
 import { createApp } from "../src/app.js";
 import { createCurrentClient } from "./current-client.js";
 
@@ -20,11 +21,12 @@ function single(email: string, base = memberA): Record<string, unknown> {
   return copy as unknown as Record<string, unknown>;
 }
 
-function harness(options: { data?: unknown; error?: unknown; throws?: boolean; details?: (tests: SourceTest[], email: string) => Promise<PlacementDetail[]> } = {}) {
+function harness(options: { data?: unknown; accounts?: unknown; error?: unknown; throws?: boolean; details?: (tests: SourceTest[], email: string) => Promise<PlacementDetail[]> } = {}) {
   const rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
   const detailCalls: { tests: string[]; email: string }[] = [];
   const session = { userId: userA, client: { rpc: async (name: string, args: Record<string, unknown>) => {
     rpcCalls.push({ name, args });
+    if (name === "get_lifty_sending_accounts") return { data: options.accounts ?? null, error: null };
     if (options.throws) throw new Error("network");
     return options.error ? { data: null, error: options.error } : { data: options.data ?? memberA, error: null };
   } } };
@@ -40,12 +42,64 @@ describe("deliverability read operation", () => {
   it("reads with the caller's session and only the database filters", async () => {
     const h = harness();
     const response = await h.ops.read(h.session, { workspace: "fixture-a" });
-    expect(h.rpcCalls).toEqual([{ name: "deliverability_read", args: { p_query: { workspace: "fixture-a", history_limit: 3, limit: 50 } } }]);
+    expect(h.rpcCalls).toEqual([
+      { name: "deliverability_read", args: { p_query: { workspace: "fixture-a", history_limit: 3, limit: 50 } } },
+      { name: "get_lifty_sending_accounts", args: { p_workspace_id: "10391000-0000-4000-8000-000000000001", p_query: { channel: "email" } } },
+    ]);
     expect(response).toEqual(presentDeliverability(DeliverabilitySource.parse(memberA), now, { detail: null, details: new Map(), warnings: [] }));
     expect(h.detailCalls).toEqual([]);
     const f = harness({ data: fleet });
     await f.ops.read(f.session, { scope: "fleet", sender: "unassigned", cursor: "abc_-1", history_limit: 8, limit: 10 });
     expect(f.rpcCalls[0]!.args).toEqual({ p_query: { scope: "fleet", sender: "unassigned", cursor: "abc_-1", history_limit: 8, limit: 10 } });
+  });
+
+  it("uses the routed account, pause controls and current warmup instead of healthy history", async () => {
+    const data = DeliverabilitySource.parse(single("mixed@a.test"));
+    const mailbox = data.mailboxes[0]!;
+    const current = mailbox.connections[0]!;
+    current.mailbox_use = "personal";
+    current.controls = [{ scope_key: mailbox.workspace_ref, send_paused: true, capture_paused: false }];
+    const warmup = structuredClone(DeliverabilitySource.parse(memberA).mailboxes.find(item => item.email === "uni-only@a.test")!.warmup.mailivery[0]!);
+    warmup.connection_ref = current.connection_ref;
+    warmup.binding!.snapshot = { email_per_day_target: 22, emails_sent_today: 0 };
+    mailbox.warmup.mailivery = [warmup];
+    const account: Account = { id: current.connection_ref, sender_id: current.sender_ref!, channel: "email", identity: mailbox.email,
+      status: "connected", state: "active", checked_at: now.toISOString(), observation: { state: "verified" },
+      connected_at: now.toISOString(), disconnected_at: null, access_revoked_at: null, declaration: null, sends: { today: 5, last_7_days: 20 } };
+    const accounts = { workspace: { workspace_ref: mailbox.workspace_ref, name: "Fixture", state: "ready" }, accounts: [account] };
+    const h = harness({ data, accounts });
+    const response = await h.ops.read(h.session, { workspace: "fixture-a" });
+    expect(response.mailboxes[0]!.account).toMatchObject({ status: "connected", observation: "verified", outreach: { code: "paused" } });
+    expect(response.mailboxes[0]!.warmup.current).toMatchObject({ provider: "mailivery", required_days: null, metrics: { ramp_target: 22 } });
+    expect(response.mailboxes[0]!.warmup.status.label).toBe("Warming");
+    // Loss of verification is distinct from an explicit provider disconnection.
+    current.controls = []; current.holds = []; current.send_block_reason = null;
+    account.observation.state = "unverified";
+    const stale = harness({ data, accounts });
+    expect((await stale.ops.read(stale.session, { workspace: "fixture-a" })).mailboxes[0]!.account).toMatchObject({
+      status: "connected", observation: "unverified", outreach: { code: "unknown" },
+    });
+    account.observation.state = "verified";
+    current.holds = [{ reason: "operator_hold" }];
+    const held = harness({ data, accounts });
+    expect((await held.ops.read(held.session, { workspace: "fixture-a" })).mailboxes[0]!.account?.outreach).toMatchObject({
+      code: "blocked", description: "An outreach safety hold is active.", reasons: [{ code: "hold" }],
+    });
+    account.status = "disconnected";
+    const disconnected = harness({ data, accounts });
+    expect((await disconnected.ops.read(disconnected.session, { workspace: "fixture-a" })).mailboxes[0]!.account).toMatchObject({
+      status: "disconnected", outreach: { code: "blocked" },
+    });
+    // A cross-workspace reply must not select an account even with the same address.
+    accounts.workspace.workspace_ref = "10391000-0000-4000-8000-000000000002";
+    const foreign = harness({ data, accounts });
+    expect((await foreign.ops.read(foreign.session, { workspace: "fixture-a" })).mailboxes[0]!.account).toBeNull();
+  });
+
+  it("leaves unavailable current account evidence unknown", async () => {
+    const h = harness();
+    const response = await h.ops.read(h.session, { workspace: "fixture-a" });
+    expect(response.mailboxes.every(item => item.account === null && item.warmup.current === null)).toBe(true);
   });
 
   it.each([

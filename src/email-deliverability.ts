@@ -1,3 +1,4 @@
+import { AccountsGetSchema, type Account } from "./identity-contracts.js";
 import { z } from "zod";
 import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
@@ -129,7 +130,7 @@ function placementRule(mailbox: SourceMailbox): { maxAgeDays: number | null; rul
 
 function initialWarmupPending(warmup: DeliverabilityMailbox["warmup"]): boolean {
   return (warmup.status.code === "active" || warmup.status.code === "pending")
-    && warmup.sources.some(source => source.period_complete === false);
+    && (warmup.current ? [warmup.current] : warmup.sources).some(source => source.period_complete === false);
 }
 
 function presentPlacement(mailbox: SourceMailbox, warmup: DeliverabilityMailbox["warmup"], now: Date, detail: PlacementDetail[] | null): DeliverabilityMailbox["placement"] {
@@ -272,31 +273,35 @@ function mailiveryWarmup(item: SourceMailivery, connection: SourceConnection | u
 
 const warmupRank: Record<WarmupSource["state"]["code"], number> = { problem: 0, not_running: 1, paused: 2, unknown: 3, pending: 4, active: 5, none: 6 };
 
-function presentWarmup(mailbox: SourceMailbox, now: Date): DeliverabilityMailbox["warmup"] {
+function presentWarmup(mailbox: SourceMailbox, now: Date, account?: Account): DeliverabilityMailbox["warmup"] {
   const smartlead = smartleadWarmup(mailbox, now);
   const sources = [...(smartlead ? [smartlead] : []),
     ...mailbox.warmup.mailivery.map(item => mailiveryWarmup(item, mailbox.connections.find(c => c.connection_ref === item.connection_ref), now))];
+  const connection = mailbox.connections.find(item => item.connection_ref === account?.id);
+  const current = account ? sources.find(item => connection?.provider === "smartlead"
+    ? item.provider === "smartlead" : item.provider === "mailivery" && item.connection_ref === account.id) ?? null : null;
+  const effective = account ? (current ? [current] : []) : sources;
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const trend = {
     window_start: iso(end.getTime() - (TREND_DAYS - 1) * DAY).slice(0, 10), window_end: iso(end.getTime()).slice(0, 10),
     days: mailbox.warmup.smartlead_daily.map(point => ({ day: point.day, observed_at: iso(ms(point.observed_at)), status: point.status, health: point.health,
       reputation_pct: n(point.reputation_pct), spam_pct: n(point.spam_pct), spam_sample_sent: n(point.spam_sample_sent), sent_7d: n(point.sent_7d) })),
   };
-  if (sources.length === 0) {
-    return { status: make("none", "No warmup evidence", "muted", "No warmup provider has reported on this inbox. Missing evidence is not a healthy result."), sources, trend };
+  if (effective.length === 0) {
+    return { status: make("none", "No warmup evidence", "muted", "No warmup provider has reported on this inbox. Missing evidence is not a healthy result."), sources, current, trend };
   }
-  const worst = [...sources].sort((a, b) => warmupRank[a.state.code] - warmupRank[b.state.code])[0]!;
-  const progress = sources.find(source => source.required_days !== null && source.active_days !== null) ?? null;
+  const worst = [...effective].sort((a, b) => warmupRank[a.state.code] - warmupRank[b.state.code])[0]!;
+  const progress = effective.find(source => source.required_days !== null && source.active_days !== null) ?? null;
   let label = worst.state.label;
   if (worst.state.code === "active" && progress) {
     label = progress.period_complete ? `${worst.state.label} · initial period complete` : `${worst.state.label} · day ${progress.active_days} of ${progress.required_days}`;
   }
-  const names = sources.map(source => source.provider === "smartlead" ? "campaign platform warmup" : "Lifty warmup").join(" and ");
+  const names = effective.map(source => source.provider === "smartlead" ? "campaign platform warmup" : "Lifty warmup").join(" and ");
   const period = progress?.period_complete ? " The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns." : "";
   return {
-    status: make(worst.state.code, label, worst.state.tone, `${worst.state.description}${sources.length > 1 ? ` Evidence comes from ${names}.` : ""}${period}`,
-      sources.flatMap(source => source.state.reasons)),
-    sources, trend,
+    status: make(worst.state.code, label, worst.state.tone, `${worst.state.description}${effective.length > 1 ? ` Evidence comes from ${names}.` : ""}${period}`,
+      effective.flatMap(source => source.state.reasons)),
+    sources, current, trend,
   };
 }
 
@@ -614,7 +619,35 @@ function presentSending(source: SourceSending | null | undefined, connections: S
     `${used} The count resets at midnight (${zone}). Room left today doesn't mean the inbox is ready; its status says whether campaigns can use it.`, reasons) };
 }
 
-function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: string; name: string }>, now: Date, detail: PlacementDetail[] | null): DeliverabilityMailbox {
+function presentAccount(account: Account | undefined, connections: Connection[], campaigns: DeliverabilityMailbox["campaigns"]): DeliverabilityMailbox["account"] {
+  if (!account) return null;
+  const connection = connections.find(item => item.connection_ref === account.id);
+  let outreach: NonNullable<DeliverabilityMailbox["account"]>["outreach"];
+  const paused = connection?.controls.filter(item => item.send_paused) ?? [];
+  if (account.status !== "connected") outreach = make("blocked", "Blocked", "bad", "Reconnect this inbox before it can send outreach.");
+  else if (account.state === "paused" || paused.length) outreach = make("paused", "Paused", "warn",
+    paused.some(item => item.scope === "global") ? "Outreach is paused globally."
+      : paused.some(item => item.scope === "workspace" || item.scope === "channel") ? "Workspace outreach is paused." : "Account outreach is paused.");
+  else if (connection?.holds.length) outreach = make("blocked", "Blocked", "bad", "An outreach safety hold is active.",
+    connection.holds.map(item => reason("hold", `A safety hold is active (${item.reason}).`)));
+  else if (connection?.send_gate.code === "blocked") outreach = make("blocked", "Blocked", "bad",
+    connection.send_gate.description, connection.send_gate.reasons);
+  else if (account.observation.state === "unverified" || !connection || connection.send_gate.code === "unknown") outreach = make("unknown", "Unverified", "warn", "A current connection check is needed to confirm whether outreach can send.");
+  else {
+    const active = campaigns.items.filter(item => item.status.code === "active" &&
+      (item.connection_ref === account.id || (connection.provider === "smartlead" && item.source === "smartlead_campaign")));
+    if (!active.length) outreach = make("idle", "No active campaign", "muted", "This account is enabled, but no active campaign uses this connection.");
+    else if (active.some(item => item.sending.code === "enabled")) outreach = make("enabled", "Enabled", "ok", "An active campaign can use this account when its schedule and send checks allow.");
+    else if (active.some(item => item.sending.code === "unverified")) outreach = make("unknown", "Unverified", "warn", "The active campaign's sending state could not be confirmed.");
+    else outreach = make("blocked", "Blocked", "warn", "An active campaign cannot currently send from this account.", active.flatMap(item => item.sending.reasons));
+  }
+  return { connection_ref: account.id, status: account.status, observation: account.observation.state, checked_at: account.checked_at, outreach };
+}
+
+function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: string; name: string }>, now: Date, detail: PlacementDetail[] | null, accounts?: Account[]): DeliverabilityMailbox {
+  const matches = accounts?.filter(item => item.channel === "email" && item.identity?.toLowerCase() === source.email.toLowerCase());
+  // The canonical read selects routes and retained identities. Never guess across owners.
+  const account = matches?.length === 1 ? matches[0] : undefined;
   const connections = source.connections.map(connection => presentConnection(source, connection));
   const connected = new Set(connections.filter(item => item.status === "connected").map(item => item.provider));
   // A disconnected connection is history when the same provider has a live one.
@@ -623,7 +656,7 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
   const smartlead = smartleadPath(source, now);
   const paths = [...(smartlead ? [smartlead] : []), ...connectionPaths];
   const readiness = presentReadiness(paths);
-  const warmup = presentWarmup(source, now);
+  const warmup = presentWarmup(source, now, account);
   const placement = presentPlacement(source, warmup, now, detail);
   const campaigns = presentCampaigns(source.campaigns.map(item => presentCampaign(item, paths)));
   const approval = presentApproval(source, now);
@@ -636,6 +669,7 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
     email: source.email, domain: source.domain,
     senders: source.senders.map(sender => ({ sender_ref: sender.sender_ref, name: sender.name })),
     identity: presentIdentity(source),
+    account: presentAccount(account, connections, campaigns),
     providers: {
       sending: unique([...(source.smartlead ? ["smartlead"] : []), ...connections.filter(item => item.status === "connected").map(item => item.provider)]),
       warmup: unique(warmup.sources.map(item => item.provider)),
@@ -703,6 +737,7 @@ export interface PresentOptions {
   detail?: "placement" | null;
   details?: ReadonlyMap<string, PlacementDetail[]>;
   warnings?: DeliverabilityResponse["warnings"];
+  accounts?: ReadonlyMap<string, Account[]>;
 }
 
 /** Maps the authorized database source to the public contract. Pure. */
@@ -720,7 +755,7 @@ export function presentDeliverability(source: DeliverabilitySource, now: Date, o
     },
     workspace_health: source.workspace_health.map(presentWorkspaceHealth),
     mailboxes: source.mailboxes.map(mailbox => presentMailbox(mailbox, workspaces, now,
-      options.detail === "placement" ? options.details?.get(mailbox.mailbox_ref) ?? [] : null)),
+      options.detail === "placement" ? options.details?.get(mailbox.mailbox_ref) ?? [] : null, options.accounts?.get(mailbox.workspace_ref))),
     total_count: source.total_count,
     next_cursor: n(source.next_cursor),
     warnings: options.warnings ?? [],
@@ -783,6 +818,23 @@ export function createEmailDeliverabilityOperations(dependencies: EmailDeliverab
       }
       const warnings: DeliverabilityResponse["warnings"] = [];
       const details = new Map<string, PlacementDetail[]>();
+      const accounts = new Map<string, Account[]>();
+      const workspaces = [...new Set(source.mailboxes.map(item => item.workspace_ref))];
+      // Reuse the identity authority with the caller's session, once per represented
+      // workspace. Bounded batches avoid a per-inbox read or unbounded fleet fanout.
+      for (let offset = 0; offset < workspaces.length; offset += 4) {
+        await Promise.all(workspaces.slice(offset, offset + 4).map(async workspace => {
+          try {
+            const result = await (session.client as RpcClient).rpc("get_lifty_sending_accounts", {
+              p_workspace_id: workspace, p_query: { channel: "email" },
+            });
+            const parsedAccounts = AccountsGetSchema.safeParse(result.data);
+            if (!result.error && parsedAccounts.success && parsedAccounts.data.workspace.workspace_ref === workspace) {
+              accounts.set(workspace, parsedAccounts.data.accounts);
+            }
+          } catch { /* Unavailable evidence stays unknown, never disconnected or enabled. */ }
+        }));
+      }
       if (detail === "placement") {
         if (source.mailboxes.length !== 1) throw unavailable("LIFTY returned an inconsistent deliverability read. Retry shortly.");
         const mailbox = source.mailboxes[0]!;
@@ -800,7 +852,7 @@ export function createEmailDeliverabilityOperations(dependencies: EmailDeliverab
           warnings.push({ code: "placement_detail_not_configured", source: "placement_detail", mailbox_ref: mailbox.mailbox_ref, message: "Provider placement reports are not configured on this server." });
         }
       }
-      return presentDeliverability(source, now(), { detail: detail ?? null, details, warnings });
+      return presentDeliverability(source, now(), { detail: detail ?? null, details, warnings, accounts });
     },
   };
 }
