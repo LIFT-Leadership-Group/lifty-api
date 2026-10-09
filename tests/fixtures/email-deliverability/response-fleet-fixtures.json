@@ -305,7 +305,8 @@
      "window_start": "2026-08-31",
      "window_end": "2026-09-29",
      "days": []
-    }
+    },
+    "current": null
    },
    "recovery": {
     "state": "paused",
@@ -562,7 +563,8 @@
     "smartlead_warmup": true,
     "mailivery_warmup": false,
     "placement_tests": true
-   }
+   },
+   "account": null
   },
   {
    "mailbox_ref": "f19a5b78-437d-6cdf-5759-280b1426e711",
@@ -675,7 +677,8 @@
      "window_start": "2026-08-31",
      "window_end": "2026-09-29",
      "days": []
-    }
+    },
+    "current": null
    },
    "recovery": null,
    "campaigns": {
@@ -834,7 +837,8 @@
     "smartlead_warmup": false,
     "mailivery_warmup": false,
     "placement_tests": true
-   }
+   },
+   "account": null
   },
   {
    "mailbox_ref": "963de4a2-7be5-5cf2-cd2d-f979e1a10f7f",
@@ -1247,7 +1251,8 @@
        "sent_7d": 30
       }
      ]
-    }
+    },
+    "current": null
    },
    "recovery": null,
    "campaigns": {
@@ -1473,7 +1478,8 @@
     "smartlead_warmup": true,
     "mailivery_warmup": false,
     "placement_tests": true
-   }
+   },
+   "account": null
   },
   {
    "mailbox_ref": "0864bf84-7189-09c2-ad3c-ec41fe2f5a55",
@@ -1591,7 +1597,8 @@
      "window_start": "2026-08-31",
      "window_end": "2026-09-29",
      "days": []
-    }
+    },
+    "current": null
    },
    "recovery": null,
    "campaigns": {
@@ -1673,7 +1680,8 @@
     "smartlead_warmup": false,
     "mailivery_warmup": false,
     "placement_tests": false
-   }
+   },
+   "account": null
   },
   {
    "mailbox_ref": "0c342394-ee33-ff78-570e-1179a0b4941b",
@@ -1804,7 +1812,8 @@
      "window_start": "2026-08-31",
      "window_end": "2026-09-29",
      "days": []
-    }
+    },
+    "current": null
    },
    "recovery": null,
    "campaigns": {
@@ -2059,7 +2068,8 @@
     "smartlead_warmup": false,
     "mailivery_warmup": true,
     "placement_tests": true
-   }
+   },
+   "account": null
   },
   {
    "mailbox_ref": "dd83a07c-bb23-babd-4f30-b9524b8ca9b3",
@@ -2218,7 +2228,8 @@
        "sent_7d": 50
       }
      ]
-    }
+    },
+    "current": null
    },
    "recovery": null,
    "campaigns": {
@@ -2399,7 +2410,8 @@
     "smartlead_warmup": true,
     "mailivery_warmup": false,
     "placement_tests": true
-   }
+   },
+   "account": null
   },
   {
    "mailbox_ref": "75b639c1-5819-90ae-3179-dce8de65ad7d",
@@ -2488,7 +2500,8 @@
      "window_start": "2026-08-31",
      "window_end": "2026-09-29",
      "days": []
-    }
+    },
+    "current": null
    },
    "recovery": null,
    "campaigns": {
@@ -2616,7 +2629,8 @@
     "smartlead_warmup": false,
     "mailivery_warmup": false,
     "placement_tests": true
-   }
+   },
+   "account": null
   }
  ],
  "total_count": 7,

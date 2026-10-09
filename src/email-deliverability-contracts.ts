@@ -387,12 +387,21 @@ export const DeliverabilityMailbox = z.object({
   domain: z.string().max(253),
   senders: z.array(z.object({ sender_ref: Uuid, name: z.string().max(200) }).strict()).max(50),
   identity: state(IdentityCode),
+  /** Canonical physical account selected by the shared identity read. Null means unconfirmed. */
+  account: z.object({
+    connection_ref: Uuid,
+    status: z.enum(["connected", "needs_reconnect", "disconnected"]),
+    observation: z.enum(["verified", "unverified"]),
+    checked_at: Timestamp.nullable(),
+    outreach: state(["paused", "blocked", "enabled", "idle", "unknown"] as const),
+  }).strict().nullable(),
   providers: z.object({ sending: z.array(Provider).max(5), warmup: z.array(Provider).max(5), placement: z.array(Provider).max(5) }).strict(),
   status: state(MailboxStatusCode),
   readiness: state(ReadinessCode).extend({ paths: z.array(Path).max(50) }).strict(),
   warmup: z.object({
     status: state(WarmupCode),
     sources: z.array(WarmupSource).max(50),
+    current: WarmupSource.nullable(),
     trend: z.object({ window_start: Day, window_end: Day, days: z.array(WarmupDay).max(60) }).strict(),
   }).strict(),
   recovery: z.object({
