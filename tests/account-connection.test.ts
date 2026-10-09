@@ -52,7 +52,7 @@ const snapshot = (db: Db, extra: Record<string, unknown> = {}) => ({
   transport: db.transport, issuance: db.issuance,
   authorization: { ...db.authorization, event_id: null, at: null }, ...extra });
 
-interface Provider { mailboxProvider: "google" | "outlook"; verificationStatus: "verified" | "pending"; senders: string; accountStatus: number; deleteStatus: number; calls: string[]; bodies: Record<string, unknown>[] }
+interface Provider { mailboxProvider: "google" | "outlook"; verificationStatus: "verified" | "pending" | "unknown"; senders: string; accountStatus: number; deleteStatus: number; calls: string[]; bodies: Record<string, unknown>[] }
 function stub(db: Db, provider: Partial<Provider> = {}) {
   const p: Provider = { mailboxProvider: "google", verificationStatus: "verified", senders: "ana@example.test", accountStatus: 200, deleteStatus: 200, calls: [], bodies: [], ...provider };
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -315,7 +315,7 @@ describe("Lifty connect page", () => {
 describe("shared confirmation for sending accounts", () => {
   it.each(["google", "outlook"] as const)("treats a browser error as a hint and completes only a signed authorization with verified identity: %s", async (mailboxProvider) => {
     const db = attemptDb(); db.declaration = { mailbox_use: "habitual" }; db.internal_state = "ready"; db.hosted_url = hostedLink;
-    const { provider } = stub(db, { mailboxProvider }); const server = app(); const state = intent();
+    const { provider } = stub(db, { mailboxProvider, verificationStatus: mailboxProvider === "outlook" ? "unknown" : "verified" }); const server = app(); const state = intent();
     const shell = await server.request(`/connect/email/return?intent=${encodeURIComponent(state)}&error_type=canceled`);
     expect(shell.status).toBe(200);
     expect(await shell.text()).toContain("Checking your connection");
