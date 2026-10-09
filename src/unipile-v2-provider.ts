@@ -167,7 +167,11 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     const parsed = Senders.safeParse(await request(`${encodeURIComponent(accountId)}/email-senders`));
     if (!parsed.success || parsed.data.next_cursor || (parsed.data.total_count !== undefined && parsed.data.total_count !== parsed.data.data.length)) fail();
     const primaries = parsed.data.data.filter(sender => sender.is_primary);
-    if (primaries.length !== 1 || primaries[0]!.verification_status !== "verified") fail("UNIPILE_MAILBOX_UNVERIFIABLE", 409);
+    // is_primary proves the authenticated address. Outlook can report unknown
+    // per-address sending readiness even for that primary; pending is never ready.
+    // https://developer.unipile.com/v2.0/reference/getemailsenders
+    if (primaries.length !== 1 || (primaries[0]!.verification_status !== "verified"
+      && !(account.provider === "outlook" && primaries[0]!.verification_status === "unknown"))) fail("UNIPILE_MAILBOX_UNVERIFIABLE", 409);
     const email = primaries[0]!.email.toLowerCase();
     if (expectedEmail && expectedEmail.toLowerCase() !== email) fail("UNIPILE_IDENTITY_MISMATCH", 409);
     return {accountId: transport.canonical_account_id ?? accountId, email, type, healthy, healthStatus, verifiedTransport};

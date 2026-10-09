@@ -7,7 +7,7 @@ const transport:UnipileTransport={api_version:"v2",connection_ref:null,canonical
 const email="founder@example.test";
 const account={object:"Account",id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",
   provider:"google",status:"running",is_locked:false,metadata:{v1_account_id:"legacy_account",products_connection_status:{gmail:"running"}}};
-const outlook={...account,provider:"outlook",oauth_scope:"User.Read,Mail.ReadWrite,Mail.Send",metadata:{v1_account_id:"legacy_account",products_connection_status:{outlook:"running"}}};
+const outlook={...account,provider:"outlook",oauth_scope:"User.Read,Mail.ReadWrite,Mail.Send",metadata:{v1_account_id:"legacy_account",products_connection_status:{mail:"running"}}};
 const senders={data:[{object:"EmailSender",email,is_primary:true,verification_status:"verified"}]};
 const profile={object:"UserProfile",provider:"linkedin",id:"owner",type:"individual",display_name:"Founder",public_identifier:"founder",specifics:{network_distance:"SELF"}};
 function harness(options:{account?:unknown;senders?:unknown;profile?:unknown;link?:string;status?:number;body?:Response}={}) {
@@ -25,8 +25,8 @@ function harness(options:{account?:unknown;senders?:unknown;profile?:unknown;lin
   return {calls,provider:createUnipileV2Provider({accessToken:"v2-test-key",applicationId:"app_test",hostedAuthOrigins:["https://connect-v2.lifty.test"],fetchImpl})};
 }
 describe("Unipile V2 authenticated contract",()=>{
-  it.each([account,outlook])("retains canonical identity after exact application/scope/owner/alias readback: $provider",async(raw)=>{
-    const h=harness({account:raw});
+  it.each([{raw:account,readiness:"verified"},{raw:outlook,readiness:"verified"},{raw:outlook,readiness:"unknown"}])("retains canonical identity after exact application/scope/owner/alias readback: $raw.provider/$readiness",async({raw,readiness})=>{
+    const h=harness({account:raw,senders:{data:[{...senders.data[0],verification_status:readiness}]}});
     expect(await h.provider.readEmailIdentity("acc_test",transport,email)).toEqual({accountId:"legacy_account",email,type:raw.provider === "outlook" ? "OUTLOOK" : "GOOGLE_OAUTH",healthy:true,healthStatus:"running",
       verifiedTransport:{api_version:"v2",account_id:"acc_test",application_id:"app_test",account_scope_id:"scope_test",user_id:"owner",owner_profile_id:null,v1_account_id:"legacy_account"}});
     expect(h.calls.map(c=>c.url)).toEqual(["https://api.unipile.com/v2/accounts/acc_test","https://api.unipile.com/v2/acc_test/email-senders"]);
@@ -51,10 +51,21 @@ describe("Unipile V2 authenticated contract",()=>{
   });
   for (const raw of [account,outlook]) it.each([
     {data:[]},{data:[...senders.data,...senders.data]},
-    {data:[{...senders.data[0],is_primary:false}]},{data:[{...senders.data[0],verification_status:"unknown"}]},
+    {data:[{...senders.data[0],is_primary:false}]},{data:[{...senders.data[0],verification_status:"pending"}]},
     {...senders,next_cursor:"more"},{...senders,total_count:2},
   ])("fails closed on ambiguous/incomplete primary address evidence %j",async(senders)=>{
     await expect(harness({account:raw,senders}).provider.readEmailIdentity("acc_test",transport,email)).rejects.toBeDefined();
+  });
+  it("keeps Google unknown readiness unverified",async()=>{
+    await expect(harness({senders:{data:[{...senders.data[0],verification_status:"unknown"}]}}).provider.readEmailIdentity("acc_test",transport,email))
+      .rejects.toMatchObject({code:"UNIPILE_MAILBOX_UNVERIFIABLE"});
+  });
+  it.each([
+    {data:[{...senders.data[0],is_primary:false,verification_status:"unknown"}]},
+    {data:[{...senders.data[0],verification_status:"unknown"},{...senders.data[0],email:"other@example.test",verification_status:"unknown"}]},
+    {data:[{...senders.data[0],email:"other@example.test",verification_status:"unknown"}]},
+  ])("does not use Outlook unknown readiness to relax primary identity: %j",async(senders)=>{
+    await expect(harness({account:outlook,senders}).provider.readEmailIdentity("acc_test",transport,email)).rejects.toBeDefined();
   });
   it.each([account,outlook])("rejects an alias even when a provider profile contains it: $provider",async(raw)=>{
     await expect(harness({account:raw}).provider.readEmailIdentity("acc_test",transport,"alias@example.test")).rejects.toMatchObject({code:"UNIPILE_IDENTITY_MISMATCH"});
