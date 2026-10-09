@@ -164,10 +164,12 @@ export function loadConfig(environment: Environment = process.env): ServiceConfi
   const attioClientSecret = environment.ATTIO_CLIENT_SECRET?.trim();
   if (Boolean(attioClientId) !== Boolean(attioClientSecret)) throw new Error("Attio connection requires both ATTIO_CLIENT_ID and ATTIO_CLIENT_SECRET.");
 
-  // The earlier provider API is used only to remove access to accounts still bound through it.
+  // Earlier accounts retain access removal and authenticated warmup identity.
   const v1Values = [environment.UNIPILE_DSN?.trim(), environment.UNIPILE_ACCESS_TOKEN?.trim()];
   if (v1Values.some(Boolean) && !v1Values.every(Boolean)) throw new Error("Unipile access removal requires both UNIPILE_DSN and UNIPILE_ACCESS_TOKEN.");
-  const v1 = v1Values.every(Boolean) ? { dsn: v1Values[0]!, accessToken: v1Values[1]! } : null;
+  const providerNamespace=environment.UNIPILE_PROVIDER_NAMESPACE?.trim();
+  const v1 = v1Values.every(Boolean) ? { dsn: v1Values[0]!, accessToken: v1Values[1]!,
+    ...(providerNamespace?{providerNamespace}:{}) } : null;
   const v2Token=environment.UNIPILE_V2_ACCESS_TOKEN?.trim(), v2Application=environment.UNIPILE_V2_APPLICATION_ID?.trim();
   const v2Origins=environment.UNIPILE_V2_HOSTED_AUTH_ORIGINS?.trim();
   if(Boolean(v2Token)!==Boolean(v2Application) || (v2Origins && !v2Token))throw new Error("Unipile V2 requires UNIPILE_V2_ACCESS_TOKEN and UNIPILE_V2_APPLICATION_ID.");

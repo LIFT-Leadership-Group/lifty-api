@@ -107,7 +107,7 @@ describe("warmup status presentation", () => {
 
   it("never projects earlier than the evidence allows when no evidence exists", () => {
     const status = presentWarmupStatus(stored({ evidence: null }, { state: "link_issued", provider_campaign_bound: false, snapshot: null, last_readback_at: null }), now);
-    expect(status).toMatchObject({ state: "link_issued", state_label: "Waiting for you to authorize the mailbox with Google", active_days: 0,
+    expect(status).toMatchObject({ state: "link_issued", state_label: "Waiting for you to authorize the mailbox", active_days: 0,
       today: { warmup_emails: null, ramp_target: null }, checks: { spf: "unknown", dmarc: "unknown", mx: "unknown" }, last_checked_at: null });
     expect(status.recommended_go_live).toMatchObject({ kind: "projected", date: "2026-10-13", remaining_active_days: 21 });
     expect(status.recommended_go_live.message).toMatch(/not running right now/);
@@ -117,7 +117,7 @@ describe("warmup status presentation", () => {
     ["paused", null, "Paused"],
     ["paused", "account_disconnected", "Paused"],
     ["problem", "dns_invalid", "Needs attention"],
-    ["pending_consent", "microsoft_consent_pending", "Waiting for Microsoft consent"],
+    ["pending_consent", "microsoft_consent_pending", "Checking mailbox authorization and warmup setup"],
     ["removed", null, "Removed"],
   ] as const)("describes %s (%s) in plain words and moves the date while not running", (state, reason, label) => {
     const status = presentWarmupStatus(stored({}, { state, blocking_reason: reason, snapshot: { ...snapshot, spf: "invalid", mx: null } }), now);
@@ -211,7 +211,7 @@ describe("warmup operations", () => {
       const consent = harness({ data: stored({}, { state: "pending_consent", blocking_reason: reason }) });
       const result = await consent.ops.start(consent.session, "senja");
       expect(result).toMatchObject({ state: "pending_consent", connect_url: null, expires_at: null,
-        blocking_reason: { code: "microsoft_consent_pending", message: expect.stringMatching(/Finish the Microsoft consent step/) } });
+        blocking_reason: reason?{ code: "microsoft_consent_pending", message: expect.stringMatching(/Finish the Microsoft consent step/) }:null });
       expect(consent.links).toHaveLength(0);
     }
     const unconfigured = harness({ issueSetupLink: null, data: stored({}, { state: "pending_consent" }) });

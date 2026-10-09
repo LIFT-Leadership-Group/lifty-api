@@ -12,6 +12,7 @@ export const CONNECTION_FLOWS = {
   slack: { path:'/slack/callback', label:'Slack', entries:['/slack/start'] },
   attio: { path:'/attio/callback', label:'Attio', entries:['/attio/start'] },
   warmup: { path:'/warmup/google/callback', label:'email warmup', entries:['/warmup/setup','/warmup/received'] },
+  warmup_microsoft: { path:'/warmup/microsoft/return', label:'email warmup', entries:['/warmup/microsoft/sign-in'] },
   email: { path:'/connect/email/return', label:'email', entries:['/connect/email'], retry:'/connect/email' },
   linkedin: { path:'/connect/linkedin/return', label:'LinkedIn', entries:['/connect/linkedin'], retry:'/connect/linkedin' },
 } as const;
@@ -21,7 +22,8 @@ export type ConnectionFlow = keyof typeof CONNECTION_FLOWS;
  * provider refused the sign-in (with a retry of the same attempt where one can
  * work), or that a warmup handoff is starting. Never terminal evidence.
  */
-export const ConfirmationAttention = z.enum(['released','exists','in_use','already_connected','canceled','provider','starting']);
+export const ConfirmationAttention = z.enum(['released','exists','in_use','already_connected','canceled','provider','starting',
+  'microsoft_sign_in','microsoft_preparing','microsoft_recovery','warmup_action']);
 export type ConfirmationAttention = z.infer<typeof ConfirmationAttention>;
 export const ConfirmationResult = z.discriminatedUnion('status', [
   z.object({status:z.literal('pending'), attention:ConfirmationAttention.optional(), progress:AccountConnectionProgress.optional(), reference:z.uuid().optional()}),
@@ -83,14 +85,23 @@ var notes={
  already_connected:['Already connected','This '+label+' account is already connected to this workspace. Return to Lifty to continue.',0],
  canceled:['Sign-in not finished','The sign-in was canceled before it finished. Try again when you are ready.',1],
  provider:['The sign-in did not finish','The sign-in stopped before Lifty received the account. Try again. If it fails again, return to Lifty for help.',1],
- starting:['Starting warmup','Google access is confirmed. Lifty is starting warmup now, usually within a few minutes, and this page updates when it does. You can also close it and return to Lifty.',0]
+ starting:['Starting warmup','Mailbox access is confirmed. Lifty is starting warmup now, usually within a few minutes, and this page updates when it does. You can also close it and return to Lifty.',0],
+ microsoft_sign_in:['Continue with Microsoft','Sign in to the mailbox shown on the setup page and approve Mailivery. Microsoft opens in a new tab. Keep this page open: it confirms when warmup is running.',0],
+ microsoft_preparing:['Preparing Microsoft sign-in','Lifty is preparing secure Microsoft authorization. This page will show the sign-in button when it is ready.',0],
+ microsoft_recovery:['Sign-in preparation needs checking','Lifty could not confirm the sign-in link. Check this same attempt, or return to Lifty for help. Warmup has not been confirmed.',0],
+ warmup_action:['Warmup needs attention','Mailbox authorization was received, but warmup could not start. Return to Lifty to see the required mailbox or DNS fix, then check this same attempt.',0]
 };
 function attend(attention){
  var note=notes[attention];if(!note||shown===attention)return;shown=attention;
  title.textContent=note[0];detail.textContent=note[1];spinner.hidden=attention!=='starting';
  retry.textContent='Try again';
  if(note[2]&&root.dataset.retry){retry.href=root.dataset.retry+'?'+key+'='+encodeURIComponent(body.state);actions.hidden=false;}else actions.hidden=true;
- if(attention==='starting'){until=Math.max(until,Date.now()+1500000);cap=30000;}
+ if(attention==='microsoft_sign_in'&&root.dataset.microsoft==='true'){
+  retry.textContent='Continue with Microsoft';retry.href='/warmup/microsoft/sign-in?state='+encodeURIComponent(body.state);
+  retry.target='_blank';retry.rel='noopener noreferrer';actions.hidden=false;
+ }
+ if(attention==='microsoft_preparing')spinner.hidden=false;
+ if(attention==='starting'||attention==='microsoft_sign_in'){until=Math.max(until,Date.now()+1500000);cap=30000;}
 }
 function progress(p,ref){
  if(!p||typeof p.stage!=='string')return;
@@ -153,7 +164,7 @@ export function renderConfirmationPage(flow:ConnectionFlow, valid=true, prepare=
   const definition:{label:string;retry?:string}=CONNECTION_FLOWS[flow], {label}=definition;
   const title=valid?(prepare?'Preparing sign-in':'Checking your connection'):'Connection needs attention';
   return renderLiftyPage({title,styles:actionStyles,content:
-    `<section id="confirmation" data-label="${label}" data-prepare="${prepare}" data-warmup="${flow==='warmup'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}"${definition.retry?` data-retry="${definition.retry}"`:''} aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${title}</h1><p id="confirmation-detail" class="intro">${valid?(prepare?'Lifty is preparing the secure sign-in page. Sign-in has not finished yet.':'Lifty is reading the status of this connection. This page will update automatically.'):'Return to Lifty to check this attempt and get the next step.'}</p><p id="confirmation-actions" class="actions" hidden><a id="confirmation-retry" href="">Try again</a></p><p><button id="confirmation-check" class="check-status" type="button" hidden>Check status</button></p><p id="confirmation-reference" class="reassurance" hidden></p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
+    `<section id="confirmation" data-label="${label}" data-prepare="${prepare}" data-warmup="${flow==='warmup'||flow==='warmup_microsoft'}" data-microsoft="${flow==='warmup_microsoft'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}"${definition.retry?` data-retry="${definition.retry}"`:''} aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${title}</h1><p id="confirmation-detail" class="intro">${valid?(prepare?'Lifty is preparing the secure sign-in page. Sign-in has not finished yet.':'Lifty is reading the status of this connection. This page will update automatically.'):'Return to Lifty to check this attempt and get the next step.'}</p><p id="confirmation-actions" class="actions" hidden><a id="confirmation-retry" href="">Try again</a></p><p><button id="confirmation-check" class="check-status" type="button" hidden>Check status</button></p><p id="confirmation-reference" class="reassurance" hidden></p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
 }
 export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string;reference?:string;progress_stage?:string;recovery_reason?:string};
 export function createConfirmationRouter(flow:ConnectionFlow, adapter:ConfirmationAdapter, options:{prefix?:string;origin?:string;log?:(event:ConfirmationLog)=>void}={}) {
@@ -168,7 +179,7 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
     const q=new URL(c.req.url).searchParams;
     const key=['email','linkedin'].includes(flow)?'intent':'state';
     const parsed=Input.safeParse({state:q.get(key)??'',...(q.has('code')?{code:q.get('code')}:{}),...(q.has('error')?{denied:true}:{})});
-    const prepare=q.get('prepare')==='1'&&['email','linkedin'].includes(flow);
+    const prepare=q.get('prepare')==='1'&&['email','linkedin','warmup_microsoft'].includes(flow);
     let valid=parsed.success && [key,'code','error','prepare'].every(key=>q.getAll(key).length<=1)
       && (!q.has('prepare')||prepare);
     if(valid&&parsed.success){try{adapter.validate(parsed.data,c);}catch{valid=false;}}

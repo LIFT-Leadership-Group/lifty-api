@@ -1,4 +1,5 @@
 import { PublicError } from "./errors.js";
+import { connectionFetch } from "./connection-confirmation.js";
 
 // Port of the monorepo's canonical Trigger.dev REST shim
 // (lift-supabase-functions/_shared/trigger-task.ts): the ingress passes only
@@ -129,7 +130,7 @@ export type EnqueueWarmupVerify = (senderRef: string, attempt: string) => Promis
  * binding now instead of at its next scheduled pass. One run per OAuth attempt.
  * Bounded, because it runs inside the founder's confirmation request. */
 export function createWarmupVerifyTrigger(settings: TriggerClientSettings): EnqueueWarmupVerify {
-  const fetchImpl = settings.fetchImpl ?? fetch;
+  const fetchImpl = connectionFetch(settings.fetchImpl ?? fetch);
   const bounded: TriggerClientSettings = { ...settings,
     fetchImpl: (input, init) => fetchImpl(input, { ...init, signal: AbortSignal.timeout(WARMUP_VERIFY_TIMEOUT_MS) }) };
   return async (senderRef, attempt) =>

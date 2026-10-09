@@ -68,7 +68,7 @@ describe("runtime context discovery and connection handoff", () => {
       "Warmup never pauses or resumes campaigns",
     );
     expect(context.instructions).toContain(
-      "Warmup setup uses Google OAuth only",
+      "selects Google or Microsoft automatically",
     );
     expect(context.instructions).toContain("Never request an App Password");
   });

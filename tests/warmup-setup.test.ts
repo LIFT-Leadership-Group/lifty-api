@@ -7,7 +7,7 @@ const policy = { version: 1, emails_per_day: 22, ramp: "slow", reply_rate: 30,
   schedule: "Weekdays - 8am to 6pm", timezone: "America/Argentina/Buenos_Aires", audience: "business" };
 const record = { email: "founder@example.test", workspace_ref: "22222222-2222-4222-8222-222222222222",
   sender_ref: "33333333-3333-4333-8333-333333333333", expires_at: "2026-10-01T00:00:00Z",
-  state: "claimed", policy, first_name: "Ada", last_name: "Lovelace" };
+  state: "claimed", method:"google" as const, policy, first_name: "Ada", last_name: "Lovelace" };
 function harness(email = record.email, providerFailure = false, tokenOverrides:Record<string,unknown> = {}, recordOverrides:Partial<WarmupSetupRecord> = {}, cleanupFailure = false,
   verifyWarmup?: (senderRef:string, attempt:string)=>Promise<unknown>) {
   const writes: {operation: string; payload: Record<string, unknown>}[] = [];
@@ -48,8 +48,8 @@ describe("warmup setup OAuth handoff", () => {
       scope:"openid email https://mail.google.com/",code_challenge_method:"S256",redirect_uri:"https://api.lifty.test/warmup/google/callback"});
     expect(url.searchParams.get("nonce")).toHaveLength(43);
     expect(url.searchParams.get("code_challenge")).toHaveLength(43);
-    expect(h.writes[0]?.payload.oauth_hash).toBe(hashSetupSecret(url.searchParams.get("state")!));
-    expect(h.writes[0]?.payload).not.toHaveProperty("code_verifier");
+    expect(h.writes.find(x=>x.operation==="choose")?.payload.oauth_hash).toBe(hashSetupSecret(url.searchParams.get("state")!));
+    expect(h.writes.find(x=>x.operation==="choose")?.payload).not.toHaveProperty("code_verifier");
   });
   it.each([{refresh_token:""},{scope:"openid email https://www.googleapis.com/auth/gmail.send"},{token_type:"mac"}])("rejects unusable Google credentials before Mailivery: %j",async change=>{
     const h=harness(record.email,false,change);
@@ -60,8 +60,8 @@ describe("warmup setup OAuth handoff", () => {
   it("chooses Google with the platform policy only; the browser supplies no name or timezone (LIF-1228)",async()=>{
     const h=harness();
     await h.setup.choose(secret,browser);
-    expect(Object.keys(h.writes[0]!.payload).sort()).toEqual(["browser_hash","intent_hash","method","oauth_hash","policy"]);
-    expect(h.writes[0]?.payload).toMatchObject({method:"google",policy:DEFAULT_WARMUP_POLICY});
+    expect(Object.keys(h.writes.find(x=>x.operation==="choose")!.payload).sort()).toEqual(["browser_hash","intent_hash","method","oauth_hash","policy"]);
+    expect(h.writes.find(x=>x.operation==="choose")?.payload).toMatchObject({method:"google",policy:DEFAULT_WARMUP_POLICY});
   });
   it("rejects another Google address before any Mailivery request or dispatch", async () => {
     const h = harness("other@example.test");

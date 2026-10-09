@@ -6,6 +6,7 @@ import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import type { MailiverySettings } from "./email-warmup.js";
 import { WarmupWorkspaceRequest } from "./email-warmup-contracts.js";
+import { UnipileTransport } from "./unipile-transport.js";
 
 export const WARMUP_SCHEDULES = ["Weekdays - 8am to 6pm", "Weekdays - 7am to 7pm", "Weekdays - 6am to 10pm",
   "With Weekends - 8am to 6pm", "With Weekends - 7am to 7pm", "With Weekends - 6am to 10pm"] as const;
@@ -24,7 +25,11 @@ const SetupRecord = z.object({email:z.email().max(254), workspace_ref:z.uuid(), 
   policy:WarmupPolicy.nullable(), first_name:name, last_name:name,
   // LIF-1223: a habitual (`personal`) mailbox is tested as soon as warmup runs.
   // Absent before the Functions migration; the page then shows the dedicated text.
-  mailbox_use:z.enum(["personal", "outreach"]).nullable().optional()});
+  mailbox_use:z.enum(["personal", "outreach"]).nullable().optional(),
+  method:z.enum(["google", "microsoft"]).nullable().optional(),
+  transport:UnipileTransport.optional(),
+  dispatch:z.boolean().optional(), microsoft_url:z.string().max(8192).nullable().optional(),
+  verify_at:z.iso.datetime({offset:true}).nullable().optional()});
 export type WarmupSetupRecord = z.infer<typeof SetupRecord>;
 export interface WarmupSetupSettings {
   serverKey:string; publicBaseUrl:string; supabaseUrl:string; publishableKey:string;
@@ -53,10 +58,11 @@ export async function verifyGoogleWarmupIdentity(idToken:string, clientId:string
   } catch { throw googleUnavailable(); }
 }
 
-/** Only non-secret intent hashes, policy and a verified email cross the DB boundary.
- * OAuth responses and provider failures are never returned, logged, persisted or retried. */
+/** Google tokens remain ephemeral. Microsoft grants go directly to Mailivery;
+ * only its short-lived consent URL is retained privately to recover lost reads. */
 export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rpc?:Rpc;fetchImpl?:typeof fetch;
   verifyIdentity?:(token:string, clientId:string, nonce:string)=>Promise<Identity>;
+  identifyMailbox?:(transport:UnipileTransport,email:string)=>Promise<"google"|"microsoft">;
   verifyWarmup?:(senderRef:string, attempt:string)=>Promise<unknown>}={}) {
   const fetchImpl = connectionFetch(dependencies.fetchImpl ?? fetch);
   const base = settings.publicBaseUrl.replace(/\/$/, "");
@@ -86,6 +92,21 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
     requireSecret(state); requireSecret(browser);
     return {oauth_hash:hashSetupSecret(state), browser_hash:hashSetupSecret(browser)};
   };
+  async function identify(record:WarmupSetupRecord,intent:string,session?:AuthSession) {
+    if(record.method)return record;
+    if(!record.transport||!dependencies.identifyMailbox)throw unavailable();
+    const method=await dependencies.identifyMailbox(record.transport,record.email);
+    const identified=await call("identify",{intent_hash:hashSetupSecret(intent),method,transport:record.transport},session);
+    if(identified.method!==method)throw unavailable();
+    return identified;
+  }
+  async function microsoftState(state:string,browser:string) {
+    const record=await call("microsoft_status",oauthPayload(state,browser));
+    if(record.method!=="microsoft")throw unavailable();
+    if(record.verify_at)await dependencies.verifyWarmup?.(record.sender_ref,
+      hashSetupSecret(`${hashSetupSecret(state)}:${record.verify_at}`)).catch(()=>{});
+    return record;
+  }
   return {
     origin:new URL(base).origin,
     validateCallback(state:string,browser:string) { oauthPayload(state,browser); },
@@ -102,30 +123,74 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
     async issue(session:AuthSession, workspace:string, connectionRef?:string) {
       const input = WarmupWorkspaceRequest.parse({workspace, ...(connectionRef === undefined ? {} : {connection_ref:connectionRef})});
       const intent = newSetupSecret();
-      const record = await call("issue", {...input, intent_hash:hashSetupSecret(intent)}, session);
+      const record = await identify(await call("issue", {...input, intent_hash:hashSetupSecret(intent)}, session),intent,session);
       return {url:`${base}/warmup/setup?intent=${intent}`, expiresAt:record.expires_at};
     },
     async read(intent:string) {
       requireSecret(intent);
-      return call("read", {intent_hash:hashSetupSecret(intent)});
+      const record=await call("read", {intent_hash:hashSetupSecret(intent)});
+      return record.state==="draft"?identify(record,intent):record;
     },
     // LIF-1228: the platform owns the warmup policy and schedule; the sender
     // name comes from the Identity person in the database. The browser supplies nothing.
     async choose(intent:string, browser:string):Promise<string> {
       requireSecret(intent); requireSecret(browser);
+      const current=await identify(await call("read",{intent_hash:hashSetupSecret(intent)}),intent);
       const state = newSetupSecret();
       const record = await call("choose", {intent_hash:hashSetupSecret(intent), browser_hash:hashSetupSecret(browser),
-        oauth_hash:hashSetupSecret(state), method:"google", policy:DEFAULT_WARMUP_POLICY});
+        oauth_hash:hashSetupSecret(state), method:current.method, policy:DEFAULT_WARMUP_POLICY});
+      if(record.method!==current.method)throw unavailable();
+      if(record.method==="microsoft")return `${base}/warmup/microsoft/return?state=${state}&prepare=1`;
       const query = new URLSearchParams({client_id:settings.googleClientId, redirect_uri:redirectUri,
         response_type:"code", scope:"openid email https://mail.google.com/", access_type:"offline", prompt:"consent select_account",
         login_hint:record.email, state, nonce:mac("nonce", state, browser), code_challenge:hashPkce(mac("pkce", state, browser)), code_challenge_method:"S256"});
       return `https://accounts.google.com/o/oauth2/v2/auth?${query}`;
+    },
+    async prepareMicrosoft(state:string,browser:string) {
+      const payload=oauthPayload(state,browser);
+      // One durable dispatch before the vendor call. Reloads and concurrent
+      // tabs only recover its saved link/status; they never request another.
+      const record=await call("microsoft_prepare",payload);
+      if(record.method!=="microsoft")throw unavailable();
+      if(!record.dispatch)return;
+      if(!record.policy)throw unavailable();
+      try {
+        const response=await fetchImpl(`${settings.mailivery.baseUrl??"https://app.mailivery.io/api/v1"}/campaigns/ms-graph`,{
+          method:"POST",redirect:"error",signal:AbortSignal.timeout(15000),
+          headers:{authorization:`Bearer ${settings.mailivery.apiKey}`,accept:"application/json","content-type":"application/json"},
+          body:JSON.stringify({email:record.email,first_name:record.first_name,last_name:record.last_name,
+            email_per_day:record.policy.emails_per_day,response_rate:record.policy.reply_rate,warmup_audience_type:record.policy.audience,
+            meta:{tags:`lifty-ws:${record.workspace_ref},lifty-sender:${record.sender_ref}`}}),
+        });
+        if(!response.ok){await response.body?.cancel().catch(()=>{});throw pending();}
+        // The response contains only an authorization URL. Never accept an
+        // arbitrary redirect or a credential-bearing provider response.
+        const reader=response.body?.getReader();if(!reader)throw pending();
+        const chunks:Uint8Array[]=[];let size=0;
+        try {while(true){const chunk=await reader.read();if(chunk.done)break;size+=chunk.value.byteLength;
+          if(size>16384){await reader.cancel();throw pending();}chunks.push(chunk.value);}}
+        finally{reader.releaseLock();}
+        const value=z.object({success:z.literal(true),data:z.object({url:z.string().max(8192)})})
+          .parse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+        const url=validateMicrosoftConsentUrl(value.data.url);
+        // Retrying this exact save is safe if its response was lost. The
+        // provider link request above is deliberately never retried.
+        try{await call("microsoft_link",{...payload,url});}
+        catch{await call("microsoft_link",{...payload,url});}
+      }catch{throw pending();}
+    },
+    async microsoftStatus(state:string,browser:string) {await microsoftState(state,browser);},
+    async microsoftLink(state:string,browser:string) {
+      const record=await microsoftState(state,browser);
+      if(!record.microsoft_url)throw unavailable();
+      return validateMicrosoftConsentUrl(record.microsoft_url);
     },
     async callback(state:string, browser:string, code:string):Promise<void> {
       const payload = oauthPayload(state, browser);
       if (!code || code.length > 4096) throw invalid();
       // Consumed before token exchange; two callbacks can never exchange/deliver twice.
       const record = await call("claim", payload);
+      if(record.method==="microsoft")throw unavailable();
       const tokenSchema = z.object({access_token:z.string().min(1).max(16384), refresh_token:z.string().min(1).max(16384),
         id_token:z.string().min(1).max(16384), token_type:z.literal("Bearer"), scope:z.string().max(2048)});
       let tokens:z.infer<typeof tokenSchema>;
@@ -164,6 +229,15 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
       await dependencies.verifyWarmup?.(record.sender_ref, payload.oauth_hash).catch(()=>{});
     },
   };
+}
+function validateMicrosoftConsentUrl(value:string):string {
+  if(value.length>8192||/[\u0000-\u0020\u007f]/.test(value))throw pending();
+  const url=new URL(value);
+  if(url.origin!=="https://login.microsoftonline.com"||url.username||url.password||url.hash
+    ||!/^\/[A-Za-z0-9.-]+\/oauth2\/v2\.0\/authorize$/.test(url.pathname)
+    ||!url.searchParams.get("state")||!url.searchParams.get("client_id")
+    ||[...url.searchParams.keys()].some(key=>!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)||["code","access_token","refresh_token","id_token"].includes(key.toLowerCase())))throw pending();
+  return url.toString();
 }
 const hashPkce = (value:string) => createHash("sha256").update(value).digest("base64url");
 export type WarmupSetup = ReturnType<typeof createWarmupSetup>;

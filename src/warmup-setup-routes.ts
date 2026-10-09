@@ -1,4 +1,4 @@
-import { createConfirmationRouter, invalidConfirmation, pendingConfirmation, type ConfirmationLog } from "./connection-confirmation.js";
+import { createConfirmationRouter, invalidConfirmation, pendingConfirmation, withConnectionDeadline, type ConfirmationLog } from "./connection-confirmation.js";
 import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -33,7 +33,7 @@ export function createWarmupSetupRouter(setup:WarmupSetup, log?:(event:Confirmat
     const record = await setup.read(intent);
     const previous = getCookie(c,cookieName);
     const csrf = previous && /^[A-Za-z0-9_-]{43}$/.test(previous) ? previous : newSetupSecret();
-    setCookie(c,cookieName,csrf,{httpOnly:true,secure,sameSite:"Lax",path:"/",maxAge:3600});
+    setCookie(c,cookieName,csrf,{httpOnly:true,secure,sameSite:"Lax",path:"/",maxAge:86400});
     return c.html(renderWarmupSetupPage(record,intent,csrf));
   });
   app.post("/setup",async c=>{
@@ -72,6 +72,30 @@ export function createWarmupSetupRouter(setup:WarmupSetup, log?:(event:Confirmat
       try{return await setup.receipt(input.state,browser);}catch{return pendingConfirmation();}
     },
   },{prefix:"/warmup",origin:setup.origin,...(log?{log}:{})}));
+  app.route("/",createConfirmationRouter("warmup_microsoft",{
+    validate:(input,c)=>{
+      setup.validateCallback(input.state,getCookie(c,cookieName)??"");
+      if(input.code||input.denied)throw new PublicError({status:400,code:"WARMUP_SETUP_INVALID",message:"Open the Microsoft warmup confirmation page."});
+    },
+    status:async(input,c)=>{
+      const browser=getCookie(c,cookieName)??"";
+      const receipt=await setup.receipt(input.state,browser);
+      if(receipt.status==="pending")await setup.microsoftStatus(input.state,browser);
+      return receipt;
+    },
+    process:async(input,c)=>{
+      const browser=getCookie(c,cookieName)??"";
+      try{await setup.prepareMicrosoft(input.state,browser);}catch{/* A lost link response stays pending. */}
+      try{return await setup.receipt(input.state,browser);}catch{return pendingConfirmation();}
+    },
+  },{prefix:"/warmup",origin:setup.origin,...(log?{log}:{})}));
+  app.get("/microsoft/sign-in",async c=>{
+    const params=new URL(c.req.url).searchParams;
+    if(params.getAll("state").length!==1||[...params.keys()].some(key=>key!=="state"))return error(c,400,"Open Microsoft sign-in from the warmup confirmation page.");
+    const state=params.get("state")!,browser=getCookie(c,cookieName)??"";
+    setup.validateCallback(state,browser);
+    return withConnectionDeadline(8000,async()=>c.redirect(await setup.microsoftLink(state,browser),303));
+  });
   app.get("/received",c=>c.html(renderWarmupReceipt()));
   return app;
 }

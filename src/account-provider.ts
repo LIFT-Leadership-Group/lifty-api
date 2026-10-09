@@ -27,8 +27,8 @@ export class IdentityMismatch extends Error {}
 
 export interface AccountProviderSettings {
   v2: UnipileV2Settings;
-  /** Only for removing access to accounts still bound through the earlier API version. */
-  v1?: { dsn: string; accessToken: string } | null;
+  /** Legacy revocation and authenticated warmup mailbox identification. */
+  v1?: { dsn: string; accessToken: string; providerNamespace?: string } | null;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }

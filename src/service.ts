@@ -29,6 +29,7 @@ import { DEFAULT_DASHBOARD_ORIGIN, loadConfig, type ServiceConfig } from "./conf
 import { executeResearchOperation } from "./research-operations.js";
 import { connectorUnavailable, executeIdentityOperation } from "./identity-operations.js";
 import { createAccountConnection } from "./account-connection.js";
+import { createWarmupMailboxIdentifier } from "./warmup-mailbox-provider.js";
 import { PublicError } from "./errors.js";
 import { createHubspotConnectOperations } from "./hubspot-connect.js";
 import { buildAuthorizationUrl } from "./hubspot-oauth.js";
@@ -47,10 +48,12 @@ import { confirmRunReview, disconnectIntegration, getCrmSyncStatus, getRunStatus
 export function createProductionApp(config: ServiceConfig) {
   const emailKey = config.serverKeys?.email ?? null;
   const accounts = config.accounts ? createAccountConnection(config.accounts) : null;
+  const identifyWarmupMailbox=config.accounts?createWarmupMailboxIdentifier(config.accounts.provider):null;
   // Workspace member operations use their session. Browser setup uses a narrow,
   // server-key-protected intent RPC, never a Supabase administrative key.
   const warmupSetup = config.warmupSetup
-    ? createWarmupSetup(config.warmupSetup, { verifyWarmup: createWarmupVerifyTrigger(config.trigger) }) : null;
+    ? createWarmupSetup(config.warmupSetup, { verifyWarmup: createWarmupVerifyTrigger(config.trigger),
+      ...(identifyWarmupMailbox?{identifyMailbox:identifyWarmupMailbox}:{}) }) : null;
   const placement = createEmailConnectionPlacementOperations();
   const warmup = createEmailWarmupOperations({ ...(warmupSetup ? {issueSetupLink:warmupSetup.issue} : {}) });
   // Reads use the caller's session; only report reads for authorized tests use the server-side key.
