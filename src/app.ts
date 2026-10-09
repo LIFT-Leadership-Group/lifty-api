@@ -866,8 +866,19 @@ export function createApp(
     }
     app.all("/mcp", context => handleMcpRequest(context.req.raw, mcp, {
       tools: getStageMcpTools(),
-      call: (name, args, request, session) => callStageMcpTool(name, args, request, (route, init) => {
-        const internal = new Request(new URL(route, request.url), init); trustedMcpRequests.set(internal, session);
+      call: (name, args, request, session) => callStageMcpTool(name, args, request, async (route, init) => {
+        const internal = new Request(new URL(route, request.url), init);
+        // Authentication binds the workspace header to the Supabase client.
+        // A tool-level selection arrives after the outer MCP authentication;
+        // reusing that unscoped client silently selects the implicit workspace.
+        // Keep the MCP resource/session fence when binding the selected client.
+        let selectedSession = session;
+        if ((internal.headers.get("x-lifty-workspace")?.trim() ?? "") !== (request.headers.get("x-lifty-workspace")?.trim() ?? "")) {
+          const scoped = await mcp.authenticate(internal);
+          if (!scoped.ok) return Response.json({ error: { code: "UNAUTHORIZED", message: "A valid Lifty OAuth session is required." } }, { status: 401 });
+          selectedSession = scoped.session;
+        }
+        trustedMcpRequests.set(internal, selectedSession);
         return Promise.resolve(app.fetch(internal));
       }),
       workspaces: session => dependencies.listMemberWorkspaces(session),
