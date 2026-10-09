@@ -112,16 +112,16 @@ omitted; with several it is required and the operation returns
 POST inputs belong in body. Every workspace uses the same operations, and each
 mailbox has its own warmup: starting one never stops another.
 
-Microsoft mailbox connections support sending and inbox reads, but the Mailivery
-setup link currently supports Google only. Do not call `warmup_start` for a
-Microsoft mailbox or direct its owner through Google warmup authorization.
-Preserve existing Smartlead warmup until a supported Microsoft warmup connection
-is verified; do not claim Mailivery is running or bypass readiness holds.
-
-For Google mailboxes, warmup authorization is a separate step from the account
-connection.
-Show the returned Lifty setup link for that exact mailbox; the owner must
-choose the same Google account again. Warmup setup uses Google OAuth only.
+Google and Microsoft mailbox connections use the same warmup and placement
+operations. Warmup authorization is a separate step from the outreach account
+connection. Show the returned Lifty setup link for that exact mailbox; Lifty
+verifies its provider and selects Google or Microsoft automatically. The owner
+must authorize the same mailbox. Microsoft consent opens in another tab;
+keep the Lifty confirmation page open until it verifies warmup is running.
+An organization may require Microsoft administrator approval. A canceled or
+blocked consent does not mean warmup is running; read the same attempt's status.
+Preserve existing Smartlead warmup during a migration until the replacement is
+verified; connecting does not transfer warmup age or resume outreach.
 Never request an App Password or route the founder to a password form.
 
 After the email account is connected, call `warmup_status` and use its
@@ -156,16 +156,17 @@ Warmup never pauses or resumes campaigns.
 
 `warmup_start` returns the setup link. Show it as "Set up warmup for your
 mailbox". The page shows the mailbox, the sender name warmup emails will use
-(from the sender's profile) and one "Continue with Google" button. Lifty sets
+(from the sender's profile) and one "Continue with Google" or "Continue with Microsoft" button. Lifty sets
 the warmup schedule and volume; the founder fills in nothing. The page also
 says when Lifty sends one test email from the mailbox to about 20-40 test
 inboxes (right after setup for a habitual mailbox, after warmup for a
 dedicated one), and that continuing accepts warmup and this test. Say so
-before sharing the link. Google must
-verify that exact address before Lifty shares access with the warmup service,
-once, without storing or logging the tokens. The setup flow does not create
-another email address. If the returned link or status does not support Google
-setup, report the actual blocker and involve support. Do not create another
+before sharing the link. For Google, Lifty verifies the exact address before
+sharing tokens once with Mailivery, without storing or logging them. For
+Microsoft, Mailivery receives authorization directly and Lifty verifies the
+resulting mailbox and its workspace binding before starting warmup. The setup
+flow does not create another email address. If setup is unavailable, report
+the actual blocker and involve support. Do not create another
 account or invent a link.
 
 After the founder finishes, Lifty verifies the mailbox and starts warmup right

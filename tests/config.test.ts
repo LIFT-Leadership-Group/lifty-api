@@ -175,11 +175,12 @@ it.each(["DASHBOARD_READ_ONLY_MODE","CONSUMER_READ_ONLY_MODE"])("preserves compa
 describe("staged V2 configuration",()=>{
   const baseline={...validEnvironment,UNIPILE_DSN:"https://api1.unipile.com:13111",UNIPILE_ACCESS_TOKEN:"v1-test",
     LIFTY_EMAIL_SERVER_KEY:"e".repeat(40),LIFTY_LINKEDIN_SERVER_KEY:"l".repeat(40)};
-  it("configures one account connection with per-channel keys; the earlier API is kept only for access removal",()=>{
+  it("configures per-channel keys and the legacy credential scope for access removal and warmup identity",()=>{
     const config=loadConfig({...baseline,UNIPILE_V2_ACCESS_TOKEN:"v2-test",UNIPILE_V2_APPLICATION_ID:"app_test",
+      UNIPILE_PROVIDER_NAMESPACE:" legacy-fixture ",
       UNIPILE_V2_HOSTED_AUTH_ORIGINS:"https://connect-v2.lifty.test,https://previous-v2.lifty.test"});
     expect(config.accounts).toMatchObject({serverKeys:{email:"e".repeat(40),linkedin:"l".repeat(40)},
-      provider:{v1:{dsn:baseline.UNIPILE_DSN,accessToken:"v1-test"},v2:{accessToken:"v2-test",applicationId:"app_test",
+      provider:{v1:{dsn:baseline.UNIPILE_DSN,accessToken:"v1-test",providerNamespace:"legacy-fixture"},v2:{accessToken:"v2-test",applicationId:"app_test",
         hostedAuthOrigins:["https://connect-v2.lifty.test","https://previous-v2.lifty.test"]}}});
     expect(loadConfig(baseline).accounts).toBeNull();
     expect(()=>loadConfig({...baseline,UNIPILE_ACCESS_TOKEN:""})).toThrow(/UNIPILE_DSN and UNIPILE_ACCESS_TOKEN/);

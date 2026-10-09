@@ -13,7 +13,7 @@ export interface MailiverySettings {
   baseUrl?: string;
 }
 export interface EmailWarmupSettings {
-  /** The branded Google setup link. Without it, warmup setup is not available. */
+  /** The branded provider-aware setup link. Without it, setup is unavailable. */
   issueSetupLink?: (session: AuthSession, workspace: string, connectionRef?: string) => Promise<{url:string;expiresAt:string}>;
   now?: () => Date;
   /** DNS seam for the check before a setup link is issued; defaults to node:dns. */
@@ -80,8 +80,8 @@ export function blockingMessage(code: string): string | undefined {
 
 const stateLabels: Record<WarmupStatus["state"], string> = {
   not_started: "Not started",
-  link_issued: "Waiting for you to authorize the mailbox with Google",
-  pending_consent: "Waiting for Microsoft consent",
+  link_issued: "Waiting for you to authorize the mailbox",
+  pending_consent: "Checking mailbox authorization and warmup setup",
   warming: "Warming up",
   paused: "Paused",
   problem: "Needs attention",
@@ -126,8 +126,7 @@ export function presentWarmupStatus(stored: StoredWarmupStatus, now: Date): Warm
   const activeDays = stored.evidence?.active_duration_days ?? 0;
   const required = stored.required_active_days;
   const storedReason = binding?.blocking_reason && /^[a-z][a-z0-9_]{0,63}$/.test(binding.blocking_reason) ? binding.blocking_reason : null;
-  // A campaign waiting for Microsoft consent is already bound; say what the founder must finish.
-  const reasonCode = storedReason ?? (state === "pending_consent" ? "microsoft_consent_pending" : null);
+  const reasonCode = storedReason;
   const blocking = reasonCode ? {
     code: reasonCode,
     message: blockingMessage(reasonCode) ?? "Warmup has a problem Lifty can't describe yet. Check status again later.",
@@ -220,7 +219,7 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
     const state = current.binding?.state;
     const linkNext = !state || state === "removed" || state === "link_issued";
     if (!settings.issueSetupLink) {
-      // Google setup is the only setup method; nothing is written without it.
+      // The Lifty setup link owns provider consent; nothing is written without it.
       if (linkNext) throw notConfigured();
       return WarmupStartResult.parse({ ...presentWarmupStatus(current, now()), connect_url: null, expires_at: null });
     }

@@ -12,15 +12,18 @@ const styles = `
 `;
 function shell(title:string, body:string) { return renderLiftyPage({ title: `${escape(title)} · Lifty`, content: body, styles }); }
 export function renderWarmupSetupPage(record:WarmupSetupRecord, intent:string, csrf:string):string {
-  if (record.state !== "draft") return renderWarmupReceipt("Authorization in progress", "Return to your agent to check warmup status. If Google authorization was interrupted, run warmup start for a new link. An authorization already submitted for warmup will not be repeated.");
+  if (record.state !== "draft") return renderWarmupReceipt("Authorization in progress", "Return to the confirmation tab or to Lifty to check warmup status. An authorization already submitted for warmup will not be repeated.");
+  const microsoft=record.method==="microsoft",provider=microsoft?"Microsoft":"Google";
   return shell("Set up email warmup", `<h1>Warm up your mailbox.</h1>
 <div class="mailbox"><strong>${escape(record.email)}</strong></div>
-<form method="post" action="setup" data-pending="Opening Google…"><input type="hidden" name="intent" value="${escape(intent)}"><input type="hidden" name="csrf" value="${escape(csrf)}">
+<form method="post" action="setup" data-pending="Opening ${provider}…"><input type="hidden" name="intent" value="${escape(intent)}"><input type="hidden" name="csrf" value="${escape(csrf)}">
 <p class="hint">Warmup emails go out as ${escape([record.first_name, record.last_name].filter(Boolean).join(" "))}. Lifty sets the warmup schedule and volume.</p>
 ${record.mailbox_use === "personal"
   ? `<p class="hint">As soon as warmup starts, Lifty sends one test email from this mailbox to about 20–40 test inboxes to check where your email lands. Warmup then keeps running alongside your outreach to protect your inbox placement. Continuing accepts warmup and this test.</p>`
   : `<p class="hint">When warmup ends, Lifty sends one test email from this mailbox to about 20–40 test inboxes to measure deliverability. Continuing accepts warmup and this test.</p>`}
-<div class="actions"><button class="primary block" type="submit">Continue with Google</button><p class="disclosure">Google grants full Gmail access, including reading, sending and deleting mail. Lifty shares this access with Mailivery to send and receive warmup mail. <a href="https://liftygtm.com/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy policy</a>.</p></div></form>
+<div class="actions"><button class="primary block" type="submit">Continue with ${provider}</button><p class="disclosure">${microsoft
+  ? "Microsoft will ask you to grant Mailivery access to read, send and manage mail for warmup. Sign in with the exact mailbox above. Your organization may require an administrator to approve access."
+  : "Google grants full Gmail access, including reading, sending and deleting mail. Lifty shares this access with Mailivery to send and receive warmup mail."} <a href="https://liftygtm.com/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy policy</a>.</p></div></form>
 ${pendingSubmitScript}`);
 }
 export function renderWarmupReceipt(title="Authorization sent", detail="Warmup received the authorization. Return to your agent to check warmup status. Lifty still needs to verify the mailbox before marking warmup as running.") {

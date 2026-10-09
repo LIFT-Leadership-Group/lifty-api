@@ -7,7 +7,8 @@ const token = "a".repeat(43);
 function harness() {
   const setup:WarmupSetup = {origin:"https://api.lifty.test", issue:vi.fn(),
     read:vi.fn(async () => ({email:"ada@example.test", workspace_ref:"22222222-2222-4222-8222-222222222222",
-      sender_ref:"33333333-3333-4333-8333-333333333333", state:"draft" as const, expires_at:"2026-10-01T00:00:00Z", policy:null,first_name:"Ada",last_name:"Lovelace"})),
+      sender_ref:"33333333-3333-4333-8333-333333333333", state:"draft" as const, method:"google" as const, expires_at:"2026-10-01T00:00:00Z", policy:null,first_name:"Ada",last_name:"Lovelace"})),
+    prepareMicrosoft:vi.fn(),microsoftStatus:vi.fn(),microsoftLink:vi.fn(),
     validateCallback:vi.fn(),receipt:vi.fn(async()=>({status:"pending" as const})),
     choose:vi.fn(async()=>"https://accounts.google.com/o/oauth2/v2/auth?state=not-a-secret"), callback:vi.fn()};
   return {setup, app:createWarmupSetupRouter(setup)};

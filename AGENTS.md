@@ -164,6 +164,20 @@ response can retry the exact hosted URL, without creating another provider link.
 Browser and agent progress come from the same database projection. Operational
 logs use the non-secret attempt reference, stage and classified outcome.
 
+Microsoft warmup setup (LIF-1385) requires the Functions migration
+`20261011090000_lif1385_microsoft_warmup.sql` and the matching Jobs Microsoft
+Graph pending-campaign handling before this API revision. Deploy database,
+Jobs, then API. The setup pins the authenticated mailbox provider; Microsoft
+consent goes directly to Mailivery. Only its short-lived sign-in URL is retained
+privately for same-attempt recovery. Never retry an uncertain provider link
+request, replay Google tokens, or infer warmup success from consent alone.
+The Microsoft confirmation page stays open while consent runs in another tab.
+Status reads wake the existing verifier with a durable idempotency key; the
+scheduled reconciliation remains the backstop.
+Legacy V1 warmup identity reads additionally require the stable credential
+scope `UNIPILE_PROVIDER_NAMESPACE`, matching the stored connection namespace;
+do not derive it from the DSN. V2 uses the existing application configuration.
+
 ## Customer exclusion imports
 
 LIF-1082's authenticated customer-exclusions status/import stage requires the

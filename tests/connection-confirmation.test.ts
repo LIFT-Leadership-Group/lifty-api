@@ -94,15 +94,42 @@ it('keeps malformed dependency receipts pending instead of inventing an invalid 
 });
 
 function browser(href:string,fetchImpl:typeof fetch){
-  const elements:Record<string,{textContent:string;hidden:boolean;href:string;dataset:Record<string,string>;addEventListener:ReturnType<typeof vi.fn>}>=Object.fromEntries(['confirmation','confirmation-title','confirmation-detail','confirmation-spinner','confirmation-actions','confirmation-retry','confirmation-check','confirmation-reference'].map(k=>[k,{textContent:'',hidden:k==='confirmation-actions',href:'',dataset:{},addEventListener:vi.fn()}]));
+  const elements:Record<string,{textContent:string;hidden:boolean;href:string;target?:string;rel?:string;dataset:Record<string,string>;addEventListener:ReturnType<typeof vi.fn>}>=Object.fromEntries(['confirmation','confirmation-title','confirmation-detail','confirmation-spinner','confirmation-actions','confirmation-retry','confirmation-check','confirmation-reference'].map(k=>[k,{textContent:'',hidden:k==='confirmation-actions',href:'',dataset:{},addEventListener:vi.fn()}]));
   const warmup=href.includes('/warmup/');
-  elements.confirmation!.dataset={prepare:String(new URL(href).searchParams.get('prepare')==='1'),label:warmup?'email warmup':'email',warmup:String(warmup),stateKey:href.includes('/connect/')?'intent':'state',
+  elements.confirmation!.dataset={prepare:String(new URL(href).searchParams.get('prepare')==='1'),label:warmup?'email warmup':'email',warmup:String(warmup),microsoft:String(href.includes('/warmup/microsoft/')),stateKey:href.includes('/connect/')?'intent':'state',
     ...(href.includes('/connect/email/')?{retry:'/connect/email'}:{})};
   const location={href};
   const history={replaceState:vi.fn((_state:unknown,_title:string,path:string)=>{location.href=new URL(path,location.href).href;})};
   const context={URL,AbortController,JSON,Date,Promise,setTimeout,clearTimeout,location,history,fetch:fetchImpl,document:{getElementById:(id:string)=>elements[id]}};
   return {elements,location,history,run:()=>runInNewContext(CONFIRMATION_SCRIPT,context) as Promise<void>};
 }
+it('keeps the Microsoft status page open during consent and shows verified warmup plus initial placement',async()=>{
+  vi.useFakeTimers();let finished=false;const requests:string[]=[];
+  const fetchImpl=vi.fn(async(input:unknown)=>{
+    const stage=String(input).split('/').at(-1)!;requests.push(stage);
+    return Response.json(finished?{status:'connected',account:'founder@example.test',placement:{when:'now',notify:['email']}}
+      :{status:'pending',attention:'microsoft_sign_in'});
+  }) as typeof fetch;
+  const page=browser('https://api.lifty.test/warmup/microsoft/return?state=attempt&prepare=1',fetchImpl);
+  const work=page.run();await vi.advanceTimersByTimeAsync(1500);
+  expect(page.elements['confirmation-retry']).toMatchObject({textContent:'Continue with Microsoft',href:'/warmup/microsoft/sign-in?state=attempt',target:'_blank',rel:'noopener noreferrer'});
+  expect(page.elements['confirmation-actions']!.hidden).toBe(false);
+  expect(page.elements['confirmation-detail']!.textContent).toContain('Keep this page open');
+  finished=true;await vi.runAllTimersAsync();await work;
+  expect(requests.filter(x=>x==='process')).toHaveLength(1);
+  expect(page.elements['confirmation-title']!.textContent).toBe('Warmup is running');
+  expect(page.elements['confirmation-detail']!.textContent).toContain('one test email');
+  expect(page.elements['confirmation-actions']!.hidden).toBe(true);
+});
+it.each(['microsoft_recovery','warmup_action'])('ends bounded checking with actionable %s, no false success or failure',async attention=>{
+  vi.useFakeTimers();
+  const page=browser('https://api.lifty.test/warmup/microsoft/return?state=attempt',vi.fn(async()=>Response.json({status:'pending',attention})) as typeof fetch);
+  const work=page.run();await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-check']!.hidden).toBe(false);
+  expect(page.elements['confirmation-spinner']!.hidden).toBe(true);
+  expect(page.elements['confirmation-actions']!.hidden).toBe(true);
+  expect(page.elements['confirmation-title']!.textContent).not.toMatch(/running|connected|failed/);
+});
 it('submits a code once, survives a lost response, displays late success, and reload only reads status',async()=>{
   vi.useFakeTimers();const requests:{stage:string;body:Record<string,string>}[]=[];let checks=0;
   const fetchImpl=vi.fn(async(input:unknown,init?:RequestInit)=>{

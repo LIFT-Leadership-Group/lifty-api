@@ -185,8 +185,11 @@ the same request finishes it. Providers without a removal operation stay 202.
 Configuration: `UNIPILE_V2_ACCESS_TOKEN`, `UNIPILE_V2_APPLICATION_ID`,
 `UNIPILE_V2_HOSTED_AUTH_ORIGINS` (Lifty's verified hosted sign-in origins only)
 and the existing `LIFTY_EMAIL_SERVER_KEY` / `LIFTY_LINKEDIN_SERVER_KEY`. The
-optional `UNIPILE_DSN` + `UNIPILE_ACCESS_TOKEN` pair is used only to remove access
-for accounts still bound through the earlier provider API. The Functions
+optional `UNIPILE_DSN` + `UNIPILE_ACCESS_TOKEN` pair removes access for accounts
+still bound through the earlier provider API. Warmup identification for those
+accounts also requires `UNIPILE_PROVIDER_NAMESPACE` to match their stored
+credential scope. It verifies the authenticated primary mailbox before choosing
+Google or Microsoft; it never infers the provider from the email domain. The Functions
 migration providing these RPCs must be released before this API.
 
 `LIFTY_LINKEDIN_SERVER_KEY` is the dedicated capability for LinkedIn account
