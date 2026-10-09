@@ -45,6 +45,9 @@ function entries(): Entry[] {
     // Published unsupported REST verbs are not actions a founder can perform.
     if (!Object.keys(operation.responses).some(status => status.startsWith("2"))) return [];
     const read = operation.readOnly;
+    // This status check can persist provider verification, but continues the
+    // connection the user already requested rather than requesting a new action.
+    const reconcilesConnection = stage === "sending-accounts" && action === "attempt";
     const name = operationToolNames(stage, action)[0]!;
       const label = title(name);
       const body = operation.request.body;
@@ -54,7 +57,7 @@ function entries(): Entry[] {
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${read ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval; a pending receipt does not confirm completion. Check its status or read back the saved resource."}`;
+      const description = `${operation.description}${read || reconcilesConnection ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval; a pending receipt does not confirm completion. Check its status or read back the saved resource."}`;
       return [{ stage, action, operation,
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },

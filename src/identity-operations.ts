@@ -88,7 +88,7 @@ export const identityOperationDefinitions = {
       readOnly: false,
       path: contracts.IdPath, query: Empty, request: null, invalid: invalidRequest,
       response: contracts.AttemptSchema, success: 200, args: input => ({ p_attempt_id: path(input) }),
-      description: "Check and reconcile one connection attempt: pending, connected (account_id), failed (reason) or expired, plus declaration and durable progress. During verifying, this may persist the account connection/reconnection or a verified failure from authorization already received. sign_in_required means the person must open the same connection link. recovery_required says whether preparing that link can be retried; if retryable:false, report its id to LIFT support and keep checking this attempt. A failed or timed-out check is unknown, not a failed connection: use bounded backoff. Never starts outreach.",
+      description: "Check and reconcile one connection attempt: pending, connected (account_id), failed (reason) or expired, plus declaration and durable progress. During verifying, this may persist the account connection/reconnection or a verified failure from authorization already received. sign_in_required means the person must open the same connection link. recovery_required says whether preparing that link can be retried; if retryable:false, report its id to LIFT support and keep checking this attempt. A failed or timed-out check is unknown, not a failed connection: use bounded backoff. Continues only the connection/reconnection the user already requested; never creates a new authorization link or starts outreach.",
     },
     reconnect: {
       method: "POST", route: `${accountsRoute}/{id}/reconnect`, cli: { operation: "reconnect" }, rpc: "reconnect_lifty_sending_account",

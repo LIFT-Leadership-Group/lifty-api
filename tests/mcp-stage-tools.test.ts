@@ -87,7 +87,15 @@ describe("generated MCP stage operations", () => {
     }
     // GET can persist a connection/reconnection after provider verification.
     expect(stageOperations["sending-accounts"]!.attempt!.readOnly).toBe(false);
-    expect(tools.find(tool => tool.name === "sending_accounts_attempt")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+    const attempt = tools.find(tool => tool.name === "sending_accounts_attempt")!;
+    expect(attempt.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+    // Reconciliation continues an authorized connection; polling must not be
+    // described as a fresh founder action after each transient status failure.
+    expect(attempt.description).toContain("connection/reconnection the user already requested");
+    expect(attempt.description).not.toContain("Requires the founder's approval");
+    for (const name of ["sending_accounts_connect", "sending_accounts_reconnect", "sending_accounts_disconnect", "campaigns_activate"]) {
+      expect(tools.find(tool => tool.name === name)!.description, name).toContain("Requires the founder's approval");
+    }
     for (const name of ["summary_get", "senders_get", "sending_accounts_get"]) {
       expect(tools.find(tool => tool.name === name)!.description, name).toMatch(/Read-only/);
     }
