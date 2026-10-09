@@ -16,6 +16,8 @@ const Empty = z.object({}).strict();
 export type IdentityInput = { path: Record<string, string>; query: Record<string, unknown>; body: unknown };
 export interface IdentityDefinition {
   method: "GET" | "POST" | "PATCH";
+  /** Override the method default when a GET can persist provider reconciliation. */
+  readOnly?: boolean;
   route: string;
   cli?: { operation: string };
   rpc: string;
@@ -83,9 +85,10 @@ export const identityOperationDefinitions = {
     },
     attempt: {
       method: "GET", route: `${accountsRoute}/attempts/{id}`, cli: { operation: "attempt" }, rpc: "get_lifty_sending_account_attempt_progress",
+      readOnly: false,
       path: contracts.IdPath, query: Empty, request: null, invalid: invalidRequest,
       response: contracts.AttemptSchema, success: 200, args: input => ({ p_attempt_id: path(input) }),
-      description: "Read one connection attempt: pending, connected (account_id), failed (reason) or expired, plus declaration and durable progress. sign_in_required means the person still needs to open the same connection link. recovery_required says whether preparing the same link can be retried; if retryable:false, report its id to LIFT support and keep checking this attempt. Only verifying may finish authorization already received. A failed or timed-out read is unknown, not a failed connection: use bounded backoff.",
+      description: "Check and reconcile one connection attempt: pending, connected (account_id), failed (reason) or expired, plus declaration and durable progress. During verifying, this may persist the account connection/reconnection or a verified failure from authorization already received. sign_in_required means the person must open the same connection link. recovery_required says whether preparing that link can be retried; if retryable:false, report its id to LIFT support and keep checking this attempt. A failed or timed-out check is unknown, not a failed connection: use bounded backoff. Never starts outreach.",
     },
     reconnect: {
       method: "POST", route: `${accountsRoute}/{id}/reconnect`, cli: { operation: "reconnect" }, rpc: "reconnect_lifty_sending_account",

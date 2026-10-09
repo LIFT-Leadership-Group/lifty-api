@@ -55,6 +55,8 @@ describe("generated MCP stage operations", () => {
     expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.destructiveHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.openWorldHint).toBe(true);
+    // Selecting a Journey revision also enables new runs of its active Campaigns.
+    expect(tools.find(tool => tool.name === "journeys_activate")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(tools.find(tool => tool.name === "summary_get")!.annotations.openWorldHint).toBe(false);
     expect(tools.find(tool => tool.name === "next_step")!.annotations.openWorldHint).toBe(false);
     expect(tools.find(tool => tool.name === "sending_accounts_reconnect")!.inputSchema.required).toEqual(["path"]);
@@ -78,11 +80,14 @@ describe("generated MCP stage operations", () => {
     expect(auth.mock.calls.at(-1)![0].headers.get("x-lifty-client-contract")).toBe(STAGE_CLIENT_CONTRACT);
   });
 
-  it("publishes the summary and account reads as read-only tools; only the attempt read reconciles a prior authorization", () => {
+  it("keeps pure reads read-only and declares account-attempt reconciliation as a write", () => {
     const tools = getStageMcpTools();
-    for (const name of ["summary_get", "senders_get", "sending_accounts_get", "sending_accounts_attempt", "next_step", "crm_get", "notifications_get"]) {
+    for (const name of ["summary_get", "senders_get", "sending_accounts_get", "next_step", "crm_get", "notifications_get"]) {
       expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
     }
+    // GET can persist a connection/reconnection after provider verification.
+    expect(stageOperations["sending-accounts"]!.attempt!.readOnly).toBe(false);
+    expect(tools.find(tool => tool.name === "sending_accounts_attempt")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
     for (const name of ["summary_get", "senders_get", "sending_accounts_get"]) {
       expect(tools.find(tool => tool.name === name)!.description, name).toMatch(/Read-only/);
     }

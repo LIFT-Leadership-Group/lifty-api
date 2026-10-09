@@ -15,7 +15,7 @@ export interface StageMcpTool {
 interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool }
 export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Response>;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
-const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate",
+const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate", "journeys.activate",
   "campaigns.message_review_post", "campaigns.reply_review_post", "campaigns.lead_stop_post",
   "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
   // Removing Lifty's access at the account provider.
@@ -54,7 +54,7 @@ function entries(): Entry[] {
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${read ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
+      const description = `${operation.description}${read ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval; a pending receipt does not confirm completion. Check its status or read back the saved resource."}`;
       return [{ stage, action, operation,
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },

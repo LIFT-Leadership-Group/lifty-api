@@ -96,7 +96,7 @@ const definitionCatalog = (definitions: Record<string, Record<string, IdentityDe
   const base = operation(definition.method, definition.route, definition.description, definition.response, definition.request, definition.query, definition.path);
   const success = json(definition.response);
   const { "200": _ok, ...errors } = base.responses;
-  return [key, { ...base, ...(definition.cli ? { cli: definition.cli } : {}),
+  return [key, { ...base, readOnly: definition.readOnly ?? base.readOnly, ...(definition.cli ? { cli: definition.cli } : {}),
     responses: definition.success === 201 ? { "201": success, ...errors } : definition.success === 202 ? { "200": success, "202": success, ...errors } : base.responses }];
 }))]));
 const identityCatalog = definitionCatalog(identityOperationDefinitions);
