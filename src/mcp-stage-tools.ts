@@ -1,8 +1,8 @@
-import { operationToolNames } from "./operation-names.js";
+import { notificationPatchToolNames, operationToolNames } from "./operation-names.js";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { AgentContextSchema, STAGE_CLIENT_CONTRACT } from "./agent-context.js";
-import { stageOperations, type StageOperation } from "./stage-contracts.js";
+import { NotificationStagePatchSchema, stageOperations, type StageOperation } from "./stage-contracts.js";
 
 type JsonSchema = Record<string, unknown>;
 export interface StageMcpTool {
@@ -12,10 +12,21 @@ export interface StageMcpTool {
   inputSchema: { type: "object"; properties: Record<string, object>; required: string[]; additionalProperties: false };
   annotations: { title: string; readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean };
 }
-interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool }
+const notificationWriteDescriptions = {
+  destination: "Save or update a Slack channel as a notification destination in the current workspace and return its saved reference. Does not change notification routes, authorize Slack, post a message or start outreach.",
+  route: "Set the saved Slack destination and enabled flag for one supported notification type in the current workspace. Replaces that routing rule and controls where future matching notifications go. Does not authorize Slack, post a message or start outreach.",
+};
+// Reuse each branch's existing strict input schema. Only the adapter selects
+// the HTTP discriminator; a model cannot switch operations through the body.
+const notificationWrites = NotificationStagePatchSchema.options.map(schema => ({
+  operation: schema.shape.operation.value,
+  schema: schema.shape.values,
+}));
+type NotificationWrite = typeof notificationWrites[number];
+interface Entry { stage: string; action: string; operation: StageOperation; tool: StageMcpTool; notificationWrite?: NotificationWrite }
 export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Response>;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
-const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate",
+const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate", "journeys.activate",
   "campaigns.message_review_post", "campaigns.reply_review_post", "campaigns.lead_stop_post",
   "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
   // Removing Lifty's access at the account provider.
@@ -24,7 +35,7 @@ const openWorld = new Set(["sample-review.post", "research-schedule.activate", "
 const nonDestructive = new Set(["business.post", "senders.post", "journeys.post", "campaigns.post"]);
 // Writes that commit synchronously, with no authorization link or receipt.
 const synchronousStages = new Set(["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule", "journeys", "campaigns"]);
-const synchronousOperations = new Set(["crm.preferences_patch", "customer-exclusions.import"]);
+const synchronousOperations = new Set(["crm.preferences_patch", "customer-exclusions.import", "notifications.patch"]);
 const pendingOperations = new Set(["campaigns.reply_review_post", "campaigns.message_rewrite_post", "campaigns.lead_stop_post"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
@@ -45,21 +56,29 @@ function entries(): Entry[] {
     // Published unsupported REST verbs are not actions a founder can perform.
     if (!Object.keys(operation.responses).some(status => status.startsWith("2"))) return [];
     const read = operation.readOnly;
-    const name = operationToolNames(stage, action)[0]!;
+    // This status check can persist provider verification, but continues the
+    // connection the user already requested rather than requesting a new action.
+    const reconcilesConnection = stage === "sending-accounts" && action === "attempt";
+    const variants: { name: string; description: string; body: JsonSchema | null; notificationWrite?: NotificationWrite }[] =
+      stage === "notifications" && action === "patch"
+        ? notificationWrites.map(write => ({ name: notificationPatchToolNames[write.operation],
+          description: notificationWriteDescriptions[write.operation], body: z.toJSONSchema(write.schema, { io: "input" }), notificationWrite: write }))
+        : [{ name: operationToolNames(stage, action)[0]!, description: operation.description, body: operation.request.body }];
+    return variants.map(({ name, description: operationDescription, body, notificationWrite }) => {
       const label = title(name);
-      const body = operation.request.body;
       const properties: Record<string, object> = { workspace: WorkspaceProperty,
         path: withoutDialect(operation.request.path) as object, query: withoutDialect(operation.request.query) as object };
       const required: string[] = [];
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operation.description}${read ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval. May return an authorization URL or pending receipt; a pending receipt does not confirm completion."}`;
-      return [{ stage, action, operation,
+      const description = `${operationDescription}${read || reconcilesConnection ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval; a pending receipt does not confirm completion. Check its status or read back the saved resource."}`;
+      return { stage, action, operation, ...(notificationWrite ? { notificationWrite } : {}),
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },
           annotations: { title: label, readOnlyHint: read, destructiveHint: !read && !nonDestructive.has(`${stage}.${action}`),
-            openWorldHint: !read && openWorld.has(`${stage}.${action}`) } } }];
+            openWorldHint: !read && openWorld.has(`${stage}.${action}`) } } };
+    });
   }));
 }
 
@@ -67,7 +86,7 @@ function entries(): Entry[] {
 // callable name is derived from a current catalog entry.
 export const getStageMcpTools = (): StageMcpTool[] => {
   const all = entries();
-  const key = (entry: Entry) => `${entry.operation.method} ${entry.operation.route}`;
+  const key = (entry: Entry) => `${entry.operation.method} ${entry.operation.route} ${entry.notificationWrite?.operation ?? ""}`;
   const stages = new Map<string, string[]>();
   for (const entry of all) stages.set(key(entry), [...(stages.get(key(entry)) ?? []), entry.stage]);
   const listed = new Set<string>();
@@ -150,7 +169,13 @@ export async function callStageMcpTool(name: string, args: unknown, request: Req
   }
   const clientContract = request.headers.get("x-lifty-client-contract");
   if (clientContract && clientContract !== STAGE_CLIENT_CONTRACT) return result({ error: { code: "CONTEXT_CLIENT_UNSUPPORTED", message: "Reconnect Lifty to refresh the client contract." } }, true);
-  const body = operation.request.body ? JSON.stringify(input.body ?? {}) : undefined;
+  let requestBody = input.body;
+  if (entry.notificationWrite) {
+    const values = entry.notificationWrite.schema.safeParse(requestBody);
+    if (!values.success) return invalid();
+    requestBody = { operation: entry.notificationWrite.operation, values: values.data };
+  }
+  const body = operation.request.body ? JSON.stringify(requestBody ?? {}) : undefined;
   if (body && Buffer.byteLength(body) > 132 * 1024) return result({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request exceeds 132 KiB." } }, true);
   if (body !== undefined) headers.set("content-type", "application/json");
   const response = await dispatch(`${route}${query.size ? `?${query}` : ""}`, {

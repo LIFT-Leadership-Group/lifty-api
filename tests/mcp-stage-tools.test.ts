@@ -25,9 +25,10 @@ describe("generated MCP stage operations", () => {
       const listedStage = firstStage.get(`${operation.method} ${operation.route}`)!;
       const name = stage === "summary" && action === "next_step" ? "next_step" : `${listedStage.replace(/-/g, "_")}_${action}`;
       const supported = Object.keys(operation.responses).some(status => status.startsWith("2"));
-      const matches = tools.filter(tool => tool.name === name || tool.name === `${name}_read` || tool.name === `${name}_write`);
-      const split = false;
-      expect(matches.length, name).toBe(supported ? split ? 2 : 1 : 0);
+      const notificationWrite = stage === "notifications" && action === "patch";
+      const names = notificationWrite ? ["notifications_destination_upsert", "notifications_route_set"] : [name];
+      const matches = tools.filter(tool => names.includes(tool.name));
+      expect(matches.length, name).toBe(supported ? names.length : 0);
       for (const tool of matches) {
         expect(tool.title.length).toBeGreaterThan(0);
         expect(typeof tool.annotations.readOnlyHint).toBe("boolean");
@@ -37,7 +38,7 @@ describe("generated MCP stage operations", () => {
         expect(tool.inputSchema.required).not.toContain("workspace");
         expect(tool.inputSchema.properties.path).toEqual(withoutDialect(operation.request.path));
         expect(tool.inputSchema.properties.query).toEqual(withoutDialect(operation.request.query));
-        if (!split && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(withoutDialect(operation.request.body));
+        if (!notificationWrite && operation.request.body) expect(tool.inputSchema.properties.body).toEqual(withoutDialect(operation.request.body));
       }
     }
     expect(JSON.stringify(tools)).not.toContain("$schema");
@@ -55,9 +56,76 @@ describe("generated MCP stage operations", () => {
     expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.destructiveHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.openWorldHint).toBe(true);
+    // Selecting a Journey revision also enables new runs of its active Campaigns.
+    expect(tools.find(tool => tool.name === "journeys_activate")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(tools.find(tool => tool.name === "summary_get")!.annotations.openWorldHint).toBe(false);
     expect(tools.find(tool => tool.name === "next_step")!.annotations.openWorldHint).toBe(false);
     expect(tools.find(tool => tool.name === "sending_accounts_reconnect")!.inputSchema.required).toEqual(["path"]);
+  });
+
+  it("exposes destination and route writes independently, without a model-selected operation", () => {
+    const tools = getStageMcpTools();
+    expect(tools.some(tool => tool.name === "notifications_patch")).toBe(false);
+    for (const [name, fields] of [
+      ["notifications_destination_upsert", ["channel_id", "channel_name"]],
+      ["notifications_route_set", ["notification_type", "destination_ref", "enabled"]],
+    ] as const) {
+      const tool = tools.find(tool => tool.name === name)!;
+      expect(tool).toBeDefined();
+      expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+      expect(tool.inputSchema.required).toContain("body");
+      expect(tool.inputSchema.properties.body).toMatchObject({ type: "object", required: [...fields], additionalProperties: false });
+      expect(Object.keys((tool.inputSchema.properties.body as { properties: object }).properties)).toEqual([...fields]);
+      expect(tool.description).toContain("Requires the founder's approval");
+    }
+  });
+
+  it("preserves notification handlers and the CLI PATCH while fixing each MCP write's scope", async () => {
+    const destination = { destination_ref: "44444444-4444-4444-8444-444444444444", provider: "slack" as const,
+      external_id: "C123CHANNEL", display_name: "review-alerts", status: "active" as const };
+    const savedRoute = { route_ref: "55555555-5555-4555-8555-555555555555", notification_type: "reply.requires_action" as const,
+      destination_ref: destination.destination_ref, enabled: true };
+    const upsertNotificationDestination = vi.fn(async () => destination);
+    const setNotificationRoute = vi.fn(async () => savedRoute);
+    const startSlackConnect = vi.fn(); const enqueueNotificationTest = vi.fn();
+    const app = createApp({ authenticate: async request => request.headers.get("authorization") === "Bearer founder"
+      ? { ok: true, session: { userId: "founder", client: {} } } : { ok: false, reason: "invalid_session" },
+      getWorkspace: async () => ({ state: "ready_for_connections", workspace, next_action: null }),
+      upsertNotificationDestination, setNotificationRoute, startSlackConnect, enqueueNotificationTest, log: () => {} });
+    const dispatch = vi.fn((route: string, init: RequestInit) => Promise.resolve(app.request(route, init)));
+    const destinationInput = { channel_id: destination.external_id, channel_name: destination.display_name };
+    const routeInput = { notification_type: savedRoute.notification_type, destination_ref: destination.destination_ref, enabled: true };
+    for (const [name, operation, body] of [
+      ["notifications_destination_upsert", "destination", destinationInput],
+      ["notifications_route_set", "route", routeInput],
+    ] as const) {
+      const denied = await callStageMcpTool(name, { body }, new Request("https://example.test/mcp"), dispatch);
+      expect(denied.structuredContent.status).toBe(401);
+      const result = await callStageMcpTool(name, { workspace: "example", body }, incoming(), dispatch);
+      expect(result.structuredContent).toMatchObject({ status: 200, data: operation === "destination" ? destination : savedRoute });
+      const [path, init] = dispatch.mock.calls.at(-1)!;
+      expect(path).toBe("/v1/workspace/notifications");
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(String(init.body))).toEqual({ operation, values: body });
+      expect(new Headers(init.headers).get("x-lifty-workspace")).toBe("example");
+      // The installed CLI keeps its original route and discriminated body.
+      const legacy = await app.request(path, { ...init, headers: new Headers(init.headers) });
+      expect(legacy.status).toBe(200);
+    }
+    expect(upsertNotificationDestination).toHaveBeenCalledTimes(2);
+    expect(setNotificationRoute).toHaveBeenCalledTimes(2);
+    const calls = dispatch.mock.calls.length;
+    for (const [name, body] of [
+      ["notifications_patch", { operation: "destination", values: destinationInput }],
+      ["notifications_destination_upsert", routeInput],
+      ["notifications_route_set", destinationInput],
+      ["notifications_destination_upsert", { ...destinationInput, operation: "route", values: routeInput }],
+      ["notifications_route_set", { ...routeInput, enabled: "true" }],
+      ["notifications_route_set", { ...routeInput, workspace: "foreign" }],
+    ] as const) expect((await callStageMcpTool(name, { body }, incoming(), dispatch)).isError).toBe(true);
+    expect(dispatch).toHaveBeenCalledTimes(calls);
+    expect(startSlackConnect).not.toHaveBeenCalled();
+    expect(enqueueNotificationTest).not.toHaveBeenCalled();
   });
 
   it("keeps authentication, current contract, validation and the shared mutation limiter in the owning REST route", async () => {
@@ -78,10 +146,21 @@ describe("generated MCP stage operations", () => {
     expect(auth.mock.calls.at(-1)![0].headers.get("x-lifty-client-contract")).toBe(STAGE_CLIENT_CONTRACT);
   });
 
-  it("publishes the summary and account reads as read-only tools; only the attempt read reconciles a prior authorization", () => {
+  it("keeps pure reads read-only and declares account-attempt reconciliation as a write", () => {
     const tools = getStageMcpTools();
-    for (const name of ["summary_get", "senders_get", "sending_accounts_get", "sending_accounts_attempt", "next_step", "crm_get", "notifications_get"]) {
+    for (const name of ["summary_get", "senders_get", "sending_accounts_get", "next_step", "crm_get", "notifications_get"]) {
       expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
+    }
+    // GET can persist a connection/reconnection after provider verification.
+    expect(stageOperations["sending-accounts"]!.attempt!.readOnly).toBe(false);
+    const attempt = tools.find(tool => tool.name === "sending_accounts_attempt")!;
+    expect(attempt.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+    // Reconciliation continues an authorized connection; polling must not be
+    // described as a fresh founder action after each transient status failure.
+    expect(attempt.description).toContain("connection/reconnection the user already requested");
+    expect(attempt.description).not.toContain("Requires the founder's approval");
+    for (const name of ["sending_accounts_connect", "sending_accounts_reconnect", "sending_accounts_disconnect", "campaigns_activate"]) {
+      expect(tools.find(tool => tool.name === name)!.description, name).toContain("Requires the founder's approval");
     }
     for (const name of ["summary_get", "senders_get", "sending_accounts_get"]) {
       expect(tools.find(tool => tool.name === name)!.description, name).toMatch(/Read-only/);

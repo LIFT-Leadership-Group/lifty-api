@@ -18,14 +18,19 @@ do not request tokens or infer authorization from channel data.
 
 After verified authorization, read `channels` and obtain only the missing
 channel choice. Explain when Lifty needs to be invited to a private channel.
-PATCH with `operation: destination` and `values` containing the actual channel
-ID/name saves the existing destination. Read its returned reference; PATCH
-with `operation: route` and the current notification type, destination reference
-and enabled flag saves the routing rule. Read GET to confirm the saved setup.
+In MCP, `notifications_destination_upsert` takes `body` with the actual
+`channel_id` and `channel_name`. Read its returned destination reference, then
+`notifications_route_set` takes `body` with `notification_type`,
+`destination_ref` and `enabled`. Each tool performs only its named operation;
+do not include an `operation` selector or `values` wrapper. Read
+`notifications_get` to confirm the saved setup.
+
+The CLI and HTTP API retain PATCH with `operation: destination` or
+`operation: route` and the corresponding fields inside `values`.
 
 ## Later edits
 
-Use the same supported PATCH for a destination or routing change. Reconnect
+Use the matching MCP tool, or the existing CLI/HTTP PATCH, for later changes. Reconnect
 Slack via a fresh POST and verify its exact attempt; old healthy Slack state
 does not prove completion. PATCH cannot authorize Slack or set connection state.
 `test` posts one visible test message to a saved destination; send it only when
