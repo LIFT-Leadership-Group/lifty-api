@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { handleMcpRequest } from "../src/mcp.js";
+import { profileFixture } from "./business-fixtures.js";
 
 const settings = { resourceUrl: "https://api.lifty.test/mcp", authorizationServer: "https://project.supabase.test/auth/v1", allowedOrigins: ["https://api.lifty.test"] };
 const authentication = async (request: Request) => request.headers.get("authorization")?.startsWith("Bearer founder-")
@@ -97,6 +98,53 @@ describe("MCP HTTP boundary", () => {
     expect(await whoami("founder-2")).toEqual({ user_id: "founder-2", workspaces: [lift] });
     expect(await whoami("founder-broken")).toEqual({ user_id: "founder-broken", workspaces: null });
     expect(listMemberWorkspaces.mock.calls.map(([session]) => session.userId)).toEqual(["founder-1", "founder-2", "founder-broken"]);
+  });
+
+  it("binds each MCP tool selection to its authenticated client for reads and writes", async () => {
+    const first = "22222222-2222-4222-8222-222222222222";
+    const second = "33333333-3333-4333-8333-333333333333";
+    // Production authentication captures x-lifty-workspace in the Supabase
+    // client. Checking only the adapter's outgoing header misses this boundary.
+    const authenticate = vi.fn(async (request: Request) => ({ ok: true as const,
+      session: { userId: "founder-1", client: { selection: request.headers.get("x-lifty-workspace") } } }));
+    const writes: string[] = [];
+    const app = createApp({ mcp: { ...settings, authenticate },
+      businessOperation: async (session, key) => {
+        const selected = (session.client as { selection: string | null }).selection ?? first;
+        if (![first, second].includes(selected)) throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Not a member" });
+        if (key === "business.patch") writes.push(selected);
+        return { workspace: { workspace_ref: selected, name: "Fixture", state: "ready_for_connections" }, profile: profileFixture };
+      }, log: () => {} });
+    const call = async (name: string, workspace: string) => (await (await app.request(post("tools/call", {
+      name, arguments: { workspace, ...(name === "business_patch" ? { body: { expected_version: 1, description: { text: "Approved fixture edit", provenance: "confirmed" } } } : {}) },
+    }))).json()).result;
+    const results = await Promise.all([call("business_get", first), call("business_patch", second)]);
+    expect(results.map(r => r.structuredContent.data.workspace.workspace_ref)).toEqual([first, second]);
+    expect(writes).toEqual([second]);
+    for (const name of ["business_get", "business_patch"]) {
+      expect(await call(name, "44444444-4444-4444-8444-444444444444")).toMatchObject({
+        isError: true, structuredContent: { status: 403, data: { error: { code: "WORKSPACE_FORBIDDEN" } } },
+      });
+    }
+    expect(writes).toEqual([second]);
+  });
+
+  it("reuses matching connection selections and fails closed if scoped MCP authentication is revoked", async () => {
+    const workspace = "22222222-2222-4222-8222-222222222222";
+    let revoked = false;
+    const authenticate = vi.fn(async (request: Request) => revoked && request.headers.has("x-lifty-workspace")
+      ? { ok: false as const, reason: "invalid_session" as const }
+      : { ok: true as const, session: { userId: "founder-1", client: {} } });
+    const businessOperation = vi.fn(async () => ({ workspace: null, profile: null }));
+    const app = createApp({ mcp: { ...settings, authenticate }, businessOperation, log: () => {} });
+    const params = { name: "business_get", arguments: { workspace } };
+    expect((await (await app.request(post("tools/call", params, { "x-lifty-workspace": workspace }))).json()).result.isError).toBe(false);
+    expect(authenticate).toHaveBeenCalledTimes(1);
+    revoked = true;
+    const denied = (await (await app.request(post("tools/call", params))).json()).result;
+    expect(denied).toMatchObject({ isError: true, structuredContent: { status: 401 } });
+    expect(denied._meta["mcp/www_authenticate"][0]).toContain('error="invalid_token"');
+    expect(businessOperation).toHaveBeenCalledTimes(1);
   });
 
   it("returns a relinking challenge when SQL rejects a session after MCP authentication", async () => {
