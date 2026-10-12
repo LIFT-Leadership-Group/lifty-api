@@ -106,7 +106,7 @@ describe("Unipile V2 authenticated contract",()=>{
     for(const reconnect of [false,true]){
       const h=harness();await h.provider.createLink({channel:"email",state:"opaque-state",redirectUri:"https://api.lifty.test/return",expiresAt:"2026-09-18T00:00:00.000Z",transport:{...transport,account_id:reconnect?"acc_test":null}});
       const body=JSON.parse(String(h.calls[0]?.init?.body));
-      expect(body).toEqual({...(reconnect?{account_id:"acc_test"}:{providers:["google","outlook"]}),config:{outlook:{oauth_scope:["User.Read","Mail.ReadWrite","Mail.Send","offline_access"]}},account_scope_id:"scope_test",domain:"connect-v2.lifty.test",
+      expect(body).toEqual({...(reconnect?{account_id:"acc_test"}:{providers:["google","outlook"]}),config:{outlook:{oauth_scope:["Mail.ReadWrite","Mail.Send"]}},account_scope_id:"scope_test",domain:"connect-v2.lifty.test",
         state:"opaque-state",redirect_uri:"https://api.lifty.test/return",expires_on:"2026-09-18T00:00:00.000Z"});
       expect(body).not.toHaveProperty("notify_url");
     }
