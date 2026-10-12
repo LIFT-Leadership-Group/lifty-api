@@ -39,20 +39,17 @@ never report an account as disconnected or missing from a failed read.
    away from Smartlead. A sender has at most one LinkedIn account
    (`LINKEDIN_ALREADY_CONNECTED`: reconnect that one instead).
 3. Use the returned `progress` before presenting the next step. For
-   `declaration_required` or `sign_in_required`, show `connection_url` as a
-   clickable link and say whose account it connects. Do not open it yourself.
-   `preparing` means Lifty is preparing the sign-in, not verifying an account.
-   An unresolved attempt is reused (`created:false`); a different-looking URL
-   with the same `id` is still the same attempt.
+   `declaration_required`, `preparing` or `sign_in_required`, show
+   `connection_url` as a clickable link and say whose account it connects. Do
+   not open it yourself. `preparing` means the questions are answered and the
+   page opens the sign-in when the person opens the link (it retries by
+   itself if the sign-in cannot open yet); it is not verifying an account.
+   A live attempt is reused (`created:false`); a different-looking URL with
+   the same `id` is still the same attempt. An expired attempt never blocks a
+   new connect.
    `verifying` means authorization was received: read that attempt instead of
    asking the person to sign in again. `complete` also needs the attempt read
    to report its verified result.
-   For `recovery_required`, explain that setup needs attention. If `retryable`
-   is true, the person can open the same link to resume preparation. If false,
-   report that the sign-in link could not be prepared or its result is unknown,
-   use the attempt `id` as the support reference, and ask LIFT support to review
-   it. Do not promise that another generated link will fix it or ask the person
-   to repeat authorization. Read the same attempt to detect a late result.
 4. After the person finishes, read `sending_accounts_attempt` with
    `path.id` = the returned `id`, with bounded backoff. `connected` gives the
    new `account_id`. A failed or timed-out read is unknown, not failure: poll

@@ -84,7 +84,7 @@ export const identityOperationDefinitions = {
       description: "Start connecting a LinkedIn account or mailbox for an existing sender_id (from the senders roster). Returns connection_url and durable progress: declaration, preparing, sign-in, verifying, recovery or complete. An unresolved attempt for the same sender and channel is reused (created:false), even when its link text changes. For recovery_required follow retryable; if false, read this attempt and ask LIFT support with its id, without offering a replacement link. The account exists only after verified authorization. Connecting never activates a campaign or sends.",
     },
     attempt: {
-      method: "GET", route: `${accountsRoute}/attempts/{id}`, cli: { operation: "attempt" }, rpc: "get_lifty_sending_account_attempt_progress",
+      method: "GET", route: `${accountsRoute}/attempts/{id}`, cli: { operation: "attempt" }, rpc: "get_lifty_sending_account_attempt",
       readOnly: false,
       path: contracts.IdPath, query: Empty, request: null, invalid: invalidRequest,
       response: contracts.AttemptSchema, success: 200, args: input => ({ p_attempt_id: path(input) }),
@@ -178,7 +178,7 @@ export async function executeIdentityOperation(session: AuthSession, key: string
   const data = await call(definition.rpc, definition.args(input));
   if (key === "sending-accounts.connect" || key === "sending-accounts.reconnect") {
     const { channel, ...started } = verified(StartedAttempt, data);
-    const attempt = verified(contracts.AttemptSchema, await call("get_lifty_sending_account_attempt_progress", { p_attempt_id: started.id }));
+    const attempt = verified(contracts.AttemptSchema, await call("get_lifty_sending_account_attempt", { p_attempt_id: started.id }));
     return { status: 200, body: verified(contracts.ConnectResultSchema,
       { ...started, progress: attempt.progress, connection_url: connector.connectionUrl(channel, started.id) }) };
   }

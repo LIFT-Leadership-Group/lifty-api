@@ -46,7 +46,8 @@ export interface ConfirmationAdapter {
   status(input:ConfirmationInput, context:Context):Promise<ConfirmationResult>;
 }
 export type ConfirmationAdapters = Partial<Record<ConnectionFlow, ConfirmationAdapter>>;
-const deadline = new AsyncLocalStorage<{signal:AbortSignal;upstream_status?:number;upstream_outcome?:string}>();
+type Execution = {signal:AbortSignal;upstream_status?:number;upstream_outcome?:string};
+const deadline = new AsyncLocalStorage<Execution>();
 /** Entry/declaration requests use the same bounded I/O contract as callbacks. */
 export function withConnectionDeadline<T>(milliseconds:number, work:()=>Promise<T>):Promise<T> {
   return deadline.run({signal:AbortSignal.timeout(milliseconds)}, work);
@@ -115,11 +116,6 @@ function progress(p,ref){
  else if(p.stage==='preparing'){title.textContent='Preparing sign-in';detail.textContent='Lifty is preparing the secure sign-in page. Sign-in has not finished yet.';spinner.hidden=false;}
  else if(p.stage==='sign_in_required'){title.textContent='Ready to sign in';detail.textContent='Continue to sign in to your '+label+' account. Lifty will verify it after you finish.';resume('Continue to sign in');}
  else if(p.stage==='verifying'){title.textContent='Checking your connection';detail.textContent='Lifty received the authorization and is verifying the account.';spinner.hidden=false;}
- else if(p.stage==='recovery_required'){
-  title.textContent=p.reason==='provider_rejected'?'Sign-in could not start':'Sign-in preparation needs attention';
-  detail.textContent=p.retryable?'The preparation was interrupted before sign-in started. Continue to safely resume this attempt.':(p.reason==='provider_rejected'?'Lifty could not start the sign-in page.':'Lifty could not confirm that the sign-in page was prepared.')+' Return to Lifty with the connection reference for help. Check this same attempt before starting another authorization.';
-  if(p.retryable)resume('Resume preparation');
- }
 }
 function placement(p){
  if(!p||(p.when!=='now'&&p.when!=='after_warmup'))return '';
@@ -139,7 +135,8 @@ async function request(stage,payload,ms){
  var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},ms);
  try{var response=await fetch(url.pathname+'/'+stage,{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','x-lifty-connection':'1'},body:JSON.stringify(payload),signal:controller.signal});if(response.ok)show(await response.json());}catch(e){}finally{clearTimeout(timer);}
 }
-if(prepare&&!code&&!denied&&!errorType)request('process',body,50000);
+// Status checks also prepare a missing sign-in; wait for this one first so one page asks once.
+if(prepare&&!code&&!denied&&!errorType)await request('process',body,50000);
 if(code||denied){var submission=Object.assign({},body,code?{code:code}:{denied:true});code=null;request('process',submission,50000);}
 if(errorType)body.errorType=errorType;
 if(errorDetail)body.errorDetail=errorDetail;
@@ -149,8 +146,9 @@ async function poll(){
  if(!finished){
   spinner.hidden=true;check.hidden=false;
   if(!shown||shown==='starting'||lastProgress==='preparing'||lastProgress==='verifying'){
-   actions.hidden=true;title.textContent=lastProgress==='preparing'?'Sign-in preparation is still pending':'Still checking';
-   detail.textContent='The result is not confirmed yet. Check the status of this same attempt, or return to Lifty with the connection reference for help.';
+   actions.hidden=true;
+   if(lastProgress==='preparing'){title.textContent='Sign-in has not opened yet';detail.textContent='Lifty could not open the sign-in page yet. Check status to try again, or return to Lifty with the connection reference for help.';}
+   else{title.textContent='Still checking';detail.textContent='The result is not confirmed yet. Check the status of this same attempt, or return to Lifty with the connection reference for help.';}
   }
  }
  polling=false;
@@ -166,7 +164,7 @@ export function renderConfirmationPage(flow:ConnectionFlow, valid=true, prepare=
   return renderLiftyPage({title,styles:actionStyles,content:
     `<section id="confirmation" data-label="${label}" data-prepare="${prepare}" data-warmup="${flow==='warmup'||flow==='warmup_microsoft'}" data-microsoft="${flow==='warmup_microsoft'}" data-state-key="${['email','linkedin'].includes(flow)?'intent':'state'}"${definition.retry?` data-retry="${definition.retry}"`:''} aria-live="polite"><div id="confirmation-spinner" class="symbol" aria-hidden="true"${valid?'':' hidden'}><span class="spinner"></span></div><h1 id="confirmation-title">${title}</h1><p id="confirmation-detail" class="intro">${valid?(prepare?'Lifty is preparing the secure sign-in page. Sign-in has not finished yet.':'Lifty is reading the status of this connection. This page will update automatically.'):'Return to Lifty to check this attempt and get the next step.'}</p><p id="confirmation-actions" class="actions" hidden><a id="confirmation-retry" href="">Try again</a></p><p><button id="confirmation-check" class="check-status" type="button" hidden>Check status</button></p><p id="confirmation-reference" class="reassurance" hidden></p><p class="reassurance">Connecting does not start outreach.</p></section><noscript>JavaScript is needed to finish this connection here. Return to Lifty to check the attempt before requesting another link.</noscript>${valid?`<script>${CONFIRMATION_SCRIPT}</script>`:''}`});
 }
-export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string;reference?:string;progress_stage?:string;recovery_reason?:string};
+export type ConfirmationLog = {flow:ConnectionFlow;stage:string;outcome:string;elapsed_ms:number;status:number;correlation:string;upstream_status?:number;upstream_outcome?:string;provider_error?:string;reference?:string;progress_stage?:string};
 export function createConfirmationRouter(flow:ConnectionFlow, adapter:ConfirmationAdapter, options:{prefix?:string;origin?:string;log?:(event:ConfirmationLog)=>void}={}) {
   const app=new Hono();
   const path=CONNECTION_FLOWS[flow].path.slice((options.prefix??'').length);
@@ -192,7 +190,7 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
     if(c.req.header('x-lifty-connection')!=='1'||!c.req.header('content-type')?.startsWith('application/json')
       ||c.req.header('sec-fetch-site')==='cross-site'||(supplied!==origin&&!(supplied==='null'&&c.req.header('sec-fetch-site')==='same-origin')))
       return c.json(invalidConfirmation(),403);
-    const started=Date.now();const execution:{signal:AbortSignal;upstream_status?:number;upstream_outcome?:string}={signal:AbortSignal.timeout(stage==='process'?45000:8000)};let correlation='invalid',validated=false,providerError:string|undefined;let result:ConfirmationResult=pendingConfirmation(), status=200;
+    const started=Date.now();const execution:Execution={signal:AbortSignal.timeout(stage==='process'?45000:8000)};let correlation='invalid',validated=false,providerError:string|undefined;let result:ConfirmationResult=pendingConfirmation(), status=200;
     try {
       const reader=c.req.raw.body?.getReader();if(!reader)return c.json(invalidConfirmation(),400);
       const cancel=()=>{void reader.cancel().catch(()=>{});};execution.signal.addEventListener('abort',cancel,{once:true});
@@ -220,7 +218,7 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
       else status=202;
     }
     if(result.reference)correlation=createHash('sha256').update(flow+'\0'+result.reference).digest('hex').slice(0,24);
-    options.log?.({flow,stage,...(result.reference?{reference:result.reference}:{}),...(result.status==='pending'&&result.progress?{progress_stage:result.progress.stage,...(result.progress.stage==='recovery_required'?{recovery_reason:result.progress.reason}:{})}:{}),outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{}),...(providerError?{provider_error:providerError}:{})});
+    options.log?.({flow,stage,...(result.reference?{reference:result.reference}:{}),...(result.status==='pending'&&result.progress?{progress_stage:result.progress.stage}:{}),outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{}),...(providerError?{provider_error:providerError}:{})});
     return c.json(result,status===202?202:200);
   });
   return app;

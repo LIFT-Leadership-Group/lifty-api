@@ -155,16 +155,17 @@ revocation path before the retry. The Functions migration
 warmup `starting` receipt. This API works before it ships (the explanation
 stays generic), so the order is free.
 
-LIF-1371 requires Functions migration
-`20261010120000_lif1371_connection_recovery.sql` before this API revision.
-The progress member RPC leaves the old member response compatible during
-rollout. Sending-account preparation runs after the shared shell loads;
-claim/dispatch fences allow recovery only before provider dispatch. An unknown
-dispatched link stays on the same attempt for support and late authorization;
-never reset its fence or issue a replacement to clear a spinner. A lost save
-response can retry the exact hosted URL, without creating another provider link.
-Browser and agent progress come from the same database projection. Operational
-logs use the non-secret attempt reference, stage and classified outcome.
+LIF-1415 requires Functions migration
+`20261012130000_lif1415_disposable_sign_in_links.sql` before this API revision.
+A hosted sign-in link is disposable: creating one connects nothing, and every
+link of an attempt carries its deterministic auth state. The shared shell loads
+first; its process and status requests ask the provider for a link whenever
+none is stored, and the first stored link wins. A failed, stalled or lost link
+request leaves nothing to recover: the attempt stays `preparing` and the next
+status check asks again. Only a received authorization is reconciled before
+another attempt; an expired attempt without one never blocks its sender.
+Browser and agent progress come from the same database projection. There is no
+compatibility layer: deploy this API immediately after that migration.
 
 ## Sample review confirmation
 
