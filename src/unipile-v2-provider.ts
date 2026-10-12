@@ -33,6 +33,10 @@ const Senders = z.object({data: z.array(z.object({object: z.literal("EmailSender
 // Unipile V2 methods-scope: Outlook sending creates a draft, so Mail.Send
 // also requires Mail.ReadWrite. Account.oauth_scope lists granted permissions.
 const outlookScopes = ["User.Read", "Mail.ReadWrite", "Mail.Send"];
+// A hosted link may request only the application's checked Microsoft methods
+// scopes; Unipile refuses any other with api/invalid_parameters. Unipile adds
+// User.Read itself, so a granted account still carries every scope above.
+const outlookRequestedScopes = ["Mail.ReadWrite", "Mail.Send"];
 function hasOutlookMailScopes(scope: string | null | undefined) {
   const granted = new Set((scope ?? "").split(/[,\s]+/).map(value => value.replace(/^https:\/\/graph\.microsoft\.com\//, "")));
   return outlookScopes.every(value => granted.has(value));
@@ -124,7 +128,7 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
     const origin = input.transport.hosted_auth_origin;
     const raw = await request("auth/link", {
       ...(input.transport.account_id ? {account_id: input.transport.account_id} : {providers: input.channel === "linkedin" ? ["linkedin"] : ["google", "outlook"]}),
-      ...(input.channel === "email" ? {config: {outlook: {oauth_scope: [...outlookScopes, "offline_access"]}}} : {}),
+      ...(input.channel === "email" ? {config: {outlook: {oauth_scope: outlookRequestedScopes}}} : {}),
       ...(input.transport.account_scope_id ? {account_scope_id: input.transport.account_scope_id} : {}),
       domain: new URL(origin).hostname,
       expires_on: input.expiresAt, redirect_uri: input.redirectUri, state: input.state,
