@@ -119,36 +119,6 @@ const SourceSending = z.object({
 });
 export type SourceSending = z.infer<typeof SourceSending>;
 
-const SourceSmartlead = z.object({
-  account_id: z.number().int(),
-  warmup_started_at: Timestamp.nullish(),
-  approved_for_outbound: z.boolean().nullish(),
-  approved_at: Timestamp.nullish(),
-  approved_by: z.string().max(200).nullish(),
-  notes: z.string().max(5000).nullish(),
-  placement_gate_passed_at: Timestamp.nullish(),
-  placement_hold_reason: z.string().max(500).nullish(),
-  placement_hold_review_at: Timestamp.nullish(),
-  mitigation_state: z.string().max(40).nullish(),
-  mitigation_reason: z.string().max(500).nullish(),
-  mitigation_paused_at: Timestamp.nullish(),
-  mitigation_resumed_at: Timestamp.nullish(),
-  warmup_activity_grace_until: Timestamp.nullish(),
-  cold_eligible_at: Timestamp.nullish(),
-  is_eligible: z.boolean().nullish(),
-});
-export type SourceSmartlead = z.infer<typeof SourceSmartlead>;
-
-const SourceSmartleadWarmup = z.object({
-  status: z.string().max(40), health: z.string().max(40), observed_at: Timestamp,
-  active_since: Timestamp.nullish(), last_sent_at: Timestamp.nullish(), sent_7d: Count.nullish(),
-  detail: z.string().max(1000).nullish(),
-  reputation_pct: Pct.nullish(), spam_pct: Pct.nullish(), spam_sample_sent: Count.nullish(), spam_count: Count.nullish(),
-});
-export type SourceSmartleadWarmup = z.infer<typeof SourceSmartleadWarmup>;
-const SourceWarmupDay = SourceSmartleadWarmup.omit({ active_since: true, last_sent_at: true, detail: true }).extend({ day: Day });
-export type SourceWarmupDay = z.infer<typeof SourceWarmupDay>;
-
 const SourceMailiverySnapshot = z.object({
   spf: z.string().max(64).nullish(), dmarc: z.string().max(64).nullish(), mx: z.string().max(64).nullish(),
   emails_sent_today: Count.nullish(), email_per_day_target: Count.nullish(), connection_problem: z.boolean().nullish(),
@@ -169,18 +139,10 @@ const SourceMailivery = z.object({
 });
 export type SourceMailivery = z.infer<typeof SourceMailivery>;
 
-const SourceCampaign = z.discriminatedUnion("source", [
-  z.object({
-    source: z.literal("smartlead_campaign"), campaign_ref: Uuid, provider: z.string().max(40),
-    provider_campaign_id: z.string().max(200).nullish(), name: z.string().max(500).nullish(),
-    status: z.string().max(40), provider_status: z.string().max(80).nullish(), sender_ref: Uuid.nullish(),
-    created_at: Timestamp, updated_at: Timestamp.nullish(), last_synced_at: Timestamp.nullish(), drift_detected_at: Timestamp.nullish(),
-  }),
-  z.object({
-    source: z.literal("lifty_direct_email"), connection_ref: Uuid, campaign_count: Count,
-    states: z.record(z.string().max(40), Count), latest_created_at: Timestamp.nullish(),
-  }),
-]);
+const SourceCampaign = z.object({
+  source: z.literal("lifty_direct_email"), connection_ref: Uuid, campaign_count: Count,
+  states: z.record(z.string().max(40), Count), latest_created_at: Timestamp.nullish(),
+});
 export type SourceCampaign = z.infer<typeof SourceCampaign>;
 
 const SourceMailbox = z.object({
@@ -195,10 +157,7 @@ const SourceMailbox = z.object({
   connections: z.array(SourceConnection).max(50),
   // Added by LIF-1341; absent from earlier databases.
   sending: SourceSending.nullish(),
-  smartlead: SourceSmartlead.nullish(),
   warmup: z.object({
-    smartlead: SourceSmartleadWarmup.nullish(),
-    smartlead_daily: z.array(SourceWarmupDay).max(60).default([]),
     mailivery: z.array(SourceMailivery).max(50).default([]),
   }),
   placement: z.object({
@@ -210,7 +169,7 @@ const SourceMailbox = z.object({
   }),
   campaigns: z.array(SourceCampaign).max(200),
   availability: z.object({
-    smartlead_registry: z.boolean(), smartlead_warmup: z.boolean(), mailivery_warmup: z.boolean(), placement_tests: z.boolean(),
+    mailivery_warmup: z.boolean(), placement_tests: z.boolean(),
   }),
 });
 export type SourceMailbox = z.infer<typeof SourceMailbox>;
@@ -265,7 +224,6 @@ export const WarmupCode = ["active", "paused", "pending", "problem", "not_runnin
 export const PlacementCode = ["passed", "failed", "stale", "no_result", "no_tests"] as const;
 export const CampaignSummaryCode = ["in_campaign_enabled", "in_campaign_blocked", "campaign_paused", "no_campaign", "unverified"] as const;
 export const CampaignCode = ["active", "paused", "draft", "closed_to_new_leads", "completed", "archived", "error", "unknown"] as const;
-export const ApprovalCode = ["approved", "awaiting_approval", "not_approved", "not_applicable"] as const;
 export const IdentityCode = ["resolved", "ambiguous_owner", "unassigned"] as const;
 export const SendingCode = ["available", "limit_reached", "not_set", "unknown"] as const;
 export const PostureCode = ["healthy", "watch", "degraded", "critical", "insufficient_data", "unknown", "none"] as const;
@@ -303,16 +261,15 @@ export const PlacementDetail = z.object({
 export type PlacementDetail = z.infer<typeof PlacementDetail>;
 
 const WarmupMetrics = z.object({
-  reputation_pct: Pct.nullable(), spam_pct: Pct.nullable(), spam_sample_sent: Count.nullable(), spam_count: Count.nullable(),
-  sent_7d: Count.nullable(), last_sent_at: Timestamp.nullable(), warmup_emails_today: Count.nullable(), ramp_target: Count.nullable(),
+  warmup_emails_today: Count.nullable(), ramp_target: Count.nullable(),
 }).strict();
 const Check = z.enum(["valid", "not_valid", "unknown"]);
 export const WarmupSource = z.object({
-  provider: z.enum(["smartlead", "mailivery"]),
+  provider: z.literal("mailivery"),
   connection_ref: Uuid.nullable(),
   state: state(WarmupCode),
   started_at: Timestamp.nullable(),
-  started_at_basis: z.enum(["observed_activity", "provider_evidence"]).nullable(),
+  started_at_basis: z.literal("provider_evidence").nullable(),
   active_days: z.number().int().min(0).max(100_000).nullable(),
   required_days: z.number().int().min(1).max(365).nullable(),
   period_complete: z.boolean().nullable(),
@@ -325,32 +282,21 @@ export const WarmupSource = z.object({
 }).strict();
 export type WarmupSource = z.infer<typeof WarmupSource>;
 
-const WarmupDay = z.object({
-  day: Day, observed_at: Timestamp, status: z.string().max(40), health: z.string().max(40),
-  reputation_pct: Pct.nullable(), spam_pct: Pct.nullable(), spam_sample_sent: Count.nullable(), sent_7d: Count.nullable(),
-}).strict();
-
 const Path = z.object({
   provider: Provider, connection_ref: Uuid.nullable(),
-  gate: z.enum(["smartlead_eligibility", "lift_send_controls", "lifty_campaign_checks", "unknown"]),
+  gate: z.enum(["lift_send_controls", "lifty_campaign_checks", "unknown"]),
   state: state(PathCode),
 }).strict();
 
 export const Campaign = z.object({
-  source: z.enum(["smartlead_campaign", "lifty_direct_email"]),
-  campaign_ref: Uuid.nullable(),
+  source: z.literal("lifty_direct_email"),
   connection_ref: Uuid.nullable(),
   provider: Provider,
-  name: z.string().max(500).nullable(),
-  sender_ref: Uuid.nullable(),
   campaign_count: Count,
   states: z.record(z.string().max(40), Count),
   status: state(CampaignCode),
   sending: state(["enabled", "blocked", "not_active", "unverified"] as const),
-  provider_status: z.string().max(80).nullable(),
   created_at: Timestamp.nullable(),
-  last_synced_at: Timestamp.nullable(),
-  drift_detected_at: Timestamp.nullable(),
 }).strict();
 export type Campaign = z.infer<typeof Campaign>;
 
@@ -402,13 +348,7 @@ export const DeliverabilityMailbox = z.object({
     status: state(WarmupCode),
     sources: z.array(WarmupSource).max(50),
     current: WarmupSource.nullable(),
-    trend: z.object({ window_start: Day, window_end: Day, days: z.array(WarmupDay).max(60) }).strict(),
   }).strict(),
-  recovery: z.object({
-    state: z.enum(["paused", "retired"]), reason: z.string().max(500).nullable(), paused_at: Timestamp.nullable(),
-    resumed_at: Timestamp.nullable(), rewarm_days: z.number().int().min(1).max(365), day: z.number().int().min(1).max(100_000).nullable(),
-    rewarm_complete_at: Timestamp.nullable(), description: Text(600),
-  }).strict().nullable(),
   campaigns: z.object({ status: state(CampaignSummaryCode), items: z.array(Campaign).max(200) }).strict(),
   placement: z.object({
     status: state(PlacementCode),
@@ -420,17 +360,9 @@ export const DeliverabilityMailbox = z.object({
     recent_tests: z.array(PlacementTest).max(DELIVERABILITY_HISTORY_MAX),
     detail: z.array(PlacementDetail).max(DELIVERABILITY_DETAIL_MAX_REPORTS).nullable(),
   }).strict(),
-  approval: z.object({
-    status: state(ApprovalCode),
-    approved_at: Timestamp.nullable(), approved_by: z.string().max(200).nullable(),
-    placement_gate_passed_at: Timestamp.nullable(), cold_eligible_at: Timestamp.nullable(),
-    hold: z.object({ reason: z.string().max(500), review_at: Timestamp.nullable() }).strict().nullable(),
-  }).strict(),
-  /** Human-entered notes, never mixed with generated explanations. */
-  notes: z.object({ human: z.string().max(5000).nullable() }).strict(),
   connections: z.array(Connection).max(50),
   sending: Sending,
-  availability: z.object({ smartlead_registry: z.boolean(), smartlead_warmup: z.boolean(), mailivery_warmup: z.boolean(), placement_tests: z.boolean() }).strict(),
+  availability: z.object({ mailivery_warmup: z.boolean(), placement_tests: z.boolean() }).strict(),
 }).strict();
 export type DeliverabilityMailbox = z.infer<typeof DeliverabilityMailbox>;
 
