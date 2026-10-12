@@ -112,7 +112,7 @@ describe("Identity member routes", () => {
       patch_lifty_sender: dbError("PT409", "VERSION_CONFLICT", { current_version: 3 }),
       resume_lifty_sending_account: dbError("PT409", "ACCOUNT_DISCONNECTED"),
       connect_lifty_sending_account: dbError("PT409", "LINKEDIN_ALREADY_CONNECTED"),
-      get_lifty_sending_account_attempt_progress: dbError("PT404", "CONNECTION_ATTEMPT_NOT_FOUND"),
+      get_lifty_sending_account_attempt: dbError("PT404", "CONNECTION_ATTEMPT_NOT_FOUND"),
       get_lifty_senders: dbError("PT409", "lifty_workspace_ambiguous", { workspaces: [{ workspace_ref: workspace.workspace_ref, name: "Example", slug: "example" }] }),
       get_lifty_sending_accounts: dbError("XX000", "private database detail"),
     };
@@ -134,7 +134,7 @@ describe("Identity member routes", () => {
 
   it("returns Lifty's connect link for the durable attempt and never exposes internal fields", async () => {
     const progress = {stage: "declaration_required"};
-    const h = harness(name => name === "get_lifty_sending_account_attempt_progress" ? attempt("pending", {progress}) : name === "connect_lifty_sending_account"
+    const h = harness(name => name === "get_lifty_sending_account_attempt" ? attempt("pending", {progress}) : name === "connect_lifty_sending_account"
       ? { workspace, id: attemptId, channel: "linkedin", expires_at: "2099-01-01T00:00:00Z", created: false }
       : { workspace, id: attemptId, channel: "email", expires_at: "2099-01-01T00:00:00Z", created: true });
     const connected = await h.request("POST", "/v1/workspace/sending-accounts/connect", { sender_id: senderId, channel: "linkedin" });
@@ -148,12 +148,11 @@ describe("Identity member routes", () => {
   });
 
   it.each([
+    {stage:"preparing"},
     {stage:"sign_in_required"},
-    {stage:"recovery_required", reason:"issuance_uncertain", retryable:false},
-    {stage:"recovery_required", reason:"preparation_interrupted", retryable:true},
   ])("returns durable pre-authorization progress without doing provider work: %j", async progress => {
     const h = harness(name => {
-      expect(name).toBe("get_lifty_sending_account_attempt_progress");
+      expect(name).toBe("get_lifty_sending_account_attempt");
       return attempt("pending",{progress});
     });
     const response = await h.request("GET", `/v1/workspace/sending-accounts/attempts/${attemptId}`);

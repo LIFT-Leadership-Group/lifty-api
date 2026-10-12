@@ -251,32 +251,27 @@ it('prepares a sending-account link once after the shell, then offers a same-att
   expect(page.elements['confirmation-reference']!.textContent).toContain('11111111-1111-4111-8111-111111111111');
   expect(page.elements['confirmation-check']!.hidden).toBe(false);
 });
-it('keeps uncertain preparation actionable without a retry and checks status without another process',async()=>{
-  vi.useFakeTimers();let connected=false;const requests:string[]=[];
-  const fetchImpl=vi.fn(async(input:unknown)=>{requests.push(String(input));return Response.json(connected
-    ?{status:'connected',account:null}
-    :{status:'pending',progress:{stage:'recovery_required',reason:'issuance_uncertain',retryable:false},reference:'11111111-1111-4111-8111-111111111111'});
+it('waits for one preparation and keeps checking until a sign-in that could not open opens',async()=>{
+  vi.useFakeTimers();let open=false;const requests:string[]=[];let processDone=false,statusDuringProcess=false;
+  const unavailable={status:'pending',progress:{stage:'preparing'},reference:'11111111-1111-4111-8111-111111111111'};
+  const fetchImpl=vi.fn(async(input:unknown)=>{
+    const path=String(input);requests.push(path);
+    if(path.endsWith('/process')){await new Promise(resolve=>setTimeout(resolve,3000));processDone=true;return Response.json(unavailable);}
+    if(!processDone)statusDuringProcess=true;
+    return Response.json(open?{status:'pending',progress:{stage:'sign_in_required'},reference:'11111111-1111-4111-8111-111111111111'}:unavailable);
   }) as typeof fetch;
   const page=browser('https://api.lifty.test/connect/email/return?intent=capability&prepare=1',fetchImpl);
-  const work=page.run();await vi.runAllTimersAsync();await work;
-  expect(page.elements['confirmation-title']!.textContent).toBe('Sign-in preparation needs attention');
-  expect(page.elements['confirmation-detail']!.textContent).toContain('Return to Lifty with the connection reference');
-  expect(page.elements['confirmation-actions']!.hidden).toBe(true);
-  expect(page.elements['confirmation-spinner']!.hidden).toBe(true);
-  expect(page.elements['confirmation-check']!.hidden).toBe(false);
-  connected=true;
-  const click=page.elements['confirmation-check']!.addEventListener.mock.calls[0]![1] as ()=>void;
-  click();await vi.runAllTimersAsync();
-  expect(page.elements['confirmation-title']!.textContent).toBe('email is connected');
+  const work=page.run();await vi.advanceTimersByTimeAsync(3000);
+  expect(page.elements['confirmation-title']!.textContent).toBe('Preparing sign-in');
+  expect(page.elements['confirmation-reference']!.textContent).toContain('11111111-1111-4111-8111-111111111111');
+  open=true;await vi.runAllTimersAsync();await work;
+  expect(page.elements['confirmation-title']!.textContent).toBe('Ready to sign in');
+  expect(page.elements['confirmation-retry']!.textContent).toBe('Continue to sign in');
   expect(requests.filter(path=>path.endsWith('/process'))).toHaveLength(1);
+  expect(statusDuringProcess).toBe(false);
 });
-it('offers a safe pre-dispatch recovery but preserves a provider refusal instead of redirecting into a loop',async()=>{
+it('preserves a provider refusal instead of preparing again or redirecting into a loop',async()=>{
   vi.useFakeTimers();
-  const page=browser('https://api.lifty.test/connect/email/return?intent=capability',vi.fn(async()=>Response.json({status:'pending',
-    progress:{stage:'recovery_required',reason:'preparation_interrupted',retryable:true}})) as typeof fetch);
-  const work=page.run();await vi.runAllTimersAsync();await work;
-  expect(page.elements['confirmation-retry']!.textContent).toBe('Resume preparation');
-  expect(page.elements['confirmation-actions']!.hidden).toBe(false);
   const requests:string[]=[];
   const refused=browser('https://api.lifty.test/connect/email/return?intent=capability&prepare=1&error_type=api/already_exists',vi.fn(async(input:unknown)=>{
     requests.push(String(input));return Response.json({status:'pending',progress:{stage:'sign_in_required'},attention:'exists'});
@@ -299,7 +294,7 @@ it('rechecking the same preparing state restores the live view and ignores overl
     requests++;return Response.json({status:'pending',progress:{stage:'preparing'}});
   }) as typeof fetch);
   const work=page.run();await vi.runAllTimersAsync();await work;
-  expect(page.elements['confirmation-title']!.textContent).toBe('Sign-in preparation is still pending');
+  expect(page.elements['confirmation-title']!.textContent).toBe('Sign-in has not opened yet');
   const click=page.elements['confirmation-check']!.addEventListener.mock.calls[0]![1] as ()=>void;
   const before=requests;click();click();await vi.advanceTimersByTimeAsync(1);
   expect(requests-before).toBe(1);
@@ -307,15 +302,15 @@ it('rechecking the same preparing state restores the live view and ignores overl
   expect(page.elements['confirmation-spinner']!.hidden).toBe(false);
   await vi.runAllTimersAsync();
 });
-it('correlates regenerated browser links to the same non-secret attempt and logs preparation outcomes',async()=>{
+it('correlates regenerated browser links to the same non-secret attempt and logs its stage',async()=>{
   const logs:unknown[]=[],reference='11111111-1111-4111-8111-111111111111';
   let connected=false;
   const router=createConfirmationRouter('email',{validate:()=>{},status:async()=>connected?{status:'connected',account:null,reference}:{status:'pending',reference,
-    progress:{stage:'recovery_required',reason:'issuance_uncertain',retryable:false}}},{log:event=>logs.push(event)});
+    progress:{stage:'preparing'}}},{log:event=>logs.push(event)});
   for(const state of ['secret-link-one','secret-link-two'])await router.request('https://api.lifty.test/connect/email/return/status',
     {method:'POST',headers,body:JSON.stringify({state})});
   const expected={correlation:createHash('sha256').update('email\0'+reference).digest('hex').slice(0,24),reference,
-    progress_stage:'recovery_required',recovery_reason:'issuance_uncertain'};
+    progress_stage:'preparing'};
   connected=true;
   await router.request('https://api.lifty.test/connect/email/return/status',{method:'POST',headers,body:JSON.stringify({state:'secret-link-three'})});
   expect(logs).toMatchObject([expected,expected,{correlation:expected.correlation,reference,outcome:'connected'}]);

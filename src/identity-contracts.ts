@@ -61,11 +61,9 @@ export const SenderDeleteResultSchema = z.object({ ...Workspace,
 export const AccountsGetSchema = z.object({ ...Workspace, accounts: z.array(AccountSchema).max(5000) }).strict();
 export const AccountResultSchema = z.object({ ...Workspace, account: AccountSchema }).strict();
 /** Durable stage shared by the browser and member/agent reads. A timeout is not a failed connection. */
-export const AccountConnectionProgress = z.discriminatedUnion("stage", [
-  z.object({ stage: z.enum(["declaration_required", "preparing", "sign_in_required", "verifying", "complete"]) }).strict(),
-  z.object({ stage: z.literal("recovery_required"), reason: z.enum(["preparation_interrupted", "provider_rejected", "issuance_uncertain"]),
-    retryable: z.boolean() }).strict(),
-]);
+export const AccountConnectionProgress = z.object({
+  stage: z.enum(["declaration_required", "preparing", "sign_in_required", "verifying", "complete"]),
+}).strict();
 export type AccountConnectionProgress = z.infer<typeof AccountConnectionProgress>;
 export const AttemptSchema = z.object({
   ...Workspace,

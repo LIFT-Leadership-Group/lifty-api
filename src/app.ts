@@ -208,7 +208,6 @@ export interface LogEvent {
   upstream_kind?: string;
   provider_error?: string;
   progress_stage?: string;
-  recovery_reason?: string;
   connection_reference?: string;
 }
 
@@ -842,7 +841,7 @@ export function createApp(
 
   const logConfirmation=(event:ConfirmationLog)=>dependencies.log({level:"warn",event:"connection_confirmation",request_id:event.correlation,method:"POST",
     path:`connection/${event.flow}`,error_code:event.outcome,status:event.status,stage:event.stage,elapsed_ms:event.elapsed_ms,
-    ...(event.progress_stage?{progress_stage:event.progress_stage}:{}),...(event.recovery_reason?{recovery_reason:event.recovery_reason}:{}),
+    ...(event.progress_stage?{progress_stage:event.progress_stage}:{}),
     ...(event.reference?{connection_reference:event.reference}:{}),
     ...(event.upstream_status===undefined?{}:{upstream_code:String(event.upstream_status)}),...(event.upstream_outcome?{upstream_kind:event.upstream_outcome}:{}),...(event.provider_error?{provider_error:event.provider_error}:{})});
   if (dependencies.warmupSetup) app.route("/warmup", createWarmupSetupRouter(dependencies.warmupSetup,logConfirmation));

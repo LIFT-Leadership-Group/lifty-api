@@ -82,9 +82,9 @@ export function createAccountConnectRouter(connection: AccountConnection,
     });
     app.route("/", createConfirmationRouter(channel, {
       validate: input => { connection.validate(channel, input.state); },
-      // Preparation is a separate fenced process after the shell is visible.
+      // Both run after the shell is visible. Each prepares a missing sign-in
+      // link (asking again is safe) and never replaces a stored one.
       process: input => connection.prepare(channel, input.state),
-      // Provider returns only read/reconcile; they never issue another link.
       status: input => connection.confirm(channel, input.state, hostedReturnError(input.errorType), input.errorDetail),
     }, { origin: options.origin, ...(options.log ? { log: options.log } : {}) }));
   }

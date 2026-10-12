@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { connectionFetch, type ConfirmationAttention, type ConfirmationResult } from "./connection-confirmation.js";
 import { openConnectAttempt, sealConnectAttempt, type ConnectChannel } from "./connect-state.js";
@@ -8,7 +7,6 @@ import { parseHostedAuthOrigin } from "./hosted-auth-branding.js";
 import { unipileV2AuthState } from "./unipile-v2-state.js";
 import { PublicError } from "./errors.js";
 import { AccountConnectionProgress, type Account } from "./identity-contracts.js";
-import { HostedLinkIssue } from "./unipile-v2-provider.js";
 
 // One controller for every sending-account connection: the browser connect
 // page, the shared confirmation shell, the attempt read's reconciliation and
@@ -29,7 +27,7 @@ const Snapshot = z.object({
     id: Uuid, channel: z.enum(["email", "linkedin"]), reconnect: z.boolean(),
     sender: z.object({ id: Uuid, name: z.string() }).strip(),
     expected_identity: z.union([z.object({ email: z.email() }).strict(), z.object({ profile_id: z.string().min(1) }).strict()]).nullable(),
-    internal_state: z.enum(["pending", "issuing", "ready", "completed", "failed"]),
+    internal_state: z.enum(["pending", "ready", "completed", "failed"]),
     state: z.enum(["pending", "connected", "failed", "expired"]),
     reason: z.enum(["canceled", "account_in_use", "identity_mismatch", "provider_rejected"]).nullable(),
     declaration: z.record(z.string(), z.unknown()).nullable(),
@@ -39,8 +37,6 @@ const Snapshot = z.object({
   }).strip(),
   transport: ProviderTransport,
   authorization: z.object({ received: z.boolean(), account_id: z.string().nullable(), return_error: HostedReturnError.nullable() }).strip(),
-  issuance: z.object({ claim_id: Uuid.nullable(), lease_expires_at: z.iso.datetime({ offset: true }).nullable(), dispatched_at: z.iso.datetime({ offset: true }).nullable() }).strip(),
-  claimed: z.boolean().optional(),
 }).strip();
 type Snapshot = z.infer<typeof Snapshot>;
 const RevocationContext = z.object({ revocable: z.boolean(), transport: ProviderTransport.nullable() }).strip();
@@ -131,56 +127,32 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
     if (attempt.state === "expired") throw rpcError({ message: "account_attempt_expired" });
     if (attempt.state === "failed") throw rpcError({ message: "account_attempt_unavailable" });
     if (!attempt.declaration) return { kind: "declare", senderName: attempt.sender.name };
-    if (attempt.internal_state === "ready" && attempt.hosted_url) return { kind: "redirect", url: hosted(attempt.hosted_url) };
+    if (attempt.hosted_url) return { kind: "redirect", url: hosted(attempt.hosted_url) };
     return { kind: "preparing" };
   }
 
-  async function prepare(channel: ConnectChannel, intent: string): Promise<ConfirmationResult> {
-    const id = open(channel, intent), claimId = randomUUID(), started = Date.now();
-    let current = await snapshot(channel, "context", { attempt_id: id });
-    if (current.authorization.received) return result(await reconcile(channel, current));
-    const progress = current.attempt.progress;
-    if (current.attempt.state !== "pending" || !current.attempt.declaration
-      || current.attempt.internal_state === "ready"
-      || (progress.stage === "recovery_required" && !progress.retryable)) return result(current);
-    let stage: "preparation" | "provider" | "persistence" = "preparation";
+  // A hosted link connects nothing: an account exists only after someone signs
+  // in through a link Lifty showed them, and every link of an attempt carries
+  // its deterministic auth state. So whenever no link is stored, ask for one;
+  // the first one saved wins. A failure leaves nothing to recover: the page's
+  // next status check simply asks again.
+  async function signIn(channel: ConnectChannel, intent: string, current: Snapshot): Promise<ConfirmationResult> {
+    const { attempt } = current;
+    if (attempt.state !== "pending" || !attempt.declaration || attempt.hosted_url || current.authorization.received) return result(current);
     try {
-      current = await snapshot(channel, "claim_link", { attempt_id: id, claim_id: claimId });
-      if (!current.claimed) return result(current);
-      const state = unipileV2AuthState(channel, id, key(channel));
-      // Only the first acknowledged dispatch can call the provider. A lost
-      // dispatch receipt must not be replayed, even by the same claim owner.
-      current = await snapshot(channel, "dispatch_link", { attempt_id: id, claim_id: claimId, state });
-      if (!current.claimed) return result(current);
-      stage = "provider";
-      const url = hosted(await provider.createLink({ channel, state, transport: current.transport, expiresAt: current.attempt.expires_at,
+      const state = unipileV2AuthState(channel, attempt.id, key(channel));
+      const url = hosted(await provider.createLink({ channel, state, transport: current.transport, expiresAt: attempt.expires_at,
         redirectUri: `${settings.publicBaseUrl}/connect/${channel}/return?intent=${encodeURIComponent(intent)}` }));
-      stage = "persistence";
-      // Retrying this exact durable write is safe; recreating the provider link
-      // is not. Read after a lost save response before retrying that same URL.
-      for (let save = 0; save < 2; save++) {
-        try { return result(await snapshot(channel, "save_link_claim", { attempt_id: id, claim_id: claimId, url })); }
-        catch (error) {
-          try {
-            current = await snapshot(channel, "context", { attempt_id: id });
-            if (current.attempt.hosted_url || current.authorization.received || current.attempt.state !== "pending") return result(current);
-          } catch { /* The bounded second save can still recover a lost read. */ }
-          if (save === 1) throw error;
-        }
-      }
-    } catch (error) {
-      // These receipts contain only a stage, classified outcome and status.
-      // No provider body, URL, auth state or exception message is persisted.
-      try {
-        await rpc(channel, "link_issue", { attempt_id: id, claim_id: claimId, stage,
-          outcome: stage === "provider" && error instanceof HostedLinkIssue ? error.outcome : "uncertain",
-          ...(stage === "provider" && error instanceof HostedLinkIssue && error.upstreamStatus !== undefined ? { upstream_status: error.upstreamStatus } : {}),
-          elapsed_ms: Math.max(0, Date.now() - started) });
-      } catch { /* A missing receipt never authorizes another dispatch. */ }
+      return result(await snapshot(channel, "link", { attempt_id: attempt.id, state, url }));
+    } catch {
+      return result(current);
     }
-    // The next safe read also discovers an authorization or a save which won
-    // the race while this request was interrupted.
-    return result(await snapshot(channel, "context", { attempt_id: id }));
+  }
+
+  /** Open the sign-in for a declared attempt, or finish one already authorized. */
+  async function prepare(channel: ConnectChannel, intent: string): Promise<ConfirmationResult> {
+    const current = await snapshot(channel, "context", { attempt_id: open(channel, intent) });
+    return signIn(channel, intent, await reconcile(channel, current));
   }
 
   // Finish an authorization the provider signed for this attempt. Only verified
@@ -274,8 +246,7 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
         const pending = result(current);
         return pending.status === "pending" ? { ...pending, attention: await explain(channel, id, hint, accountRef) } : pending;
       }
-      current = await reconcile(channel, current);
-      return result(current);
+      return signIn(channel, intent, await reconcile(channel, current));
     },
     async reconcileAttempt(channel: ConnectChannel, attemptId: string): Promise<void> {
       await reconcile(channel, await snapshot(channel, "context", { attempt_id: attemptId }));

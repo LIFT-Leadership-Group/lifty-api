@@ -23,12 +23,10 @@ const transport = { api_version: "v2", application_id: "app_test", account_scope
 type Db = ReturnType<typeof attemptDb>;
 function attemptDb(channel: "email" | "linkedin" = "email") {
   return {
-    channel, internal_state: "pending" as "pending" | "issuing" | "ready" | "completed" | "failed", state: "pending",
+    channel, internal_state: "pending" as "pending" | "ready" | "completed" | "failed", state: "pending",
     reason: null as string | null, declaration: null as Record<string, unknown> | null, hosted_url: null as string | null,
     expected_identity: null as Record<string, string> | null, transport: { ...transport },
     authorization: { received: false, account_id: null as string | null, return_error: null as string | null },
-    issuance: { claim_id: null as string | null, lease_expires_at: null as string | null, dispatched_at: null as string | null },
-    issue: null as { stage: string; outcome: string } | null,
     ops: [] as string[], payloads: {} as Record<string, Record<string, unknown>>,
     // The conflict read's answer (undefined: the read is unavailable) and the revocation context.
     conflict: undefined as Record<string, unknown> | undefined, revocation: null as Record<string, unknown> | null,
@@ -38,9 +36,7 @@ function progress(db: Db) {
   if (db.internal_state === "completed") return { stage: "complete" };
   if (db.authorization.received) return { stage: "verifying" };
   if (!db.declaration) return { stage: "declaration_required" };
-  if (db.internal_state === "ready") return { stage: "sign_in_required" };
-  if (db.issue || (db.internal_state === "issuing" && !db.issuance.claim_id)) return { stage: "recovery_required",
-    reason: db.issue?.outcome === "rejected" ? "provider_rejected" : "issuance_uncertain", retryable: false };
+  if (db.hosted_url) return { stage: "sign_in_required" };
   return { stage: "preparing" };
 }
 const snapshot = (db: Db, extra: Record<string, unknown> = {}) => ({
@@ -49,7 +45,7 @@ const snapshot = (db: Db, extra: Record<string, unknown> = {}) => ({
     account_id: null, expected_identity: db.expected_identity, internal_state: db.internal_state, state: db.state, reason: db.reason,
     declaration: db.declaration, declaration_required: true, issuer_user_id: "44444444-4444-4444-8444-444444444444",
     created_at: "2026-10-02T12:00:00Z", expires_at: "2099-01-01T00:00:00Z", hosted_url: db.hosted_url, progress: progress(db) },
-  transport: db.transport, issuance: db.issuance,
+  transport: db.transport,
   authorization: { ...db.authorization, event_id: null, at: null }, ...extra });
 
 interface Provider { mailboxProvider: "google" | "outlook"; verificationStatus: "verified" | "pending" | "unknown"; senders: string; accountStatus: number; deleteStatus: number; calls: string[]; bodies: Record<string, unknown>[] }
@@ -59,7 +55,8 @@ function stub(db: Db, provider: Partial<Provider> = {}) {
     const url = new URL(String(input));
     if (url.origin === "https://api.unipile.com") {
       p.calls.push(`${init?.method ?? "GET"} ${url.pathname}`);
-      if (url.pathname === "/v2/auth/link") { p.bodies.push(JSON.parse(String(init!.body))); return Response.json({ object: "HostedAuthLink", link: hostedLink }); }
+      // Each provider call returns a distinct session, like Unipile.
+      if (url.pathname === "/v2/auth/link") { p.bodies.push(JSON.parse(String(init!.body))); return Response.json({ object: "HostedAuthLink", link: `https://connect.lifty.test/session-${p.bodies.length}` }); }
       if (init?.method === "DELETE") return new Response("{}", { status: p.deleteStatus });
       if (p.accountStatus !== 200) return new Response("PRIVATE provider body", { status: p.accountStatus });
       if (url.pathname.endsWith("/email-senders")) return Response.json({ data: [{ object: "EmailSender", email: p.senders, is_primary: true, verification_status: p.verificationStatus }] });
@@ -76,18 +73,8 @@ function stub(db: Db, provider: Partial<Provider> = {}) {
     const op = body.p_operation as string, payload = body.p_payload as Record<string, unknown>;
     db.ops.push(op); db.payloads[op] = payload;
     if (op === "declare") db.declaration = payload.declaration as Record<string, unknown>;
-    if (op === "claim_link") {
-      const claimed = db.internal_state === "pending";
-      if (claimed) { db.internal_state = "issuing"; db.issuance.claim_id = String(payload.claim_id); db.issuance.lease_expires_at = "2099-01-01T00:00:00Z"; }
-      return Response.json(snapshot(db, { claimed }));
-    }
-    if (op === "dispatch_link") {
-      const claimed = !db.issuance.dispatched_at && db.issuance.claim_id === payload.claim_id;
-      if (claimed) db.issuance.dispatched_at = new Date().toISOString();
-      return Response.json(snapshot(db, { claimed }));
-    }
-    if (op === "link_issue") db.issue = { stage: String(payload.stage), outcome: String(payload.outcome) };
-    if (op === "save_link_claim") { db.internal_state = "ready"; db.hosted_url = String(payload.url); }
+    // Like the database, the first stored link wins.
+    if (op === "link" && !db.hosted_url && !db.authorization.received) { db.internal_state = "ready"; db.hosted_url = String(payload.url); }
     // Like the database, only the first hint is kept.
     if (op === "return_error") db.authorization.return_error ??= String(payload.return_error);
     if (op === "fail") { db.internal_state = "failed"; db.state = "failed"; db.reason = String(payload.reason); }
@@ -128,10 +115,11 @@ describe("Lifty connect page", () => {
     const prepared = await server.request("/connect/email/return/process", status("email", state));
     expect(await prepared.json()).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" }, reference: attemptId });
     expect(db.declaration).toEqual({ mailbox_use: "dedicated" });
-    // The state is persisted before the provider creates the link.
-    expect(db.ops).toEqual(["context", "declare", "context", "claim_link", "dispatch_link", "save_link_claim"]);
+    // The link is stored with the attempt's deterministic auth state.
+    expect(db.ops).toEqual(["context", "declare", "context", "link"]);
     expect(provider.bodies).toEqual([expect.objectContaining({ providers: ["google", "outlook"], domain: "connect.lifty.test",
-      redirect_uri: `https://api.lifty.test/connect/email/return?intent=${encodeURIComponent(state)}`, state: db.payloads.dispatch_link!.state })]);
+      redirect_uri: `https://api.lifty.test/connect/email/return?intent=${encodeURIComponent(state)}`, state: db.payloads.link!.state })]);
+    expect(db.payloads.link).toEqual({ attempt_id: attemptId, state: db.payloads.link!.state, url: hostedLink });
 
     for (let visit = 0; visit < 2; visit++) {
       const again = await server.request(`/connect/email?intent=${encodeURIComponent(state)}`);
@@ -183,43 +171,49 @@ describe("Lifty connect page", () => {
     expect(response.headers.get("location")).toBe(`/connect/email/return?intent=${encodeURIComponent(state)}`);
     expect(db.ops).toEqual(["context"]); expect(provider.calls).toEqual([]);
   });
-  it.each(["provider", "save_link_claim"])("recovers a lost %s response without reissuing the claimed link", async lost => {
-    const db = attemptDb();
-    const { fetchImpl, provider } = stub(db);
-    const original = fetchImpl.getMockImplementation()!;
-    let dropped = false;
-    fetchImpl.mockImplementation(async (input, init) => {
-      const response = await original(input, init);
-      const target = lost === "provider" ? String(input).endsWith("/auth/link")
-        : String(init?.body).includes('"p_operation":"save_link_claim"');
-      if (target && !dropped) { dropped = true; throw new DOMException("response lost", "TimeoutError"); }
-      return response;
+  // LIF-1415: a hosted link connects nothing until someone signs in through a
+  // link Lifty showed, so no link failure may leave the attempt stuck.
+  it.each(["provider timeout", "provider rejection", "lost save response", "failed save"])(
+    "keeps the same attempt retryable after a %s and reaches sign-in on the next try", async failure => {
+      const db = attemptDb(); db.declaration = { mailbox_use: "habitual" };
+      const { fetchImpl, provider } = stub(db), original = fetchImpl.getMockImplementation()!;
+      let failed = false;
+      fetchImpl.mockImplementation(async (input, init) => {
+        const link = String(input).endsWith("/auth/link"), save = String(init?.body).includes('"p_operation":"link"');
+        if (!failed && link && failure.startsWith("provider")) {
+          failed = true; await original(input, init);
+          if (failure === "provider timeout") throw new DOMException("response lost", "TimeoutError");
+          return Response.json({ object: "Error", status: 400, type: "api/invalid_parameters", detail: "PRIVATE" }, { status: 400 });
+        }
+        if (!failed && save && failure.includes("save")) {
+          failed = true;
+          if (failure === "failed save") return Response.json({ message: "unavailable" }, { status: 503 });
+          await original(input, init); throw new DOMException("response lost", "TimeoutError");
+        }
+        return original(input, init);
+      });
+      const server = app(), state = intent();
+      const first = await (await server.request("/connect/email/return/process", status("email", state))).json();
+      expect(first).toEqual({ status: "pending", progress: { stage: "preparing" }, reference: attemptId });
+      const next = await (await server.request("/connect/email/return/status", status("email", state))).json();
+      expect(next).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" }, reference: attemptId });
+      // A save that landed is found by the next read without asking the provider again.
+      expect(provider.calls).toHaveLength(failure === "lost save response" ? 1 : 2);
+      // Both links carry the same auth state; the stored one opens.
+      expect(new Set(provider.bodies.map(body => body.state)).size).toBe(1);
+      const open = await server.request(`/connect/email?intent=${encodeURIComponent(state)}`);
+      expect(open.headers.get("location")).toBe(db.hosted_url);
+      expect(db.ops).not.toContain("fail"); expect(db.state).toBe("pending");
     });
-    const server = app();
-    const response = await server.request("/connect/email", form(`intent=${encodeURIComponent(intent())}&mailbox_use=habitual`));
-    expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toContain("/connect/email/return?intent=");
-    const prepared = await server.request("/connect/email/return/process", status("email", intent()));
-    expect(await prepared.json()).toMatchObject({ status: "pending", progress: lost === "provider"
-      ? { stage: "recovery_required", reason: "issuance_uncertain", retryable: false } : { stage: "sign_in_required" } });
-    expect(db.ops).not.toContain("fail");
-    expect(db.state).toBe("pending");
-    await server.request("/connect/email/return/process", status("email", intent()));
-    const read = await server.request("/connect/email/return/status", status("email", intent()));
-    expect(await read.json()).toMatchObject({ status: "pending", progress: lost === "provider"
-      ? { stage: "recovery_required" } : { stage: "sign_in_required" } });
-    await server.request(`/connect/email?intent=${encodeURIComponent(intent())}`);
-    expect(provider.calls).toEqual(["POST /v2/auth/link"]);
-  });
 
-  it("renders the shell while provider preparation is stalled and lets a concurrent tab discover the durable link", async () => {
+  it("renders the shell while the provider is stalled and keeps the first stored link for concurrent tabs", async () => {
     const db = attemptDb(); db.declaration = { mailbox_use: "habitual" };
     const { fetchImpl, provider } = stub(db), original = fetchImpl.getMockImplementation()!;
-    let release!: () => void, started!: () => void;
+    let release!: () => void, started!: () => void, stalled = true;
     const held = new Promise<void>(resolve => { release = resolve; });
     const dispatched = new Promise<void>(resolve => { started = resolve; });
     fetchImpl.mockImplementation(async (input, init) => {
-      if (String(input).endsWith("/auth/link")) { started(); await held; }
+      if (String(input).endsWith("/auth/link") && stalled) { stalled = false; started(); await held; }
       return original(input, init);
     });
     const server = app(), state = intent();
@@ -228,61 +222,23 @@ describe("Lifty connect page", () => {
     const shell = await server.request(`/connect/email/return?intent=${encodeURIComponent(state)}&prepare=1`);
     expect(shell.status).toBe(200); expect(await shell.text()).toContain("Preparing sign-in");
     const second = await server.request("/connect/email/return/process", status("email", state));
-    expect(await second.json()).toMatchObject({ status: "pending", progress: { stage: "preparing" } });
+    expect(await second.json()).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" } });
+    const stored = db.hosted_url;
     release();
     expect(await (await first).json()).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" } });
-    const check = await server.request("/connect/email/return/status", status("email", state));
-    expect(await check.json()).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" } });
-    expect(provider.calls).toEqual(["POST /v2/auth/link"]);
+    expect(provider.calls).toHaveLength(2);
+    expect(db.hosted_url).toBe(stored);
+    expect((await server.request(`/connect/email?intent=${encodeURIComponent(state)}`)).headers.get("location")).toBe(stored);
   });
 
-  it("never calls the provider after losing an accepted dispatch receipt", async () => {
-    const db = attemptDb(); db.declaration = { mailbox_use: "habitual" };
-    const { fetchImpl, provider } = stub(db), original = fetchImpl.getMockImplementation()!;
-    fetchImpl.mockImplementation(async (input, init) => {
-      const response = await original(input, init);
-      if (String(init?.body).includes('"p_operation":"dispatch_link"')) throw new Error("PRIVATE lost receipt");
-      return response;
-    });
-    const server = app(), state = intent();
-    for (let i = 0; i < 2; i++) {
-      const process = await server.request("/connect/email/return/process", status("email", state));
-      expect(await process.json()).toMatchObject({ status: "pending", reference: attemptId,
-        progress: { stage: "recovery_required", reason: "issuance_uncertain", retryable: false } });
-    }
-    expect(db.payloads.link_issue).toMatchObject({ stage: "preparation", outcome: "uncertain" });
-    expect(JSON.stringify(db.payloads.link_issue)).not.toMatch(/PRIVATE|state|url/);
-    expect(provider.calls).toEqual([]);
-    expect(db.ops.filter(op => op === "dispatch_link")).toHaveLength(1);
-  });
-
-  it("retries only the same save if persistence failed before accepting the URL", async () => {
-    const db = attemptDb(); db.declaration = { mailbox_use: "habitual" };
-    const { fetchImpl, provider } = stub(db), original = fetchImpl.getMockImplementation()!;
-    const saves: Record<string, unknown>[] = [];
-    fetchImpl.mockImplementation(async (input, init) => {
-      const body = JSON.parse(String(init?.body));
-      if (body.p_operation === "save_link_claim") {
-        saves.push(body.p_payload);
-        if (saves.length === 1) throw new Error("unavailable");
-      }
-      return original(input, init);
-    });
-    const response = await app().request("/connect/email/return/process", status("email", intent()));
-    expect(await response.json()).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" } });
-    expect(saves).toHaveLength(2); expect(saves[0]).toEqual(saves[1]);
-    expect(provider.calls).toEqual(["POST /v2/auth/link"]);
-  });
-
-  it("bounds stalled provider preparation and records uncertainty without a second dispatch", async () => {
+  it("bounds a stalled provider call and lets the next check ask again", async () => {
     vi.useFakeTimers();
     vi.spyOn(AbortSignal, "timeout").mockImplementation(ms => { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; });
     const db = attemptDb(); db.declaration = { mailbox_use: "habitual" };
     const { fetchImpl } = stub(db), original = fetchImpl.getMockImplementation()!;
     let calls = 0;
     fetchImpl.mockImplementation(async (input, init) => {
-      if (String(input).endsWith("/auth/link")) {
-        calls++;
+      if (String(input).endsWith("/auth/link") && ++calls === 1) {
         return new Promise<Response>((_resolve, reject) => init!.signal!.addEventListener("abort", () => reject(new Error("PRIVATE stalled provider")), { once: true }));
       }
       return original(input, init);
@@ -290,24 +246,12 @@ describe("Lifty connect page", () => {
     const server = app(), state = intent();
     const work = server.request("/connect/email/return/process", status("email", state));
     await vi.advanceTimersByTimeAsync(15_000);
-    const response = await work;
-    expect(await response.json()).toMatchObject({ status: "pending", progress: { stage: "recovery_required", retryable: false } });
-    expect(db.payloads.link_issue).toMatchObject({ stage: "provider", outcome: "uncertain", elapsed_ms: 15_000 });
-    await server.request("/connect/email/return/process", status("email", state));
-    expect(calls).toBe(1);
-  });
-
-  it("explains legacy stranded issuance without replaying it and accepts a later signed authorization", async () => {
-    const db = attemptDb(); db.declaration = { mailbox_use: "habitual" }; db.internal_state = "issuing";
-    const { provider } = stub(db), server = app(), state = intent();
-    const pending = await server.request("/connect/email/return/process", status("email", state));
-    expect(await pending.json()).toMatchObject({ status: "pending", reference: attemptId,
-      progress: { stage: "recovery_required", reason: "issuance_uncertain", retryable: false } });
-    expect(provider.calls).toEqual([]); expect(db.ops).toEqual(["context"]);
-    db.authorization = { received: true, account_id: "acc_new", return_error: null };
-    const later = await server.request("/connect/email/return/status", status("email", state));
-    expect(await later.json()).toEqual({ status: "connected", account: null, reference: attemptId });
-    expect(provider.calls).not.toContain("POST /v2/auth/link");
+    const stalled = await (await work).json();
+    expect(stalled).toMatchObject({ status: "pending", progress: { stage: "preparing" } });
+    expect(JSON.stringify(stalled)).not.toContain("PRIVATE");
+    const retried = await server.request("/connect/email/return/status", status("email", state));
+    expect(await retried.json()).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" } });
+    expect(calls).toBe(2);
   });
 
 });
