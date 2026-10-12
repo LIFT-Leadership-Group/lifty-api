@@ -192,9 +192,16 @@ describe("Lifty connect page", () => {
         }
         return original(input, init);
       });
+      const logged: string[] = [];
+      vi.spyOn(process.stderr, "write").mockImplementation(line => { logged.push(String(line)); return true; });
       const server = app(), state = intent();
       const first = await (await server.request("/connect/email/return/process", status("email", state))).json();
-      expect(first).toEqual({ status: "pending", progress: { stage: "preparing" }, reference: attemptId });
+      // A refusal is not shown as a sign-in still being prepared; only its error code is logged.
+      expect(first).toEqual({ status: "pending", progress: { stage: "preparing" }, reference: attemptId,
+        ...(failure === "provider rejection" ? { attention: "sign_in_unavailable" } : {}) });
+      if (failure === "provider rejection") expect(logged.map(line => JSON.parse(line))).toContainEqual(expect.objectContaining({
+        event: "connection_confirmation", stage: "process", upstream_code: "400", provider_error: "api/invalid_parameters" }));
+      expect(logged.join("")).not.toContain("PRIVATE");
       const next = await (await server.request("/connect/email/return/status", status("email", state))).json();
       expect(next).toMatchObject({ status: "pending", progress: { stage: "sign_in_required" }, reference: attemptId });
       // A save that landed is found by the next read without asking the provider again.

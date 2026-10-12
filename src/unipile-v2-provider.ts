@@ -1,4 +1,4 @@
-import { connectionFetch } from "./connection-confirmation.js";
+import { connectionFetch, noteProviderError } from "./connection-confirmation.js";
 import { z } from "zod";
 import { PublicError } from "./errors.js";
 import { parseHostedAuthOrigin } from "./hosted-auth-branding.js";
@@ -24,6 +24,9 @@ const Account = z.object({
   metadata: z.object({ v1_account_id: ProviderIdentifier.optional(),
     products_connection_status: z.record(z.string(), z.enum(["running", "disconnected", "errored"])).optional() }),
 });
+// A refused hosted link names its documented error type; only that code is kept.
+// https://developer.unipile.com/v2.0/reference/error-responses
+const HostedLinkError = z.object({object: z.literal("Error"), type: z.string().max(100)});
 const Senders = z.object({data: z.array(z.object({object: z.literal("EmailSender"), email: z.email(),
   is_primary: z.boolean(), verification_status: z.enum(["verified", "pending", "unknown"])})),
   next_cursor: z.string().nullish(), total_count: z.number().int().nonnegative().optional()});
@@ -60,20 +63,29 @@ export function createUnipileV2Provider(settings: UnipileV2Settings & {fetchImpl
         ...(body ? {body: JSON.stringify(body)} : {}),
       });
       if (!response.ok) {
+        // Unipile refused to create the link: asking again gets the same answer.
+        if (path === "auth/link" && [400, 401, 403, 422].includes(response.status)) {
+          const error = HostedLinkError.safeParse(await json(response, signal, 16_384).catch(() => null));
+          if (error.success) noteProviderError(error.data.type);
+          fail("UNIPILE_HOSTED_REJECTED");
+        }
         void response.body?.cancel().catch(() => {});
         if (response.status === 404) fail("UNIPILE_ACCOUNT_NOT_FOUND", 409);
         fail();
       }
-      if (!response.body) fail();
-      const chunks: Uint8Array[] = []; let size = 0;
-      await response.body.pipeTo(new WritableStream<Uint8Array>({write(chunk) {
-        size += chunk.byteLength; if (size > 1_048_576) fail(); chunks.push(chunk);
-      }}), {signal});
-      return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+      return await json(response, signal, 1_048_576);
     } catch (error) {
       if (error instanceof PublicError) throw error;
       fail();
     } finally {clearTimeout(timer);}
+  }
+  async function json(response: Response, signal: AbortSignal, limit: number): Promise<unknown> {
+    if (!response.body) fail();
+    const chunks: Uint8Array[] = []; let size = 0;
+    await response.body.pipeTo(new WritableStream<Uint8Array>({write(chunk) {
+      size += chunk.byteLength; if (size > limit) fail(); chunks.push(chunk);
+    }}), {signal});
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
   }
   function validateTransport(transport: UnipileTransport) {
     if (transport.api_version !== "v2" || transport.application_id !== settings.applicationId

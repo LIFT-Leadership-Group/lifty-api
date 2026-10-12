@@ -144,8 +144,12 @@ export function createAccountConnection(settings: AccountConnectionSettings) {
       const url = hosted(await provider.createLink({ channel, state, transport: current.transport, expiresAt: attempt.expires_at,
         redirectUri: `${settings.publicBaseUrl}/connect/${channel}/return?intent=${encodeURIComponent(intent)}` }));
       return result(await snapshot(channel, "link", { attempt_id: attempt.id, state, url }));
-    } catch {
-      return result(current);
+    } catch (error) {
+      // The attempt stays open and the next check asks again, but a refusal
+      // is not shown as a sign-in that is still being prepared.
+      const pending = result(current);
+      return error instanceof PublicError && error.code === "UNIPILE_HOSTED_REJECTED" && pending.status === "pending"
+        ? { ...pending, attention: "sign_in_unavailable" } : pending;
     }
   }
 
