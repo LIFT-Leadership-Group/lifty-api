@@ -127,10 +127,10 @@ describe("Unipile V2 authenticated contract",()=>{
     expect(h.calls).toHaveLength(1);
   });
   it("never exposes a rejected or malformed hosted setup response",async()=>{
-    for(const body of [new Response(JSON.stringify({object:"Error",status:400,type:"api/invalid_parameters",detail:"secret token"}),{status:400}),new Response("{broken secret")]){
+    for(const [body,code] of [[new Response(JSON.stringify({object:"Error",status:400,type:"api/invalid_parameters",detail:"secret token"}),{status:400}),"UNIPILE_HOSTED_REJECTED"],[new Response("{broken secret"),"UNIPILE_UNAVAILABLE"]] as const){
       const h=harness({body});
       const issue=await h.provider.createLink({channel:"linkedin",state:"opaque",redirectUri:"https://api.lifty.test/return",expiresAt:"2099-01-01T00:00:00Z",transport}).catch(error=>error);
-      expect(issue).toMatchObject({code:"UNIPILE_UNAVAILABLE"});
+      expect(issue).toMatchObject({code});
       expect(String(issue)+JSON.stringify(issue)).not.toContain("secret");
       expect(h.calls).toHaveLength(1);
     }

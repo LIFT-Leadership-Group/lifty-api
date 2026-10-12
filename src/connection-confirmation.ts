@@ -23,7 +23,7 @@ export type ConnectionFlow = keyof typeof CONNECTION_FLOWS;
  * work), or that a warmup handoff is starting. Never terminal evidence.
  */
 export const ConfirmationAttention = z.enum(['released','exists','in_use','already_connected','canceled','provider','starting',
-  'microsoft_sign_in','microsoft_preparing','microsoft_recovery','warmup_action']);
+  'microsoft_sign_in','microsoft_preparing','microsoft_recovery','warmup_action','sign_in_unavailable']);
 export type ConfirmationAttention = z.infer<typeof ConfirmationAttention>;
 export const ConfirmationResult = z.discriminatedUnion('status', [
   z.object({status:z.literal('pending'), attention:ConfirmationAttention.optional(), progress:AccountConnectionProgress.optional(), reference:z.uuid().optional()}),
@@ -46,8 +46,14 @@ export interface ConfirmationAdapter {
   status(input:ConfirmationInput, context:Context):Promise<ConfirmationResult>;
 }
 export type ConfirmationAdapters = Partial<Record<ConnectionFlow, ConfirmationAdapter>>;
-type Execution = {signal:AbortSignal;upstream_status?:number;upstream_outcome?:string};
+type Execution = {signal:AbortSignal;upstream_status?:number;upstream_outcome?:string;provider_error?:string};
 const deadline = new AsyncLocalStorage<Execution>();
+const providerErrorCode = /^[a-z0-9_]{1,40}(\/[a-z0-9_]{1,40})?$/;
+/** Record a provider's error code (e.g. api/invalid_parameters) for this request's log. Codes only, never free text. */
+export function noteProviderError(code:string) {
+  const parent = deadline.getStore();
+  if (parent && providerErrorCode.test(code)) parent.provider_error ??= code;
+}
 /** Entry/declaration requests use the same bounded I/O contract as callbacks. */
 export function withConnectionDeadline<T>(milliseconds:number, work:()=>Promise<T>):Promise<T> {
   return deadline.run({signal:AbortSignal.timeout(milliseconds)}, work);
@@ -90,7 +96,8 @@ var notes={
  microsoft_sign_in:['Continue with Microsoft','Sign in to the mailbox shown on the setup page and approve Mailivery. Microsoft opens in a new tab. Keep this page open: it confirms when warmup is running.',0],
  microsoft_preparing:['Preparing Microsoft sign-in','Lifty is preparing secure Microsoft authorization. This page will show the sign-in button when it is ready.',0],
  microsoft_recovery:['Sign-in preparation needs checking','Lifty could not confirm the sign-in link. Check this same attempt, or return to Lifty for help. Warmup has not been confirmed.',0],
- warmup_action:['Warmup needs attention','Mailbox authorization was received, but warmup could not start. Return to Lifty to see the required mailbox or DNS fix, then check this same attempt.',0]
+ warmup_action:['Warmup needs attention','Mailbox authorization was received, but warmup could not start. Return to Lifty to see the required mailbox or DNS fix, then check this same attempt.',0],
+ sign_in_unavailable:['Sign-in could not open','Lifty could not open the '+label+' sign-in page. Nothing was connected. Return to Lifty with the connection reference for help.',0]
 };
 function attend(attention){
  var note=notes[attention];if(!note||shown===attention)return;shown=attention;
@@ -206,7 +213,7 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
       validated=true;
       // A provider's error code (e.g. api/already_exists) is an untrusted hint but
       // the only record of why an attempt failed. Log codes only, never free text.
-      if(input.errorType&&/^[a-z0-9_]{1,40}(\/[a-z0-9_]{1,40})?$/.test(input.errorType))providerError=input.errorType;
+      if(input.errorType&&providerErrorCode.test(input.errorType))providerError=input.errorType;
       const handler=stage==='process'?adapter.process:adapter.status;
       if(!handler)return c.json(invalidConfirmation(),400);
       // The handler remains awaited; request cancellation never launches an
@@ -218,7 +225,8 @@ export function createConfirmationRouter(flow:ConnectionFlow, adapter:Confirmati
       else status=202;
     }
     if(result.reference)correlation=createHash('sha256').update(flow+'\0'+result.reference).digest('hex').slice(0,24);
-    options.log?.({flow,stage,...(result.reference?{reference:result.reference}:{}),...(result.status==='pending'&&result.progress?{progress_stage:result.progress.stage}:{}),outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{}),...(providerError?{provider_error:providerError}:{})});
+    const reportedError=execution.provider_error??providerError;
+    options.log?.({flow,stage,...(result.reference?{reference:result.reference}:{}),...(result.status==='pending'&&result.progress?{progress_stage:result.progress.stage}:{}),outcome:result.status,elapsed_ms:Date.now()-started,status,correlation,...(execution.upstream_status===undefined?{}:{upstream_status:execution.upstream_status}),...(execution.upstream_outcome?{upstream_outcome:execution.upstream_outcome}:{}),...(reportedError?{provider_error:reportedError}:{})});
     return c.json(result,status===202?202:200);
   });
   return app;
