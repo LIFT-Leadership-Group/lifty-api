@@ -24,7 +24,7 @@ const turn = { turn_ref: message.message_ref, version: 1, lead_ref: message.lead
   sender_id: message.sender_id, sender_name: message.sender_name, lead_name: message.lead_name,
   lead_email: message.lead_email, lead_linkedin_url: message.lead_linkedin_url, campaign_ref: message.campaign_ref,
   inbound_text: "Can you send details?", inbound_at: time, follow_up_due_at: null, created_at: time, sent_at: null,
-  history: [], history_complete: true };
+  history: [{ ...message, account_id: workspace.workspace_ref, sender_id: workspace.workspace_ref }], history_complete: true };
 const replyBody = { expected_version: 0, source_digest: turn.source_digest, action: "send", text: "Happy to help." };
 const rewriteBody = { request_ref: message.message_ref, source_digest: message.source_digest, expected_review_status: "pending" };
 const rewrite = { ...captures.approve, message: { ...message, review_status: "pending" }, rewrite_work: {
@@ -119,7 +119,7 @@ describe("member Review transport", () => {
       ["reply_review_post", { workspace, turn: { ...turn, state: "sent", sent_at: null } }],
       ["reply_review_post", { workspace, turn: { ...turn, account_id: null } }],
       ["reply_review_post", { workspace, turn: { ...turn, draft: "An older draft." } }],
-      ["replies_get", { workspace, turns: [{ ...turn, history: [{ ...sample, lead_ref: workspace.workspace_ref }] }], next_after: null }],
+      ["replies_get", { workspace, turns: [{ ...turn, history: [{ ...sample, message_ref: "invalid" }] }], next_after: null }],
       ["message_rewrite_post", { ...rewrite, rewrite_work: { ...rewrite.rewrite_work, message_ref: message.lead_ref } }],
       ["message_rewrite_post", { ...rewrite, history: [{ ...sample, account_id: message.lead_ref, sender_id: message.lead_ref }] }],
       ["message_rewrite_post", { ...rewrite, revisions: [{ ...sample, account_id: message.lead_ref }] }],

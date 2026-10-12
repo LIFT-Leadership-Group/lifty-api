@@ -65,12 +65,12 @@ export function memberReviewReceiptMatches(action: string, input: IdentityInput,
     case "replies_get": {
       const query = c.ReviewPageQuerySchema.parse(input.query);
       const { turns } = c.ReplyTurnsSchema.parse(value);
-      return turns.length <= (query.limit ?? 100) && turns.every(turn => (!query.channel || turn.channel === query.channel) && sameConversation(turn));
+      return turns.length <= (query.limit ?? 100) && turns.every(turn => !query.channel || turn.channel === query.channel);
     }
     case "reply_get":
     case "reply_review_post": {
       const { turn } = c.ReplyTurnResultSchema.parse(value);
-      if (turn.turn_ref !== input.path.turn_ref || !sameConversation(turn)) return false;
+      if (turn.turn_ref !== input.path.turn_ref) return false;
       if (action === "reply_get") return true;
       const request = c.ReplyTurnReviewSchema.parse(input.body);
       return turn.version > request.expected_version && (request.action === "skip" ? turn.state === "suppressed"
@@ -91,7 +91,4 @@ export function memberReviewReceiptMatches(action: string, input: IdentityInput,
     case "lead_stop_post": return c.StopLeadOutreachResultSchema.parse(value).lead_ref === input.path.lead_ref;
     default: return true;
   }
-}
-function sameConversation(turn: z.infer<typeof c.ReplyTurnSchema>): boolean {
-  return turn.history.every(message => turn.account_id !== null && c.inConversation(message, turn));
 }

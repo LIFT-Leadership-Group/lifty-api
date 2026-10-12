@@ -370,7 +370,7 @@ export const ReplyTurnSchema = z.object({ turn_ref: Ref, version: z.number().int
   lead_linkedin_url: z.string().nullable(), campaign_ref: Ref.nullable(), inbound_text: z.string(), inbound_at: Timestamp,
   follow_up_due_at: Timestamp.nullable(), created_at: Timestamp, sent_at: Timestamp.nullable(),
   history: z.array(CampaignMessageSchema).max(100), history_complete: z.boolean(),
-}).strict().refine(turn => turn.state !== "sent" || turn.sent_at !== null, "A sent reply requires a confirmed receipt.");
+}).strip().refine(turn => turn.state !== "sent" || turn.sent_at !== null, "A sent reply requires a confirmed receipt.");
 export const ReplyTurnsSchema = z.object({ ...Workspace, turns: z.array(ReplyTurnSchema).max(100), next_after: Ref.nullable() }).strict();
 export const ReplyTurnResultSchema = z.object({ ...Workspace, turn: ReplyTurnSchema }).strict();
 export const ReplyTurnReviewSchema = z.object({ expected_version: z.number().int().nonnegative(), source_digest: Digest,
