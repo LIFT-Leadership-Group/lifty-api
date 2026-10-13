@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { STAGE_CLIENT_CONTRACT } from "../src/agent-context.js";
 import { CampaignTestResultSchema, CampaignTestsSchema } from "../src/outreach-contracts.js";
+import { testFailureMessage } from "../src/campaign-test-failure.js";
 import fixtures from "./outreach-test-sql-fixtures.json" with { type: "json" };
 const test = fixtures.test_pending.test;
 const body = { request_ref: test.request_ref, expected_version: 1, revision_ref: test.revision_ref, digest: test.digest,
@@ -55,7 +56,7 @@ describe("isolated saved campaign tests", () => {
     expect(response.status).toBe(200);
     const samples: Array<{ failure: Record<string, unknown> }> = (await response.json()).test.samples;
     expect(samples.map(sample => sample.failure)).toEqual(expect.arrayContaining([
-      { code: "composition_held", message: "This draft could not be completed, and no reason was recorded for it." },
+      { code: "composition_held", message: "The writer did not return a draft for this lead. Nothing was saved or sent; preview again, and report it if it repeats." },
       { code: "composition_templates_unavailable", stage: "version", position: 4, cause: "TemplateReadiness.undeclared_slot",
         message: "A saved template in step 4 uses a {placeholder} Lifty cannot fill. Use {first_name}, {company} or a declared slot, then preview again." },
     ]));
@@ -64,6 +65,13 @@ describe("isolated saved campaign tests", () => {
     const bare = await harness(legacy).request("GET", path);
     expect(bare.status).toBe(200);
     expect((await bare.json()).test.samples.every((sample: object) => !("failure" in sample))).toBe(true);
+    // LIF-1445: AgentAPI failures name the writer or the service, never a raw status.
+    expect(testFailureMessage({ code: "composition_held", stage: "compose", position: 1, cause: "AgentApiSchemaError", http_status: 400 }))
+      .toBe("The writer did not return a usable draft for this lead. Nothing was saved or sent; previewing again usually works, and report it if it keeps happening.");
+    for (const failure of [{ cause: "AgentApiHttpError", http_status: 503 }, { cause: "AgentBusyError", http_status: 500 }, { http_status: 429 }])
+      expect(testFailureMessage({ code: "composition_held", stage: "compose", ...failure })).toMatch(/^Lifty's writing service is busy or unavailable/);
+    expect(testFailureMessage({ code: "composition_held", stage: "compose", cause: "AgentApiHttpError", http_status: 401 }))
+      .toMatch(/^Lifty could not reach its writing service/);
     const invented = { ...fixtures.test_failed, test: { ...failed, samples: failed.samples.map(sample => ({ ...sample, failure: { code: "made_up" } })) } };
     expect((await harness(invented).request("GET", path)).status).toBe(502);
   });
