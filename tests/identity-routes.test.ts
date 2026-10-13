@@ -75,6 +75,23 @@ describe("Identity member routes", () => {
     expect(h.effects.revoke).not.toHaveBeenCalled();
   });
 
+  it("publishes sending state, limits and access removal, and still accepts reads without them", async () => {
+    const held = account(accountId, { sending: { allowed: false, reason: "paused_by_lift", scope: "account" }, limits: { emails_per_day: 10 }, access_removal: null });
+    const linkedin = account(otherAccount, { channel: "linkedin", identity: "https://www.linkedin.com/in/ana", declaration: null,
+      sending: { allowed: true, reason: null, scope: null }, limits: { invitations_per_day: 30, messages_per_day: 30, invitations_per_7_days: 25 } });
+    for (const accounts of [[held, linkedin], [account()]]) {
+      const h = harness(() => ({ workspace, accounts }));
+      const response = await h.request("GET", "/v1/workspace/sending-accounts");
+      expect(response.status).toBe(200);
+      expect((await response.json()).accounts).toEqual(accounts);
+    }
+    // An unknown reason or a mixed limit shape is not the published contract.
+    for (const invalid of [{ sending: { allowed: false, reason: "lift_hold", scope: null } }, { limits: { emails_per_day: 10, messages_per_day: 5 } }]) {
+      const h = harness(() => ({ workspace, accounts: [account(accountId, invalid)] }));
+      expect((await h.request("GET", "/v1/workspace/sending-accounts")).status).toBe(502);
+    }
+  });
+
   it("preserves signature input for SQL normalization and accepts its 500-character Unicode result", async () => {
     const raw = "  " + "😀".repeat(498) + "\r\nA  ";
     const normalized = "😀".repeat(498) + "\nA";
@@ -204,6 +221,23 @@ describe("account disconnect and sender delete receipts", () => {
       expect(response.status, readback).toBe(202);
       expect(await response.json()).toMatchObject({ account: { id: accountId, status: "disconnected", state: "paused", access_revoked_at: null } });
     }
+  });
+
+  it("returns 200 without provider work for a previous tool's account Lifty never authorized", async () => {
+    const legacy = (id = accountId) => account(id, { status: "disconnected", state: "paused", disconnected_at: now, access_removal: "not_applicable" });
+    const disconnect = harness(() => ({ workspace, account: legacy() }));
+    expect((await disconnect.request("POST", `/v1/workspace/sending-accounts/${accountId}/disconnect`, { confirm: true })).status).toBe(200);
+    expect(disconnect.effects.revoke).not.toHaveBeenCalled();
+    expect(disconnect.calls).toHaveLength(1);
+
+    // A deleted sender with one legacy and one Lifty account removes only the Lifty access.
+    const removed = account(otherAccount, { status: "disconnected", state: "paused", disconnected_at: now, access_revoked_at: now, access_removal: "confirmed" });
+    const h = harness(name => name === "delete_lifty_sender"
+      ? { workspace, sender: { id: senderId, version: 3, deleted_at: now }, accounts: [legacy(), { ...blocked(otherAccount), access_removal: "pending" }] }
+      : { workspace, accounts: [legacy(), removed] });
+    const response = await h.request("POST", `/v1/workspace/senders/${senderId}/delete`, { expected_version: 2, confirm: true });
+    expect(response.status).toBe(200);
+    expect(vi.mocked(h.effects.revoke).mock.calls[0]![0].map(item => item.id)).toEqual([otherAccount]);
   });
 
   it("skips provider work when access removal is already confirmed", async () => {

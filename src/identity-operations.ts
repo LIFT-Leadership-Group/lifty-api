@@ -67,7 +67,7 @@ export const identityOperationDefinitions = {
       path: contracts.IdPath, query: Empty, request: contracts.SenderDeleteSchema, invalid: invalidRequest,
       response: contracts.SenderDeleteResultSchema, success: 202,
       args: input => ({ p_sender_id: path(input), p_payload: input.body }),
-      description: "Soft-delete a person with expected_version and confirm:true. The person leaves the roster and every account they own is disconnected exactly as sending-accounts disconnect; history stays. 200 when Lifty's access was confirmed removed for every account, 202 when the accounts are blocked but removal at the provider is still unconfirmed (access_revoked_at null): repeat the same request to finish it. Not reversible.",
+      description: "Soft-delete a person with expected_version and confirm:true. The person leaves the roster and every account they own is disconnected exactly as sending-accounts disconnect; history stays. 200 when Lifty's access was confirmed removed for every account (or not applicable), 202 when the accounts are blocked but removal at the provider is still unconfirmed: repeat the same request to finish it. Not reversible.",
     },
   },
   "sending-accounts": {
@@ -75,7 +75,7 @@ export const identityOperationDefinitions = {
       method: "GET", route: accountsRoute, rpc: "get_lifty_sending_accounts", path: Empty,
       query: contracts.AccountsQuerySchema, request: null, invalid: invalidRequest,
       response: contracts.AccountsGetSchema, success: 200, args: input => ({ p_query: input.query }),
-      description: "Read sending accounts, optionally filtered by sender_id and channel, including disconnected history: connection status, usage state (active/paused), last verified check, observation (verified/unverified), declaration and sends. Read-only; never checks or changes a provider. Unverified means the last known facts are older than the freshness window, not a disconnection.",
+      description: "Read sending accounts, optionally filtered by sender_id and channel, including disconnected history: connection status, usage state (active/paused), sending (allowed now, else reason), daily limits, last verified check, observation (verified/unverified), access removal, declaration and sends. Read-only; never checks or changes a provider. Unverified means the last known facts are older than the freshness window, not a disconnection.",
     },
     connect: {
       method: "POST", route: `${accountsRoute}/connect`, cli: { operation: "connect" }, rpc: "connect_lifty_sending_account",
@@ -103,7 +103,7 @@ export const identityOperationDefinitions = {
       path: contracts.IdPath, query: Empty, request: contracts.DisconnectSchema, invalid: invalidRequest,
       response: contracts.AccountResultSchema, success: 202,
       args: input => ({ p_account_id: path(input), p_payload: input.body }),
-      description: "Disconnect this account with confirm:true: it is paused and disconnected at once (new sends stop; submitted sends keep their history), then Lifty requests removal of its access at the provider. 200 when removal is confirmed (access_revoked_at set), 202 when it is still unconfirmed: repeat the same request to finish it, no new consent needed. Other accounts are unaffected.",
+      description: "Disconnect this account with confirm:true: it is paused and disconnected at once (new sends stop; submitted sends keep their history), then Lifty requests removal of its access at the provider. 200 when removal is confirmed (access_revoked_at set) or not applicable, 202 when it is still unconfirmed: repeat the same request to finish it, no new consent needed. Other accounts are unaffected.",
     },
   },
 } satisfies Record<string, Record<string, IdentityDefinition>>;
@@ -194,20 +194,20 @@ export async function executeIdentityOperation(session: AuthSession, key: string
     const receipt = verified(contracts.AccountResultSchema, data);
     const accounts = await revokeWithinBudget([receipt.account], receipt.account.sender_id);
     const account = accounts.find(item => item.id === receipt.account.id) ?? receipt.account;
-    return { status: account.access_revoked_at ? 200 : 202, body: { ...receipt, account } };
+    return { status: contracts.removalPending(account) ? 202 : 200, body: { ...receipt, account } };
   }
   if (key === "senders.delete") {
     const receipt = verified(contracts.SenderDeleteResultSchema, data);
     const latest = await revokeWithinBudget(receipt.accounts, receipt.sender.id);
     const accounts = receipt.accounts.map(account => latest.find(item => item.id === account.id) ?? account);
-    return { status: accounts.every(account => account.access_revoked_at) ? 200 : 202, body: { ...receipt, accounts } };
+    return { status: accounts.some(contracts.removalPending) ? 202 : 200, body: { ...receipt, accounts } };
   }
   return { status: definition.success, body: verified(definition.response, data) };
 
   // The local block already committed. Provider work shares one deadline; a
   // failed readback keeps the committed receipt (revocation stays unconfirmed).
   async function revokeWithinBudget(accounts: contracts.Account[], senderId: string): Promise<contracts.Account[]> {
-    const pending = accounts.filter(account => account.status === "disconnected" && !account.access_revoked_at);
+    const pending = accounts.filter(contracts.removalPending);
     if (!pending.length) return accounts;
     const budget = AbortSignal.timeout(REVOCATION_BUDGET_MS);
     try { await connector.revoke(pending, signal ? AbortSignal.any([signal, budget]) : budget); } catch { /* unconfirmed */ }

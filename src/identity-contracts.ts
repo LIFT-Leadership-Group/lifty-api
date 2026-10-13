@@ -25,6 +25,22 @@ const Declaration = z.union([
   z.object({ habitual_personal_account: z.literal(true), no_other_automation: z.literal(true),
     declared_by: Id.nullable(), declared_at: Timestamp }).strict(),
 ]);
+// LIF-1446: whether the account-level send gate lets this account send now.
+// `paused_by_member` is the account's own `state`; `paused_by_lift` is a LIFT
+// hold that only LIFT releases, at the reported scope.
+export const SendingReason = z.enum([
+  "paused_by_member", "paused_by_lift", "channel_paused", "workspace_suspended", "disconnected",
+  "needs_reconnect", "status_unconfirmed", "connection_unavailable", "sender_deleted", "mailbox_not_ready",
+  "previous_automation_active", "blocked",
+]);
+export const SendingScope = z.enum(["account", "sender", "channel", "workspace", "all_workspaces"]);
+const Sending = z.object({ allowed: z.boolean(), reason: SendingReason.nullable(), scope: SendingScope.nullable() }).strict();
+const Limit = z.number().int().nonnegative();
+// The limits the send budgets enforce; null when no Lifty budget governs the account.
+const Limits = z.union([
+  z.object({ emails_per_day: Limit }).strict(),
+  z.object({ invitations_per_day: Limit, messages_per_day: Limit, invitations_per_7_days: Limit }).strict(),
+]);
 export const AccountSchema = z.object({
   id: Id,
   sender_id: Id,
@@ -32,15 +48,24 @@ export const AccountSchema = z.object({
   identity: z.string().min(1).max(2048).nullable(),
   status: z.enum(["connected", "needs_reconnect", "disconnected"]),
   state: z.enum(["active", "paused"]),
+  // Optional until the Functions migration 20261013160000 is live everywhere.
+  sending: Sending.optional(),
+  limits: Limits.nullable().optional(),
   checked_at: Timestamp.nullable(),
   observation: z.object({ state: z.enum(["verified", "unverified"]) }).strict(),
   connected_at: Timestamp.nullable(),
   disconnected_at: Timestamp.nullable(),
   access_revoked_at: Timestamp.nullable(),
+  // pending: Lifty still holds provider access to remove; not_applicable: a
+  // previous tool's account Lifty never authorized, so nothing to remove.
+  access_removal: z.enum(["pending", "confirmed", "not_applicable"]).nullable().optional(),
   declaration: Declaration.nullable(),
   sends: z.object({ today: Count, last_7_days: Count }).strict(),
 }).strict();
 export type Account = z.infer<typeof AccountSchema>;
+/** Disconnected with provider access still to remove (a retired provider's account has none). */
+export const removalPending = (account: Account) =>
+  account.status === "disconnected" && !account.access_revoked_at && account.access_removal !== "not_applicable";
 export const SenderSchema = z.object({
   id: Id,
   version: Version,
