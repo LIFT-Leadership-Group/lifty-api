@@ -6,6 +6,7 @@ export const TEST_FAILURE_CODES = [
   "composition_held", "composition_configuration_invalid", "composition_context_unavailable",
   "composition_context_mismatch", "composition_templates_unavailable", "composition_approaches_unavailable",
   "composition_research_mismatch", "composition_receipt_invalid", "composition_quality_hold", "composition_unexpected",
+  "composition_lead_data_missing",
 ] as const;
 export const TEST_FAILURE_STAGES = ["identity", "version", "sender_identity", "compose", "signing"] as const;
 
@@ -65,6 +66,12 @@ export function testFailureMessage(failure: TestFailure): string {
       return templatesMessage(failure);
     case "composition_receipt_invalid":
       return "The writer returned copy that did not fit the saved campaign. Nothing was saved or sent; previewing again usually works.";
+    case "composition_lead_data_missing": {
+      // LIF-1458: Jobs stops before writing when no template the lead's data
+      // can fill exists; `cause` names the missing field.
+      const field = failure.cause === "first_name" ? "first name" : failure.cause === "company" ? "company name" : "details";
+      return `This lead has no ${field}, and the campaign's templates need it. Nothing was written or sent; add it to the lead or use a template that doesn't need it, then preview again.`;
+    }
     case "composition_quality_hold":
       return `A draft${failure.position ? ` for step ${failure.position}` : ""} did not pass Lifty's quality check. Adjust that step's template or instructions, then preview again.`;
     case "composition_context_unavailable":
