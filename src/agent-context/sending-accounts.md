@@ -15,6 +15,11 @@ behind Lifty's connection pages; do not name it.
   operator).
 - `state`: `active` or `paused`, the account's own usage switch, independent of
   `status`.
+- `sending`: whether the account may send now (`allowed`) and, if not, the
+  `reason`. `paused_by_member` is its own pause; `paused_by_lift` (with
+  `scope`) is a LIFT hold that only LIFT releases. Campaign schedule, review
+  and daily budget still apply.
+- `limits`: daily limits Lifty enforces (null when none). Only LIFT changes them.
 - `checked_at` and `observation.state`: the last verified provider check and
   whether it is recent enough. `unverified` means the last known facts are
   older than the freshness window; it is not a disconnection and not a reason
@@ -83,7 +88,8 @@ current sign-in; ask LIFT support rather than connecting a different account.
 the user asks. Pause stops new work on that account (in-flight sends settle);
 resume makes it usable again only when it is connected and every campaign gate
 allows. Resume refuses a disconnected account (`ACCOUNT_DISCONNECTED`):
-reconnect first. Neither changes other accounts or activates a campaign.
+reconnect first. Resume never lifts `paused_by_lift`. Neither changes other
+accounts or activates a campaign.
 
 ## Disconnect
 
@@ -91,7 +97,9 @@ Only with the user's explicit yes in this conversation:
 `sending_accounts_disconnect` with `path.id` and `{"confirm":true}`. The account
 is paused and disconnected at once (new sends stop; already submitted sends
 keep their history and limits), then Lifty removes its access at the provider.
-200 means access removal is confirmed (`access_revoked_at`). 202 means the
+200 means access removal is confirmed (`access_revoked_at`) or not applicable
+(`access_removal: not_applicable`: a previous tool's account; connect it again
+to use it). 202 means the
 account is blocked but removal is not confirmed yet: repeat the same request a
 few times with short waits; no new consent is needed. If it stays unconfirmed,
 tell the user the account is blocked and removal is pending, and repeat it later

@@ -254,3 +254,16 @@ without a post-send sample. This API revision, the Jobs revision that accepts 0
 and the dashboard must all be active before any workspace is set to 0; the
 Functions migration `20261009150000_lif1360_sample_review_off.sql` is what
 allows saving it.
+
+## Sending account state and limits
+
+LIF-1446 adds `sending` (whether the account-level send gate allows the
+account now, else the reason and scope), `limits` and `access_removal` to every
+sending account. The fields are optional, so ship this API revision before the
+Functions migration `20261013160000_lif1446_sending_account_state_limits.sql`:
+an older API rejects a response that carries them. `access_removal:
+not_applicable` (a previous tool's account Lifty never authorized) needs no
+provider revocation, so disconnect and sender delete return 200 for it. Limits
+are changed only by LIFT admins through the database RPC
+`set_lifty_sending_account_limits`, called by the dashboard; this API exposes
+no write for them.
