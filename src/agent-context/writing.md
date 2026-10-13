@@ -157,8 +157,9 @@ Templates take placeholders in single braces. Lifty fills `{first_name}` and
 `{company}` (the company's spoken name) from each lead, and `{sender_first_name}`
 from the mailbox in email only; there is no last-name placeholder. Any other
 lower-case slot, such as `{pain}`, is written for each lead from the campaign
-instructions. Shared template banks have their existing slot catalog,
-and generate mode composes using the reusable overlay and each lead's evidence.
+instructions. In shared template banks the text also defines the slots; a
+template's `slots_spec` only guides the writer. Generate mode composes using
+the reusable overlay and each lead's evidence.
 Keep sample-specific facts out of universal instructions. Review saved examples
 as examples of that policy; they do not imply a fixed recipient list. Follow
 individual campaign workflows only when explicitly requested.

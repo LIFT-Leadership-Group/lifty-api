@@ -75,6 +75,30 @@ describe("canonical Outreach member transport", () => {
     expect(activated.customer_list).toEqual({ state: "fresh", reason: null, checked_at: "2026-10-07T04:05:00.123+00:00" });
     expect(h.rpc.mock.calls.map(call => call[0])).toEqual(["publish_lifty_campaign", "activate_lifty_campaign"]);
   });
+  it("LIF-1454: warns when slots_spec names a placeholder its template's subject and text do not use, without blocking or changing the save", async () => {
+    const consistent = "{company} = the spoken company name. {pain} = one verified pain.";
+    const stale = `${consistent} No {main_focus}.`;
+    const templated = (slots_spec: string) => ({ ...policy, compose_mode: "templates", steps: [{ position: 1, delay: { business_days: 0 },
+      template: { id: "pain-1", arms: ["pain"], subject: "{company} and month-end", text: "Hi {first_name}, {pain}", slots_spec } }] });
+    const email = { ...campaign, channel: "email" };
+    const draft = { ...revision(templated(consistent)), revision_ref: senderId };
+    const h = harness(name => ({ workspace, campaign: name === "create_lifty_campaign" ? { ...email, draft_revision: revision(templated(stale)), revisions: [revision(templated(stale))] }
+      : name === "publish_lifty_campaign" ? { ...email, draft_revision: draft, revisions: [draft, revision(templated(stale), true)] }
+        : { ...email, draft_revision: draft, revisions: [draft] } }));
+    const warning = { revision_ref: revisionRef, unused_placeholders: [{ position: 1, template: "pain-1", placeholder: "{main_focus}" }] };
+
+    const saved = await h.request("POST", "/v1/workspace/campaigns", { name: "Email", journey_ref: journeyRef, channel: "email", policy: templated(stale) });
+    expect(saved.status).toBe(201);
+    expect((await saved.json()).slots_spec_warnings).toEqual(warning);
+    expect(h.rpc).toHaveBeenLastCalledWith("create_lifty_campaign", expect.objectContaining({ p_payload: expect.objectContaining({ policy: templated(stale) }) }));
+    // Publishing an older revision warns about the revision it approved, not the newer draft.
+    const published = await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/publish`, { expected_version: 1, revision_ref: revisionRef, digest });
+    expect(published.status).toBe(200);
+    expect((await published.json()).slots_spec_warnings).toEqual(warning);
+    const fixed = await h.request("PATCH", `/v1/workspace/campaigns/${campaignRef}/draft`, { expected_version: 2, revision_ref: revisionRef, changes: { steps: templated(consistent).steps } });
+    expect(fixed.status).toBe(200);
+    expect(await fixed.json()).not.toHaveProperty("slots_spec_warnings");
+  });
   it("LIF-1128: refuses activation while the CRM customer list is not current and says where to read why", async () => {
     const h = harness(() => { throw { code: "PT409", message: "OUTREACH_CUSTOMER_LIST_NOT_CURRENT" }; });
     const response = await h.request("POST", `/v1/workspace/campaigns/${campaignRef}/activate`, { expected_version: 2, revision_ref: revisionRef, digest });

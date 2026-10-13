@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { WorkspaceIdentitySchema } from "./business-contracts.js";
-import { WritingRecommendationsSchema } from "./writing-rules.js";
+import { WritingRecommendationsSchema, templateRef } from "./writing-rules.js";
 import { TEST_FAILURE_CODES, TEST_FAILURE_STAGES } from "./campaign-test-failure.js";
 
 const Ref = z.uuid();
@@ -46,7 +46,8 @@ const DisplayName = text(100).refine(value => !/[\u0000-\u001f\u007f]/.test(valu
 const Template = z.object({ subject: Subject.optional(), text: text(20000), display_name: DisplayName.optional(),
   id: CatalogId.optional(), arms: z.array(Arm).min(1).max(4).refine(values => new Set(values).size === values.length).optional(),
   variant: CatalogId.optional(), coverage: z.enum(["broad", "signal_specific"]).optional(),
-  fit: line(2000).optional(), slots_spec: line(4000).optional(),
+  fit: line(2000).optional(),
+  slots_spec: line(4000).optional().describe("Free-form guidance the writer reads about the slots this template's subject and text use. The text defines the slots; this spec never adds or removes one."),
 }).strict();
 const Variant = Template.extend({ lane: LaneName.optional(), opener: z.enum(["cold", "linkedin_bridge"]).optional() }).strict();
 const Step = z.object({ position: z.number().int().min(1).max(5), delay: DelaySchema,
@@ -179,6 +180,31 @@ export function canonicalTemplateText(value: string): string {
     return field ? `{${field}}` : match;
   });
 }
+// LIF-1454: a template's subject and text define its slots; slots_spec is
+// prose the writer reads. A spec naming a placeholder its own template never
+// uses is reported, never enforced: prose may mention one on purpose
+// ("No {main_focus}"), and saved bytes are never changed.
+const PLACEHOLDER = /\{[a-z][a-z0-9_]*\}/g;
+export const SlotsSpecWarningsSchema = z.object({ revision_ref: Ref,
+  unused_placeholders: z.array(z.object({ position: z.number().int().positive(), template: z.string().nullable(),
+    placeholder: z.string() }).strict()).min(1),
+}).strict();
+export type SlotsSpecWarnings = z.infer<typeof SlotsSpecWarningsSchema>;
+interface SpecTemplate { id?: string | undefined; lane?: string | undefined; opener?: string | undefined;
+  subject?: string | undefined; text: string; slots_spec?: string | undefined }
+/** Placeholders each template's slots_spec names that its own subject and
+ * text do not use. Null when there are none. */
+export function slotsSpecWarnings(revision: { revision_ref: string;
+  content: { steps: Array<{ position: number; template?: SpecTemplate | undefined; variants?: SpecTemplate[] | undefined }> } }): SlotsSpecWarnings | null {
+  const unused = revision.content.steps.flatMap(step => [...(step.template ? [step.template] : []), ...(step.variants ?? [])].flatMap(template => {
+    if (!template.slots_spec) return [];
+    const used = new Set(canonicalTemplateText(`${template.subject ?? ""}\n${template.text}`).match(PLACEHOLDER));
+    const named = new Set(canonicalTemplateText(template.slots_spec).match(PLACEHOLDER));
+    return [...named].filter(placeholder => !used.has(placeholder))
+      .map(placeholder => ({ position: step.position, template: templateRef(template), placeholder }));
+  }));
+  return unused.length ? { revision_ref: revision.revision_ref, unused_placeholders: unused } : null;
+}
 const canonicalTemplate = <T extends { text: string; subject?: string | undefined }>(template: T): T =>
   ({ ...template, text: canonicalTemplateText(template.text), ...(template.subject === undefined ? {} : { subject: canonicalTemplateText(template.subject) }) });
 const canonicalSteps = (steps: z.infer<typeof Step>[]) => steps.map(step => ({ ...step,
@@ -258,8 +284,12 @@ const Workspace = { workspace: WorkspaceIdentitySchema };
 export const JourneyResultSchema = z.object({ ...Workspace, journey: JourneySchema }).strict();
 // Banned phrases in the draft's saved templates. Recommendations only: they
 // never block a save, preview or approval. Absent when the list is unknown.
+// slots_spec_warnings: the API adds it (never the database); absent when the
+// revision has none.
 export const CampaignResultSchema = z.object({ ...Workspace, campaign: CampaignSchema,
-  writing_recommendations: WritingRecommendationsSchema.optional() }).strict();
+  writing_recommendations: WritingRecommendationsSchema.optional(),
+  slots_spec_warnings: SlotsSpecWarningsSchema.optional().describe("Placeholders a template's slots_spec names that its own subject and text do not use, in the published revision for publish and the draft otherwise. Warnings only; absent when there are none."),
+}).strict();
 export const JourneySummarySchema = z.object({ journey_ref: Ref, version: Version, name: Name, active_revision: RevisionSummarySchema.nullable(),
   draft_revision: RevisionSummarySchema, executable_version: ExecutableVersionSchema.nullable() }).strict();
 export const JourneysSchema = z.object({ ...Workspace, journeys: z.array(JourneySummarySchema).max(100), next_cursor: Ref.nullable() }).strict();

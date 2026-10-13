@@ -206,7 +206,11 @@ export async function executeOutreachOperation(session: AuthSession, key: string
     // The response schema already validated this Campaign (activation adds its Journey).
     const { campaign } = parsed.data as { campaign: z.infer<typeof c.CampaignSchema> };
     const recommendations = writingRecommendations(campaign.draft_revision, campaign.channel);
-    if (recommendations) return { ...(parsed.data as object), writing_recommendations: recommendations };
+    // Publish may approve an older revision; warn about the one it approved.
+    const published = entry.action === "publish" ? campaign.revisions.find(revision => revision.revision_ref === body?.revision_ref) : undefined;
+    const slots = c.slotsSpecWarnings(published ?? campaign.draft_revision);
+    if (recommendations || slots) return { ...(parsed.data as object),
+      ...(recommendations ? { writing_recommendations: recommendations } : {}), ...(slots ? { slots_spec_warnings: slots } : {}) };
   }
   return parsed.data;
 }
