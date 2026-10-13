@@ -124,7 +124,7 @@ export const businessOperationDefinitions = {
       rpc: "save_lifty_setup_draft",
       code: "SETUP_DRAFT_INVALID",
       description:
-        "Save the current workspace draft with expected_version and generated_criteria or null. The server binds generated criteria to the draft version this save creates. Submitted drafts are immutable. Does not submit or activate work.",
+        "Replace the current workspace draft with the supplied complete draft and generated_criteria, or null to clear generated criteria. Uses expected_version and retains prior revisions. The server binds generated criteria to the draft version this save creates. Submitted drafts are immutable. Does not submit or activate work.",
     },
     delete_draft: {
       method: "DELETE",

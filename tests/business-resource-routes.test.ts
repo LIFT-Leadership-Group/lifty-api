@@ -829,6 +829,7 @@ describe("research schedule, leads and sample share one workspace rule", () => {
     ["PATCH", "/v1/workspace/research-schedule", { weekly_target: 20 }, 422, "TARGET_INVALID", "/expected_version"],
     ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 0 }, 422, "TARGET_INVALID", "/weekly_target"],
     ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 2.5 }, 422, "TARGET_INVALID", "/weekly_target"],
+    ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 1_000_000_000 }, 422, "TARGET_INVALID", "/weekly_target"],
     ["PATCH", "/v1/workspace/research-schedule", { expected_version: 1, weekly_target: 20, run_days: ["mon"] }, 422, "TARGET_INVALID", "/"],
     ["POST", "/v1/workspace/research-schedule/activate", {}, 400, "INVALID_REQUEST", "/expected_version"],
     ["POST", "/v1/workspace/research-schedule/pause", { expected_version: -1 }, 400, "INVALID_REQUEST", "/expected_version"],

@@ -46,7 +46,8 @@ export const ResearchSchedulePatchSchema = z
       .number()
       .int()
       .min(1)
-      .max(2_147_483_647)
+      // The RPC accepts one-to-nine-digit targets before enforcing plan limits.
+      .max(999_999_999)
       .nullable()
       .describe("People per week, from 1 up to the limit, or null to follow the plan's full limit."),
   })
