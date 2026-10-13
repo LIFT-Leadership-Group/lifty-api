@@ -39,9 +39,27 @@ function templatesMessage(failure: TestFailure): string {
   }
 }
 
+/** The AgentAPI error classes Jobs names as `cause` (LIF-1445). */
+const WRITER_OUTPUT_CAUSE = "AgentApiSchemaError";
+const SERVICE_CAUSES = new Set(["AgentBusyError", "AgentApiHttpError"]);
+
+/** A failure AgentAPI reported: the writer's output failed its schema (a
+ * refusal or invalid draft, usually fine on the next try), or the writing
+ * service itself was busy or unavailable. */
+function writerMessage(failure: TestFailure): string | undefined {
+  const status = failure.http_status;
+  if (failure.cause === WRITER_OUTPUT_CAUSE || status === 400)
+    return "The writer did not return a usable draft for this lead. Nothing was saved or sent; previewing again usually works, and report it if it keeps happening.";
+  if (status === 429 || (status !== undefined && status >= 500) || (status === undefined && SERVICE_CAUSES.has(failure.cause ?? "")))
+    return "Lifty's writing service is busy or unavailable right now, so this draft was not written. Nothing was saved or sent; preview again in a few minutes.";
+  if (status !== undefined)
+    return "Lifty could not reach its writing service, so this draft was not written. Nothing was saved or sent; report it if it repeats.";
+  return undefined;
+}
+
 export function testFailureMessage(failure: TestFailure): string {
-  if (failure.http_status)
-    return `The writing service answered with HTTP ${failure.http_status}, so this draft was not written. Nothing was saved or sent; preview again later.`;
+  const writer = writerMessage(failure);
+  if (writer) return writer;
   switch (failure.code) {
     case "composition_templates_unavailable":
       return templatesMessage(failure);
@@ -59,7 +77,7 @@ export function testFailureMessage(failure: TestFailure): string {
     case "composition_approaches_unavailable":
       return "No LinkedIn approach is active for this workspace, so the first message cannot be written.";
     case "composition_held":
-      return "This draft could not be completed, and no reason was recorded for it.";
+      return "The writer did not return a draft for this lead. Nothing was saved or sent; preview again, and report it if it repeats.";
     case "composition_unexpected":
       if (failure.stage === "sender_identity")
         return "The sending mailbox's name could not be verified, so templates that use {sender_first_name} cannot be filled.";

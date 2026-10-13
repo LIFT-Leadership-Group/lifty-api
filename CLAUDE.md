@@ -241,6 +241,12 @@ API revision first: the Functions migration that stores and returns failures
 comes next, then the Jobs runner that reports the real code. An older API
 rejects a response that carries the new field.
 
+LIF-1445: an AgentAPI failure stays `composition_held` (the code is the
+retry class) and is explained by `cause`/`http_status`: `AgentApiSchemaError`
+or 400 means the writer's output failed its schema; `AgentBusyError`,
+`AgentApiHttpError`, 429 or 5xx means the writing service was unavailable.
+The message never shows a raw status. Either deploy order is safe.
+
 ## Sending without a post-send sample
 
 LIF-1360: a channel's `sample_rate` may be 0, meaning the channel sends
