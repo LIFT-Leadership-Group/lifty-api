@@ -72,6 +72,10 @@ describe("isolated saved campaign tests", () => {
       expect(testFailureMessage({ code: "composition_held", stage: "compose", ...failure })).toMatch(/^Lifty's writing service is busy or unavailable/);
     expect(testFailureMessage({ code: "composition_held", stage: "compose", cause: "AgentApiHttpError", http_status: 401 }))
       .toMatch(/^Lifty could not reach its writing service/);
+    // LIF-1458: a lead missing data the templates need is named, not retried blindly.
+    expect(testFailureMessage({ code: "composition_lead_data_missing", stage: "compose", position: 1, cause: "company" }))
+      .toBe("This lead has no company name, and the campaign's templates need it. Nothing was written or sent; add it to the lead or use a template that doesn't need it, then preview again.");
+    expect(testFailureMessage({ code: "composition_lead_data_missing", cause: "first_name" })).toMatch(/^This lead has no first name,/);
     const invented = { ...fixtures.test_failed, test: { ...failed, samples: failed.samples.map(sample => ({ ...sample, failure: { code: "made_up" } })) } };
     expect((await harness(invented).request("GET", path)).status).toBe(502);
   });

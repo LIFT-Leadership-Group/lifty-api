@@ -253,6 +253,10 @@ or 400 means the writer's output failed its schema; `AgentBusyError`,
 `AgentApiHttpError`, 429 or 5xx means the writing service was unavailable.
 The message never shows a raw status. Either deploy order is safe.
 
+LIF-1458 adds `composition_lead_data_missing` (`cause` names the missing
+lead field). Ship this API revision before the Jobs revision that reports it:
+an older API answers a sample carrying an unknown code with 502.
+
 ## Sending without a post-send sample
 
 LIF-1360: a channel's `sample_rate` may be 0, meaning the channel sends
