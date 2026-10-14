@@ -19,9 +19,9 @@ function operation(key: string, method: IdentityDefinition["method"], route: str
 
 export const memberReviewOperationDefinitions = {
   review_settings_get: operation("review_settings_get", "GET", "review-settings", "get_lifty_review_settings", c.ReviewSettingsResultSchema,
-    "Read the selected workspace's versioned LinkedIn and email review choices. Each channel approves every new draft or sends routine drafts and returns a 10%, 20% or 50% sample. Flagged drafts, replies and requested follow-ups always wait."),
+    "Read the selected workspace's versioned LinkedIn and email review choices. Each channel approves every new draft or sends routine drafts with a 0%, 10%, 20% or 50% post-send sample; 0% disables sampling. Flagged drafts, replies and requested follow-ups always wait."),
   review_settings_patch: operation("review_settings_patch", "PATCH", "review-settings", "update_lifty_review_settings", c.ReviewSettingsResultSchema,
-    "Save supplied channel choices with expected_version. Applies to new drafts only; existing pending drafts still require a decision. Never activates a Campaign or releases its pending messages.", { request: c.ReviewSettingsUpdateSchema }),
+    "Save supplied channel review choices with expected_version. send_and_sample lets future unflagged drafts in already active approved Campaigns automatically send to external recipients under existing account, schedule and safety gates. sample_rate selects confirmed sent messages for later rating; 0% disables sampling. Applies to new drafts only; existing pending drafts still require a decision. Never activates a Campaign or releases its pending messages.", { request: c.ReviewSettingsUpdateSchema }),
   samples_get: operation("samples_get", "GET", "campaign-review-samples", "get_lifty_campaign_review_samples", c.CampaignReviewsSchema,
     "Read unrated sampled messages with provider-confirmed delivery only, scoped to the selected workspace. Planned or enrolled work is not a sent sample.", { query: c.ReviewPageQuerySchema }),
   message_rating_post: operation("message_rating_post", "POST", "campaign-messages/{message_ref}/rating", "rate_lifty_campaign_message", c.MessageRatingResultSchema,

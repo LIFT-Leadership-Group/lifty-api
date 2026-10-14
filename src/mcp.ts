@@ -4,6 +4,7 @@ import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, typ
 import type { AuthSession, AuthenticationResult } from "./app.js";
 import type { MemberWorkspacesOutput } from "./member-workspaces.js";
 import { CLIENT_UPGRADE_MESSAGE, isSupportedClientContract } from "./agent-context.js";
+import { canonicalMcpToolName } from "./operation-names.js";
 
 export interface McpSettings {
   /** Canonical public /mcp URL, never derived from request Host. */
@@ -77,8 +78,9 @@ function createMcpServer(session: AuthSession, request: Request, settings: McpSe
       const result = { user_id: session.userId, workspaces };
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     }
-    if (registry?.tools.some(tool => tool.name === params.name)) {
-      const result = await registry.call(params.name, params.arguments ?? {}, request, session);
+    const name = canonicalMcpToolName(params.name);
+    if (registry?.tools.some(tool => tool.name === name)) {
+      const result = await registry.call(name, params.arguments ?? {}, request, session);
       if (result.isError && result.structuredContent?.status === 401) {
         return { ...result, _meta: { ...result._meta, "mcp/www_authenticate": [challenge(settings) + ', error="invalid_token", error_description="The Lifty session is no longer active. Reconnect Lifty."'] } };
       }

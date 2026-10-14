@@ -157,6 +157,48 @@ describe("MCP HTTP boundary", () => {
     expect(payload.result._meta["mcp/www_authenticate"][0]).toContain('error_description="');
   });
 
+  it("advertises Slack connection clearly while preserving cached names through the authenticated MCP boundary", async () => {
+    const workspace = { workspace_ref: "22222222-2222-4222-8222-222222222222", name: "Example", slug: "example", active: true };
+    const intent = { provider: "slack" as const, attempt_ref: "44444444-4444-4444-8444-444444444444", expires_in_seconds: 600,
+      connect_url: "https://api.lifty.test/connect/slack/fixture", expires_at: "2026-10-14T03:00:00Z" };
+    const startSlackConnect = vi.fn(async () => intent);
+    const authenticate = async (request: Request) => {
+      const result = await authentication(request);
+      return result.ok ? { ...result, session: { ...result.session, client: { selection: request.headers.get("x-lifty-workspace") } } } : result;
+    };
+    const app = createApp({ mcp: { ...settings, authenticate }, authenticate,
+      getWorkspace: async session => {
+        const selected = (session.client as { selection: string | null }).selection;
+        if (selected && selected !== workspace.workspace_ref) throw new PublicError({ status: 403, code: "WORKSPACE_FORBIDDEN", message: "Not a member" });
+        return { state: "ready_for_connections", workspace: { workspace_ref: workspace.workspace_ref, name: workspace.name }, next_action: null };
+      },
+      listMemberWorkspaces: async () => ({ workspaces: [workspace] }), startSlackConnect, log: () => {} });
+    const transport = new StreamableHTTPClientTransport(new URL(settings.resourceUrl), {
+      requestInit: { headers: { authorization: "Bearer founder-1" } },
+      fetch: async (input, init) => app.request(new Request(input, init)),
+    });
+    const client = new Client({ name: "cached-name-proof", version: "1" });
+    try {
+      await client.connect(transport as Parameters<Client["connect"]>[0]);
+      const { tools } = await client.listTools();
+      expect(tools.some(tool => tool.name === "notifications_connect")).toBe(true);
+      expect(tools.some(tool => tool.name === "notifications_post")).toBe(false);
+      for (const name of ["notifications_connect", "notifications_post"]) {
+        const denied = await app.request(post("tools/call", { name, arguments: { body: {} } }, { authorization: "" }));
+        expect(denied.status, name).toBe(401);
+        const result = await client.callTool({ name, arguments: { workspace: workspace.workspace_ref, body: {} } });
+        expect(result.structuredContent, name).toMatchObject({ status: 200, data: {
+          status: "authorization_required", attempt_ref: intent.attempt_ref, connection_url: intent.connect_url, expires_at: intent.expires_at,
+        } });
+        const invalid = await client.callTool({ name, arguments: { body: { connected: true } } });
+        expect(invalid.isError, name).toBe(true);
+        const foreign = await client.callTool({ name, arguments: { workspace: "33333333-3333-4333-8333-333333333333", body: {} } });
+        expect(foreign.structuredContent, name).toMatchObject({ status: 403, data: { error: { code: "WORKSPACE_FORBIDDEN" } } });
+      }
+      expect(startSlackConnect).toHaveBeenCalledTimes(2);
+    } finally { await client.close(); }
+  });
+
   it("rejects unsupported contracts, origins, methods, invalid tools and oversized bodies before execution", async () => {
     const authenticate = vi.fn(authentication);
     const dependencies = { ...settings, authenticate };
