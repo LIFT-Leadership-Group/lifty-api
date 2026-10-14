@@ -163,9 +163,10 @@ Warmup never pauses or resumes campaigns.
 mailbox". The page shows the mailbox, the sender name warmup emails will use
 (from the sender's profile) and one "Continue with Google" or "Continue with Microsoft" button. Lifty sets
 the warmup schedule and volume; the founder fills in nothing. The page also
-says when Lifty sends one test email from the mailbox to about 20-40 test
+says when Lifty sends the initial test email from the mailbox to about 20-40 test
 inboxes (right after setup for a habitual mailbox, after warmup for a
-dedicated one), and that continuing accepts warmup and this test. Say so
+dedicated one), repeats it weekly while the mailbox is active and warmup is
+running, and that continuing accepts warmup and these tests. Say so
 before sharing the link. For Google, Lifty verifies the exact address before
 sharing tokens once with Mailivery, without storing or logging them. For
 Microsoft, Mailivery receives authorization directly and Lifty verifies the
@@ -214,14 +215,14 @@ Read
 `placement_status` with the explicit `workspace` and, when the workspace has
 more than one warmed mailbox, its `connection_ref`.
 
-Lifty queues one test by itself (`test.automatic: true`) once warmup runs on
-a habitual mailbox, or when warmup finishes on a dedicated one. Accepting
-warmup covered it, so do not ask for consent again or call `placement_start`
-for it. The result goes to Slack when connected and by email to each member's
-Lifty login address. It uses a fixed short business email signed with the
-sender's signature, never campaign content. Repeated checks never start a
-second automatic test. If it could not start and nothing was sent or billed
-(for example, no test credits), Lifty tries again within a day.
+Lifty automatically tests a habitual mailbox once warmup runs, or a dedicated
+mailbox after warmup. Setup consent covers the initial test and weekly retests;
+do not call `placement_start` for them. Retests run seven days after the latest
+measured result, including member tests, while the workspace, account and
+warmup are active. They use one credit and the same fixed short signed email,
+never campaign copy. Initial results and measured failures follow the configured
+Slack/email notices; recurring passes refresh health without repeating onboarding.
+Lifty allows one test in progress. Unbilled failures retry daily.
 
 Only call `placement_start` when the user asks for another test, after they
 explicitly agree to what it does.

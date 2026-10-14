@@ -19,8 +19,8 @@ export function renderWarmupSetupPage(record:WarmupSetupRecord, intent:string, c
 <form method="post" action="setup" data-pending="Opening ${provider}…"><input type="hidden" name="intent" value="${escape(intent)}"><input type="hidden" name="csrf" value="${escape(csrf)}">
 <p class="hint">Warmup emails go out as ${escape([record.first_name, record.last_name].filter(Boolean).join(" "))}. Lifty sets the warmup schedule and volume.</p>
 ${record.mailbox_use === "personal"
-  ? `<p class="hint">As soon as warmup starts, Lifty sends one test email from this mailbox to about 20–40 test inboxes to check where your email lands. Warmup then keeps running alongside your outreach to protect your inbox placement. Continuing accepts warmup and this test.</p>`
-  : `<p class="hint">When warmup ends, Lifty sends one test email from this mailbox to about 20–40 test inboxes to measure deliverability. Continuing accepts warmup and this test.</p>`}
+  ? `<p class="hint">As soon as warmup starts, Lifty sends one test email from this mailbox to about 20–40 test inboxes to check where your email lands. Lifty repeats the test weekly while this mailbox is active and warmup is running. Warmup keeps running alongside your outreach. Continuing accepts warmup and these tests.</p>`
+  : `<p class="hint">When warmup ends, Lifty sends one test email from this mailbox to about 20–40 test inboxes to measure deliverability. Lifty repeats the test weekly while this mailbox is active and warmup is running. Continuing accepts warmup and these tests.</p>`}
 <div class="actions"><button class="primary block" type="submit">Continue with ${provider}</button><p class="disclosure">${microsoft
   ? "Microsoft will ask you to grant Mailivery access to read, send and manage mail for warmup. Sign in with the exact mailbox above. Your organization may require an administrator to approve access."
   : "Google grants full Gmail access, including reading, sending and deleting mail. Lifty shares this access with Mailivery to send and receive warmup mail."} <a href="https://liftygtm.com/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy policy</a>.</p></div></form>
