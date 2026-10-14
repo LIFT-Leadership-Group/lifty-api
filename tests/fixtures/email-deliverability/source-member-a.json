@@ -32,9 +32,7 @@
   {
    "availability": {
     "mailivery_warmup": false,
-    "placement_tests": true,
-    "smartlead_registry": true,
-    "smartlead_warmup": true
+    "placement_tests": true
    },
    "campaigns": [],
    "connections": [
@@ -203,42 +201,8 @@
      ]
     }
    ],
-   "smartlead": {
-    "account_id": 103902,
-    "approved_at": null,
-    "approved_by": null,
-    "approved_for_outbound": false,
-    "cold_eligible_at": "2026-10-06T19:52:58.138404+00:00",
-    "created_at": "2026-09-29T19:52:58.138404+00:00",
-    "is_eligible": false,
-    "mitigation_paused_at": null,
-    "mitigation_reason": "placement_failed",
-    "mitigation_resumed_at": null,
-    "mitigation_state": "paused",
-    "notes": null,
-    "placement_gate_passed_at": null,
-    "placement_hold_reason": "operator review",
-    "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:52:58.138404+00:00",
-    "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-09-14T19:52:58.138404+00:00"
-   },
    "warmup": {
-    "mailivery": [],
-    "smartlead": {
-     "active_since": "2026-09-15T19:52:58.138404+00:00",
-     "detail": "12 observed warmup sends/7d (minimum 20)",
-     "health": "pending",
-     "last_sent_at": "2026-09-28T19:52:58.138404+00:00",
-     "observed_at": "2026-09-29T16:52:58.138404+00:00",
-     "reputation_pct": 98.0,
-     "sent_7d": 12,
-     "spam_count": 0,
-     "spam_pct": 1.5,
-     "spam_sample_sent": 20,
-     "status": "active"
-    },
-    "smartlead_daily": []
+    "mailivery": []
    },
    "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001",
@@ -256,26 +220,9 @@
   {
    "availability": {
     "mailivery_warmup": false,
-    "placement_tests": true,
-    "smartlead_registry": true,
-    "smartlead_warmup": false
+    "placement_tests": true
    },
-   "campaigns": [
-    {
-     "campaign_ref": "10394200-0000-4000-8000-000000000002",
-     "created_at": "2026-09-24T19:52:58.138404+00:00",
-     "drift_detected_at": null,
-     "last_synced_at": null,
-     "name": "A paused campaign",
-     "provider": "smartlead",
-     "provider_campaign_id": "3902",
-     "provider_status": "PAUSED",
-     "sender_ref": "10392000-0000-4000-8000-000000000001",
-     "source": "smartlead_campaign",
-     "status": "paused",
-     "updated_at": "2026-09-29T19:52:58.138404+00:00"
-    }
-   ],
+   "campaigns": [],
    "connections": [],
    "domain": "a.test",
    "email": "shared@a.test",
@@ -356,30 +303,8 @@
      ]
     }
    ],
-   "smartlead": {
-    "account_id": 103903,
-    "approved_at": null,
-    "approved_by": null,
-    "approved_for_outbound": false,
-    "cold_eligible_at": null,
-    "created_at": "2026-09-29T19:52:58.138404+00:00",
-    "is_eligible": false,
-    "mitigation_paused_at": null,
-    "mitigation_reason": null,
-    "mitigation_resumed_at": null,
-    "mitigation_state": "none",
-    "notes": null,
-    "placement_gate_passed_at": null,
-    "placement_hold_reason": null,
-    "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:52:58.138404+00:00",
-    "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-08-30T19:52:58.138404+00:00"
-   },
    "warmup": {
-    "mailivery": [],
-    "smartlead": null,
-    "smartlead_daily": []
+    "mailivery": []
    },
    "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001",
@@ -397,40 +322,9 @@
   {
    "availability": {
     "mailivery_warmup": false,
-    "placement_tests": true,
-    "smartlead_registry": true,
-    "smartlead_warmup": true
+    "placement_tests": true
    },
-   "campaigns": [
-    {
-     "campaign_ref": "10394200-0000-4000-8000-000000000001",
-     "created_at": "2026-09-19T19:52:58.138404+00:00",
-     "drift_detected_at": null,
-     "last_synced_at": null,
-     "name": "A active campaign",
-     "provider": "smartlead",
-     "provider_campaign_id": "3901",
-     "provider_status": "ACTIVE",
-     "sender_ref": "10392000-0000-4000-8000-000000000001",
-     "source": "smartlead_campaign",
-     "status": "active",
-     "updated_at": "2026-09-29T19:52:58.138404+00:00"
-    },
-    {
-     "campaign_ref": "10394200-0000-4000-8000-000000000002",
-     "created_at": "2026-09-24T19:52:58.138404+00:00",
-     "drift_detected_at": null,
-     "last_synced_at": null,
-     "name": "A paused campaign",
-     "provider": "smartlead",
-     "provider_campaign_id": "3902",
-     "provider_status": "PAUSED",
-     "sender_ref": "10392000-0000-4000-8000-000000000001",
-     "source": "smartlead_campaign",
-     "status": "paused",
-     "updated_at": "2026-09-29T19:52:58.138404+00:00"
-    }
-   ],
+   "campaigns": [],
    "connections": [],
    "domain": "a.test",
    "email": "sl-only@a.test",
@@ -549,373 +443,8 @@
      ]
     }
    ],
-   "smartlead": {
-    "account_id": 103901,
-    "approved_at": "2026-09-28T19:52:58.138404+00:00",
-    "approved_by": "fixture-operator",
-    "approved_for_outbound": true,
-    "cold_eligible_at": "2026-09-10T19:52:58.138404+00:00",
-    "created_at": "2026-09-29T19:52:58.138404+00:00",
-    "is_eligible": true,
-    "mitigation_paused_at": null,
-    "mitigation_reason": null,
-    "mitigation_resumed_at": null,
-    "mitigation_state": "none",
-    "notes": "A human note",
-    "placement_gate_passed_at": "2026-09-27T19:52:58+00:00",
-    "placement_hold_reason": null,
-    "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:52:58.138404+00:00",
-    "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-08-20T19:52:58.138404+00:00"
-   },
    "warmup": {
-    "mailivery": [],
-    "smartlead": {
-     "active_since": "2026-08-25T19:52:58.138404+00:00",
-     "detail": "reputation 100% \u00b7 warmup spam 0% of 40",
-     "health": "pass",
-     "last_sent_at": "2026-09-29T18:52:58.138404+00:00",
-     "observed_at": "2026-09-29T19:52:58.138404+00:00",
-     "reputation_pct": 100.0,
-     "sent_7d": 30,
-     "spam_count": 0,
-     "spam_pct": 0.0,
-     "spam_sample_sent": 40,
-     "status": "active"
-    },
-    "smartlead_daily": [
-     {
-      "day": "2026-08-31",
-      "health": "pass",
-      "observed_at": "2026-08-31T19:52:58.138404+00:00",
-      "reputation_pct": 71.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-01",
-      "health": "pass",
-      "observed_at": "2026-09-01T19:52:58.138404+00:00",
-      "reputation_pct": 72.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-02",
-      "health": "pass",
-      "observed_at": "2026-09-02T19:52:58.138404+00:00",
-      "reputation_pct": 73.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-03",
-      "health": "pass",
-      "observed_at": "2026-09-03T19:52:58.138404+00:00",
-      "reputation_pct": 74.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-04",
-      "health": "pass",
-      "observed_at": "2026-09-04T19:52:58.138404+00:00",
-      "reputation_pct": 75.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-05",
-      "health": "pass",
-      "observed_at": "2026-09-05T19:52:58.138404+00:00",
-      "reputation_pct": 76.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-06",
-      "health": "pass",
-      "observed_at": "2026-09-06T19:52:58.138404+00:00",
-      "reputation_pct": 77.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-07",
-      "health": "pass",
-      "observed_at": "2026-09-07T19:52:58.138404+00:00",
-      "reputation_pct": 78.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-08",
-      "health": "pass",
-      "observed_at": "2026-09-08T19:52:58.138404+00:00",
-      "reputation_pct": 79.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-09",
-      "health": "pass",
-      "observed_at": "2026-09-09T19:52:58.138404+00:00",
-      "reputation_pct": 80.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-10",
-      "health": "pass",
-      "observed_at": "2026-09-10T19:52:58.138404+00:00",
-      "reputation_pct": 81.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-11",
-      "health": "pass",
-      "observed_at": "2026-09-11T19:52:58.138404+00:00",
-      "reputation_pct": 82.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-12",
-      "health": "pass",
-      "observed_at": "2026-09-12T19:52:58.138404+00:00",
-      "reputation_pct": 83.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-13",
-      "health": "pass",
-      "observed_at": "2026-09-13T19:52:58.138404+00:00",
-      "reputation_pct": 84.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-14",
-      "health": "pass",
-      "observed_at": "2026-09-14T19:52:58.138404+00:00",
-      "reputation_pct": 85.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-15",
-      "health": "pass",
-      "observed_at": "2026-09-15T19:52:58.138404+00:00",
-      "reputation_pct": 86.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-16",
-      "health": "pass",
-      "observed_at": "2026-09-16T19:52:58.138404+00:00",
-      "reputation_pct": 87.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-17",
-      "health": "pass",
-      "observed_at": "2026-09-17T19:52:58.138404+00:00",
-      "reputation_pct": 88.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-18",
-      "health": "pass",
-      "observed_at": "2026-09-18T19:52:58.138404+00:00",
-      "reputation_pct": 89.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-19",
-      "health": "pass",
-      "observed_at": "2026-09-19T19:52:58.138404+00:00",
-      "reputation_pct": 90.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-20",
-      "health": "pass",
-      "observed_at": "2026-09-20T19:52:58.138404+00:00",
-      "reputation_pct": 91.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-21",
-      "health": "pass",
-      "observed_at": "2026-09-21T19:52:58.138404+00:00",
-      "reputation_pct": 92.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-22",
-      "health": "pass",
-      "observed_at": "2026-09-22T19:52:58.138404+00:00",
-      "reputation_pct": 93.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-23",
-      "health": "pass",
-      "observed_at": "2026-09-23T19:52:58.138404+00:00",
-      "reputation_pct": 94.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-24",
-      "health": "pass",
-      "observed_at": "2026-09-24T19:52:58.138404+00:00",
-      "reputation_pct": 95.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-25",
-      "health": "pass",
-      "observed_at": "2026-09-25T19:52:58.138404+00:00",
-      "reputation_pct": 96.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-26",
-      "health": "pass",
-      "observed_at": "2026-09-26T19:52:58.138404+00:00",
-      "reputation_pct": 97.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-27",
-      "health": "pass",
-      "observed_at": "2026-09-27T19:52:58.138404+00:00",
-      "reputation_pct": 98.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-28",
-      "health": "pass",
-      "observed_at": "2026-09-28T19:52:58.138404+00:00",
-      "reputation_pct": 99.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     },
-     {
-      "day": "2026-09-29",
-      "health": "pass",
-      "observed_at": "2026-09-29T19:52:58.138404+00:00",
-      "reputation_pct": 100.0,
-      "sent_7d": 30,
-      "spam_count": 0,
-      "spam_pct": 0.0,
-      "spam_sample_sent": 40,
-      "status": "active"
-     }
-    ]
+    "mailivery": []
    },
    "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001",
@@ -933,9 +462,7 @@
   {
    "availability": {
     "mailivery_warmup": false,
-    "placement_tests": false,
-    "smartlead_registry": true,
-    "smartlead_warmup": false
+    "placement_tests": false
    },
    "campaigns": [],
    "connections": [],
@@ -955,30 +482,8 @@
     "test_count": 0
    },
    "senders": [],
-   "smartlead": {
-    "account_id": 103904,
-    "approved_at": null,
-    "approved_by": null,
-    "approved_for_outbound": false,
-    "cold_eligible_at": null,
-    "created_at": "2026-09-29T19:52:58.138404+00:00",
-    "is_eligible": false,
-    "mitigation_paused_at": null,
-    "mitigation_reason": null,
-    "mitigation_resumed_at": null,
-    "mitigation_state": "none",
-    "notes": null,
-    "placement_gate_passed_at": null,
-    "placement_hold_reason": null,
-    "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:52:58.138404+00:00",
-    "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-09-27T19:52:58.138404+00:00"
-   },
    "warmup": {
-    "mailivery": [],
-    "smartlead": null,
-    "smartlead_daily": []
+    "mailivery": []
    },
    "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001",
@@ -996,9 +501,7 @@
   {
    "availability": {
     "mailivery_warmup": true,
-    "placement_tests": true,
-    "smartlead_registry": false,
-    "smartlead_warmup": false
+    "placement_tests": true
    },
    "campaigns": [
     {
@@ -1164,7 +667,6 @@
      ]
     }
    ],
-   "smartlead": null,
    "warmup": {
     "mailivery": [
      {
@@ -1192,9 +694,7 @@
       },
       "outreach_unlocked": false
      }
-    ],
-    "smartlead": null,
-    "smartlead_daily": []
+    ]
    },
    "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001",

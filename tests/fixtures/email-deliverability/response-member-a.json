@@ -97,21 +97,18 @@
    },
    "providers": {
     "sending": [
-     "smartlead",
      "unipile"
     ],
-    "warmup": [
-     "smartlead"
-    ],
+    "warmup": [],
     "placement": [
      "smartlead"
     ]
    },
    "status": {
-    "code": "paused",
-    "label": "Paused · recovering",
+    "code": "placement_failed",
+    "label": "Failed placement",
     "tone": "bad",
-    "description": "Paused after placement failed. Warmup keeps running; after at least 14 days a clean placement test can resume sending. Approval is kept separately.",
+    "description": "The latest completed test failed: Failed \u00b7 5/10 inbox.",
     "reasons": []
    },
    "readiness": {
@@ -121,64 +118,11 @@
     "description": "Every sending path for this inbox is blocked.",
     "reasons": [
      {
-      "code": "mitigation_paused",
-      "message": "Smartlead: Paused by deliverability mitigation (placement failed)."
-     },
-     {
-      "code": "not_approved",
-      "message": "Smartlead: Not approved for outbound yet."
-     },
-     {
-      "code": "placement_gate_not_passed",
-      "message": "Smartlead: Hasn't passed the placement gate."
-     },
-     {
-      "code": "warmup_period_incomplete",
-      "message": "Smartlead: The registry's 21-day warmup period ends 2026-10-05."
-     },
-     {
-      "code": "warmup_activity_low",
-      "message": "Smartlead: Warmup activity is below the minimum: 12 observed warmup sends/7d (minimum 20)"
-     },
-     {
       "code": "send_paused",
       "message": "Unipile connection: Sending is paused for all LIFT email."
      }
     ],
     "paths": [
-     {
-      "provider": "smartlead",
-      "connection_ref": null,
-      "gate": "smartlead_eligibility",
-      "state": {
-       "code": "blocked",
-       "label": "Blocked",
-       "tone": "bad",
-       "description": "Doesn't meet the Smartlead eligibility rules yet.",
-       "reasons": [
-        {
-         "code": "mitigation_paused",
-         "message": "Paused by deliverability mitigation (placement failed)."
-        },
-        {
-         "code": "not_approved",
-         "message": "Not approved for outbound yet."
-        },
-        {
-         "code": "placement_gate_not_passed",
-         "message": "Hasn't passed the placement gate."
-        },
-        {
-         "code": "warmup_period_incomplete",
-         "message": "The registry's 21-day warmup period ends 2026-10-05."
-        },
-        {
-         "code": "warmup_activity_low",
-         "message": "Warmup activity is below the minimum: 12 observed warmup sends/7d (minimum 20)"
-        }
-       ]
-      }
-     },
      {
       "provider": "unipile",
       "connection_ref": "10393000-0000-4000-8000-000000000002",
@@ -200,79 +144,14 @@
    },
    "warmup": {
     "status": {
-     "code": "active",
-     "label": "Warming · low activity · day 13 of 21",
-     "tone": "watch",
-     "description": "Warmup is running, but recent warmup activity is below the minimum for a passing check.",
-     "reasons": [
-      {
-       "code": "warmup_activity_low",
-       "message": "Warmup activity is below the minimum. 12 observed warmup sends/7d (minimum 20)"
-      }
-     ]
+     "code": "none",
+     "label": "No warmup evidence",
+     "tone": "muted",
+     "description": "No warmup provider has reported on this inbox. Missing evidence is not a healthy result.",
+     "reasons": []
     },
-    "sources": [
-     {
-      "provider": "smartlead",
-      "connection_ref": null,
-      "state": {
-       "code": "active",
-       "label": "Warming · low activity",
-       "tone": "watch",
-       "description": "Warmup is running, but recent warmup activity is below the minimum for a passing check.",
-       "reasons": [
-        {
-         "code": "warmup_activity_low",
-         "message": "Warmup activity is below the minimum. 12 observed warmup sends/7d (minimum 20)"
-        }
-       ]
-      },
-      "started_at": "2026-09-15T19:52:58.138Z",
-      "started_at_basis": "observed_activity",
-      "active_days": 13,
-      "required_days": 21,
-      "period_complete": false,
-      "estimated_completion": {
-       "at": "2026-10-06T19:52:58.138Z",
-       "on": null,
-       "basis": "Estimated: continuous warmup activity since 2026-09-15 plus 21 days. A gap in activity restarts the count."
-      },
-      "outreach_unlocked": null,
-      "last_check": {
-       "observed_at": "2026-09-29T16:52:58.138Z",
-       "freshness": "fresh",
-       "fresh_until": "2026-09-30T18:52:58.138Z"
-      },
-      "metrics": {
-       "reputation_pct": 98,
-       "spam_pct": 1.5,
-       "spam_sample_sent": 20,
-       "spam_count": 0,
-       "sent_7d": 12,
-       "last_sent_at": "2026-09-28T19:52:58.138Z",
-       "warmup_emails_today": null,
-       "ramp_target": null
-      },
-      "checks": null,
-      "provider_detail": "12 observed warmup sends/7d (minimum 20)"
-     }
-    ],
-    "trend": {
-     "window_start": "2026-08-31",
-     "window_end": "2026-09-29",
-     "days": []
-    },
+    "sources": [],
     "current": null
-   },
-   "recovery": {
-    "state": "paused",
-    "reason": "placement_failed",
-    "paused_at": null,
-    "resumed_at": null,
-    "rewarm_days": 14,
-    "day": null,
-    "rewarm_complete_at": null,
-    "description": "Paused after placement failed. Warmup keeps running; after at least 14 days a clean placement test can resume sending. Approval is kept separately."
    },
    "campaigns": {
     "status": {
@@ -287,17 +166,17 @@
    "placement": {
     "status": {
      "code": "failed",
-     "label": "Failed placement · 2026-09-25",
+     "label": "Failed placement \u00b7 2026-09-25",
      "tone": "bad",
-     "description": "The latest completed test failed: Failed · 5/10 inbox.",
+     "description": "The latest completed test failed: Failed \u00b7 5/10 inbox.",
      "reasons": []
     },
     "evidence": {
      "observed_at": "2026-09-25T19:52:58.000Z",
-     "freshness": "fresh",
-     "fresh_until": "2026-10-05T19:52:58.000Z",
-     "max_age_days": 10,
-     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+     "freshness": "unknown",
+     "fresh_until": null,
+     "max_age_days": null,
+     "rule": "No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency."
     },
     "test_count": 3,
     "latest_test_ref": "smartlead:900023",
@@ -310,7 +189,7 @@
      "execution_status": "completed",
      "execution_reason": null,
      "verdict": "fail",
-     "label": "Failed · 5/10 inbox",
+     "label": "Failed \u00b7 5/10 inbox",
      "tested_at": "2026-09-25T19:52:58.000Z",
      "completed_at": null,
      "age_days": 4,
@@ -334,7 +213,7 @@
       "execution_status": "completed",
       "execution_reason": null,
       "verdict": "fail",
-      "label": "Failed · 5/10 inbox",
+      "label": "Failed \u00b7 5/10 inbox",
       "tested_at": "2026-09-25T19:52:58.000Z",
       "completed_at": null,
       "age_days": 4,
@@ -357,7 +236,7 @@
       "execution_status": "completed",
       "execution_reason": null,
       "verdict": "fail",
-      "label": "Failed · 4/10 inbox",
+      "label": "Failed \u00b7 4/10 inbox",
       "tested_at": "2026-09-23T19:52:58.000Z",
       "completed_at": null,
       "age_days": 6,
@@ -380,7 +259,7 @@
       "execution_status": "completed",
       "execution_reason": null,
       "verdict": "pass",
-      "label": "Passed · 10/10 inbox",
+      "label": "Passed \u00b7 10/10 inbox",
       "tested_at": "2026-09-19T19:52:58.000Z",
       "completed_at": null,
       "age_days": 10,
@@ -397,43 +276,6 @@
      }
     ],
     "detail": null
-   },
-   "approval": {
-    "status": {
-     "code": "not_approved",
-     "label": "Not approved",
-     "tone": "muted",
-     "description": "Not approved for outbound yet.",
-     "reasons": [
-      {
-       "code": "placement_hold",
-       "message": "Placement testing is on hold: operator review."
-      },
-      {
-       "code": "warmup_period_incomplete",
-       "message": "The warmup period ends 2026-10-06 (estimated)."
-      },
-      {
-       "code": "placement_gate_not_passed",
-       "message": "Hasn't passed the placement gate."
-      },
-      {
-       "code": "mitigation_paused",
-       "message": "Paused by deliverability mitigation."
-      }
-     ]
-    },
-    "approved_at": null,
-    "approved_by": null,
-    "placement_gate_passed_at": null,
-    "cold_eligible_at": "2026-10-06T19:52:58.138Z",
-    "hold": {
-     "reason": "operator review",
-     "review_at": null
-    }
-   },
-   "notes": {
-    "human": null
    },
    "connections": [
     {
@@ -515,8 +357,6 @@
     "resets_at": "2026-09-30T00:00:00.000Z"
    },
    "availability": {
-    "smartlead_registry": true,
-    "smartlead_warmup": true,
     "mailivery_warmup": false,
     "placement_tests": true
    },
@@ -558,9 +398,7 @@
     ]
    },
    "providers": {
-    "sending": [
-     "smartlead"
-    ],
+    "sending": [],
     "warmup": [],
     "placement": [
      "smartlead"
@@ -570,55 +408,16 @@
     "code": "placement_failed",
     "label": "Failed placement",
     "tone": "bad",
-    "description": "The latest completed test failed: Failed · 7/12 inbox.",
+    "description": "The latest completed test failed: Failed \u00b7 7/12 inbox.",
     "reasons": []
    },
    "readiness": {
-    "code": "blocked",
-    "label": "Not ready to send",
-    "tone": "bad",
-    "description": "Every sending path for this inbox is blocked.",
-    "reasons": [
-     {
-      "code": "not_approved",
-      "message": "Smartlead: Not approved for outbound yet."
-     },
-     {
-      "code": "placement_gate_not_passed",
-      "message": "Smartlead: Hasn't passed the placement gate."
-     },
-     {
-      "code": "warmup_check_missing",
-      "message": "Smartlead: No Smartlead warmup check is recorded."
-     }
-    ],
-    "paths": [
-     {
-      "provider": "smartlead",
-      "connection_ref": null,
-      "gate": "smartlead_eligibility",
-      "state": {
-       "code": "blocked",
-       "label": "Blocked",
-       "tone": "bad",
-       "description": "Doesn't meet the Smartlead eligibility rules yet.",
-       "reasons": [
-        {
-         "code": "not_approved",
-         "message": "Not approved for outbound yet."
-        },
-        {
-         "code": "placement_gate_not_passed",
-         "message": "Hasn't passed the placement gate."
-        },
-        {
-         "code": "warmup_check_missing",
-         "message": "No Smartlead warmup check is recorded."
-        }
-       ]
-      }
-     }
-    ]
+    "code": "unknown",
+    "label": "No sending path",
+    "tone": "muted",
+    "description": "This inbox has no email connection, so nothing can send from it.",
+    "reasons": [],
+    "paths": []
    },
    "warmup": {
     "status": {
@@ -629,69 +428,32 @@
      "reasons": []
     },
     "sources": [],
-    "trend": {
-     "window_start": "2026-08-31",
-     "window_end": "2026-09-29",
-     "days": []
-    },
     "current": null
    },
-   "recovery": null,
    "campaigns": {
     "status": {
-     "code": "campaign_paused",
-     "label": "Campaign paused",
-     "tone": "warn",
-     "description": "Every campaign using this inbox is paused.",
+     "code": "no_campaign",
+     "label": "No campaign",
+     "tone": "muted",
+     "description": "This inbox isn't configured on any campaign.",
      "reasons": []
     },
-    "items": [
-     {
-      "source": "smartlead_campaign",
-      "campaign_ref": "10394200-0000-4000-8000-000000000002",
-      "connection_ref": null,
-      "provider": "smartlead",
-      "name": "A paused campaign",
-      "sender_ref": "10392000-0000-4000-8000-000000000001",
-      "campaign_count": 1,
-      "states": {
-       "paused": 1
-      },
-      "status": {
-       "code": "paused",
-       "label": "Paused",
-       "tone": "warn",
-       "description": "The campaign record says paused (provider: PAUSED). This is LIFT's configuration, not a live provider readback.",
-       "reasons": []
-      },
-      "sending": {
-       "code": "not_active",
-       "label": "Not active",
-       "tone": "muted",
-       "description": "The campaign isn't active, so this inbox doesn't send for it.",
-       "reasons": []
-      },
-      "provider_status": "PAUSED",
-      "created_at": "2026-09-24T19:52:58.138Z",
-      "last_synced_at": null,
-      "drift_detected_at": null
-     }
-    ]
+    "items": []
    },
    "placement": {
     "status": {
      "code": "failed",
-     "label": "Failed placement · 2026-09-24",
+     "label": "Failed placement \u00b7 2026-09-24",
      "tone": "bad",
-     "description": "The latest completed test failed: Failed · 7/12 inbox.",
+     "description": "The latest completed test failed: Failed \u00b7 7/12 inbox.",
      "reasons": []
     },
     "evidence": {
      "observed_at": "2026-09-24T19:52:58.000Z",
-     "freshness": "fresh",
-     "fresh_until": "2026-10-04T19:52:58.000Z",
-     "max_age_days": 10,
-     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+     "freshness": "unknown",
+     "fresh_until": null,
+     "max_age_days": null,
+     "rule": "No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency."
     },
     "test_count": 1,
     "latest_test_ref": "smartlead:900011",
@@ -704,7 +466,7 @@
      "execution_status": "completed",
      "execution_reason": null,
      "verdict": "fail",
-     "label": "Failed · 7/12 inbox",
+     "label": "Failed \u00b7 7/12 inbox",
      "tested_at": "2026-09-24T19:52:58.000Z",
      "completed_at": null,
      "age_days": 5,
@@ -728,7 +490,7 @@
       "execution_status": "completed",
       "execution_reason": null,
       "verdict": "fail",
-      "label": "Failed · 7/12 inbox",
+      "label": "Failed \u00b7 7/12 inbox",
       "tested_at": "2026-09-24T19:52:58.000Z",
       "completed_at": null,
       "age_days": 5,
@@ -745,32 +507,6 @@
      }
     ],
     "detail": null
-   },
-   "approval": {
-    "status": {
-     "code": "not_approved",
-     "label": "Not approved",
-     "tone": "muted",
-     "description": "Not approved for outbound yet.",
-     "reasons": [
-      {
-       "code": "warmup_period_incomplete",
-       "message": "The warmup period hasn't started counting."
-      },
-      {
-       "code": "placement_gate_not_passed",
-       "message": "Hasn't passed the placement gate."
-      }
-     ]
-    },
-    "approved_at": null,
-    "approved_by": null,
-    "placement_gate_passed_at": null,
-    "cold_eligible_at": null,
-    "hold": null
-   },
-   "notes": {
-    "human": null
    },
    "connections": [],
    "sending": {
@@ -789,8 +525,6 @@
     "resets_at": null
    },
    "availability": {
-    "smartlead_registry": true,
-    "smartlead_warmup": false,
     "mailivery_warmup": false,
     "placement_tests": true
    },
@@ -819,483 +553,62 @@
     "reasons": []
    },
    "providers": {
-    "sending": [
-     "smartlead"
-    ],
-    "warmup": [
-     "smartlead"
-    ],
+    "sending": [],
+    "warmup": [],
     "placement": [
      "smartlead"
     ]
    },
    "status": {
-    "code": "in_campaign",
-    "label": "In campaign",
-    "tone": "ok",
-    "description": "Configured on an active campaign and passing its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.",
+    "code": "not_ready",
+    "label": "Not ready yet",
+    "tone": "muted",
+    "description": "This inbox has no email connection, so nothing can send from it.",
     "reasons": []
    },
    "readiness": {
-    "code": "ready",
-    "label": "Ready to send",
-    "tone": "ok",
-    "description": "Allowed to send through Smartlead. Being allowed doesn't mean it is sending; see campaigns.",
+    "code": "unknown",
+    "label": "No sending path",
+    "tone": "muted",
+    "description": "This inbox has no email connection, so nothing can send from it.",
     "reasons": [],
-    "paths": [
-     {
-      "provider": "smartlead",
-      "connection_ref": null,
-      "gate": "smartlead_eligibility",
-      "state": {
-       "code": "allowed",
-       "label": "Allowed to send",
-       "tone": "ok",
-       "description": "Passes the Smartlead eligibility rules: approved, warmed, placement-gated, live warmup and no mitigation.",
-       "reasons": []
-      }
-     }
-    ]
+    "paths": []
    },
    "warmup": {
     "status": {
-     "code": "active",
-     "label": "Warming · initial period complete",
-     "tone": "ok",
-     "description": "Warmup is running and its latest check passed. The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns.",
+     "code": "none",
+     "label": "No warmup evidence",
+     "tone": "muted",
+     "description": "No warmup provider has reported on this inbox. Missing evidence is not a healthy result.",
      "reasons": []
     },
-    "sources": [
-     {
-      "provider": "smartlead",
-      "connection_ref": null,
-      "state": {
-       "code": "active",
-       "label": "Warming",
-       "tone": "ok",
-       "description": "Warmup is running and its latest check passed.",
-       "reasons": []
-      },
-      "started_at": "2026-08-25T19:52:58.138Z",
-      "started_at_basis": "observed_activity",
-      "active_days": 35,
-      "required_days": 21,
-      "period_complete": true,
-      "estimated_completion": null,
-      "outreach_unlocked": null,
-      "last_check": {
-       "observed_at": "2026-09-29T19:52:58.138Z",
-       "freshness": "fresh",
-       "fresh_until": "2026-09-30T21:52:58.138Z"
-      },
-      "metrics": {
-       "reputation_pct": 100,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "spam_count": 0,
-       "sent_7d": 30,
-       "last_sent_at": "2026-09-29T18:52:58.138Z",
-       "warmup_emails_today": null,
-       "ramp_target": null
-      },
-      "checks": null,
-      "provider_detail": "reputation 100% · warmup spam 0% of 40"
-     }
-    ],
-    "trend": {
-     "window_start": "2026-08-31",
-     "window_end": "2026-09-29",
-     "days": [
-      {
-       "day": "2026-08-31",
-       "observed_at": "2026-08-31T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 71,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-01",
-       "observed_at": "2026-09-01T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 72,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-02",
-       "observed_at": "2026-09-02T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 73,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-03",
-       "observed_at": "2026-09-03T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 74,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-04",
-       "observed_at": "2026-09-04T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 75,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-05",
-       "observed_at": "2026-09-05T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 76,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-06",
-       "observed_at": "2026-09-06T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 77,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-07",
-       "observed_at": "2026-09-07T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 78,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-08",
-       "observed_at": "2026-09-08T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 79,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-09",
-       "observed_at": "2026-09-09T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 80,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-10",
-       "observed_at": "2026-09-10T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 81,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-11",
-       "observed_at": "2026-09-11T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 82,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-12",
-       "observed_at": "2026-09-12T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 83,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-13",
-       "observed_at": "2026-09-13T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 84,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-14",
-       "observed_at": "2026-09-14T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 85,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-15",
-       "observed_at": "2026-09-15T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 86,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-16",
-       "observed_at": "2026-09-16T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 87,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-17",
-       "observed_at": "2026-09-17T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 88,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-18",
-       "observed_at": "2026-09-18T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 89,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-19",
-       "observed_at": "2026-09-19T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 90,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-20",
-       "observed_at": "2026-09-20T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 91,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-21",
-       "observed_at": "2026-09-21T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 92,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-22",
-       "observed_at": "2026-09-22T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 93,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-23",
-       "observed_at": "2026-09-23T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 94,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-24",
-       "observed_at": "2026-09-24T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 95,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-25",
-       "observed_at": "2026-09-25T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 96,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-26",
-       "observed_at": "2026-09-26T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 97,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-27",
-       "observed_at": "2026-09-27T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 98,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-28",
-       "observed_at": "2026-09-28T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 99,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      },
-      {
-       "day": "2026-09-29",
-       "observed_at": "2026-09-29T19:52:58.138Z",
-       "status": "active",
-       "health": "pass",
-       "reputation_pct": 100,
-       "spam_pct": 0,
-       "spam_sample_sent": 40,
-       "sent_7d": 30
-      }
-     ]
-    },
+    "sources": [],
     "current": null
    },
-   "recovery": null,
    "campaigns": {
     "status": {
-     "code": "in_campaign_enabled",
-     "label": "In 1 active campaign · allowed",
-     "tone": "ok",
-     "description": "Configured on an active campaign and passing its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.",
+     "code": "no_campaign",
+     "label": "No campaign",
+     "tone": "muted",
+     "description": "This inbox isn't configured on any campaign.",
      "reasons": []
     },
-    "items": [
-     {
-      "source": "smartlead_campaign",
-      "campaign_ref": "10394200-0000-4000-8000-000000000001",
-      "connection_ref": null,
-      "provider": "smartlead",
-      "name": "A active campaign",
-      "sender_ref": "10392000-0000-4000-8000-000000000001",
-      "campaign_count": 1,
-      "states": {
-       "active": 1
-      },
-      "status": {
-       "code": "active",
-       "label": "Active",
-       "tone": "ok",
-       "description": "The campaign record says active (provider: ACTIVE). This is LIFT's configuration, not a live provider readback.",
-       "reasons": []
-      },
-      "sending": {
-       "code": "enabled",
-       "label": "Allowed to send",
-       "tone": "ok",
-       "description": "The campaign is active and this inbox passes its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.",
-       "reasons": []
-      },
-      "provider_status": "ACTIVE",
-      "created_at": "2026-09-19T19:52:58.138Z",
-      "last_synced_at": null,
-      "drift_detected_at": null
-     },
-     {
-      "source": "smartlead_campaign",
-      "campaign_ref": "10394200-0000-4000-8000-000000000002",
-      "connection_ref": null,
-      "provider": "smartlead",
-      "name": "A paused campaign",
-      "sender_ref": "10392000-0000-4000-8000-000000000001",
-      "campaign_count": 1,
-      "states": {
-       "paused": 1
-      },
-      "status": {
-       "code": "paused",
-       "label": "Paused",
-       "tone": "warn",
-       "description": "The campaign record says paused (provider: PAUSED). This is LIFT's configuration, not a live provider readback.",
-       "reasons": []
-      },
-      "sending": {
-       "code": "not_active",
-       "label": "Not active",
-       "tone": "muted",
-       "description": "The campaign isn't active, so this inbox doesn't send for it.",
-       "reasons": []
-      },
-      "provider_status": "PAUSED",
-      "created_at": "2026-09-24T19:52:58.138Z",
-      "last_synced_at": null,
-      "drift_detected_at": null
-     }
-    ]
+    "items": []
    },
    "placement": {
     "status": {
      "code": "passed",
-     "label": "Passed · 2026-09-27",
+     "label": "Passed \u00b7 2026-09-27",
      "tone": "ok",
-     "description": "The latest completed test passed: Passed · 12/12 inbox. LIFT's deliverability policy treats a placement result as current for 10 days.",
+     "description": "The latest completed test passed: Passed \u00b7 12/12 inbox. No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency.",
      "reasons": []
     },
     "evidence": {
      "observed_at": "2026-09-27T19:52:58.000Z",
-     "freshness": "fresh",
-     "fresh_until": "2026-10-07T19:52:58.000Z",
-     "max_age_days": 10,
-     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+     "freshness": "unknown",
+     "fresh_until": null,
+     "max_age_days": null,
+     "rule": "No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency."
     },
     "test_count": 4,
     "latest_test_ref": "smartlead:900004",
@@ -1308,7 +621,7 @@
      "execution_status": "completed",
      "execution_reason": null,
      "verdict": "pass",
-     "label": "Passed · 12/12 inbox",
+     "label": "Passed \u00b7 12/12 inbox",
      "tested_at": "2026-09-27T19:52:58.000Z",
      "completed_at": null,
      "age_days": 2,
@@ -1332,7 +645,7 @@
       "execution_status": "completed",
       "execution_reason": null,
       "verdict": "pass",
-      "label": "Passed · 12/12 inbox",
+      "label": "Passed \u00b7 12/12 inbox",
       "tested_at": "2026-09-27T19:52:58.000Z",
       "completed_at": null,
       "age_days": 2,
@@ -1355,7 +668,7 @@
       "execution_status": "completed",
       "execution_reason": null,
       "verdict": "pass",
-      "label": "Passed · 12/12 inbox",
+      "label": "Passed \u00b7 12/12 inbox",
       "tested_at": "2026-09-27T19:52:58.000Z",
       "completed_at": null,
       "age_days": 2,
@@ -1378,7 +691,7 @@
       "execution_status": "completed",
       "execution_reason": null,
       "verdict": "pass",
-      "label": "Passed · 10/10 inbox",
+      "label": "Passed \u00b7 10/10 inbox",
       "tested_at": "2026-09-09T19:52:58.000Z",
       "completed_at": null,
       "age_days": 20,
@@ -1395,23 +708,6 @@
      }
     ],
     "detail": null
-   },
-   "approval": {
-    "status": {
-     "code": "approved",
-     "label": "Approved",
-     "tone": "ok",
-     "description": "Approved for outbound on 2026-09-28 by fixture-operator. Approval alone doesn't enable sending; the other checks still apply.",
-     "reasons": []
-    },
-    "approved_at": "2026-09-28T19:52:58.138Z",
-    "approved_by": "fixture-operator",
-    "placement_gate_passed_at": "2026-09-27T19:52:58.000Z",
-    "cold_eligible_at": "2026-09-10T19:52:58.138Z",
-    "hold": null
-   },
-   "notes": {
-    "human": "A human note"
    },
    "connections": [],
    "sending": {
@@ -1430,8 +726,6 @@
     "resets_at": null
    },
    "availability": {
-    "smartlead_registry": true,
-    "smartlead_warmup": true,
     "mailivery_warmup": false,
     "placement_tests": true
    },
@@ -1455,90 +749,24 @@
     "reasons": []
    },
    "providers": {
-    "sending": [
-     "smartlead"
-    ],
+    "sending": [],
     "warmup": [],
     "placement": []
    },
    "status": {
-    "code": "not_ready",
-    "label": "Not ready yet",
+    "code": "no_evidence",
+    "label": "No evidence yet",
     "tone": "muted",
-    "description": "Every sending path for this inbox is blocked.",
-    "reasons": [
-     {
-      "code": "not_approved",
-      "message": "Smartlead: Not approved for outbound yet."
-     },
-     {
-      "code": "placement_gate_not_passed",
-      "message": "Smartlead: Hasn't passed the placement gate."
-     },
-     {
-      "code": "warmup_period_incomplete",
-      "message": "Smartlead: The registry's 21-day warmup period ends 2026-10-18."
-     },
-     {
-      "code": "warmup_check_missing",
-      "message": "Smartlead: No Smartlead warmup check is recorded."
-     }
-    ]
+    "description": "No warmup or placement evidence is recorded for this inbox yet. Missing evidence is not a healthy result.",
+    "reasons": []
    },
    "readiness": {
-    "code": "blocked",
-    "label": "Not ready to send",
-    "tone": "bad",
-    "description": "Every sending path for this inbox is blocked.",
-    "reasons": [
-     {
-      "code": "not_approved",
-      "message": "Smartlead: Not approved for outbound yet."
-     },
-     {
-      "code": "placement_gate_not_passed",
-      "message": "Smartlead: Hasn't passed the placement gate."
-     },
-     {
-      "code": "warmup_period_incomplete",
-      "message": "Smartlead: The registry's 21-day warmup period ends 2026-10-18."
-     },
-     {
-      "code": "warmup_check_missing",
-      "message": "Smartlead: No Smartlead warmup check is recorded."
-     }
-    ],
-    "paths": [
-     {
-      "provider": "smartlead",
-      "connection_ref": null,
-      "gate": "smartlead_eligibility",
-      "state": {
-       "code": "blocked",
-       "label": "Blocked",
-       "tone": "bad",
-       "description": "Doesn't meet the Smartlead eligibility rules yet.",
-       "reasons": [
-        {
-         "code": "not_approved",
-         "message": "Not approved for outbound yet."
-        },
-        {
-         "code": "placement_gate_not_passed",
-         "message": "Hasn't passed the placement gate."
-        },
-        {
-         "code": "warmup_period_incomplete",
-         "message": "The registry's 21-day warmup period ends 2026-10-18."
-        },
-        {
-         "code": "warmup_check_missing",
-         "message": "No Smartlead warmup check is recorded."
-        }
-       ]
-      }
-     }
-    ]
+    "code": "unknown",
+    "label": "No sending path",
+    "tone": "muted",
+    "description": "This inbox has no email connection, so nothing can send from it.",
+    "reasons": [],
+    "paths": []
    },
    "warmup": {
     "status": {
@@ -1549,14 +777,8 @@
      "reasons": []
     },
     "sources": [],
-    "trend": {
-     "window_start": "2026-08-31",
-     "window_end": "2026-09-29",
-     "days": []
-    },
     "current": null
    },
-   "recovery": null,
    "campaigns": {
     "status": {
      "code": "no_campaign",
@@ -1571,16 +793,16 @@
     "status": {
      "code": "no_tests",
      "label": "No placement test yet",
-     "tone": "warn",
-     "description": "No placement test has been recorded for this inbox. Missing evidence is not a passing result.",
+     "tone": "muted",
+     "description": "No placement test has been recorded for this inbox. No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency.",
      "reasons": []
     },
     "evidence": {
      "observed_at": null,
      "freshness": "unknown",
      "fresh_until": null,
-     "max_age_days": 10,
-     "rule": "LIFT's deliverability policy treats a placement result as current for 10 days."
+     "max_age_days": null,
+     "rule": "No placement freshness rule is known for this inbox, so its age is shown without a verdict on currency."
     },
     "test_count": 0,
     "latest_test_ref": null,
@@ -1588,32 +810,6 @@
     "latest_completed_test": null,
     "recent_tests": [],
     "detail": null
-   },
-   "approval": {
-    "status": {
-     "code": "not_approved",
-     "label": "Not approved",
-     "tone": "muted",
-     "description": "Not approved for outbound yet.",
-     "reasons": [
-      {
-       "code": "warmup_period_incomplete",
-       "message": "The warmup period hasn't started counting."
-      },
-      {
-       "code": "placement_gate_not_passed",
-       "message": "Hasn't passed the placement gate."
-      }
-     ]
-    },
-    "approved_at": null,
-    "approved_by": null,
-    "placement_gate_passed_at": null,
-    "cold_eligible_at": null,
-    "hold": null
-   },
-   "notes": {
-    "human": null
    },
    "connections": [],
    "sending": {
@@ -1632,8 +828,6 @@
     "resets_at": null
    },
    "availability": {
-    "smartlead_registry": true,
-    "smartlead_warmup": false,
     "mailivery_warmup": false,
     "placement_tests": false
    },
@@ -1674,7 +868,7 @@
    },
    "status": {
     "code": "blocked_in_campaign",
-    "label": "In campaign · blocked",
+    "label": "In campaign \u00b7 blocked",
     "tone": "bad",
     "description": "Configured on an active campaign, but this inbox is blocked from sending.",
     "reasons": [
@@ -1718,7 +912,7 @@
    "warmup": {
     "status": {
      "code": "active",
-     "label": "Warming · day 10 of 21",
+     "label": "Warming \u00b7 day 10 of 21",
      "tone": "ok",
      "description": "Lifty is warming this inbox.",
      "reasons": []
@@ -1751,12 +945,6 @@
        "fresh_until": "2026-09-30T19:52:58.138Z"
       },
       "metrics": {
-       "reputation_pct": null,
-       "spam_pct": null,
-       "spam_sample_sent": null,
-       "spam_count": null,
-       "sent_7d": null,
-       "last_sent_at": null,
        "warmup_emails_today": null,
        "ramp_target": null
       },
@@ -1764,18 +952,12 @@
       "provider_detail": null
      }
     ],
-    "trend": {
-     "window_start": "2026-08-31",
-     "window_end": "2026-09-29",
-     "days": []
-    },
     "current": null
    },
-   "recovery": null,
    "campaigns": {
     "status": {
      "code": "in_campaign_blocked",
-     "label": "In 1 active campaign · blocked",
+     "label": "In 1 active campaign \u00b7 blocked",
      "tone": "bad",
      "description": "Configured on an active campaign, but this inbox is blocked from sending.",
      "reasons": [
@@ -1788,11 +970,8 @@
     "items": [
      {
       "source": "lifty_direct_email",
-      "campaign_ref": null,
       "connection_ref": "10393000-0000-4000-8000-000000000001",
       "provider": "unipile",
-      "name": null,
-      "sender_ref": null,
       "campaign_count": 2,
       "states": {
        "active": 1,
@@ -1817,17 +996,14 @@
         }
        ]
       },
-      "provider_status": null,
-      "created_at": "2026-09-25T19:52:58.138Z",
-      "last_synced_at": null,
-      "drift_detected_at": null
+      "created_at": "2026-09-25T19:52:58.138Z"
      }
     ]
    },
    "placement": {
     "status": {
      "code": "stale",
-     "label": "Passed 2026-09-10 · out of date",
+     "label": "Passed 2026-09-10 \u00b7 out of date",
      "tone": "warn",
      "description": "The latest completed test passed, but it is older than 10 days, so it no longer counts as current evidence.",
      "reasons": [
@@ -1855,7 +1031,7 @@
      "execution_status": "completed",
      "execution_reason": null,
      "verdict": "pass",
-     "label": "Passed · 4/4 inbox",
+     "label": "Passed \u00b7 4/4 inbox",
      "tested_at": "2026-09-09T19:52:58.138Z",
      "completed_at": "2026-09-10T19:52:58.138Z",
      "age_days": 19,
@@ -1943,23 +1119,6 @@
     ],
     "detail": null
    },
-   "approval": {
-    "status": {
-     "code": "not_applicable",
-     "label": "No approval record",
-     "tone": "muted",
-     "description": "This inbox has no LIFT approval record. Its send controls decide whether it may send.",
-     "reasons": []
-    },
-    "approved_at": null,
-    "approved_by": null,
-    "placement_gate_passed_at": null,
-    "cold_eligible_at": null,
-    "hold": null
-   },
-   "notes": {
-    "human": null
-   },
    "connections": [
     {
      "connection_ref": "10393000-0000-4000-8000-000000000001",
@@ -2020,8 +1179,6 @@
     "resets_at": "2026-09-30T04:00:00.000Z"
    },
    "availability": {
-    "smartlead_registry": false,
-    "smartlead_warmup": false,
     "mailivery_warmup": true,
     "placement_tests": true
    },

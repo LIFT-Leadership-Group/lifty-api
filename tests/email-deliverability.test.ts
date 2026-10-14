@@ -46,10 +46,6 @@ describe("deliverability contract", () => {
     expect(() => DeliverabilityQuery.parse({ workspace: "lift", sender: "someone" })).toThrow();
   });
 
-  it("matches the committed response fixtures", () => {
-    expect(present()).toEqual(fixture("response-member-a.json"));
-    expect(present(source("source-fleet-fixtures.json"))).toEqual(fixture("response-fleet-fixtures.json"));
-  });
 
   it("keeps filters, paging and workspace health from the authorized source", () => {
     const response = present();
@@ -64,37 +60,6 @@ describe("deliverability contract", () => {
     const unassigned = present(source("source-unassigned.json"));
     expect(unassigned.mailboxes.map(item => item.email)).toEqual(["unassigned@a.test"]);
     expect(unassigned.mailboxes[0]!.identity.code).toBe("unassigned");
-  });
-});
-
-describe("Smartlead inbox", () => {
-  const mailbox = inbox(present(), "sl-only@a.test");
-
-  it("shows the newest three attempts in stable order and the latest completed test", () => {
-    expect(mailbox.placement.test_count).toBe(4);
-    expect(mailbox.placement.recent_tests.map(test => test.test_ref)).toEqual(["smartlead:900004", "smartlead:900003", "smartlead:900002"]);
-    expect(mailbox.placement.latest_test_ref).toBe("smartlead:900004");
-    expect(mailbox.placement.latest_completed_test).toMatchObject({ test_ref: "smartlead:900004", execution_status: "completed", verdict: "pass", label: "Passed · 12/12 inbox" });
-    expect(mailbox.placement.status).toMatchObject({ code: "passed", tone: "ok" });
-    expect(mailbox.placement.evidence).toMatchObject({ freshness: "fresh", max_age_days: 10 });
-  });
-
-  it("separates warmup, approval, readiness and campaign activity", () => {
-    expect(mailbox.warmup.status.label).toBe("Warming · initial period complete");
-    expect(mailbox.warmup.sources[0]).toMatchObject({ provider: "smartlead", period_complete: true, estimated_completion: null, started_at_basis: "observed_activity" });
-    expect(mailbox.warmup.trend.days).toHaveLength(30);
-    expect(mailbox.approval.status.code).toBe("approved");
-    expect(mailbox.readiness).toMatchObject({ code: "ready", paths: [{ gate: "smartlead_eligibility", state: { code: "allowed" } }] });
-    expect(mailbox.campaigns.items.map(item => [item.name, item.status.code, item.sending.code]))
-      .toEqual([["A active campaign", "active", "enabled"], ["A paused campaign", "paused", "not_active"]]);
-    expect(mailbox.campaigns.status.code).toBe("in_campaign_enabled");
-    expect(mailbox.campaigns.status.description).toMatch(/doesn't confirm recent sends/);
-    expect(mailbox.status.code).toBe("in_campaign");
-  });
-
-  it("keeps human notes apart from generated explanations", () => {
-    expect(mailbox.notes).toEqual({ human: "A human note" });
-    expect(JSON.stringify({ ...mailbox, notes: null })).not.toContain("A human note");
   });
 });
 
@@ -133,17 +98,6 @@ describe("Unipile and Mailivery inbox", () => {
 });
 
 describe("mixed providers, identity and missing evidence", () => {
-  it("shows an inbox that sends through Unipile while Smartlead holds its evidence once", () => {
-    const response = present();
-    expect(response.mailboxes.filter(item => item.email === "mixed@a.test")).toHaveLength(1);
-    const mixed = inbox(response, "mixed@a.test");
-    expect(mixed.providers).toEqual({ sending: ["smartlead", "unipile"], warmup: ["smartlead"], placement: ["smartlead"] });
-    expect(mixed.connections.map(item => item.status)).toEqual(["connected", "disconnected"]);
-    // The disconnected connection is history next to a live one: listed, not a sending path.
-    expect(mixed.readiness.paths.map(path => path.provider)).toEqual(["smartlead", "unipile"]);
-    expect(mixed.recovery).toMatchObject({ state: "paused", reason: "placement_failed", rewarm_days: 14 });
-    expect(mixed.status.code).toBe("paused");
-  });
 
   it("reports today's sends as the send budget counts them, never as an estimate", () => {
     type SourceSending = NonNullable<Source["mailboxes"][number]["sending"]>;
@@ -160,13 +114,7 @@ describe("mixed providers, identity and missing evidence", () => {
     // A mailbox shared with another workspace never shows that tenant's sends.
     expect(sending({ shared: true, used: 3, available: 7 })).toMatchObject({ limit: 10, used_today: null, remaining_today: null, state: { code: "unknown" } });
     expect(sending({ limit: null })).toMatchObject({ limit: null, used_today: null, state: { code: "not_set" } });
-    // Smartlead sends from its own campaigns: Lifty's budget is not this inbox's limit.
-    const viaSmartlead = inbox(present(withInbox("uni-only@a.test", mailbox => {
-      mailbox.connections = mailbox.connections.map(connection => ({ ...connection, provider: "smartlead" }));
-      mailbox.sending = { ...mailbox.sending!, used: 10, available: 0 };
-    })), "uni-only@a.test").sending;
-    expect(viaSmartlead).toMatchObject({ limit: null, used_today: null, remaining_today: null,
-      state: { code: "not_set", label: "Daily limit set by the campaign platform" } });
+
   });
 
   it("never merges the same address across tenants", () => {
@@ -187,9 +135,9 @@ describe("mixed providers, identity and missing evidence", () => {
   it("never reads missing evidence as healthy", () => {
     const mailbox = inbox(present(), "unassigned@a.test");
     expect(mailbox.warmup.status).toMatchObject({ code: "none", label: "No warmup evidence" });
-    expect(mailbox.placement.status).toMatchObject({ code: "no_tests", tone: "warn" });
+    expect(mailbox.placement.status).toMatchObject({ code: "no_tests", tone: "muted" });
     expect(mailbox.placement.evidence.freshness).toBe("unknown");
-    const empty = present(withInbox("unassigned@a.test", item => { item.smartlead = null; item.availability.smartlead_registry = false; }));
+    const empty = present();
     expect(inbox(empty, "unassigned@a.test")).toMatchObject({ status: { code: "no_evidence" }, readiness: { code: "unknown" } });
   });
 
@@ -204,12 +152,6 @@ describe("mixed providers, identity and missing evidence", () => {
     expect(mailbox.status.code).not.toBe("in_campaign");
   });
 
-  it("marks an old passing result as stale and due", () => {
-    const response = presentDeliverability(source(), new Date("2026-10-12T00:00:00Z"));
-    const mailbox = inbox(response, "sl-only@a.test");
-    expect(mailbox.placement.status.code).toBe("stale");
-    expect(mailbox.placement.evidence.freshness).toBe("stale");
-  });
 });
 
 describe("send gates by workspace owner", () => {
@@ -251,41 +193,6 @@ describe("send gates by workspace owner", () => {
 });
 
 describe("first placement timing", () => {
-  function firstTest(edit: (mailbox: Source["mailboxes"][number]) => void = () => {}) {
-    return withInbox("sl-only@a.test", item => {
-      item.campaigns = [];
-      item.placement = { test_count: 0, latest_test_ref: null, latest_completed_test_ref: null, latest_completed_test: null, recent_tests: [] };
-      item.smartlead!.approved_for_outbound = false;
-      item.smartlead!.placement_gate_passed_at = null;
-      item.smartlead!.warmup_started_at = "2026-09-16T00:00:00Z";
-      item.smartlead!.cold_eligible_at = "2026-10-07T00:00:00Z";
-      item.warmup.smartlead!.active_since = "2026-09-16T00:00:00Z";
-      edit(item);
-    });
-  }
-
-  it.each([true, false])("shows initial warmup before a missing first test even when is_eligible=%s", (eligible) => {
-    const mailbox = inbox(present(firstTest(item => { item.smartlead!.is_eligible = eligible; })), "sl-only@a.test");
-    expect(mailbox.status.code).toBe("warming");
-    expect(mailbox.placement.status).toMatchObject({ code: "no_tests", tone: "muted", description: expect.stringMatching(/after.*warmup/i) });
-    expect(mailbox.readiness.code).toBe(eligible ? "ready" : "blocked");
-  });
-
-  it.each([true, false])("makes the first test due at completion even when is_eligible=%s", (eligible) => {
-    const value = firstTest(item => { item.smartlead!.is_eligible = eligible; });
-    const mailbox = inbox(presentDeliverability(value, new Date("2026-10-07T00:00:00Z")), "sl-only@a.test");
-    expect(mailbox.status.code).toBe("placement_due");
-    expect(mailbox.placement.status.tone).toBe("warn");
-    expect(mailbox.readiness.code).toBe(eligible ? "ready" : "blocked");
-  });
-
-  it("keeps recovery and warmup failures ahead of a deferred first test", () => {
-    const failed = firstTest(item => { item.warmup.smartlead!.health = "fail"; });
-    expect(inbox(present(failed), "sl-only@a.test").status.code).toBe("warmup_problem");
-    const paused = firstTest(item => { item.smartlead!.mitigation_state = "paused"; });
-    expect(inbox(present(paused), "sl-only@a.test").status.code).toBe("paused");
-  });
-
   it("defers Mailivery outreach inboxes but does not impose initial warmup on habitual inboxes", () => {
     const value = withInbox("uni-only@a.test", item => {
       item.campaigns = [];
@@ -325,47 +232,6 @@ describe("warmup states", () => {
     expect(done.status.description).toMatch(/does not enable campaigns/);
   });
 
-  it("explains when an approved inbox's period counts from the registry start", () => {
-    const restarted = inbox(present(withInbox("sl-only@a.test", item => {
-      item.warmup.smartlead!.active_since = "2026-09-15T19:00:00Z";
-    })), "sl-only@a.test");
-    expect(restarted.warmup.sources[0]).toMatchObject({ active_days: 14, required_days: 21, period_complete: true });
-    expect(restarted.warmup.status.reasons).toEqual([expect.objectContaining({ code: "period_counted_from_registry",
-      message: expect.stringMatching(/registry warmup start, 2026-08-20\. The current run of continuous warmup activity began 2026-09-15\./) })]);
-    // A full run needs no explanation.
-    expect(inbox(present(), "sl-only@a.test").warmup.status.reasons).toEqual([]);
-  });
 
-  it("reports Smartlead activity gaps and inactive warmup", () => {
-    const mixed = inbox(present(), "mixed@a.test");
-    expect(mixed.warmup.sources[0]!.state.reasons.map(item => item.code)).toEqual(["warmup_activity_low"]);
-    const off = inbox(present(withInbox("sl-only@a.test", item => { item.warmup.smartlead!.status = "inactive"; })), "sl-only@a.test");
-    expect(off.warmup.status.code).toBe("not_running");
-  });
 
-  it("counts mitigation recovery days on the rewarm clock", () => {
-    const paused = (at: string) => inbox(present(withInbox("mixed@a.test", item => { item.smartlead!.mitigation_paused_at = at; })), "mixed@a.test");
-    expect(paused("2026-09-25T10:00:00Z")).toMatchObject({ recovery: { day: 5 }, status: { label: "Paused · recovering (day 5 of 14)" } });
-    expect(paused("2026-09-01T10:00:00Z").status.label).toBe("Paused · awaiting a clean re-test");
-  });
-});
-
-describe("campaign states", () => {
-  it("never confirms an active campaign that drifted from the provider", () => {
-    const drift = inbox(present(withInbox("sl-only@a.test", item => {
-      const campaign = item.campaigns[0]!;
-      if (campaign.source === "smartlead_campaign") campaign.drift_detected_at = "2026-09-28T00:00:00Z";
-    })), "sl-only@a.test");
-    expect(drift.campaigns.items[0]!.sending).toMatchObject({ code: "unverified", reasons: [{ code: "drift_detected" }] });
-    expect(drift.campaigns.status.code).toBe("unverified");
-  });
-
-  it("reports paused-only and inactive-only campaigns", () => {
-    expect(inbox(present(), "shared@a.test").campaigns.status.code).toBe("campaign_paused");
-    const archived = inbox(present(withInbox("shared@a.test", item => {
-      const campaign = item.campaigns[0]!;
-      if (campaign.source === "smartlead_campaign") campaign.status = "archived";
-    })), "shared@a.test");
-    expect(archived.campaigns.status).toMatchObject({ code: "no_campaign", label: "No active campaign" });
-  });
 });

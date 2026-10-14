@@ -13,22 +13,13 @@ import {
 import type { PlacementReportReader } from "./email-deliverability-placement.js";
 
 // Canonical rules this presentation explains; none of them is decided here.
-/** sender_mailbox_eligibility: a Smartlead warmup check counts for 26 hours. */
-const SMARTLEAD_WARMUP_FRESH_HOURS = 26;
-/** sender_mailbox_eligibility: live warmup needs 20 sends in 7 days and one in 48 hours. */
-const SMARTLEAD_WARMUP_MIN_SENDS_7D = 20;
-const SMARTLEAD_WARMUP_MAX_SEND_GAP_HOURS = 48;
 /** lifty_email_warmup_unlocked / outreach_email_warmup_status: 24-hour evidence. */
 const MAILIVERY_EVIDENCE_FRESH_HOURS = 24;
 /**
- * Placement evidence is current for 10 days: jobs DELIVERABILITY_POLICY_V1
- * placementStaleDays for Smartlead inboxes, and outreach_email_mailbox_ready /
+ * Placement evidence is current for 10 days: outreach_email_mailbox_ready /
  * lifty_email_sender_gate for Unipile connections under the strict policy.
  */
 const PLACEMENT_FRESH_DAYS = 10;
-/** jobs DELIVERABILITY_POLICY_V1.mitigationRewarmDays. */
-const MITIGATION_REWARM_DAYS = 14;
-const TREND_DAYS = 30;
 const LIFTY_BETA_POLICY = /^lifty\.personal-beta\./;
 
 const HOUR = 3_600_000;
@@ -48,8 +39,6 @@ const iso = (at: number) => new Date(at).toISOString();
 const day = (value: string | null | undefined) => value ? value.slice(0, 10) : null;
 const n = <T>(value: T | null | undefined): T | null => value ?? null;
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
-/** Stored reason codes such as placement_failed read as words. */
-const words = (value: string) => value.replace(/_/g, " ");
 
 type Evidence = { observed_at: string | null; freshness: "fresh" | "stale" | "unknown" | "not_applicable"; fresh_until: string | null };
 /** Missing evidence and an unknown rule are both "unknown"; never fresh by default. */
@@ -116,8 +105,6 @@ function presentTest(test: SourceTest, now: Date): PlacementTest {
 }
 
 function placementRule(mailbox: SourceMailbox): { maxAgeDays: number | null; rule: string; applies: boolean; disabled: boolean } {
-  if (mailbox.smartlead) return { maxAgeDays: PLACEMENT_FRESH_DAYS, applies: true, disabled: false,
-    rule: `LIFT's deliverability policy treats a placement result as current for ${PLACEMENT_FRESH_DAYS} days.` };
   // outreach_email_mailbox_ready governs LIFT-managed Unipile inboxes only;
   // Lifty workspaces follow their own email policy, which the source doesn't carry.
   if (mailbox.workspace_managed_by !== "lifty" && mailbox.warmup.mailivery.some(item => item.binding)) return { maxAgeDays: PLACEMENT_FRESH_DAYS, applies: true, disabled: false,
@@ -184,47 +171,6 @@ function presentPlacement(mailbox: SourceMailbox, warmup: DeliverabilityMailbox[
 
 // ---------------------------------------------------------------- warmup
 
-function smartleadWarmup(mailbox: SourceMailbox, now: Date): WarmupSource | null {
-  const w = mailbox.warmup.smartlead;
-  if (!w) return null;
-  const registry = mailbox.smartlead;
-  const check = freshness(w.observed_at, SMARTLEAD_WARMUP_FRESH_HOURS * HOUR, now);
-  const reasons: Reason[] = [];
-  if (check.freshness === "stale") reasons.push(reason("warmup_check_stale", `The latest warmup check is older than ${SMARTLEAD_WARMUP_FRESH_HOURS} hours.`));
-  const detail = w.detail ? ` ${w.detail}` : "";
-  const activeDays = w.active_since ? Math.max(0, Math.floor((ms(w.observed_at) - ms(w.active_since)) / DAY)) : null;
-  const eligibleAt = ms(registry?.cold_eligible_at);
-  const complete = Number.isFinite(eligibleAt) ? eligibleAt <= now.getTime() : activeDays === null ? null : activeDays >= REQUIRED_WARMUP_ACTIVE_DAYS;
-  // Approved inboxes count the required period from the registry start
-  // (sender_mailbox_eligibility.cold_eligible_at), not from the latest
-  // continuous activity, so the two numbers can legitimately differ.
-  if (complete === true && registry?.approved_for_outbound && registry.warmup_started_at && activeDays !== null && activeDays < REQUIRED_WARMUP_ACTIVE_DAYS) {
-    reasons.push(reason("period_counted_from_registry", `For this approved inbox the required period counts from the registry warmup start, ${day(registry.warmup_started_at)}. The current run of continuous warmup activity began ${day(w.active_since)}.`));
-  }
-  let state: WarmupSource["state"];
-  if (w.status === "active" && w.health === "pass") state = make("active", "Warming", "ok", "Warmup is running and its latest check passed.", reasons);
-  else if (w.status === "active" && w.health === "pending") state = make("active", "Warming · low activity", "watch",
-    "Warmup is running, but recent warmup activity is below the minimum for a passing check.", [...reasons, reason("warmup_activity_low", `Warmup activity is below the minimum.${detail}`)]);
-  else if (w.status === "active" && w.health === "fail") state = make("problem", "Warmup failing", "bad",
-    "Warmup is running, but its latest check failed.", [...reasons, reason("warmup_health_failed", `The latest warmup check failed.${detail}`)]);
-  else if (w.status === "inactive") state = make("not_running", "Warmup off", "warn", "Warmup is not running for this inbox.", reasons);
-  else if (w.status === "blocked") state = make("problem", "Warmup blocked", "bad", "Warmup is blocked for this inbox.", [...reasons, reason("warmup_blocked", `Warmup is blocked.${detail}`)]);
-  else state = make("unknown", "Warmup state unknown", "warn", "The latest check could not determine the warmup state.", reasons);
-  return {
-    provider: "smartlead", connection_ref: null, state,
-    started_at: w.active_since ? iso(ms(w.active_since)) : null, started_at_basis: w.active_since ? "observed_activity" : null,
-    active_days: activeDays, required_days: REQUIRED_WARMUP_ACTIVE_DAYS, period_complete: complete,
-    estimated_completion: complete === false && Number.isFinite(eligibleAt) ? { at: iso(eligibleAt), on: null,
-      basis: registry?.approved_for_outbound
-        ? `Estimated: the registry warmup start plus ${REQUIRED_WARMUP_ACTIVE_DAYS} days.`
-        : `Estimated: continuous warmup activity since ${day(w.active_since)} plus ${REQUIRED_WARMUP_ACTIVE_DAYS} days. A gap in activity restarts the count.` } : null,
-    outreach_unlocked: null, last_check: check,
-    metrics: { reputation_pct: n(w.reputation_pct), spam_pct: n(w.spam_pct), spam_sample_sent: n(w.spam_sample_sent), spam_count: n(w.spam_count),
-      sent_7d: n(w.sent_7d), last_sent_at: w.last_sent_at ? iso(ms(w.last_sent_at)) : null, warmup_emails_today: null, ramp_target: null },
-    checks: null, provider_detail: n(w.detail),
-  };
-}
-
 function mailiveryWarmup(item: SourceMailivery, connection: SourceConnection | undefined, now: Date): WarmupSource {
   const binding = item.binding ?? null;
   const evidence = item.evidence ?? null;
@@ -264,8 +210,7 @@ function mailiveryWarmup(item: SourceMailivery, connection: SourceConnection | u
       basis: "Estimated if warmup runs every day from today. Paused days and days with a problem don't count, so the date moves later if warmup stops." } : null,
     outreach_unlocked: personal ? null : n(item.outreach_unlocked),
     last_check: { ...check, observed_at: check.observed_at ?? (binding?.last_readback_at ? iso(ms(binding.last_readback_at)) : null) },
-    metrics: { reputation_pct: null, spam_pct: null, spam_sample_sent: null, spam_count: null, sent_7d: null, last_sent_at: null,
-      warmup_emails_today: n(snapshot?.emails_sent_today), ramp_target: n(snapshot?.email_per_day_target) },
+    metrics: { warmup_emails_today: n(snapshot?.emails_sent_today), ramp_target: n(snapshot?.email_per_day_target) },
     checks: snapshot ? { spf: checkValue(snapshot.spf), dmarc: checkValue(snapshot.dmarc), mx: checkValue(snapshot.mx) } : null,
     provider_detail: null,
   };
@@ -274,21 +219,11 @@ function mailiveryWarmup(item: SourceMailivery, connection: SourceConnection | u
 const warmupRank: Record<WarmupSource["state"]["code"], number> = { problem: 0, not_running: 1, paused: 2, unknown: 3, pending: 4, active: 5, none: 6 };
 
 function presentWarmup(mailbox: SourceMailbox, now: Date, account?: Account): DeliverabilityMailbox["warmup"] {
-  const smartlead = smartleadWarmup(mailbox, now);
-  const sources = [...(smartlead ? [smartlead] : []),
-    ...mailbox.warmup.mailivery.map(item => mailiveryWarmup(item, mailbox.connections.find(c => c.connection_ref === item.connection_ref), now))];
-  const connection = mailbox.connections.find(item => item.connection_ref === account?.id);
-  const current = account ? sources.find(item => connection?.provider === "smartlead"
-    ? item.provider === "smartlead" : item.provider === "mailivery" && item.connection_ref === account.id) ?? null : null;
+  const sources = mailbox.warmup.mailivery.map(item => mailiveryWarmup(item, mailbox.connections.find(c => c.connection_ref === item.connection_ref), now));
+  const current = account ? sources.find(item => item.connection_ref === account.id) ?? null : null;
   const effective = account ? (current ? [current] : []) : sources;
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const trend = {
-    window_start: iso(end.getTime() - (TREND_DAYS - 1) * DAY).slice(0, 10), window_end: iso(end.getTime()).slice(0, 10),
-    days: mailbox.warmup.smartlead_daily.map(point => ({ day: point.day, observed_at: iso(ms(point.observed_at)), status: point.status, health: point.health,
-      reputation_pct: n(point.reputation_pct), spam_pct: n(point.spam_pct), spam_sample_sent: n(point.spam_sample_sent), sent_7d: n(point.sent_7d) })),
-  };
   if (effective.length === 0) {
-    return { status: make("none", "No warmup evidence", "muted", "No warmup provider has reported on this inbox. Missing evidence is not a healthy result."), sources, current, trend };
+    return { status: make("none", "No warmup evidence", "muted", "No warmup provider has reported on this inbox. Missing evidence is not a healthy result."), sources, current };
   }
   const worst = [...effective].sort((a, b) => warmupRank[a.state.code] - warmupRank[b.state.code])[0]!;
   const progress = effective.find(source => source.required_days !== null && source.active_days !== null) ?? null;
@@ -296,12 +231,12 @@ function presentWarmup(mailbox: SourceMailbox, now: Date, account?: Account): De
   if (worst.state.code === "active" && progress) {
     label = progress.period_complete ? `${worst.state.label} · initial period complete` : `${worst.state.label} · day ${progress.active_days} of ${progress.required_days}`;
   }
-  const names = effective.map(source => source.provider === "smartlead" ? "campaign platform warmup" : "Lifty warmup").join(" and ");
+  const names = effective.map(() => "Lifty warmup").join(" and ");
   const period = progress?.period_complete ? " The initial warmup period is complete; warmup can keep running after it, and that alone does not enable campaigns." : "";
   return {
     status: make(worst.state.code, label, worst.state.tone, `${worst.state.description}${effective.length > 1 ? ` Evidence comes from ${names}.` : ""}${period}`,
       effective.flatMap(source => source.state.reasons)),
-    sources, current, trend,
+    sources, current,
   };
 }
 
@@ -334,37 +269,6 @@ function controlReason(value: string): Reason {
   }
   const code = /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value : "send_blocked";
   return reason(code, controlReasons[value] ?? "A send control blocks this connection.");
-}
-
-function smartleadPath(mailbox: SourceMailbox, now: Date): DeliverabilityMailbox["readiness"]["paths"][number] | null {
-  const m = mailbox.smartlead;
-  if (!m) return null;
-  const base = { provider: "smartlead", connection_ref: null, gate: "smartlead_eligibility" as const };
-  if (m.is_eligible === true) return { ...base, state: make("allowed", "Allowed to send", "ok", "Passes the Smartlead eligibility rules: approved, warmed, placement-gated, live warmup and no mitigation.") };
-  if (m.is_eligible == null) return { ...base, state: make("unknown", "Eligibility unknown", "warn", "The Smartlead registry did not report eligibility.") };
-  const reasons: Reason[] = [];
-  if (m.mitigation_state === "retired") reasons.push(reason("retired", "The inbox is retired."));
-  else if (m.mitigation_state && m.mitigation_state !== "none") reasons.push(reason("mitigation_paused", `Paused by deliverability mitigation${m.mitigation_reason ? ` (${words(m.mitigation_reason)})` : ""}.`));
-  if (!m.approved_for_outbound) reasons.push(reason("not_approved", "Not approved for outbound yet."));
-  if (!m.placement_gate_passed_at) reasons.push(reason("placement_gate_not_passed", "Hasn't passed the placement gate."));
-  const started = ms(m.warmup_started_at);
-  if (Number.isFinite(started) && started + REQUIRED_WARMUP_ACTIVE_DAYS * DAY > now.getTime()) {
-    reasons.push(reason("warmup_period_incomplete", `The registry's ${REQUIRED_WARMUP_ACTIVE_DAYS}-day warmup period ends ${day(iso(started + REQUIRED_WARMUP_ACTIVE_DAYS * DAY))}.`));
-  }
-  const w = mailbox.warmup.smartlead;
-  if (!w) reasons.push(reason("warmup_check_missing", "No Smartlead warmup check is recorded."));
-  else {
-    if (w.status !== "active") reasons.push(reason("warmup_not_active", `Smartlead warmup is ${w.status}.`));
-    if (now.getTime() - ms(w.observed_at) > SMARTLEAD_WARMUP_FRESH_HOURS * HOUR) reasons.push(reason("warmup_check_stale", `The latest warmup check is older than ${SMARTLEAD_WARMUP_FRESH_HOURS} hours.`));
-    const grace = ms(m.warmup_activity_grace_until) > now.getTime();
-    if (w.health === "pending" && !grace) reasons.push(reason("warmup_activity_low", `Warmup activity is below the minimum${w.detail ? `: ${w.detail}` : "."}`));
-    else if (w.health === "pass" && ((w.sent_7d ?? 0) < SMARTLEAD_WARMUP_MIN_SENDS_7D
-      || !(ms(w.last_sent_at) >= now.getTime() - SMARTLEAD_WARMUP_MAX_SEND_GAP_HOURS * HOUR))) {
-      reasons.push(reason("warmup_activity_low", `Live warmup needs ${SMARTLEAD_WARMUP_MIN_SENDS_7D} sends in 7 days and one in the last ${SMARTLEAD_WARMUP_MAX_SEND_GAP_HOURS} hours.`));
-    } else if (w.health !== "pass" && w.health !== "pending") reasons.push(reason("warmup_health_failed", `Warmup health is ${w.health}${w.detail ? `: ${w.detail}` : "."}`));
-  }
-  if (reasons.length === 0) reasons.push(reason("not_eligible", "Not eligible under the current Smartlead rules."));
-  return { ...base, state: make("blocked", "Blocked", "bad", "Doesn't meet the Smartlead eligibility rules yet.", reasons) };
 }
 
 function connectionGate(mailbox: SourceMailbox, connection: SourceConnection): Connection["send_gate"] & { gate: DeliverabilityMailbox["readiness"]["paths"][number]["gate"] } {
@@ -408,11 +312,11 @@ function presentConnection(mailbox: SourceMailbox, connection: SourceConnection)
 
 function presentReadiness(paths: DeliverabilityMailbox["readiness"]["paths"]): DeliverabilityMailbox["readiness"] {
   const codes = paths.map(path => path.state.code);
-  const name = (path: (typeof paths)[number]) => path.provider === "smartlead" ? "Smartlead" : `${path.provider[0]!.toUpperCase()}${path.provider.slice(1)} connection`;
+  const name = (path: (typeof paths)[number]) => `${path.provider[0]!.toUpperCase()}${path.provider.slice(1)} connection`;
   const blockedReasons = paths.filter(path => path.state.code !== "allowed")
     .flatMap(path => path.state.reasons.map(item => reason(item.code, `${name(path)}: ${item.message}`)));
   let summary: State<DeliverabilityMailbox["readiness"]["code"]>;
-  if (paths.length === 0) summary = make("unknown", "No sending path", "muted", "This inbox has no Smartlead registry record and no email connection, so nothing can send from it.");
+  if (paths.length === 0) summary = make("unknown", "No sending path", "muted", "This inbox has no email connection, so nothing can send from it.");
   else if (codes.every(code => code === "allowed")) summary = make("ready", "Ready to send", "ok",
     `Allowed to send through ${paths.map(name).join(" and ")}. Being allowed doesn't mean it is sending; see campaigns.`);
   else if (codes.includes("allowed")) summary = make("partially_ready", "Ready on some paths", "watch",
@@ -432,45 +336,25 @@ const campaignLabels: Record<Campaign["status"]["code"], [string, Tone]> = {
 };
 
 function presentCampaign(source: SourceCampaign, paths: DeliverabilityMailbox["readiness"]["paths"]): Campaign {
-  let code: Campaign["status"]["code"];
-  let states: Record<string, number>;
-  if (source.source === "smartlead_campaign") {
-    code = (["active", "paused", "draft", "closed_to_new_leads", "archived", "error"] as const).find(value => value === source.status) ?? "unknown";
-    states = { [source.status]: 1 };
-  } else {
-    states = source.states;
-    code = (states.active ?? 0) > 0 ? "active" : (states.paused ?? 0) > 0 ? "paused"
-      : (states.draft ?? 0) + (states.approved ?? 0) > 0 ? "draft" : "completed";
-  }
+  const states = source.states;
+  const code = (states.active ?? 0) > 0 ? "active" : (states.paused ?? 0) > 0 ? "paused"
+    : (states.draft ?? 0) + (states.approved ?? 0) > 0 ? "draft" : "completed";
   const [label, tone] = campaignLabels[code];
-  const status = make(code, label, tone, source.source === "smartlead_campaign"
-    ? `The campaign record says ${label.toLowerCase()}${source.provider_status ? ` (provider: ${source.provider_status})` : ""}. This is LIFT's configuration, not a live provider readback.`
-    : `${plural(source.campaign_count, "direct Lifty campaign")} use this connection: ${Object.entries(states).map(([key, count]) => `${count} ${key}`).join(", ")}.`);
-  const path = source.source === "smartlead_campaign"
-    ? paths.find(item => item.gate === "smartlead_eligibility")
-    : paths.find(item => item.connection_ref === source.connection_ref);
+  const status = make(code, label, tone, `${plural(source.campaign_count, "direct Lifty campaign")} use this connection: ${Object.entries(states).map(([key, count]) => `${count} ${key}`).join(", ")}.`);
+  const path = paths.find(item => item.connection_ref === source.connection_ref);
   let sending: Campaign["sending"];
   if (code !== "active") sending = make("not_active", "Not active", "muted", "The campaign isn't active, so this inbox doesn't send for it.");
-  else if (source.source === "smartlead_campaign" && (source.drift_detected_at || source.status === "error")) {
-    sending = make("unverified", "Unverified", "warn", "The campaign record disagrees with the provider or reports an error, so its state can't be confirmed.",
-      source.drift_detected_at ? [reason("drift_detected", `Provider drift detected ${day(source.drift_detected_at)}.`)] : []);
-  } else if (!path || path.state.code === "unknown") sending = make("unverified", "Unverified", "warn", "Lifty can't tell whether this inbox passes the send checks for this campaign.");
+  else if (!path || path.state.code === "unknown") sending = make("unverified", "Unverified", "warn", "Lifty can't tell whether this inbox passes the send checks for this campaign.");
   else if (path.state.code === "blocked") sending = make("blocked", "Blocked", "bad", "The campaign is active, but this inbox is blocked from sending.", path.state.reasons);
   else sending = make("enabled", path.state.code === "allowed" ? "Allowed to send" : "No known blocker", path.state.code === "allowed" ? "ok" : "watch",
     "The campaign is active and this inbox passes its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.");
   return {
     source: source.source,
-    campaign_ref: source.source === "smartlead_campaign" ? source.campaign_ref : null,
-    connection_ref: source.source === "lifty_direct_email" ? source.connection_ref : null,
-    provider: source.source === "smartlead_campaign" ? (/^[a-z][a-z0-9_-]{0,39}$/.test(source.provider) ? source.provider : "other") : "unipile",
-    name: source.source === "smartlead_campaign" ? n(source.name) : null,
-    sender_ref: source.source === "smartlead_campaign" ? n(source.sender_ref) : null,
-    campaign_count: source.source === "smartlead_campaign" ? 1 : source.campaign_count,
+    connection_ref: source.connection_ref,
+    provider: "unipile",
+    campaign_count: source.campaign_count,
     states, status, sending,
-    provider_status: source.source === "smartlead_campaign" ? n(source.provider_status) : null,
-    created_at: source.source === "smartlead_campaign" ? iso(ms(source.created_at)) : source.latest_created_at ? iso(ms(source.latest_created_at)) : null,
-    last_synced_at: source.source === "smartlead_campaign" && source.last_synced_at ? iso(ms(source.last_synced_at)) : null,
-    drift_detected_at: source.source === "smartlead_campaign" && source.drift_detected_at ? iso(ms(source.drift_detected_at)) : null,
+    created_at: source.latest_created_at ? iso(ms(source.latest_created_at)) : null,
   };
 }
 
@@ -479,7 +363,7 @@ function presentCampaigns(items: Campaign[]): DeliverabilityMailbox["campaigns"]
   const enabled = active.filter(item => item.sending.code === "enabled");
   const blocked = active.filter(item => item.sending.code === "blocked");
   const unverified = active.filter(item => item.sending.code === "unverified");
-  const name = (item: Campaign) => item.name ?? (item.source === "lifty_direct_email" ? "Direct Lifty campaigns" : "Unnamed campaign");
+  const name = (item: Campaign) => "Direct Lifty campaigns";
   let status: DeliverabilityMailbox["campaigns"]["status"];
   if (enabled.length > 0) status = make("in_campaign_enabled", `In ${plural(enabled.length, "active campaign")} · allowed`, "ok",
     "Configured on an active campaign and passing its send checks. Lifty has no dated send evidence here, so this doesn't confirm recent sends.",
@@ -496,40 +380,6 @@ function presentCampaigns(items: Campaign[]): DeliverabilityMailbox["campaigns"]
 
 // ------------------------------------------------ approval, recovery, status
 
-function presentApproval(mailbox: SourceMailbox, now: Date): DeliverabilityMailbox["approval"] {
-  const m = mailbox.smartlead;
-  const hold = m?.placement_hold_reason ? { reason: m.placement_hold_reason, review_at: m.placement_hold_review_at ? iso(ms(m.placement_hold_review_at)) : null } : null;
-  const common = { approved_at: m?.approved_at ? iso(ms(m.approved_at)) : null, approved_by: n(m?.approved_by),
-    placement_gate_passed_at: m?.placement_gate_passed_at ? iso(ms(m.placement_gate_passed_at)) : null,
-    cold_eligible_at: m?.cold_eligible_at ? iso(ms(m.cold_eligible_at)) : null, hold };
-  const holdReason = hold ? [reason("placement_hold", `Placement testing is on hold: ${hold.reason}${hold.review_at ? ` (review ${day(hold.review_at)})` : ""}.`)] : [];
-  if (!m) return { status: make("not_applicable", "No approval record", "muted", "This inbox has no LIFT approval record. Its send controls decide whether it may send."), ...common };
-  if (m.approved_for_outbound) return { status: make("approved", "Approved", "ok",
-    `Approved for outbound${m.approved_at ? ` on ${day(m.approved_at)}` : ""}${m.approved_by ? ` by ${m.approved_by}` : ""}. Approval alone doesn't enable sending; the other checks still apply.`, holdReason), ...common };
-  const paused = Boolean(m.mitigation_state && m.mitigation_state !== "none");
-  const ageDone = ms(m.cold_eligible_at) <= now.getTime();
-  if (!paused && ageDone && m.placement_gate_passed_at) return { status: make("awaiting_approval", "Needs approval", "watch",
-    "The warmup period and placement gate are done; only explicit human approval remains.", holdReason), ...common };
-  const reasons: Reason[] = [...holdReason];
-  if (!ageDone) reasons.push(reason("warmup_period_incomplete", m.cold_eligible_at ? `The warmup period ends ${day(m.cold_eligible_at)} (estimated).` : "The warmup period hasn't started counting."));
-  if (!m.placement_gate_passed_at) reasons.push(reason("placement_gate_not_passed", "Hasn't passed the placement gate."));
-  if (paused) reasons.push(reason("mitigation_paused", "Paused by deliverability mitigation."));
-  return { status: make("not_approved", "Not approved", "muted", "Not approved for outbound yet.", reasons), ...common };
-}
-
-function presentRecovery(mailbox: SourceMailbox, now: Date): DeliverabilityMailbox["recovery"] {
-  const m = mailbox.smartlead;
-  if (!m || (m.mitigation_state !== "paused" && m.mitigation_state !== "retired")) return null;
-  const pausedAt = ms(m.mitigation_paused_at);
-  const base = { reason: n(m.mitigation_reason), paused_at: Number.isFinite(pausedAt) ? iso(pausedAt) : null,
-    resumed_at: m.mitigation_resumed_at ? iso(ms(m.mitigation_resumed_at)) : null, rewarm_days: MITIGATION_REWARM_DAYS };
-  if (m.mitigation_state === "retired") return { state: "retired", ...base, day: null, rewarm_complete_at: null,
-    description: "Retired after a deliverability problem. Replace the domain; this inbox doesn't return to sending." };
-  const dayNumber = Number.isFinite(pausedAt) ? Math.max(1, Math.floor((now.getTime() - pausedAt) / DAY) + 1) : null;
-  return { state: "paused", ...base, day: dayNumber, rewarm_complete_at: Number.isFinite(pausedAt) ? iso(pausedAt + MITIGATION_REWARM_DAYS * DAY) : null,
-    description: `Paused${m.mitigation_reason ? ` after ${words(m.mitigation_reason)}` : ""}. Warmup keeps running; after at least ${MITIGATION_REWARM_DAYS} days a clean placement test can resume sending. Approval is kept separately.` };
-}
-
 function presentIdentity(mailbox: SourceMailbox): DeliverabilityMailbox["identity"] {
   const names = mailbox.senders.map(sender => sender.name);
   if (mailbox.identity.status === "resolved") return make("resolved", names[0] ?? "Assigned", "ok", `This inbox belongs to ${names[0] ?? "one sender"}.`);
@@ -539,23 +389,18 @@ function presentIdentity(mailbox: SourceMailbox): DeliverabilityMailbox["identit
 }
 
 function presentStatus(parts: {
-  recovery: DeliverabilityMailbox["recovery"]; placement: DeliverabilityMailbox["placement"]; campaigns: DeliverabilityMailbox["campaigns"];
-  warmup: DeliverabilityMailbox["warmup"]; approval: DeliverabilityMailbox["approval"]; readiness: DeliverabilityMailbox["readiness"]; hasEvidence: boolean;
+  placement: DeliverabilityMailbox["placement"]; campaigns: DeliverabilityMailbox["campaigns"];
+  account: DeliverabilityMailbox["account"]; warmup: DeliverabilityMailbox["warmup"]; readiness: DeliverabilityMailbox["readiness"]; hasEvidence: boolean;
 }): DeliverabilityMailbox["status"] {
-  const { recovery, placement, campaigns, warmup, approval, readiness } = parts;
-  if (recovery?.state === "retired") return make("retired", "Retired · replace domain", "bad", recovery.description);
-  if (recovery?.state === "paused") {
-    const label = recovery.day === null ? "Paused · recovering" : recovery.day <= recovery.rewarm_days
-      ? `Paused · recovering (day ${recovery.day} of ${recovery.rewarm_days})` : "Paused · awaiting a clean re-test";
-    return make("paused", label, "bad", recovery.description);
-  }
+  const { account, placement, campaigns, warmup, readiness } = parts;
+  if (account?.outreach.code === "paused") return make("paused", account.outreach.label, account.outreach.tone, account.outreach.description, account.outreach.reasons);
+  if (account?.outreach.code === "blocked") return make(campaigns.status.code === "in_campaign_blocked" ? "blocked_in_campaign" : "not_ready", account.outreach.label, account.outreach.tone, account.outreach.description, account.outreach.reasons);
   if (placement.status.code === "failed") return make("placement_failed", "Failed placement", "bad", placement.status.description, placement.status.reasons);
   if (campaigns.status.code === "in_campaign_blocked") return make("blocked_in_campaign", "In campaign · blocked", "bad", campaigns.status.description, campaigns.status.reasons);
   if (warmup.status.code === "problem") return make("warmup_problem", warmup.status.label, "warn", warmup.status.description, warmup.status.reasons);
-  if (approval.status.code === "awaiting_approval") return make("needs_approval", "Needs approval", "watch", approval.status.description, approval.status.reasons);
   const ready = readiness.code === "ready" || readiness.code === "partially_ready";
   // A permissive sending path does not make the first test overdue during
-  // initial warmup. Actual failures, recovery and campaign blocks still win.
+  // initial warmup. Actual failures and campaign blocks still win.
   if (placement.status.code === "no_tests" && initialWarmupPending(warmup)) {
     return make("warming", warmup.status.label, "muted", `${warmup.status.description} ${placement.status.description}`, warmup.status.reasons);
   }
@@ -569,12 +414,13 @@ function presentStatus(parts: {
   if (ready && placement.evidence.max_age_days !== null && (placement.status.code === "stale" || placement.status.code === "no_tests" || placement.status.code === "no_result")) {
     return make("placement_due", "Placement test due", "warn", placement.status.description, placement.status.reasons);
   }
+  if ((!account || account.outreach.code === "unknown") && (ready || campaigns.status.code === "in_campaign_enabled")) return make("not_ready", "Unverified", "warn", "A current connection check is needed to confirm whether outreach can send.");
   if (campaigns.status.code === "in_campaign_enabled") return make("in_campaign", "In campaign", "ok", campaigns.status.description, campaigns.status.reasons);
   if (ready) return make("ready_idle", "Ready · no active campaign", "watch", `${readiness.description} It isn't on an active campaign.`, readiness.reasons);
   const warming = warmup.sources.find(source => (source.state.code === "active" || source.state.code === "pending") && source.period_complete === false);
   if (warming) return make("warming", warmup.status.label, "muted", warmup.status.description, warmup.status.reasons);
   if (readiness.code === "no_known_blocker") return make("no_known_blocker", readiness.label, "watch", readiness.description, readiness.reasons);
-  if (!parts.hasEvidence) return make("no_evidence", "No evidence yet", "muted", "No warmup, placement or registry evidence is recorded for this inbox yet. Missing evidence is not a healthy result.");
+  if (!parts.hasEvidence) return make("no_evidence", "No evidence yet", "muted", "No warmup or placement evidence is recorded for this inbox yet. Missing evidence is not a healthy result.");
   return make("not_ready", "Not ready yet", "muted", readiness.description, readiness.reasons);
 }
 
@@ -582,7 +428,7 @@ function presentStatus(parts: {
  * LIF-1341: today's sends against the inbox's daily limit, as the send budget
  * counts them. Nothing here estimates a count or decides whether a send may go.
  */
-function presentSending(source: SourceSending | null | undefined, connections: SourceConnection[]): DeliverabilityMailbox["sending"] {
+function presentSending(source: SourceSending | null | undefined): DeliverabilityMailbox["sending"] {
   const at = (value: string | null | undefined) => Number.isFinite(ms(value)) ? iso(ms(value)) : null;
   const base = { limit: n(source?.limit), used_today: null, remaining_today: null, timezone: n(source?.timezone),
     day_started_at: at(source?.day_started_at), resets_at: at(source?.resets_at) };
@@ -593,13 +439,6 @@ function presentSending(source: SourceSending | null | undefined, connections: S
   if (source.limit === null || source.limit === undefined) {
     return { ...base, state: make("not_set", "No Lifty daily limit", "muted",
       "No email connection in Lifty sends from this inbox, so Lifty sets no daily limit for it. Sends from other tools aren't counted here.") };
-  }
-  // Smartlead runs its own campaigns from these inboxes and sets their daily
-  // limit; Lifty's budget would read as a cap the inbox doesn't follow.
-  const connected = connections.filter(connection => connection.status === "connected");
-  if (connected.length > 0 && connected.every(connection => connection.provider === "smartlead")) {
-    return { ...base, limit: null, state: make("not_set", "Daily limit set by the campaign platform", "muted",
-      "This inbox sends through the campaign platform, which sets its daily limit. Lifty doesn't cap or count those sends here.") };
   }
   if (source.shared) {
     return { ...base, state: make("unknown", "Today's sends not shown", "muted",
@@ -635,7 +474,7 @@ function presentAccount(account: Account | undefined, connections: Connection[],
   else if (account.observation.state === "unverified" || !connection || connection.send_gate.code === "unknown") outreach = make("unknown", "Unverified", "warn", "A current connection check is needed to confirm whether outreach can send.");
   else {
     const active = campaigns.items.filter(item => item.status.code === "active" &&
-      (item.connection_ref === account.id || (connection.provider === "smartlead" && item.source === "smartlead_campaign")));
+      item.connection_ref === account.id);
     if (!active.length) outreach = make("idle", "No active campaign", "muted", "This account is enabled, but no active campaign uses this connection.");
     else if (active.some(item => item.sending.code === "enabled")) outreach = make("enabled", "Enabled", "ok", "An active campaign can use this account when its schedule and send checks allow.");
     else if (active.some(item => item.sending.code === "unverified")) outreach = make("unknown", "Unverified", "warn", "The active campaign's sending state could not be confirmed.");
@@ -653,14 +492,12 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
   // A disconnected connection is history when the same provider has a live one.
   const connectionPaths = connections.filter(item => item.status === "connected" || !connected.has(item.provider))
     .map(item => ({ provider: item.provider, connection_ref: item.connection_ref, gate: item.gate, state: item.send_gate }));
-  const smartlead = smartleadPath(source, now);
-  const paths = [...(smartlead ? [smartlead] : []), ...connectionPaths];
+  const paths = connectionPaths;
   const readiness = presentReadiness(paths);
   const warmup = presentWarmup(source, now, account);
   const placement = presentPlacement(source, warmup, now, detail);
   const campaigns = presentCampaigns(source.campaigns.map(item => presentCampaign(item, paths)));
-  const approval = presentApproval(source, now);
-  const recovery = presentRecovery(source, now);
+  const currentAccount = presentAccount(account, connections, campaigns);
   const workspace = workspaces.get(source.workspace_ref);
   const unique = (values: string[]) => [...new Set(values)].slice(0, 5);
   return {
@@ -669,18 +506,17 @@ function presentMailbox(source: SourceMailbox, workspaces: Map<string, { slug: s
     email: source.email, domain: source.domain,
     senders: source.senders.map(sender => ({ sender_ref: sender.sender_ref, name: sender.name })),
     identity: presentIdentity(source),
-    account: presentAccount(account, connections, campaigns),
+    account: currentAccount,
     providers: {
-      sending: unique([...(source.smartlead ? ["smartlead"] : []), ...connections.filter(item => item.status === "connected").map(item => item.provider)]),
+      sending: unique([...connections.filter(item => item.status === "connected").map(item => item.provider)]),
       warmup: unique(warmup.sources.map(item => item.provider)),
       placement: unique([...placement.recent_tests, ...(placement.latest_completed_test ? [placement.latest_completed_test] : [])].map(test => test.provider)),
     },
-    status: presentStatus({ recovery, placement, campaigns, warmup, approval, readiness,
-      hasEvidence: Boolean(source.smartlead) || warmup.sources.length > 0 || source.placement.test_count > 0 }),
-    readiness, warmup, recovery, campaigns, placement, approval,
-    notes: { human: source.smartlead?.notes?.trim() || null },
+    status: presentStatus({ account: currentAccount, placement, campaigns, warmup, readiness,
+      hasEvidence: warmup.sources.length > 0 || source.placement.test_count > 0 }),
+    readiness, warmup, campaigns, placement,
     connections: connections.map(({ gate: _gate, ...connection }) => connection),
-    sending: presentSending(source.sending, source.connections),
+    sending: presentSending(source.sending),
     availability: source.availability,
   };
 }

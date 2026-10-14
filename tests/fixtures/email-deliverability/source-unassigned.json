@@ -30,9 +30,7 @@
   {
    "availability": {
     "mailivery_warmup": false,
-    "placement_tests": false,
-    "smartlead_registry": true,
-    "smartlead_warmup": false
+    "placement_tests": false
    },
    "campaigns": [],
    "connections": [],
@@ -52,30 +50,8 @@
     "test_count": 0
    },
    "senders": [],
-   "smartlead": {
-    "account_id": 103904,
-    "approved_at": null,
-    "approved_by": null,
-    "approved_for_outbound": false,
-    "cold_eligible_at": null,
-    "created_at": "2026-09-29T19:52:58.283595+00:00",
-    "is_eligible": false,
-    "mitigation_paused_at": null,
-    "mitigation_reason": null,
-    "mitigation_resumed_at": null,
-    "mitigation_state": "none",
-    "notes": null,
-    "placement_gate_passed_at": null,
-    "placement_hold_reason": null,
-    "placement_hold_review_at": null,
-    "updated_at": "2026-09-29T19:52:58.283595+00:00",
-    "warmup_activity_grace_until": null,
-    "warmup_started_at": "2026-09-27T19:52:58.283595+00:00"
-   },
    "warmup": {
-    "mailivery": [],
-    "smartlead": null,
-    "smartlead_daily": []
+    "mailivery": []
    },
    "workspace_managed_by": "lift",
    "workspace_ref": "10391000-0000-4000-8000-000000000001"
