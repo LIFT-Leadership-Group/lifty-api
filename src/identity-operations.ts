@@ -97,7 +97,7 @@ export const identityOperationDefinitions = {
       description: "Start a new authorization of this same account (same mailbox or LinkedIn profile); returns connection_url like connect and reuses its open reconnect attempt. Another identity fails with identity_mismatch. After needs_reconnect the usage state is kept; after disconnect the account returns paused until resumed. Never activates a campaign.",
     },
     pause: accountAction("pause", "Pause this account: nothing new is done with it until resumed; in-flight sends settle and its connection stays. Idempotent. Other accounts and campaigns are unchanged."),
-    resume: accountAction("resume", "Resume this account (state active). Refused with ACCOUNT_DISCONNECTED when disconnected: reconnect first. Does not authorize or activate any campaign; an active campaign uses it only when its connection and every existing gate allow. Idempotent."),
+    resume: accountAction("resume", "Resume this account (state active). An already active approved campaign may automatically send to external recipients through it, including pending work, when its connection and all existing readiness, schedule and incident gates allow. Does not approve or activate a campaign or release separate sending holds. Refused with ACCOUNT_DISCONNECTED when disconnected: reconnect first. Idempotent."),
     disconnect: {
       method: "POST", route: `${accountsRoute}/{id}/disconnect`, cli: { operation: "disconnect" }, rpc: "disconnect_lifty_sending_account",
       path: contracts.IdPath, query: Empty, request: contracts.DisconnectSchema, invalid: invalidRequest,

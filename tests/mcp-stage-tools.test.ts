@@ -51,9 +51,12 @@ describe("generated MCP stage operations", () => {
     expect(tools.find(tool => tool.name === "crm_mapping_sources")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "sending_accounts_deliverability")!.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     expect(tools.find(tool => tool.name === "sending_accounts_disconnect")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
+    const resume = tools.find(tool => tool.name === "sending_accounts_resume")!;
+    expect(resume.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
+    expect(resume.description).toContain("automatically send to external recipients");
+    expect(resume.description).toContain("Does not approve or activate a campaign or release separate sending holds");
     expect(tools.find(tool => tool.name === "senders_delete")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(tools.find(tool => tool.name === "senders_post")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: false });
-    expect(tools.find(tool => tool.name === "crm_mapping_preview")!.annotations.readOnlyHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.destructiveHint).toBe(true);
     expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.openWorldHint).toBe(true);
     // Selecting a Journey revision also enables new runs of its active Campaigns.
@@ -146,7 +149,7 @@ describe("generated MCP stage operations", () => {
     expect(auth.mock.calls.at(-1)![0].headers.get("x-lifty-client-contract")).toBe(STAGE_CLIENT_CONTRACT);
   });
 
-  it("keeps pure reads read-only and declares account-attempt reconciliation as a write", () => {
+  it("keeps pure reads read-only and declares connection reconciliation and CRM maintenance as writes", () => {
     const tools = getStageMcpTools();
     for (const name of ["summary_get", "senders_get", "sending_accounts_get", "next_step", "crm_get", "notifications_get"]) {
       expect(tools.find(tool => tool.name === name)!.annotations, name).toMatchObject({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
@@ -159,6 +162,15 @@ describe("generated MCP stage operations", () => {
     // described as a fresh founder action after each transient status failure.
     expect(attempt.description).toContain("connection/reconnection the user already requested");
     expect(attempt.description).not.toContain("Requires the founder's approval");
+    for (const name of ["crm_mapping_catalog", "crm_mapping_preview", "crm_records", "crm_mapping_context", "crm_client_mapping_context"]) {
+      const tool = tools.find(tool => tool.name === name)!;
+      expect(tool.annotations, name).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+      expect(tool.description, name).toContain("refresh and replace stored CRM credentials");
+      expect(tool.description, name).toContain("synchronous maintenance uses the existing authorization");
+      expect(tool.description, name).toContain("does not save mappings or write CRM records");
+      expect(tool.description, name).not.toContain("pending receipt");
+      expect(tool.description, name).not.toContain("Requires the founder's approval");
+    }
     for (const name of ["sending_accounts_connect", "sending_accounts_reconnect", "sending_accounts_disconnect", "campaigns_activate"]) {
       expect(tools.find(tool => tool.name === name)!.description, name).toContain("Requires the founder's approval");
     }

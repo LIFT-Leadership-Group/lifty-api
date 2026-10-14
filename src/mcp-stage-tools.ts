@@ -28,7 +28,7 @@ export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Res
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
 const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate", "journeys.activate",
   "campaigns.message_review_post", "campaigns.reply_review_post", "campaigns.lead_stop_post",
-  "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
+  "sending-accounts.resume", "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
   // Removing Lifty's access at the account provider.
   "sending-accounts.disconnect", "senders.delete"]);
 // Creating a resource changes nothing that exists.
@@ -37,6 +37,9 @@ const nonDestructive = new Set(["business.post", "senders.post", "journeys.post"
 const synchronousStages = new Set(["business", "targeting", "research-criteria", "commercial-voice", "setup", "research-schedule", "journeys", "campaigns"]);
 const synchronousOperations = new Set(["crm.preferences_patch", "customer-exclusions.import", "notifications.patch"]);
 const pendingOperations = new Set(["campaigns.reply_review_post", "campaigns.message_rewrite_post", "campaigns.lead_stop_post"]);
+// Live CRM reads can replace credentials or connection health synchronously
+// under the existing authorization; they do not start a new business write.
+const crmMaintenanceOperations = new Set(["crm.mapping_catalog", "crm.mapping_preview", "crm.records", "crm.mapping_context", "crm.client_mapping_context"]);
 const plainObject = (value: unknown): value is JsonSchema => !!value && typeof value === "object" && !Array.isArray(value);
 // Clients load every tool definition on every turn; the dialect marker adds
 // nothing to an input schema a client already treats as JSON Schema.
@@ -59,6 +62,7 @@ function entries(): Entry[] {
     // This status check can persist provider verification, but continues the
     // connection the user already requested rather than requesting a new action.
     const reconcilesConnection = stage === "sending-accounts" && action === "attempt";
+    const maintainsCrmConnection = crmMaintenanceOperations.has(`${stage}.${action}`);
     const variants: { name: string; description: string; body: JsonSchema | null; notificationWrite?: NotificationWrite }[] =
       stage === "notifications" && action === "patch"
         ? notificationWrites.map(write => ({ name: notificationPatchToolNames[write.operation],
@@ -72,7 +76,7 @@ function entries(): Entry[] {
       if (Array.isArray(operation.request.path.required) && operation.request.path.required.length) required.push("path");
       if (Array.isArray(operation.request.query.required) && operation.request.query.required.length) required.push("query");
       if (body) { properties.body = withoutDialect(body) as object; required.push("body"); }
-      const description = `${operationDescription}${read || reconcilesConnection ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval; a pending receipt does not confirm completion. Check its status or read back the saved resource."}`;
+      const description = `${operationDescription}${read || reconcilesConnection || maintainsCrmConnection ? "" : !pendingOperations.has(`${stage}.${action}`) && (synchronousStages.has(stage) || synchronousOperations.has(`${stage}.${action}`)) ? " Requires the founder's approval. Writes commit synchronously; read back the saved resource or setup receipt after an uncertain response." : " Requires the founder's approval; a pending receipt does not confirm completion. Check its status or read back the saved resource."}`;
       return { stage, action, operation, ...(notificationWrite ? { notificationWrite } : {}),
         tool: { name, title: label, description,
           inputSchema: { type: "object" as const, properties, required, additionalProperties: false as const },

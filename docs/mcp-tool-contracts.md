@@ -14,9 +14,8 @@ and contact with external recipients are open-world effects.
 
 ## Audited operation contracts
 
-Tuple order is read-only / destructive / open-world. The hints below describe
-the requested business operation. The current generator already supplies these
-tuples; the corrections concern descriptions and the research target schema.
+Tuple order is read-only / destructive / open-world. Hints describe the complete
+operation, including persisted provider maintenance and enabled scheduled work.
 
 | Tool | Hints | Complete requested effect |
 | --- | --- | --- |
@@ -30,12 +29,16 @@ tuples; the corrections concern descriptions and the research target schema.
 | `leads_list` | true / false / false | Lists existing tenant research results; does not acquire or enrich leads. |
 | `crm_sync_start` | false / true / false | Queues creation/update of eligible saved leads in the connected CRM and configured research mirrors. |
 | `crm_mapping_sources` | true / false / false | Reads saved evidence for the explicit tenant-owned cohort. |
-| `crm_mapping_preview` | true / false / false | Computes proposed mapping values against existing records in the connected CRM. |
+| `crm_mapping_preview` | false / true / false | Computes proposed mapping values against existing records; can replace stored CRM credentials or connection health. |
+| `crm_mapping_catalog` | false / true / false | Reads the full saved mapping and live provider schema with the same credential maintenance. |
+| `crm_records` | false / true / false | Verifies existing synced record identities and links with the same credential maintenance. |
+| `crm_mapping_context`, `crm_client_mapping_context` | false / true / false | Reads bounded live HubSpot company schema/mapping with the same credential maintenance. |
 | `crm_mapping_sync` | false / true / false | Queues bounded existing-record updates; approved write policies can overwrite populated fields. |
 | `journeys_activate` | false / true / true | Selects an approved revision for new starts; active Campaigns can subsequently contact recipients. |
 | `campaigns_activate` | false / true / true | Selects an approved revision and active intent, or resumes retained work that can contact recipients. |
 | `campaigns_post` | false / false / false | Adds an inactive, unapproved private Campaign draft. |
 | `campaigns_draft_patch` | false / true / false | Replaces the effective unapproved draft and refreshes default Business/current sender revision pins. |
+| `sending_accounts_resume` | false / true / true | Resumes an existing account; already active approved Campaigns may automatically send pending work to external recipients. |
 
 ## Description and schema boundaries
 
@@ -53,6 +56,9 @@ tuples; the corrections concern descriptions and the research target schema.
 - Journey and Campaign activation receipts confirm saved selection/intent.
   Scheduled execution can contact external recipients after the existing
   readiness, account, customer-list and incident gates permit it.
+- Resuming an account removes its paused state, allowing already approved
+  active Campaigns to send when all existing gates permit it. It does not
+  approve or activate a Campaign or release separate sending holds.
 - The research target RPC accepts one-to-nine-digit positive integers before
   checking the workspace's plan limit. The API maximum is therefore
   `999999999`, not the wider PostgreSQL integer bound; `null` still follows the
@@ -61,18 +67,24 @@ tuples; the corrections concern descriptions and the research target schema.
 ## Provider-session maintenance boundary
 
 Mapping previews do not save mappings, enqueue delivery or write CRM records.
-Their shared provider transport can refresh existing OAuth credentials and mark
-an invalid connection as needing reconnect. The preview hint treats that as
-existing-session maintenance, rather than a requested business mutation. The
-strict wording of OpenAI's no-environment-mutation rule leaves this interpretation
-unconfirmed. It must not be represented as OpenAI approval or proof that this
-transport is persistence-free. See [transport.ts](../src/crm-mapping/transport.ts).
+Their shared provider transport can replace stored OAuth credentials and mark
+an invalid connection as needing reconnect. The same effects occur in live
+catalog, record verification and company-context reads. These operations are
+therefore annotated as writes under OpenAI's no-environment-mutation rule;
+overwritten credential/health state justifies the destructive hint. The bounded
+connected private CRM remains closed-world. This synchronous maintenance uses
+existing authorization; it is not a new CRM business write or an asynchronous
+job. Saved source, sync-status and mapping-status reads remain read-only.
+See [transport.ts](../src/crm-mapping/transport.ts) and the bounded company
+[runtime.ts](../src/company-mapping/runtime.ts). An earlier session-maintenance
+interpretation is superseded by the complete persistence effects above.
 
 ## Source and verification
 
 Operation owners are [business-operations.ts](../src/business-operations.ts),
 [research-operations.ts](../src/research-operations.ts),
 [outreach-operations.ts](../src/outreach-operations.ts),
+[identity-operations.ts](../src/identity-operations.ts),
 [stage-contracts.ts](../src/stage-contracts.ts) and
 [mcp-stage-tools.ts](../src/mcp-stage-tools.ts).
 
@@ -87,6 +99,12 @@ The backing Functions migrations are
 `lifty-first-run`, `lifty-crm-sync`, `lifty-crm-mapping-sync` and
 `lifty-workspace-outreach` tasks. Source inspection does not prove a sibling
 revision is deployed.
+
+Account resumption is implemented by
+`20261003100000_lif1182_identity_resources.sql`; its paused-account blocker is
+consumed by `20261004130000_lif1188_native_runtime.sql` and Jobs' scheduled
+`lifty-email` dispatch. All existing readiness, suppression, incident and final
+send fences still apply.
 
 Existing MCP catalog/HTTP tests protect schemas, annotations, authentication
 and dispatch. The research invalid-input table rejects a ten-digit target
