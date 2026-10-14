@@ -112,6 +112,12 @@ IDs or make simple templates an authored catalog. Absent fields add no defaults
 or historical digest changes; `fit` and raw `slots_spec` retain their existing
 selection and personalization roles.
 
+LIF-1454: a template's subject and text define its slots; `slots_spec` is
+guidance the writer reads. Campaign responses add `slots_spec_warnings` when a
+spec names a placeholder its own template does not use (publish reports the
+revision it approved). The API computes it from the parsed revision, so either
+deploy order is safe; it never blocks a write or changes saved bytes.
+
 ## Shared writing rules
 
 The banned-phrase list Lifty serves is the database rulebook Jobs composes

@@ -76,6 +76,10 @@ export const WritingRecommendationsSchema = z.object({
 export type WritingRecommendations = z.infer<typeof WritingRecommendationsSchema>;
 
 interface ScannedTemplate { id?: string | undefined; lane?: string | undefined; opener?: string | undefined; subject?: string | undefined; text: string }
+/** How campaign advisories name a saved template: its catalog id, else its
+ * lane/opener route, else null for a step's single template. */
+export const templateRef = (template: { id?: string | undefined; lane?: string | undefined; opener?: string | undefined }) =>
+  template.id ?? ([template.lane, template.opener].filter(Boolean).join("/") || null);
 interface ScannedRevision {
   revision_ref: string;
   content: { steps: Array<{ position: number; template?: ScannedTemplate | undefined; variants?: ScannedTemplate[] | undefined }> };
@@ -88,7 +92,7 @@ export function writingRecommendations(revision: ScannedRevision, channel: "emai
   const rules = current.rules;
   const phrases = revision.content.steps.flatMap(step =>
     [...(step.template ? [step.template] : []), ...(step.variants ?? [])].flatMap(template => {
-      const ref = template.id ?? ([template.lane, template.opener].filter(Boolean).join("/") || null);
+      const ref = templateRef(template);
       return (["subject", "text"] as const).flatMap(field => {
         const value = template[field];
         return value ? scanAntiSlop(value, { channel, rules }).map(match =>
