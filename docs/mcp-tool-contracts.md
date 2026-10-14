@@ -39,6 +39,8 @@ operation, including persisted provider maintenance and enabled scheduled work.
 | `campaigns_post` | false / false / false | Adds an inactive, unapproved private Campaign draft. |
 | `campaigns_draft_patch` | false / true / false | Replaces the effective unapproved draft and refreshes default Business/current sender revision pins. |
 | `sending_accounts_resume` | false / true / true | Resumes an existing account; already active approved Campaigns may automatically send pending work to external recipients. |
+| `campaigns_review_settings_patch` | false / true / true | Saves channel review choices; send-and-sample enables future unflagged drafts to send automatically under existing Campaign and safety gates. Existing pending drafts remain held. |
+| `notifications_connect` | false / true / false | Starts a Slack consent attempt and supersedes earlier unused pending links; does not replace the existing grant or post messages. |
 
 ## Description and schema boundaries
 
@@ -59,6 +61,15 @@ operation, including persisted provider maintenance and enabled scheduled work.
 - Resuming an account removes its paused state, allowing already approved
   active Campaigns to send when all existing gates permit it. It does not
   approve or activate a Campaign or release separate sending holds.
+- Channel review choices affect new drafts. `send_and_sample` permits future
+  automatic external-recipient sends; risk holds and existing pending drafts
+  remain protected. A 0% rate disables post-send sampling, as implemented by
+  LIF-1360; it does not remove pre-send review or risk holds.
+- Slack connection requests replace earlier unused pending consent links.
+  Recover an uncertain request through its exact attempt when known. MCP
+  discovery names this operation `notifications_connect`; cached
+  `notifications_post` calls remain compatible through the same route and
+  strict input/authentication checks. HTTP/CLI POST is unchanged.
 - The research target RPC accepts one-to-nine-digit positive integers before
   checking the workspace's plan limit. The API maximum is therefore
   `999999999`, not the wider PostgreSQL integer bound; `null` still follows the
@@ -85,6 +96,7 @@ Operation owners are [business-operations.ts](../src/business-operations.ts),
 [research-operations.ts](../src/research-operations.ts),
 [outreach-operations.ts](../src/outreach-operations.ts),
 [identity-operations.ts](../src/identity-operations.ts),
+[member-review-operations.ts](../src/member-review-operations.ts),
 [stage-contracts.ts](../src/stage-contracts.ts) and
 [mcp-stage-tools.ts](../src/mcp-stage-tools.ts).
 
@@ -105,6 +117,11 @@ Account resumption is implemented by
 consumed by `20261004130000_lif1188_native_runtime.sql` and Jobs' scheduled
 `lifty-email` dispatch. All existing readiness, suppression, incident and final
 send fences still apply.
+
+Channel review choices and future automatic approvals are implemented in
+`20261007190200_lif1287_channel_review_policy.sql`; LIF-1360's subsequent
+sampling migration preserves 0% support. Slack attempt supersession is owned
+by `20260916203147_lif890_exact_connection_attempts.sql`.
 
 Existing MCP catalog/HTTP tests protect schemas, annotations, authentication
 and dispatch. The research invalid-input table rejects a ten-digit target

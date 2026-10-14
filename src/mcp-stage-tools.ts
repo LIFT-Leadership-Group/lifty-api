@@ -1,4 +1,4 @@
-import { notificationPatchToolNames, operationToolNames } from "./operation-names.js";
+import { canonicalMcpToolName, notificationPatchToolNames, operationToolNames } from "./operation-names.js";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { AgentContextSchema, STAGE_CLIENT_CONTRACT } from "./agent-context.js";
@@ -27,7 +27,7 @@ interface Entry { stage: string; action: string; operation: StageOperation; tool
 export type McpRouteDispatch = (route: string, init: RequestInit) => Promise<Response>;
 // Writes whose effect leaves the user's Lifty workspace and private accounts.
 const openWorld = new Set(["sample-review.post", "research-schedule.activate", "campaigns.activate", "journeys.activate",
-  "campaigns.message_review_post", "campaigns.reply_review_post", "campaigns.lead_stop_post",
+  "campaigns.review_settings_patch", "campaigns.message_review_post", "campaigns.reply_review_post", "campaigns.lead_stop_post",
   "sending-accounts.resume", "sending-accounts.warmup_start", "sending-accounts.warmup_resume", "sending-accounts.placement_start", "notifications.test",
   // Removing Lifty's access at the account provider.
   "sending-accounts.disconnect", "senders.delete"]);
@@ -139,7 +139,10 @@ function contextGuide(data: unknown) {
 }
 
 export async function callStageMcpTool(name: string, args: unknown, request: Request, dispatch: McpRouteDispatch) {
-  const entry = entries().find(item => item.tool.name === name);
+  // Cached connector catalogs can still call the previous connection name.
+  // Both names use the same owning route, schema and authorization checks.
+  const canonicalName = canonicalMcpToolName(name);
+  const entry = entries().find(item => item.tool.name === canonicalName);
   if (!entry) return result({ error: { code: "UNKNOWN_TOOL", message: "Refresh the tools list and use an available Lifty tool." } }, true);
   const parsed = Envelope.safeParse(args ?? {});
   if (!parsed.success) return invalid();

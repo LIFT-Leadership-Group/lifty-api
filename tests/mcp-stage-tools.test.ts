@@ -26,7 +26,8 @@ describe("generated MCP stage operations", () => {
       const name = stage === "summary" && action === "next_step" ? "next_step" : `${listedStage.replace(/-/g, "_")}_${action}`;
       const supported = Object.keys(operation.responses).some(status => status.startsWith("2"));
       const notificationWrite = stage === "notifications" && action === "patch";
-      const names = notificationWrite ? ["notifications_destination_upsert", "notifications_route_set"] : [name];
+      const names = notificationWrite ? ["notifications_destination_upsert", "notifications_route_set"]
+        : stage === "notifications" && action === "post" ? ["notifications_connect"] : [name];
       const matches = tools.filter(tool => names.includes(tool.name));
       expect(matches.length, name).toBe(supported ? names.length : 0);
       for (const tool of matches) {
@@ -55,6 +56,15 @@ describe("generated MCP stage operations", () => {
     expect(resume.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(resume.description).toContain("automatically send to external recipients");
     expect(resume.description).toContain("Does not approve or activate a campaign or release separate sending holds");
+    const reviewSettings = tools.find(tool => tool.name === "campaigns_review_settings_patch")!;
+    expect(reviewSettings.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
+    expect(reviewSettings.description).toContain("automatically send to external recipients");
+    expect(reviewSettings.description).toContain("existing pending drafts still require a decision");
+    expect(tools.some(tool => tool.name === "notifications_post")).toBe(false);
+    const slackConnect = tools.find(tool => tool.name === "notifications_connect")!;
+    expect(slackConnect.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: false });
+    expect(slackConnect.description).toContain("Supersedes earlier unused pending Slack consent links");
+    expect(slackConnect.description).toContain("Does not replace the existing Slack grant");
     expect(tools.find(tool => tool.name === "senders_delete")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(tools.find(tool => tool.name === "senders_post")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: false });
     expect(tools.find(tool => tool.name === "campaigns_activate")!.annotations.destructiveHint).toBe(true);
