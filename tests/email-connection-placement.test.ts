@@ -50,6 +50,13 @@ describe("connection placement presentation", () => {
       label: "Queued automatically because the mailbox was connected. Lifty creates the test in Mailivery within about 5 minutes." });
   });
 
+  it("reads a weekly refresh through the real RPC boundary", async () => {
+    const session = { userId: "u", client: { rpc: async () => ({ data: stored(test({ origin: "recurring" })), error: null }) } };
+    const status = await createEmailConnectionPlacementOperations().status(session as never, { workspace: "lift", connection_ref: connection });
+    expect(status.test).toMatchObject({ state: "pending", automatic: true,
+      label: "Queued automatically for the weekly placement refresh. Lifty creates the test in Mailivery within about 5 minutes." });
+  });
+
   it("maps database refusals to safe public errors and checks the returned connection", async () => {
     const session = (response: { data: unknown; error: unknown }) => ({ userId: "u", client: { rpc: async () => response } });
     const ops = createEmailConnectionPlacementOperations();
