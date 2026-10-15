@@ -353,6 +353,7 @@ export const CampaignMessageSchema = z.object({ message_ref: Ref, lead_ref: Ref,
   campaign_ref: Ref.nullable(), direction: z.enum(["inbound", "outbound"]),
   delivery_state: z.enum(["confirmed", "scheduled", "planned", "unknown"]), sent_at: Timestamp.nullable(),
   not_sent_cause: z.enum(["account_disconnected", "sender_unavailable", "provider_rejected", "unknown"]).nullable().optional(),
+  action_blocked_reason: z.literal("historical_engine_retired").nullable().optional(),
 }).strict().refine(message => message.direction !== "outbound" || message.delivery_state !== "confirmed" || message.sent_at !== null,
   "Confirmed outbound delivery requires its saved receipt time.");
 type ConversationOwner = Pick<z.infer<typeof CampaignMessageSchema>, "lead_ref" | "channel" | "account_id" | "sender_id">;
@@ -416,8 +417,10 @@ export const StopLeadOutreachResultSchema = z.object({ ...Workspace, lead_ref: R
 }).strict();
 export const CampaignMessageReviewSchema = z.object({ action: z.enum(["approve", "skip", "retry"]), source_digest: Digest,
   expected_review_status: z.enum(["pending", "enroll_failed"]), reason: text(2000).optional(),
+  feedback: z.object({ rating: z.enum(["up", "down"]), note: text(2000) }).strict().optional(),
 }).strict().refine(value => value.action !== "retry" || value.expected_review_status === "enroll_failed", "Retry requires a saved review failure.")
-  .refine(value => value.action !== "skip" || value.reason !== undefined, "Explain why this message is being skipped.");
+  .refine(value => value.action !== "skip" || value.reason !== undefined, "Explain why this message is being skipped.")
+  .refine(value => value.action !== "skip" || value.feedback === undefined, "Decision feedback is only available for approve or retry.");
 export const CampaignRuntimeSchema = z.object({ ...Workspace, campaign_ref: Ref, intent_active: z.boolean(),
   executable_versions: z.array(z.object({ executable_version_ref: Ref, revision_ref: Ref, started_journeys: z.number().int().nonnegative(),
     continuing_journeys: z.number().int().nonnegative(), prepared_journeys: z.number().int().nonnegative(), pending_journeys: z.number().int().nonnegative(),
