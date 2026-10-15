@@ -2,6 +2,7 @@ import { historicalEmailResult, historicalOperation, HistoricalEmailResultSchema
 import { executeOutreachOperation, type OutreachInput } from "./outreach-operations.js";
 import { executeLinkedinOperation, type LinkedinInput } from "./linkedin-operations.js";
 import { executeCrmPreferencesOperation } from "./crm-preferences.js";
+import { executeCrmRulesOperation } from "./crm-rules.js";
 import { executeCustomerExclusionsOperation } from "./customer-exclusions.js";
 import { AcquisitionRecoveryBody, AcquisitionRecoveryStatus, AcquisitionRestartResult, type AcquisitionRecoveryInput, type AcquisitionRecoveryOutput } from "./acquisition-recovery.js";
 import { RepairIssueSchema } from "./business-contracts.js";
@@ -113,6 +114,8 @@ export interface AppDependencies {
   linkedinOperation(session: AuthSession, key: string, input: LinkedinInput): Promise<unknown>;
   /** CRM research-note and conversation preferences (LIF-1239). */
   crmPreferencesOperation(session: AuthSession, key: string, input: IdentityInput): Promise<unknown>;
+  /** CRM counting rules for Pipeline and Performance (LIF-1477). */
+  crmRulesOperation(session: AuthSession, key: string, input: IdentityInput): Promise<unknown>;
   /** Founder CSV customer protections (LIF-1082), with no provider effects. */
   customerExclusionsOperation(session: AuthSession, key: string, input: IdentityInput): Promise<unknown>;
   /** Browser connect page and confirmation shell for sending accounts. */
@@ -717,6 +720,7 @@ const defaultDependencies: AppDependencies = {
   identityOperation: (session, key, input, signal) => executeIdentityOperation(session, key, input, connectorUnavailable, signal),
   linkedinOperation: executeLinkedinOperation,
   crmPreferencesOperation: executeCrmPreferencesOperation,
+  crmRulesOperation: executeCrmRulesOperation,
   customerExclusionsOperation: executeCustomerExclusionsOperation,
   researchOperation: (session, key, input) => executeResearchOperation(session, key, input, DEFAULT_DASHBOARD_ORIGIN),
   getWorkspace: async () => {
