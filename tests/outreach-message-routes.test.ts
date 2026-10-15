@@ -125,4 +125,65 @@ describe("actual unapproved campaign message corrections", () => {
       expect(rpc).toHaveBeenCalledOnce();
     }
   });
+  it("reads both pre-retirement and additive retirement receipts without weakening strict response validation", async () => {
+    const oldReceipt = { ...fixtures.message_original, message: { ...source } };
+    delete (oldReceipt.message as typeof source & { action_blocked_reason?: string | null }).action_blocked_reason;
+    const old = await harness(oldReceipt).request("GET");
+    expect(old.status).toBe(200);
+    expect((await old.json()).message).not.toHaveProperty("action_blocked_reason");
+    for (const reason of [null, "historical_engine_retired"]) {
+      const receipt = { ...fixtures.message_original, message: { ...source, action_blocked_reason: reason } };
+      const response = await harness(receipt).request("GET");
+      expect(response.status).toBe(200);
+      expect((await response.json()).message.action_blocked_reason).toBe(reason);
+    }
+    for (const reason of ["sender_missing", true, {}]) {
+      const receipt = { ...fixtures.message_original, message: { ...source, action_blocked_reason: reason } };
+      expect((await harness(receipt).request("GET")).status).toBe(502);
+    }
+  });
+  it("forwards explicit approval feedback unchanged, including a down rating for edited copy", async () => {
+    for (const action of ["approve", "retry"] as const) {
+      const receipt = reviewFixtures[action];
+      const before = reviewFixtures.queue.messages.find(message => message.message_ref === receipt.message.message_ref)!;
+      for (const rating of ["up", "down"]) {
+        const decision = { action, source_digest: before.source_digest, expected_review_status: before.review_status,
+          feedback: { rating, note: "I changed the opening sentence." } };
+        const h = harness(receipt, before.message_ref);
+        expect((await h.request("POST", "/review", decision)).status).toBe(200);
+        expect(h.rpc).toHaveBeenLastCalledWith("review_lifty_campaign_message", {
+          p_workspace_id: null, p_message_id: before.message_ref, p_payload: decision,
+        });
+      }
+    }
+    const h = harness(reviewFixtures.approve);
+    const decision = { action: "approve", source_digest: source.source_digest, expected_review_status: "pending" };
+    for (const feedback of [{ rating: "up" }, { rating: "up", note: "" }, { rating: "up", note: "x".repeat(2001) },
+      { rating: "other", note: "Comment" }, { rating: "down", note: "Comment", extra: true }]) {
+      expect((await h.request("POST", "/review", { ...decision, feedback })).status).toBe(422);
+    }
+    expect((await h.request("POST", "/review", { ...decision, action: "skip", reason: "Skip", feedback: { rating: "down", note: "Comment" } })).status).toBe(422);
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+  it("returns a safe retirement conflict for every stale write without exposing provider detail", async () => {
+    const error = { code: "PT409", message: "OUTREACH_HISTORICAL_RETIRED", details: "secret provider response" };
+    const rpc = vi.fn(async () => ({ data: null, error }));
+    const app = createApp({ authenticate: async () => ({ ok: true, session: { userId: "founder", client: { rpc } } }), log: () => {} });
+    const write = (suffix: string, payload: unknown) => app.request(`/v1/workspace/campaign-messages/${source.message_ref}${suffix}`, {
+      method: "POST", headers: { authorization: "Bearer test", "x-lifty-client-contract": STAGE_CLIENT_CONTRACT, "content-type": "application/json" }, body: JSON.stringify(payload),
+    });
+    const decision = { source_digest: source.source_digest, expected_review_status: "pending" };
+    for (const [suffix, value] of [["/revisions", body], ["/rewrite", { request_ref: source.message_ref, ...decision }],
+      ["/review", { action: "approve", ...decision }], ["/review", { action: "retry", ...decision, expected_review_status: "enroll_failed" }],
+      ["/review", { action: "skip", reason: "Skip", ...decision }]] as const) {
+      const result = await write(suffix, value);
+      expect(result.status).toBe(409);
+      const response = await result.json();
+      expect(response.error.code).toBe("OUTREACH_HISTORICAL_RETIRED");
+      expect(response.error.message).toContain("history remains available");
+      expect(JSON.stringify(response)).not.toContain(error.details);
+    }
+    expect(rpc).toHaveBeenCalledTimes(5);
+  });
+
 });
