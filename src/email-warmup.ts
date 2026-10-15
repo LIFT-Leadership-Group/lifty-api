@@ -92,7 +92,7 @@ const stateLabels: Record<WarmupStatus["state"], string> = {
 
 // A pending remove wins over pause/resume in the database, so it wins here too.
 function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"], reason: string | null): string {
-  if (reason === "mailbox_in_other_warmup" || reason === "provider_rejected") return "Warmup setup was refused";
+  if (!requested && state !== "removed" && (reason === "mailbox_in_other_warmup" || reason === "provider_rejected")) return "Warmup setup was refused";
   const current = state === "pending_consent" && dnsHoldRecords(reason) ? "Waiting for valid DNS records" : stateLabels[state];
   if (state === "removed" || state === "not_started" || !requested) return current;
   if (requested === "remove") return "Removing warmup at the next check";
@@ -236,7 +236,12 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
     // Only an unbound binding gets a link; a bound one needs no second setup.
     const link = stored.binding.state === "link_issued"
       ? await settings.issueSetupLink(session, input.workspace, stored.connection_ref ?? input.connection_ref) : null;
-    return WarmupStartResult.parse({ ...presentWarmupStatus(stored, now()),
+    // Issuing the fresh intent clears its predecessor's refusal in SQL.
+    // The start snapshot was read before that write, so do not present the
+    // previous attempt's refusal as the outcome of the new link.
+    const currentStatus = link && ["mailbox_in_other_warmup", "provider_rejected"].includes(stored.binding.blocking_reason ?? "")
+      ? { ...stored, binding: { ...stored.binding, blocking_reason: null } } : stored;
+    return WarmupStartResult.parse({ ...presentWarmupStatus(currentStatus, now()),
       connect_url: link?.url ?? null, expires_at: link?.expiresAt ?? null });
   }
 

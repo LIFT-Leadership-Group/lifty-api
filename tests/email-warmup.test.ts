@@ -160,6 +160,8 @@ describe("warmup operations", () => {
     expect(status).toMatchObject({state_label:"Warmup setup was refused",blocking_reason:{code}});
     expect(status.blocking_reason!.message).toContain("start warmup again in Lifty");
     expect(status.blocking_reason!.message).not.toContain("Mailivery");
+    expect(await h.ops.start(h.session,"senja")).toMatchObject({connect_url:setupUrl,blocking_reason:null,state_label:"Waiting for you to authorize the mailbox"});
+    expect(h.links).toHaveLength(1);
   });
 
   it("reads status with only the workspace; the database resolves its single account", async () => {
