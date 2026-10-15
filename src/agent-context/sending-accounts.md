@@ -182,6 +182,10 @@ still waits for authorization, read it again a minute later. Do not say Lifty
 waits for a scheduled check. For a habitual mailbox the placement test starts
 in the same step: the result usually comes within 20 minutes, on Slack and by
 email according to the founder's notification settings.
+For `mailbox_in_other_warmup`, quote `blocking_reason.message`; start again
+after external removal. For `provider_rejected`, our team fixes setup first.
+Pending handoffs stay locked.
+
 `warmup_start` fails with `EMAIL_CONNECTION_REQUIRED` until a connected,
 verified email account exists, and with `EMAIL_WARMUP_MAILBOX_TAKEN` when
 another Lifty workspace already warms the same mailbox. It fails with

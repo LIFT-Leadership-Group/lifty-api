@@ -36,6 +36,8 @@ const rpcMessages: Record<string, { status: number; message: string }> = {
 };
 
 export const blockingMessages: Record<string, string> = {
+  mailbox_in_other_warmup: "This mailbox is already registered with another warmup service. Remove it there, then start warmup again in Lifty.",
+  provider_rejected: "The warmup service refused this setup. Our team has been alerted. Once the issue is fixed, start warmup again in Lifty.",
   identity_mismatch: "The mailbox authorized for warmup is not the one connected to Lifty. Remove warmup and authorize the same address.",
   connection_problem: "Warmup lost access to the mailbox, so active days stop counting. Our team has been alerted and will help you authorize it again.",
   dns_invalid: "SPF, DMARC or MX for this domain is not valid. Warmup days don't count until all three pass.",
@@ -90,6 +92,7 @@ const stateLabels: Record<WarmupStatus["state"], string> = {
 
 // A pending remove wins over pause/resume in the database, so it wins here too.
 function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"], reason: string | null): string {
+  if (!requested && state !== "removed" && (reason === "mailbox_in_other_warmup" || reason === "provider_rejected")) return "Warmup setup was refused";
   const current = state === "pending_consent" && dnsHoldRecords(reason) ? "Waiting for valid DNS records" : stateLabels[state];
   if (state === "removed" || state === "not_started" || !requested) return current;
   if (requested === "remove") return "Removing warmup at the next check";
@@ -233,7 +236,12 @@ export function createEmailWarmupOperations(settings: EmailWarmupSettings) {
     // Only an unbound binding gets a link; a bound one needs no second setup.
     const link = stored.binding.state === "link_issued"
       ? await settings.issueSetupLink(session, input.workspace, stored.connection_ref ?? input.connection_ref) : null;
-    return WarmupStartResult.parse({ ...presentWarmupStatus(stored, now()),
+    // Issuing the fresh intent clears its predecessor's refusal in SQL.
+    // The start snapshot was read before that write, so do not present the
+    // previous attempt's refusal as the outcome of the new link.
+    const currentStatus = link && ["mailbox_in_other_warmup", "provider_rejected"].includes(stored.binding.blocking_reason ?? "")
+      ? { ...stored, binding: { ...stored.binding, blocking_reason: null } } : stored;
+    return WarmupStartResult.parse({ ...presentWarmupStatus(currentStatus, now()),
       connect_url: link?.url ?? null, expires_at: link?.expiresAt ?? null });
   }
 

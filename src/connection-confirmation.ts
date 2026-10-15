@@ -30,7 +30,7 @@ export const ConfirmationResult = z.discriminatedUnion('status', [
   // Warmup only: when the placement test runs and where its result goes.
   z.object({status:z.literal('connected'), account:z.string().max(254).nullable(), reference:z.uuid().optional(),
     placement:z.object({when:z.enum(['now','after_warmup']), notify:z.array(z.enum(['email','slack'])).max(2)}).optional()}),
-  z.object({status:z.literal('failed'), reason:z.enum(['canceled','exists','provider','verification','ended','invalid']), reference:z.uuid().optional()}),
+  z.object({status:z.literal('failed'), reason:z.enum(['canceled','exists','provider','verification','ended','invalid','mailbox_in_other_warmup','provider_rejected']), reference:z.uuid().optional()}),
 ]);
 export type ConfirmationResult = z.infer<typeof ConfirmationResult>;
 const Input = z.strictObject({state:z.string().min(1).max(4096),code:z.string().min(1).max(4096).optional(),
@@ -136,7 +136,7 @@ function show(result){
  if(result.status==='pending'){if(result.progress)progress(result.progress,result.reference);if(result.attention)attend(result.attention);return;}
  finished=true;spinner.hidden=true;actions.hidden=true;check.hidden=true;
  if(result.status==='connected'){title.textContent=warmup?'Warmup is running':label+' is connected';detail.textContent='Lifty verified '+(result.account||'the connection')+'.'+(warmup?placement(result.placement):'')+' Return to Lifty to continue. Connecting does not start outreach.';if(label==='Slack')detail.textContent+=' Invite @Lifty to the channel where you want notifications, then tell Lifty which channel you chose.';}
- else{title.textContent='Connection needs attention';detail.textContent=result.reason==='canceled'?'Authorization was not completed. Return to Lifty to check this attempt.':result.reason==='verification'?'The selected account could not be verified. Return to Lifty for help.':'Return to Lifty to check this attempt and the next step before requesting another link.';if(label==='HubSpot'&&result.reason==='canceled')detail.textContent+=' If permissions were blocked, ask a HubSpot super admin to approve Lifty in Settings > Integrations > Connected Apps > Approved apps.';}
+ else{title.textContent='Connection needs attention';detail.textContent=result.reason==='mailbox_in_other_warmup'?'This mailbox is already registered with another warmup service. Remove it there, then start warmup again in Lifty.':result.reason==='provider_rejected'?'The warmup service refused this setup. Our team has been alerted. Once the issue is fixed, start warmup again in Lifty.':result.reason==='canceled'?'Authorization was not completed. Return to Lifty to check this attempt.':result.reason==='verification'?'The selected account could not be verified. Return to Lifty for help.':'Return to Lifty to check this attempt and the next step before requesting another link.';if(label==='HubSpot'&&result.reason==='canceled')detail.textContent+=' If permissions were blocked, ask a HubSpot super admin to approve Lifty in Settings > Integrations > Connected Apps > Approved apps.';}
 }
 async function request(stage,payload,ms){
  var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},ms);

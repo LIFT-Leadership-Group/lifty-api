@@ -6,6 +6,7 @@ import type { AuthSession } from "./app.js";
 import { PublicError } from "./errors.js";
 import type { MailiverySettings } from "./email-warmup.js";
 import { WarmupWorkspaceRequest } from "./email-warmup-contracts.js";
+import { warmupHandoffRefusal, type WarmupRefusal } from "./warmup-handoff.js";
 import { UnipileTransport } from "./unipile-transport.js";
 
 export const WARMUP_SCHEDULES = ["Weekdays - 8am to 6pm", "Weekdays - 7am to 7pm", "Weekdays - 6am to 10pm",
@@ -21,7 +22,8 @@ export const DEFAULT_WARMUP_POLICY: WarmupPolicy = {version:1, emails_per_day:22
   schedule:"Weekdays - 8am to 6pm", timezone:"America/New_York", audience:"inherit"};
 const name = z.string().trim().max(80).refine(value => !/[\u0000-\u001f\u007f]/.test(value));
 const SetupRecord = z.object({email:z.email().max(254), workspace_ref:z.uuid(), sender_ref:z.uuid(),
-  expires_at:z.iso.datetime({offset:true}), state:z.enum(["draft", "authorizing", "claimed", "dispatched"]),
+  expires_at:z.iso.datetime({offset:true}), state:z.enum(["draft", "authorizing", "claimed", "dispatched", "refused"]),
+  refusal_code:z.enum(["mailbox_in_other_warmup","provider_rejected"]).optional(),
   policy:WarmupPolicy.nullable(), first_name:name, last_name:name,
   // LIF-1223: a habitual (`personal`) mailbox is tested as soon as warmup runs.
   // Absent before the Functions migration; the page then shows the dedicated text.
@@ -100,6 +102,12 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
     if(identified.method!==method)throw unavailable();
     return identified;
   }
+  async function refuse(payload:Record<string,unknown>, record:WarmupSetupRecord, code:WarmupRefusal) {
+    const save=async()=>z.object({state:z.literal("refused"),code:z.literal(code)}).parse(await rpc("refuse",{...payload,code}));
+    // Retrying the same persistence is safe; never repeat the provider request.
+    try { await save(); } catch { await save(); }
+    await dependencies.verifyWarmup?.(record.sender_ref, `${payload.oauth_hash}:refused`).catch(()=>{});
+  }
   async function microsoftState(state:string,browser:string) {
     const record=await call("microsoft_status",oauthPayload(state,browser));
     if(record.method!=="microsoft")throw unavailable();
@@ -162,7 +170,11 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
             email_per_day:record.policy.emails_per_day,response_rate:record.policy.reply_rate,warmup_audience_type:record.policy.audience,
             meta:{tags:`lifty-ws:${record.workspace_ref},lifty-sender:${record.sender_ref}`}}),
         });
-        if(!response.ok){await response.body?.cancel().catch(()=>{});throw pending();}
+        if(!response.ok){
+          const code=await warmupHandoffRefusal(response);
+          if(code){await refuse(payload,record,code);return;}
+          throw pending();
+        }
         // The response contains only an authorization URL. Never accept an
         // arbitrary redirect or a credential-bearing provider response.
         const reader=response.body?.getReader();if(!reader)throw pending();
@@ -219,8 +231,8 @@ export function createWarmupSetup(settings:WarmupSetupSettings, dependencies:{rp
         const response = await fetchImpl(`${settings.mailivery.baseUrl ?? "https://app.mailivery.io/api/v1"}/campaigns/google-oauth`, {
           method:"POST", redirect:"error", signal:AbortSignal.timeout(15000), headers:{authorization:`Bearer ${settings.mailivery.apiKey}`, accept:"application/json"}, body});
         // Even 2xx is not binding evidence. Jobs verifies email, SMTP, IMAP and both tags.
-        // Do not read provider JSON: it can contain mailbox credentials.
-        await response.body?.cancel().catch(()=>{});
+        const code=await warmupHandoffRefusal(response);
+        if(code){await refuse(payload,record,code);return;}
         if (!response.ok) throw new Error();
       } catch { throw pending(); }
       // Jobs verifies and starts this binding now, so the page can confirm it
