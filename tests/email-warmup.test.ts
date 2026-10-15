@@ -154,6 +154,14 @@ describe("warmup status presentation", () => {
 });
 
 describe("warmup operations", () => {
+  it.each(["mailbox_in_other_warmup","provider_rejected"])("returns the mapped %s cause through the member status read",async code=>{
+    const h=harness({data:stored({}, {state:"link_issued",provider_campaign_bound:false,blocking_reason:code,snapshot:null})});
+    const status=await h.ops.status(h.session,"senja");
+    expect(status).toMatchObject({state_label:"Warmup setup was refused",blocking_reason:{code}});
+    expect(status.blocking_reason!.message).toContain("start warmup again in Lifty");
+    expect(status.blocking_reason!.message).not.toContain("Mailivery");
+  });
+
   it("reads status with only the workspace; the database resolves its single account", async () => {
     const h = harness();
     expect(await h.ops.status(h.session, "senja")).toMatchObject({ connection_ref: connection });

@@ -1,3 +1,4 @@
+import { blockingMessages } from "./email-warmup.js";
 import type { WarmupSetupRecord } from "./warmup-setup.js";
 import { pendingSubmitScript, renderLiftyPage } from "./lifty-brand.js";
 
@@ -12,6 +13,7 @@ const styles = `
 `;
 function shell(title:string, body:string) { return renderLiftyPage({ title: `${escape(title)} · Lifty`, content: body, styles }); }
 export function renderWarmupSetupPage(record:WarmupSetupRecord, intent:string, csrf:string):string {
+  if (record.state === "refused") return renderWarmupReceipt("Warmup setup was refused", blockingMessages[record.refusal_code ?? "provider_rejected"]);
   if (record.state !== "draft") return renderWarmupReceipt("Authorization in progress", "Return to the confirmation tab or to Lifty to check warmup status. An authorization already submitted for warmup will not be repeated.");
   const microsoft=record.method==="microsoft",provider=microsoft?"Microsoft":"Google";
   return shell("Set up email warmup", `<h1>Warm up your mailbox.</h1>

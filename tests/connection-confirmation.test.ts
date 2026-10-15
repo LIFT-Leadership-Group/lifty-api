@@ -316,3 +316,12 @@ it('correlates regenerated browser links to the same non-secret attempt and logs
   expect(logs).toMatchObject([expected,expected,{correlation:expected.correlation,reference,outcome:'connected'}]);
   expect(JSON.stringify(logs)).not.toContain('secret-link');
 });
+
+it.each(['google/callback','microsoft/return'])('renders a warmup refusal and next step on the %s page',async path=>{
+  vi.useFakeTimers();
+  const page=browser(`https://api.lifty.test/warmup/${path}?state=capability`,async()=>Response.json({status:'failed',reason:'mailbox_in_other_warmup'}));
+  await page.run();await vi.runAllTimersAsync();
+  expect(page.elements['confirmation-detail']!.textContent).toBe('This mailbox is already registered with another warmup service. Remove it there, then start warmup again in Lifty.');
+  expect(page.elements['confirmation-detail']!.textContent).not.toMatch(/Mailivery/);
+  expect(page.elements['confirmation-spinner']!.hidden).toBe(true);
+});

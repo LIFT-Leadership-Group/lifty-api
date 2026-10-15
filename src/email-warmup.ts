@@ -36,6 +36,8 @@ const rpcMessages: Record<string, { status: number; message: string }> = {
 };
 
 export const blockingMessages: Record<string, string> = {
+  mailbox_in_other_warmup: "This mailbox is already registered with another warmup service. Remove it there, then start warmup again in Lifty.",
+  provider_rejected: "The warmup service refused this setup. Our team has been alerted. Once the issue is fixed, start warmup again in Lifty.",
   identity_mismatch: "The mailbox authorized for warmup is not the one connected to Lifty. Remove warmup and authorize the same address.",
   connection_problem: "Warmup lost access to the mailbox, so active days stop counting. Our team has been alerted and will help you authorize it again.",
   dns_invalid: "SPF, DMARC or MX for this domain is not valid. Warmup days don't count until all three pass.",
@@ -90,6 +92,7 @@ const stateLabels: Record<WarmupStatus["state"], string> = {
 
 // A pending remove wins over pause/resume in the database, so it wins here too.
 function label(state: WarmupStatus["state"], requested: WarmupStatus["requested_action"], reason: string | null): string {
+  if (reason === "mailbox_in_other_warmup" || reason === "provider_rejected") return "Warmup setup was refused";
   const current = state === "pending_consent" && dnsHoldRecords(reason) ? "Waiting for valid DNS records" : stateLabels[state];
   if (state === "removed" || state === "not_started" || !requested) return current;
   if (requested === "remove") return "Removing warmup at the next check";
